@@ -491,6 +491,14 @@ html{scrollbar-gutter:stable}
  border-radius:50%;background:#c279a2;box-shadow:0 0 0 1.5px rgba(255,255,255,.9);
  pointer-events:none;
 }
+.timeline-auto-dock{
+ display:flex;align-items:center;flex:0 0 auto;
+ padding:5px 9px 4px;margin:0 3px 2px;
+ min-height:30px;background:#fbfcfe;border-bottom:1px solid #eff1f6;
+}
+.timeline-auto-dock .timeline-auto-tools{
+ padding-left:0;border-left:0;flex-wrap:wrap;row-gap:3px;
+}
 .timeline-auto-tools{
  display:flex;gap:6px;align-items:center;min-width:0;
  padding-left:9px;border-left:1px solid #e6eaf0;color:#8a617a;
