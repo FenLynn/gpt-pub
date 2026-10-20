@@ -58,7 +58,9 @@ function settingsContent(section){
  case 'rules':return sectionCard('班次与判据','应用后重新计算当前月的考勤分析，原始打卡记录保持不变。',
    [['amStart','上午上班'],['amEnd','上午下班'],['pmStart','下午上班'],['pmEnd','下午下班']].map(([k,label])=>
     '<label class="r14-setting-row"><span>'+label+'</span><input type="time" id="r14Rule_'+k+'"></label>').join('')+
-   '<label class="r14-setting-row"><span>迟到宽限（分钟）</span><input id="r14Grace" type="number" min="0" max="120" step="1"></label>'+
+   [['graceAmStart','上午上班冗余（分钟）'],['graceAmEnd','上午下班冗余（分钟）'],
+     ['gracePmStart','下午上班冗余（分钟）'],['gracePmEnd','下午下班冗余（分钟）']].map(([key,label])=>
+    '<label class="r14-setting-row"><span>'+label+'</span><input id="r14Rule_'+key+'" type="number" min="0" max="120" step="1"></label>').join('')+
    '<label class="r14-setting-row"><span>重复打卡判定（秒）</span><input id="r14Dup" type="number" min="0" max="1800" step="10"></label>'+
    '<label class="r14-setting-row"><span>加班候选最短时长（分钟）</span><input id="r14OvertimeMin" type="number" min="0" max="240" step="5"></label>'+
    '<p class="r14-setting-note">工作日仅推算下班后的完整进出，非工作日按完整进出扣除午休；均为待核候选，不替代加班审批。</p>');
@@ -106,7 +108,9 @@ function bindSettings(){
   }
   if(section==='rules'){
    for(const k of ['amStart','amEnd','pmStart','pmEnd'])set('r14Rule_'+k,d.rules[k]);
-   set('r14Grace',d.rules.grace);set('r14Dup',d.rules.dupSeconds);set('r14OvertimeMin',d.rules.overtimeMinMinutes??30);
+   for(const k of ['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'])
+    set('r14Rule_'+k,d.rules[k]??(k.endsWith('Start')?(d.rules.grace??5):0));
+   set('r14Dup',d.rules.dupSeconds);set('r14OvertimeMin',d.rules.overtimeMinMinutes??30);
   }
   if(section==='table'){
    set('settingTableKind',d.tableKind||'attendance');
@@ -134,7 +138,9 @@ function bindSettings(){
    for(const k of ['rules','events','trip','leave','outing','overtime'])p.timelineTracks[k]=!!ch('settingTrack_'+k);
   }
   if(section==='rules'){for(const k of ['amStart','amEnd','pmStart','pmEnd'])d.rules[k]=v('r14Rule_'+k)||d.rules[k];
-   d.rules.grace=Number(v('r14Grace'));d.rules.dupSeconds=Number(v('r14Dup'));
+   for(const k of ['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'])
+    d.rules[k]=Number(v('r14Rule_'+k));
+   d.rules.grace=d.rules.graceAmStart;d.rules.dupSeconds=Number(v('r14Dup'));
    d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'))}
   if(section==='table'){
    const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};
@@ -166,7 +172,9 @@ function bindSettings(){
   if(!d)return;
   const time=['amStart','amEnd','pmStart','pmEnd'].map(k=>d.rules[k]);
   if(time.some(t=>!/^\d\d:\d\d$/.test(t))||!(minutes(time[0])<minutes(time[1])&&minutes(time[1])<minutes(time[2])&&minutes(time[2])<minutes(time[3]))||
-    !Number.isFinite(d.rules.grace)||d.rules.grace<0||d.rules.grace>120||!Number.isFinite(d.rules.dupSeconds)||d.rules.dupSeconds<0||d.rules.dupSeconds>1800||
+    !['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'].every(k=>
+      Number.isInteger(d.rules[k])&&d.rules[k]>=0&&d.rules[k]<=120)||
+    !Number.isFinite(d.rules.dupSeconds)||d.rules.dupSeconds<0||d.rules.dupSeconds>1800||
     !Number.isFinite(d.rules.overtimeMinMinutes)||d.rules.overtimeMinMinutes<0||d.rules.overtimeMinMinutes>240){
     toast('请检查工作时段、宽限与重复判定参数',true);return;
   }
