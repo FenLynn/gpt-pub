@@ -133,11 +133,12 @@ function bindWorkspaceNavigation(){
  document.querySelectorAll('[data-sidebar-chart]').forEach(b=>b.onclick=()=>{
   state.chartTab=b.dataset.sidebarChart;
   document.querySelectorAll('[data-sidebar-chart]').forEach(x=>x.classList.toggle('active',x.dataset.sidebarChart===state.chartTab));
+  asNavTrack();asNavUpdateButtons();
   renderAnalysisPanel();
-  asNavRefreshCurrent();
  });
  document.querySelectorAll('.side-controls [data-data-section]').forEach(b=>b.onclick=()=>{
   state.dataSection=b.dataset.dataSection;
+  asNavTrack();asNavUpdateButtons();
   document.querySelectorAll('.side-controls [data-data-section]').forEach(x=>x.classList.toggle('active',x.dataset.dataSection===state.dataSection));
   renderDataWorkspace();
  });
