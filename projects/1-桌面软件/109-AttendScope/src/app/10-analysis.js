@@ -229,7 +229,9 @@ function attendanceBehaviors(a){
   if(a.trips?.length)results.push('trip');
   if(a.leaves?.length)results.push('leave');
   if(a.outings?.length||state.outings?.some(x=>x.employeeId===a.employee.id&&a.date>=x.startDate&&a.date<=x.endDate))results.push('outing');
-  if(a.overtime?.length||(!isWorkday(a.day)&&a.punches.length)||state.overtimeEntries?.some(x=>x.employeeId===a.employee.id&&x.date===a.date))results.push('overtime');
+  if(a.overtime?.length||activeAutoOvertimeSegments(a).length||
+    (!isWorkday(a.day)&&a.punches.length)||state.overtimeEntries?.some(x=>x.employeeId===a.employee.id&&x.date===a.date))
+   results.push('overtime');
   return results;
 }
 function attendanceCategory(a){return attendanceJudgment(a)}
