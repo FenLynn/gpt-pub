@@ -244,7 +244,7 @@ function matrixCategory(a,filter=state.filter){
 }
 function categoryColor(category){return ATTEND_STATUS_COLORS[category]||ATTEND_BEHAVIOR_COLORS[category]||ATTEND_STATUS_COLORS.rest}
 function outingFor(empId,date){return (state.outings||[]).filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
-function overtimeFor(empId,date){return (state.overtimeEntries||[]).filter(x=>x.employeeId===empId&&x.date===date)}
+function overtimeFor(empId,date){return attendanceDailyRegistered(empId,date)}
 function behaviorMinutes(a,kind){
   const intervals=kind==='leave'?a.leaves:kind==='outing'?a.outings:kind==='overtime'?a.overtime:[];
   if(kind==='trip')return a.trips.length?Math.max(0,minutes(RULES.amEnd)-minutes(RULES.amStart))+Math.max(0,minutes(RULES.pmEnd)-minutes(RULES.pmStart)):0;
@@ -255,6 +255,112 @@ function behaviorMinutes(a,kind){
 function analysisPairMinutes(pairs,start,end){
  return pairs.reduce((total,[enter,exit])=>total+
    intervalOverlap(minutes(enter.time),minutes(exit.time),minutes(start),minutes(end)),0);
+}
+// Civil-day boundaries use UTC arithmetic only for local calendar dates.
+// No timezone conversion is applied to imported clock readings.
+function attendanceUtcMinute(date,clock='00:00'){
+ const stamp=Date.parse(date+'T00:00:00Z');
+ return stamp/60000+minutes(clock);
+}
+function attendanceDateFromMinute(value){
+ return new Date(Math.floor(value/1440)*86400000).toISOString().slice(0,10);
+}
+function attendanceClock(value){
+ const total=Math.round(value*60),m=Math.floor(total/60),seconds=total%60;
+ return pad(Math.floor(m/60))+':'+pad(m%60)+':'+pad(seconds);
+}
+function attendanceNeighborDates(){
+ const first=attendanceUtcMinute(isoDate(1)),last=attendanceUtcMinute(isoDate(monthDays()+1));
+ return {first,last,previous:attendanceDateFromMinute(first-1),
+  next:attendanceDateFromMinute(last)};
+}
+function attendanceAdjacentRows(field='records'){
+ const {first,last}=attendanceNeighborDates();
+ const previous=attendanceDateFromMinute(first-1).slice(0,7),
+   next=attendanceDateFromMinute(last).slice(0,7);
+ const stores=[state.monthStores?.get(previous),state.monthStores?.get(next)];
+ const combined=[...(state[field]||[]),...stores.flatMap(s=>s?.[field]||[])];
+ const found=new Map();
+ for(let i=0;i<combined.length;i++){
+  const record=combined[i],date=String(record.datetime||record.date||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
+  const minute=attendanceUtcMinute(date);
+  if(minute<first-1440||minute>last+1440)continue;
+  const id=record.recordId||record.id||
+   [record.importId||'',record.row||'',record.datetime||'',
+    record.direction||'',record.employeeId||'',i].join('/');
+  if(!found.has(id))found.set(id,record);
+ }
+ return [...found.values()];
+}
+function attendanceVisitEvents(employeeId){
+ const rows=attendanceAdjacentRows('records').filter(x=>x.employeeId===employeeId&&
+   x.datetime&&['进','出'].includes(x.direction))
+  .sort((a,b)=>a.datetime.localeCompare(b.datetime)||
+    (a.direction==='进'?-1:1));
+ const visits=[];let pending=null;
+ for(const row of rows){
+  const stamp=attendanceUtcMinute(row.datetime.slice(0,10),row.time||row.datetime.slice(11));
+  if(row.direction==='进'){
+   if(!pending)pending={row,stamp};
+   continue;
+  }
+  if(!pending)continue;
+  if(stamp>pending.stamp&&stamp-pending.stamp<=36*60){
+   const first=pending.row;
+   visits.push({from:pending.stamp,to:stamp,enter:first,exit:row,
+    id:'auto-visit:'+employeeId+':'+(first.recordId||first.datetime)+'-'+
+      (row.recordId||row.datetime)});
+  }
+  pending=null;
+ }
+ return visits;
+}
+function attendanceDateIsWork(date){
+ if(date.slice(0,7)===monthISO())return isWorkday(Number(date.slice(8,10)));
+ const custom=state.calendarOverrides?.[date];
+ if(['holiday','rest'].includes(custom))return false;
+ if(['work','adjust','adjusted-work'].includes(custom))return true;
+ const day=new Date(date+'T00:00:00Z').getUTCDay();
+ return day!==0&&day!==6;
+}
+function attendanceVisitEligibleMinutes(visit){
+ let total=0;
+ for(let cursor=Math.floor(visit.from/1440)*1440;cursor<visit.to;cursor+=1440){
+  const date=attendanceDateFromMinute(cursor),a=Math.max(visit.from,cursor),
+   z=Math.min(visit.to,cursor+1440),start=visit.from<cursor||!attendanceDateIsWork(date)?
+    cursor:cursor+minutes(RULES.pmEnd);
+  total+=Math.max(0,z-Math.max(a,start));
+ }
+ return total;
+}
+function attendanceDailyVisits(employeeId,date){
+ const day=attendanceUtcMinute(date);
+ return attendanceVisitEvents(employeeId).filter(v=>v.to>day&&v.from<day+1440)
+  .map(v=>{
+   const start=Math.max(v.from,day),end=Math.min(v.to,day+1440);
+   const first={...v.enter,time:attendanceClock(start-day),sessionId:v.id,
+    sessionFrom:v.from,sessionTo:v.to,sessionEligibleMinutes:attendanceVisitEligibleMinutes(v),
+    sessionCarry:v.from<day};
+   const last={...v.exit,time:attendanceClock(end-day),sessionId:v.id,
+    sessionFrom:v.from,sessionTo:v.to};
+   return [first,last];
+  });
+}
+function attendanceDailyRegistered(employeeId,date){
+ const start=attendanceUtcMinute(date),end=start+1440;
+ const found=[];
+ for(const r of attendanceAdjacentRows('overtimeEntries')){
+  if(r.employeeId!==employeeId||!r.date)continue;
+  const from=attendanceUtcMinute(r.date,r.start),endMinute=attendanceUtcMinute(r.date,r.end)+
+    (minutes(r.end)<minutes(r.start)?1440:0);
+  if(!Number.isFinite(from)||!Number.isFinite(endMinute)||endMinute<=from||
+    endMinute-from>1440||endMinute<=start||from>=end)continue;
+  const x=Math.max(from,start),y=Math.min(endMinute,end);
+  found.push({...r,start:attendanceClock(x-start),end:attendanceClock(y-start),
+   originalDate:r.date,originalStart:r.start,originalEnd:r.end});
+ }
+ return found;
 }
 // Minutes are a union of intervals, not a sum of overlapping registrations.
 function analysisUnionMinutes(intervals){
@@ -283,23 +389,30 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,
   reason:'打卡进出配对待核',segments:[]};
  const windows=isWorkday(day)?[[minutes(RULES.pmEnd),1440]]:
-   [[0,minutes(RULES.amEnd)],[minutes(RULES.pmStart),1440]];
+   [[0,1440]];
  const eligible=[];
  for(const [enter,exit] of pairs){
   const a=minutes(enter.time),b=minutes(exit.time);
-  for(const [start,end] of windows){
+  const activeWindows=enter.sessionCarry?[[0,1440]]:windows;
+  for(const [start,end] of activeWindows){
    const from=Math.max(a,start),to=Math.min(b,end);
-   if(to>from)eligible.push([from,to]);
+   if(to>from)eligible.push([from,to,enter.sessionId||null,
+     enter.sessionEligibleMinutes||0,enter.sessionFrom,enter.sessionTo]);
   }
  }
- const valid=analysisUnionSegments(eligible);
+ // Preserve original visit identities across midnight and across dates.
+ // A session may touch several date slices; its threshold is checked ONCE
+ // against the entire continuous overtime-eligible period.
+ const valid=eligible.map(([from,to,id,qualifying,sessionFrom,sessionTo])=>({
+  from,to,id,qualifying,sessionFrom,sessionTo}));
  const registeredIntervals=analysisUnionSegments(registered.map(r=>[
   minutes(r.start||''),minutes(r.end||'')]));
  // Decide the 5-minute threshold on the continuous in→out evidence first.
  // Registered overtime is an accounting overlay, not an 'out' punch and must
  // NOT break one session into several independent threshold candidates.
  const residual=[],raw=[];
- for(const [begin,end] of valid){
+ for(const item of valid){
+  const begin=item.from,end=item.to;
   let cursor=begin,fragments=[];
   for(const [regStart,regEnd] of registeredIntervals){
    if(regEnd<=cursor||regStart>=end)continue;
@@ -314,9 +427,10 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   // A 4-minute leftover from a 15-minute session is eligible; a separate
   // 4-minute punch session is not. Both are still non-overlapping with raw
   // registered entries in the statistics ledger.
-  if(end-begin+1e-8>=minMinutes){
+  if((item.qualifying||end-begin)+1e-8>=minMinutes){
    for(const [from,to] of all)residual.push({from,to,minutes:to-from,
-      sessionFrom:begin,sessionTo:end});
+      sessionFrom:item.sessionFrom??begin,sessionTo:item.sessionTo??end,
+      sessionId:item.id});
   }
  }
  const rawMinutes=analysisUnionMinutes(raw),
@@ -338,6 +452,11 @@ function setAutoOvertimeDecision(segmentId,accepted){
  const before=found.accepted!==false,next=!!accepted;
  if(before===next)return true;
  if(!state.overtimeReview)state.overtimeReview={};
+ for(const store of state.monthStores.values()){
+  if(!store.overtimeReview)store.overtimeReview={};
+  if(next)delete store.overtimeReview[segmentId];
+  else store.overtimeReview[segmentId]=false;
+ }
  if(next)delete state.overtimeReview[segmentId];
  else state.overtimeReview[segmentId]=false;
  state.revisions.push({id:'R'+(++state.revisionSeq),key:found.employeeId+'|'+found.date,
@@ -349,6 +468,7 @@ function setAutoOvertimeDecision(segmentId,accepted){
 function analyzeDay(emp,d){
  const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date)
    .sort((a,b)=>a.datetime.localeCompare(b.datetime));
+ const completePairs=attendanceDailyVisits(emp.id,date);
  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
    overtime=overtimeFor(emp.id,date),typ=dayType(d);
  let severity='normal',status='正常',issues=[],pairs=[],pending=null,pairingUncertain=false;
@@ -374,7 +494,26 @@ function analyzeDay(emp,d){
    else{pairingUncertain=true;suspect('缺少对应进入记录')}
   }
  }
- if(pending){suspect('存在未闭合进入记录');pairingUncertain=true}
+ // A midnight boundary is not an 'out'. Match its next-day punch
+ // before declaring an entry open or a next-day exit unpaired.
+ const covered=new Set();
+ for(const [start,end] of completePairs){
+  if(start.recordId)covered.add(start.recordId);
+  if(end.recordId)covered.add(end.recordId);
+ }
+ const missing=punches.filter(p=>!covered.has(p.recordId));
+ if(missing.some(p=>p.direction==='进')){
+  suspect('存在未闭合进入记录');pairingUncertain=true;
+ }
+ if(missing.some(p=>p.direction==='出')){
+  suspect('缺少对应进入记录');pairingUncertain=true;
+ }
+ if(completePairs.length){
+  pairs=completePairs;
+  // The local noon/midnight split must not poison an otherwise complete
+  // in→out pair. Genuine extra exits still set pairingUncertain above.
+  pairingUncertain=missing.length>0;
+ }
  const covers=(rows,start,end)=>rows.some(x=>minutes(x.start||'00:00')<=minutes(start)&&minutes(x.end||'24:00')>=minutes(end));
  const overlapEnough=(rows,start,end,need=180)=>rows.some(x=>
    intervalOverlap(minutes(x.start||'00:00'),minutes(x.end||'24:00'),minutes(start),minutes(end))>=need);
@@ -392,7 +531,7 @@ function analyzeDay(emp,d){
  const lunchReturn=pairs.find(([x,y])=>minutes(x.time)>=lunchStart-10&&
    minutes(x.time)<=lunchEnd+120&&minutes(y.time)>lunchEnd);
  const crossesLunch=pairs.some(([x,y])=>minutes(x.time)<lunchStart&&minutes(y.time)>lunchEnd);
- const lunchEvidence=crossesLunch?'未分段（工时按班次扣午休）':
+ const lunchEvidence=crossesLunch?(isWorkday(d)?'未分段（班内工时按班次扣午休）':'连续在岗跨中午（不扣午休）'):
   morningPair&&lunchReturn?'有午休进出':'未明确';
  const autoOvertime=estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain);
  // A recalculated interval must not inherit a past exclusion from a DIFFERENT
@@ -408,10 +547,11 @@ function analyzeDay(emp,d){
  autoOvertime.segments=autoOvertime.segments.map(seg=>{
   // Shared ID links residual fragments to ONE uninterrupted in→out session.
   // One ×/✓ decision covers all of its parts, not only a fragment.
-  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.sessionFrom*60)+'-'+
+  const id=seg.sessionId||'auto:'+emp.id+':'+date+':'+Math.round(seg.sessionFrom*60)+'-'+
    Math.round(seg.sessionTo*60)+':'+evidenceSuffix;
   return {...seg,id,employeeId:emp.id,date,origin:'auto',
-   accepted:state.overtimeReview?.[id]!==false};
+   accepted:state.overtimeReview?.[id]!==false&&
+    ![...state.monthStores.values()].some(store=>store.overtimeReview?.[id]===false)};
  });
  if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length){
   status='未导入';severity='rest';return pack();
@@ -421,7 +561,7 @@ function analyzeDay(emp,d){
   else{status=typ==='holiday'?'节假日':'休息';severity='rest'}
   return pack();
  }
- if(!punches.length){
+ if(!punches.length&&!pairs.length){
   if(fullExcused){status=trips.length?'出差':leaves.length?'请假':'外出';severity='excused'}
   else{status='缺勤';severity='problem';issues.push('工作日无打卡')}
  }else{
@@ -469,7 +609,8 @@ function analyzeDay(emp,d){
     }else suspect('午休返岗偏晚（待核）');
    }
   }
-  if((!firstIn||!lastOut)&&severity!=='problem')suspect('打卡记录不完整（待核）');
+  if((!firstIn||!lastOut)&&!completePairs.length&&severity!=='problem')
+   suspect('打卡记录不完整（待核）');
   if(severity==='suspect'&&status==='正常')status='疑似打卡异常';
   if((leaves.length||trips.length||outings.length)&&severity==='normal')
    status=trips.length?'出差覆盖':leaves.length?'请假覆盖':'外出覆盖';
