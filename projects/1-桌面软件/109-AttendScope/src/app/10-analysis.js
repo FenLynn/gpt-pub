@@ -84,9 +84,12 @@ async function importAttendance(file){
     const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
     const datetime=importedDate(aliases(r,['打卡时间','时间','datetime','DateTime']));
     const direction=String(aliases(r,['进出','方向','状态','direction'])).trim();
-    if(!name||!/^(进|出)$/.test(direction)||!strictDateTime(datetime)||!datetime.startsWith(monthISO()+'-'))return;
-    const day=Number(datetime.slice(8,10));
-    if(day<1||day>monthDays())return;
+    if(!name||!/^(进|出)$/.test(direction)||!strictDateTime(datetime))return;
+    // Include exactly one adjoining day on each side: a 20:00→02:00
+    // session can straddle month-end without losing its exit punch.
+    const {first,last}=attendanceNeighborDates(),stamp=
+      attendanceUtcMinute(datetime.slice(0,10),datetime.slice(11));
+    if(stamp<first-1440||stamp>=last+1440)return;
     parsed.push({name,datetime,time:datetime.slice(11,19),direction,row:sourceRow(r,i)});
   });
   if(!parsed.length)throw new Error('未识别到本月有效考勤记录，请确认姓名、打卡时间与进出列');
@@ -184,7 +187,7 @@ async function importOvertime(file){
   const start=importClock(aliases(r,['开始时间','开始','start']),'');
   const end=importClock(aliases(r,['结束时间','结束','end']),'');
   if(!start||!end)return;
-  if(minutes(end)<=minutes(start))throw new Error('加班起止时间须在同一日内且结束晚于开始；跨日加班待班制核查');
+  if(minutes(end)===minutes(start))throw new Error('登记加班起止时间相同，请明确记录有效区间；跨午夜请填写次日结束时刻');
   parsed.push({name,date,start,end,row:sourceRow(r,i),
    type:String(aliases(r,['类型','事项','type'])||'登记加班'),
    note:String(aliases(r,['备注','说明','note'])||'')});
@@ -286,9 +289,9 @@ function attendanceAdjacentRows(field='records'){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))continue;
   const minute=attendanceUtcMinute(date);
   if(minute<first-1440||minute>last+1440)continue;
-  const id=record.recordId||record.id||
-   [record.importId||'',record.row||'',record.datetime||'',
-    record.direction||'',record.employeeId||'',i].join('/');
+  const id=(record.recordId||record.id||record.importId||'')+'|'+date+'|'+
+   (record.datetime||'')+'|'+(record.direction||'')+'|'+
+   (record.employeeId||'')+'|'+(record.row||'');
   if(!found.has(id))found.set(id,record);
  }
  return [...found.values()];
