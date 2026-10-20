@@ -29,7 +29,13 @@ function r23BehaviorSegments(a,key){
   if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',sourceIds:[p.id]}));
   if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]}));
   if(key==='outing')return (a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'外出',sourceIds:[p.id]}));
-  if(key==='overtime')return (a.overtime||[]).map(p=>({from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),title:'加班',sourceIds:[p.id]}));
+  if(key==='overtime')return [
+   ...(a.overtime||[]).map(p=>({from:minutes(p.start||'17:30'),to:minutes(p.end||'20:00'),
+    title:'登记加班',origin:'registered',sourceIds:[p.id]})),
+   ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
+    title:p.accepted!==false?'自动加班 · 已勾选':'自动加班 · 已取消',
+    origin:'auto',accepted:p.accepted!==false,segmentId:p.id,sourceIds:null}))
+  ];
   return [];
 }
 function r14TrackData(a,range=timelineRange(a),width=800){
@@ -46,7 +52,9 @@ function r14TrackData(a,range=timelineRange(a),width=800){
     const lane=tracks.findIndex(t=>t.key===key),track=tracks[lane];
     for(const seg of (state.prefs?.timelineTracks?.[key]===false?[]:r23BehaviorSegments(a,key))){
       const from=Math.max(0,Math.min(1440,+seg.from)),to=Math.max(0,Math.min(1440,+seg.to));
-      if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,sourceIds:seg.sourceIds||null});
+      if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,
+        sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
+        accepted:seg.accepted!==false,segmentId:seg.segmentId||null});
     }
   }
   const workWindows=!isWorkday(a.day)||state.prefs?.timelineTracks?.rules===false?[]:[
@@ -73,6 +81,22 @@ function mountAttendanceTimeline(a){
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
     const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)+.5);
+    if(d.origin==='auto'){
+      const y=p[1]-h/2,accepted=d.accepted!==false,children=[
+        {type:'rect',shape:{x,y,width:w,height:h,r:0},
+          style:{fill:accepted?'rgba(181,108,144,.32)':'rgba(181,108,144,.075)',
+            stroke:accepted?'rgba(177,91,135,.3)':'rgba(181,108,144,.13)',lineWidth:.5}}
+      ];
+      // Separate derived time from solid registered bands by a clipped
+      // diagonal hatch. Cancelled time becomes very faint but remains visible.
+      for(let offset=0;offset<w;offset+=9){
+       const size=Math.min(6,w-offset);
+       children.push({type:'line',shape:{x1:x+offset,y1:y+h-1,
+         x2:x+offset+size,y2:y+1},style:{
+           stroke:accepted?'rgba(155,66,121,.43)':'rgba(155,66,121,.09)',lineWidth:1.15}});
+      }
+      return {type:'group',children};
+    }
     const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'];
     return {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
       style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[
@@ -196,11 +220,45 @@ function mountAttendanceTimeline(a){
     });
   };
   syncNavSelection();
-  chart.on('finished',syncNavigator);
-  requestAnimationFrame(syncNavigator);
+  const syncOvertimeControls=()=>{
+    const overlay=document.getElementById('overtimeReviewLayer');
+    if(!overlay||!overlay.isConnected)return;
+    overlay.replaceChildren();
+    const lineH=Math.max(14,(chart.getHeight()-116)/6);
+    for(const seg of model.bars.filter(d=>d.track==='overtime'&&d.origin==='auto')){
+      const from=seg.value[0],to=seg.value[1];
+      const x1=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[from,5]);
+      const x2=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,5]);
+      if(!x1||!x2||!Number.isFinite(x1[0])||!Number.isFinite(x2[0]))continue;
+      const left=Math.max(x1[0],0),right=Math.min(x2[0],chart.getWidth());
+      if(right<=left||right<0||left>=chart.getWidth())continue;
+      const box=document.createElement('div');
+      box.className='overtime-review-actions'+(seg.accepted?'':' is-excluded');
+      box.style.left=Math.max(0,Math.min(right-45,chart.getWidth()-48))+'px';
+      box.style.top=Math.max(0,x1[1]-lineH/2+2)+'px';
+      for(const [accepted,glyph,word] of [[false,'×','排除'],[true,'✓','纳入']]){
+       const btn=document.createElement('button');
+       btn.type='button';btn.className='overtime-review-btn'+(seg.accepted===accepted?' chosen':'');
+       btn.textContent=glyph;
+       btn.title=word+'自动加班：'+minuteText(from)+'–'+minuteText(to)+'（仅调整统计纳入，不代表审批）';
+       btn.setAttribute('aria-label',word+' '+minuteText(from)+'–'+minuteText(to)+' 自动加班');
+       btn.setAttribute('aria-pressed',String(seg.accepted===accepted));
+       btn.onclick=e=>{e.stopPropagation();setAutoOvertimeDecision(seg.segmentId,accepted)};
+       box.appendChild(btn);
+      }
+      overlay.appendChild(box);
+    }
+  };
+  chart.on('finished',()=>{syncNavigator();syncOvertimeControls()});
+  requestAnimationFrame(()=>{syncNavigator();syncOvertimeControls()});
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}
+    if(p.seriesId==='bands'&&d.origin==='auto'&&d.segmentId){
+      // Clicking the band itself selects the current review state; the
+      // explicit ✓ and × controls handle decisions.
+      syncOvertimeControls();return;
+    }
     if(p.seriesId==='bands'&&d.track&&d.sourceIds?.length)focusRawEvidence(d.track,d.sourceIds);
   });
   chart.on('datazoom',e=>{
