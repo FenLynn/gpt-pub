@@ -80,3 +80,11 @@
 .as-rank-name{font-size:14px}
 .as-stats-rank-row strong{font-size:15px}
 .as-stats-foot{font-size:12.5px;line-height:1.55}
+
+/* R45 final: high-contrast, restrained labels and keyboard focus */
+.as-stats-heading h2{color:#294a60}
+.as-stats-chart h3,.as-stats-rank h3{color:#33556a}
+.as-stats-filters label{color:#546f82}
+.as-stats-inline strong{color:#255f86}
+.as-stats-rank-row:hover .as-rank-name{color:#1e668f}
+.as-stats-chart-switch button:focus-visible,.as-stats-rank-head button:focus-visible{outline:2px solid #5296c4;outline-offset:2px}

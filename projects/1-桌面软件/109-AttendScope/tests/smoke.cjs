@@ -453,6 +453,16 @@ async function run(){
  await check(page,()=>state.workspaceMode==='group'&&state.analyticsPage==='stats'&&
   state.statsConfig.compare==='people'&&asStatRows().people.every(e=>groupOf(e)===state.selectedGroup),
   'R45 group comparison drilldown did not scope to group');
+ await page.locator('#asStatCompare').selectOption('groups');
+ await check(page,()=>{
+  const data=asStatRows(),all=Array.from({length:monthDays()},(_,i)=>i+1);
+  const total=asStatValue(data.ledger,state.statsConfig.family,state.statsConfig.metric,EMPLOYEES,all);
+  return data.people.length===EMPLOYEES.length&&data.rows.length===workspaceGroups().length&&
+    Math.abs(data.rows.reduce((x,r)=>x+r.raw,0)-total)<1e-8;
+ },'R45 cross-group mode must include all groups, not only the selected team');
+ await page.locator('#asStatCompare').selectOption('people');
+ await check(page,()=>asStatRows().people.every(e=>groupOf(e)===state.selectedGroup),
+  'R45 back to group-member comparison must restore group scope');
  await page.screenshot({path:path.join(out,'r45-group-stats.png')});
  await page.locator('.as-stats-rank-row').first().click();
  await page.waitForSelector('#asStatChart svg',{timeout:15000});
@@ -471,8 +481,8 @@ async function run(){
  rankedDay,'R45 ranked nonzero day must open the matching timeline and calendar');
  // Legacy matrix/time-axis QA below starts from the normal All view.
  await page.locator('[data-workspace="all"]').click();
- await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main',
-  'R45 route back to matrix must work');
+ await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main'&&
+  asStatCSVCell('=HYPERLINK("x")').startsWith('"\'='),'R45 matrix reset or CSV formula escaping failed');
  // R36: malformed timestamps must be rejected, and final export cannot depend
  // on whether the operator is currently viewing the initial or manual layer.
  await check(page,()=>{

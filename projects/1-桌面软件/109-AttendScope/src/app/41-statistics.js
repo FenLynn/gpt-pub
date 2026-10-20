@@ -24,19 +24,12 @@ function asStatMetric(){const c=asStatPrefs();return asStatFamily(c.family)[2].f
 function asStatSelectedPeople(){
  const m=state.workspaceMode;
  if(m==='person')return EMPLOYEES.filter(e=>e.id===(state.selection.employeeId||EMPLOYEES[0]?.id));
- if(m==='group')return EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup);
+ if(m==='group')return asStatPrefs().compare==='groups'?EMPLOYEES:
+   EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup);
  return EMPLOYEES;
 }
 function asStatWorkMinutes(){return Math.max(0,minutes(RULES.amEnd)-minutes(RULES.amStart))+
  Math.max(0,minutes(RULES.pmEnd)-minutes(RULES.pmStart))}
-function asStatIntervalHours(start,end,workOnly){
- if(!start||!end)return 0;
- const a=minutes(start),b=minutes(end);
- if(!Number.isFinite(a)||!Number.isFinite(b)||b<=a)return 0;
- if(!workOnly)return (b-a)/60;
- return (intervalOverlap(a,b,minutes(RULES.amStart),minutes(RULES.amEnd))+
-  intervalOverlap(a,b,minutes(RULES.pmStart),minutes(RULES.pmEnd)))/60;
-}
 function asStatLedger(){
  const cells=new Map(),dayCount=monthDays();
  const coveredIntervals=new Map(),tripPersonDays=new Set();
@@ -194,11 +187,11 @@ function statisticsWorkspaceHtml(){
   mode==='group'?[['people','组内人员'],['days','每日趋势'],['groups','各组对比']]:
   [['groups','各组对比'],['people','全员排名'],['days','每日趋势']];
  const selected=asStatRows(),personLabel=mode==='person'?(selected.people[0]?.name||'员工'):
-  mode==='group'?(state.selectedGroup||'组别'):'全体员工';
+  mode==='group'?(c.compare==='groups'?'各组横向比较':(state.selectedGroup||'组别')):'全体员工';
  const warning=c.family==='trip'?'出差日数按自然日去重；工时按设定工作时段折算，不代表实际出差时长':
   c.family==='leave'?'请假按记录逐条计数，时长扣午休并合并重叠区间；记录数不等于申请次数':
   c.family==='outing'?'外出时长来自记录区间并去除重叠时段；跨日记录按每日时段折算':
-  c.family==='overtime'?'仅统计有来源的加班记录，重叠时段不重复计时；未导入不代表没有加班':
+  c.family==='overtime'?'仅统计有来源的加班记录，重叠时段不重复计时；跨日需核查':
   c.family==='punch'?'每条原始打卡计一次，重复打卡仍按实际记录计入':
   '工作日的考勤状态与当前初始／人工判定视图保持一致';
  const unavailable=(c.family==='outing'&&!state.outings?.length)||(c.family==='overtime'&&!state.overtimeEntries?.length);
@@ -253,11 +246,15 @@ function asStatDrill(key){
   else{state.analyticsPage='main';state.selection={type:'date',day:Number(key)};render()}
  }
 }
+function asStatCSVCell(value){
+ let str=String(value);
+ if(/^[\s]*[=+\-@]/.test(str))str="'"+str;
+ return '"'+str.replace(/"/g,'""')+'"';
+}
 function asStatExport(){
  const data=asStatRows(),c=asStatPrefs(),metric=asStatMetric(),header=['对象','指标','统计方式','数值','单位','员工数','应出勤人日'];
- const escape=s=>'"'+String(s).replace(/"/g,'""')+'"';
  const csv=[header,...data.rows.map(r=>[r.label,metric[1],c.aggregate,r.value,data.effectiveUnit,r.peopleCount,r.scheduled])].
-  map(row=>row.map(escape).join(',')).join('\r\n');
+  map(row=>row.map(asStatCSVCell).join(',')).join('\r\n');
  downloadBlob(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}),monthKey()+'_统计_'+c.family+'_'+c.metric+'.csv');
  toast('已导出当前指标统计明细');
 }
