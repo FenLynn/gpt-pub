@@ -107,7 +107,7 @@ async function run(){
  },'R39 1600px responsive calendar/matrix regression');
  await page.screenshot({path:path.join(out,'r39-all-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
- await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===4&&
+ await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===5&&
    !!document.querySelector('#scopeInsights .scope-insight-numbers')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
  await check(page,()=>{
@@ -414,73 +414,53 @@ async function run(){
    RULES.overtimeMinMinutes=previous.threshold;
   }
  },'R49 lunch clock-gap evidence, threshold, registered-event exclusion and inferred overtime failed');
- // R50: the two-layer sidebar, browser-like workspace history and redundant
- // statistical normalizations are visible and functionally connected.
+ // R52: exactly one top-level statistics route; the old left statistics
+ // switchers must no longer compete with group/person selection.
  await check(page,()=>{
-   const buttons=[...document.querySelectorAll('.side-primary-nav .side-views button')];
-   const label=document.querySelector('.side-refinements-title');
-   return buttons.length===2&&buttons[0].textContent.includes('01')&&
-     buttons[1].textContent.includes('02')&&label?.textContent==='辅助筛选'&&
-     !!document.getElementById('asNavBack')&&!!document.getElementById('asNavForward');
- },'R50 primary/subordinate sidebar hierarchy or history controls missing');
+  const top=[...document.querySelectorAll('[data-workspace]')];
+  return top.length===5&&top.some(b=>b.dataset.workspace==='stats')&&
+   document.querySelectorAll('.side-views [data-as-view="stats"]').length===0&&
+   !!document.querySelector('.side-refinements')&&
+   !!document.getElementById('asNavBack')&&!!document.getElementById('asNavForward');
+ },'R52 statistics must appear once at top, not repeated in the sidebar');
  await check(page,()=>{
-   const initial=asNavSnapshot(),next=initial.workspaceMode==='person'?'all':'person';
-   navigateWorkspace(next);
-   if(asNavHistory.back.length===0||document.getElementById('asNavBack').disabled)return false;
-   asNavGo('back');
-   const back=asNavSnapshot();
-   if(back.workspaceMode!==initial.workspaceMode||back.analyticsPage!==initial.analyticsPage||
-     JSON.stringify(back.selection)!==JSON.stringify(initial.selection))return false;
-   if(document.getElementById('asNavForward').disabled)return false;
-   asNavGo('forward');
-   if(state.workspaceMode!==next)return false;
-   asNavGo('back');
-   return state.workspaceMode===initial.workspaceMode;
- },'R50 backward/forward workspace and selection history failed');
+  const initial=asNavSnapshot(),next=initial.workspaceMode==='person'?'all':'person';
+  navigateWorkspace(next);
+  if(asNavHistory.back.length===0||document.getElementById('asNavBack').disabled)return false;
+  asNavGo('back');
+  const back=asNavSnapshot();
+  if(back.workspaceMode!==initial.workspaceMode||back.analyticsPage!==initial.analyticsPage||
+    JSON.stringify(back.selection)!==JSON.stringify(initial.selection))return false;
+  if(document.getElementById('asNavForward').disabled)return false;
+  asNavGo('forward');
+  if(state.workspaceMode!==next)return false;
+  asNavGo('back');
+  return state.workspaceMode===initial.workspaceMode;
+ },'R52 backward/forward workspace and selection history failed');
  await check(page,()=>{
-   const original={workspaceMode:state.workspaceMode,statsConfig:state.statsConfig,
-     selection:state.selection};
-   try{
-    state.workspaceMode='person';state.selection={type:'cell',employeeId:EMPLOYEES[0].id,day:1};
-    state.statsConfig={family:'overtime',metric:'candidatePeople',compare:'days',
+  const previous={workspaceMode:state.workspaceMode,statsScope:state.statsScope,
+   statsConfig:state.statsConfig,selection:state.selection};
+  try{
+   state.workspaceMode='stats';state.statsScope='person';
+   state.statsConfig={family:'overtime',metric:'candidatePeople',compare:'days',
       aggregate:'perPerson',chart:'bar',limit:10,sort:'desc'};
-    const person=asStatPrefs();
-    if(person.metric==='candidatePeople'||person.aggregate==='perPerson')return false;
-    state.workspaceMode='all';state.statsConfig={...state.statsConfig,family:'leave',
-      metric:'people',compare:'people',aggregate:'perPerson'};
-    const ranked=asStatPrefs();
-    if(ranked.metric==='people'||ranked.aggregate==='perPerson')return false;
-    const ledger=new Map();
-    const data=asStatRows();
-    if(data.rankRows.some(row=>row.raw<=0))return false;
-    return true;
-   }finally{
-    state.workspaceMode=original.workspaceMode;
-    state.selection=original.selection;state.statsConfig=original.statsConfig;
-   }
- },'R50 redundant zero/one metrics, duplicate per-person normalization or zero rankings');
+   const person=asStatPrefs();
+   if(person.metric==='candidatePeople'||person.aggregate==='perPerson')return false;
+   state.statsScope='all';state.statsConfig={...state.statsConfig,
+      family:'leave',metric:'people',compare:'people',aggregate:'perPerson',chart:'line'};
+   const ranked=asStatPrefs();
+   return ranked.metric!=='people'&&ranked.aggregate!=='perPerson'&&ranked.chart==='bar';
+  }finally{
+   state.workspaceMode=previous.workspaceMode;state.statsScope=previous.statsScope;
+   state.statsConfig=previous.statsConfig;state.selection=previous.selection;
+  }
+ },'R52 redundant individual metrics or categorical line chart not pruned');
  await check(page,()=>{
-   const old=asNavSnapshot();
-   state.analyticsPage='stats';render();
-   const label=document.querySelector('.as-stats-filters label');
-   const select=label?.querySelector('select');
-   const aligned=!!select&&Math.abs(select.getBoundingClientRect().top-
-     label.getBoundingClientRect().top)<16&&
-     getComputedStyle(label).gridTemplateColumns.split(' ').length>=2;
-   asNavGo('back');
-   return aligned&&state.analyticsPage===old.analyticsPage;
- },'R50 statistics labels are not horizontally aligned with selects');
- // R51: selected primary view highlights text only; index is not a nested tile.
- await check(page,()=>{
-  const active=document.querySelector('.side-primary-nav .side-views button.active');
-  const index=active?.querySelector('.side-view-index');
   const refinements=document.querySelector('.side-refinements');
-  const views=document.querySelector('.side-primary-nav');
-  const style=active&&getComputedStyle(active),num=index&&getComputedStyle(index);
-  return !!style&&!!num&&style.backgroundColor==='rgba(0, 0, 0, 0)'&&
-   parseFloat(style.borderTopWidth)===0&&num.backgroundColor==='rgba(0, 0, 0, 0)'&&
-   refinements.getBoundingClientRect().left>views.getBoundingClientRect().left+12;
- },'R51 active sidebar view must be a text highlight, not enclosing boxes');
+  const title=document.querySelector('.side-refinements-title');
+  return !!refinements&&title?.textContent==='辅助筛选'&&
+   refinements.getBoundingClientRect().left>document.querySelector('.sidebar').getBoundingClientRect().left+12;
+ },'R52 matrix sidebar retains its subordinate filters');
  await check(page,()=>{
   const a=document.getElementById('asNavBack'),b=document.getElementById('asNavForward');
   return a.querySelector('svg path')&&b.querySelector('svg path')&&
@@ -580,139 +560,105 @@ async function run(){
    state.judgmentMode=mode;
   }
  },'R45 initial/manual status facts must share one verdict source');
- await page.locator('.workspace-mode-all [data-as-view="stats"]').click();
+ // R52 unified statistical workbench and visual interaction regression.
+ await page.locator('[data-workspace="stats"]').click();
  await page.waitForSelector('#asStatChart svg',{timeout:20000});
- await check(page,()=>state.analyticsPage==='stats'&&state.workspaceMode==='all'&&
-   document.querySelector('.as-stats')&&document.querySelectorAll('.side-views button').length===2&&
-   !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&
-   !document.querySelector('.stats-active .workbench')?.getBoundingClientRect().height,
-  'R45 all-staff statistics view missing or old matrix not hidden');
  await check(page,()=>{
+  const layout=document.querySelector('.workspace-mode-stats');
+  const h=document.querySelector('.as-stats-heading');
   const chart=document.querySelector('.as-stats-chart').getBoundingClientRect();
   const rank=document.querySelector('.as-stats-rank').getBoundingClientRect();
-  return chart.width>400&&rank.width>=270&&rank.left>chart.left&&
-    document.documentElement.scrollWidth<=innerWidth+3;
- },'R45 1920 analytics layout overflow');
- // Empty categories must be visibly empty instead of manufacturing 0-value ranks.
+  return state.workspaceMode==='stats'&&state.statsScope==='all'&&
+   document.querySelector('[data-workspace="stats"].active')!==null&&
+   !!document.getElementById('asStatsScope')&&
+   getComputedStyle(layout.querySelector('.sidebar')).display==='none'&&
+   chart.width>400&&rank.width>280&&rank.left>chart.left&&
+   !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&h.textContent.includes('考勤统计');
+ },'R52 top-level statistics route, width, or chart missing');
  await check(page,()=>{
-  const prev=state.outings,cfg={...state.statsConfig};
-  try{
-   state.outings=[];state.statsConfig.family='outing';state.statsConfig.metric='hours';
-   state.statsConfig.compare='days';renderStatisticsWorkspace();
-   return asStatRows().rankRows.length===0&&
-    !!document.querySelector('.as-stats-empty')&&
-    document.querySelector('.as-stats-chart').classList.contains('is-empty')&&
-    document.querySelectorAll('.as-stats-rank-row').length===0;
-  }finally{
-   state.outings=prev;state.statsConfig=cfg;renderStatisticsWorkspace();
-  }
- },'R45 empty dataset must have an honest no-record state');
- await check(page,()=>document.querySelector('[data-as-chart="bar"]').getAttribute('aria-pressed')==='true',
- 'R47 chart toggle must communicate selected mode');
- await page.locator('#asStatFamily').focus();
- await page.locator('#asStatFamily').selectOption('trip');
- await check(page,()=>document.activeElement?.id==='asStatFamily'&&
-  !!document.querySelector('#asStatChart svg'),'R47 changing a metric must retain focus and chart');
- await page.locator('#asStatFamily').selectOption('leave');
- await page.locator('.as-stats-rank-row').first().hover();
- await check(page,()=>document.querySelector('.as-stats-rank-row.is-linked')!==null,
- 'R47 rank hover must connect to plotted comparison');
- await page.locator('#asStatsExport').hover();
- await check(page,()=>document.querySelector('.as-stats-rank-row.is-linked')===null,
- 'R47 rank highlight must clear on pointer exit');
- await page.screenshot({path:path.join(out,'r45-all-stats-1920.png')});
- await page.locator('#asStatFamily').selectOption('overtime');
- await page.locator('#asStatMetric').selectOption('hours');
- await page.locator('#asStatCompare').selectOption('groups');
- await page.locator('#asStatAggregate').selectOption('perPerson');
+  const selected=document.getElementById('asStatsScope');
+  const label=document.querySelector('.as-stats-filters label');
+  return selected.value==='all'&&label.querySelector('select')&&
+   getComputedStyle(label).display==='grid'&&
+   !document.querySelector('.as-stats-chart-switch [data-as-chart="line"]:not(:disabled)');
+ },'R52 categorical trend should not allow a line chart');
+ await page.locator('#asStatFamily').selectOption('punch');
+ await page.locator('#asStatMetric').selectOption('count');
+ await page.locator('#asStatCompare').selectOption('people');
+ await page.locator('#asStatLimit').selectOption('all');
  await check(page,()=>{
-  const data=asStatRows(),all=Array.from({length:monthDays()},(_,i)=>i+1),
-    full=asStatValue(data.ledger,'overtime','hours',EMPLOYEES,all);
-  const grouped=data.rows.reduce((sum,r)=>sum+r.raw,0);
-  return data.compare==='groups'&&Math.abs(full-grouped)<1e-6&&
-    data.rows.every(r=>Math.abs(r.value-(r.peopleCount?r.raw/r.peopleCount:0))<1e-8);
- },'R45 per-capita group ranking must reconcile with the whole workforce');
- await page.locator('[data-as-chart="line"]').click();
- await check(page,()=>state.statsConfig.chart==='line'&&
-  echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption().series[0].type==='line',
- 'R45 chart-type switch failed');
+  const data=asStatRows(),opts=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
+  return data.compare==='people'&&data.visible.length<=12&&data.rankRows.length>12&&
+   opts.series[0].type==='bar'&&opts.yAxis[0].type==='category'&&
+   document.querySelector('[data-as-chart="line"]').disabled&&
+   document.querySelector('.as-stats-chart-hint')!==null;
+ },'R52 all-people ranking plotted too many bars or allowed spaghetti lines');
+ await page.screenshot({path:path.join(out,'r52-top-people-bars.png')});
+ const firstRank=page.locator('.as-stats-rank-row').first();
+ await firstRank.click();
+ await check(page,()=>{
+  const row=document.querySelector('.as-stats-rank-row');
+  const entry=row?.closest('.as-rank-entry');
+  return row?.getAttribute('aria-expanded')==='true'&&
+    !entry?.querySelector('.as-rank-detail')?.hidden&&
+    !!entry.querySelector('[data-as-drill]')&&state.workspaceMode==='stats';
+ },'R52 single rank click must disclose details without navigation');
+ await firstRank.click();
+ await check(page,()=>document.querySelector('.as-stats-rank-row')?.getAttribute('aria-expanded')==='false'&&
+  document.querySelector('.as-rank-detail')?.hidden,'R52 second click must collapse rank details');
  await page.locator('#asStatCompare').selectOption('days');
- await page.locator('#asStatLimit').selectOption('5');
  await check(page,()=>{
-  const d=asStatRows(),ranking=d.rankRows,shown=document.querySelectorAll('.as-stats-rank-row').length;
-  return d.rows.length===monthDays()&&d.visible.length===monthDays()&&
-   ranking.length<=5&&shown===ranking.length&&
-   ranking.every(r=>r.value>0)&&ranking.every((r,i)=>!i||r.value<=ranking[i-1].value);
- },'R45 date chart must remain chronological while its ranking is positive-only and sorted');
+  const data=asStatRows();
+  const opts=echarts.getInstanceByDom(document.getElementById('asStatChart')).getOption();
+  return data.compare==='days'&&data.rows.length===monthDays()&&
+   opts.series[0].type==='line'&&!document.querySelector('[data-as-chart="line"]').disabled;
+ },'R52 daily chronology should use a readable line trend');
  await page.locator('#asStatCompare').selectOption('groups');
- await page.locator('[data-as-chart="bar"]').click();
+ await check(page,()=>asStatRows().rows.length===workspaceGroups().length,
+  'R52 whole-workforce group comparison broken');
  const exported=page.waitForEvent('download');
  await page.locator('#asStatsExport').click();
  const csv=await exported;
- if(!csv.suggestedFilename().includes('overtime'))throw Error('R45 statistics export filename incorrect');
+ if(!csv.suggestedFilename().includes('punch'))throw Error('R52 statistics CSV filename incorrect');
  await page.setViewportSize({width:1366,height:768});
  await check(page,()=>{
-  const region=document.querySelector('.as-stats'),buttons=document.querySelector('.as-stats-rank-table');
-  const filters=[...document.querySelectorAll('.as-stats-filters label')];
-  const top=filters[0].getBoundingClientRect().top;
-  const line=filters.every(e=>Math.abs(e.getBoundingClientRect().top-top)<2&&
-    e.getBoundingClientRect().width>=155);
-  const visible=filters.every(e=>{
-    const select=e.querySelector('select'),rect=select.getBoundingClientRect();
-    return rect.right<=region.getBoundingClientRect().right&&rect.left>=region.getBoundingClientRect().left;
-  });
+  const f=[...document.querySelectorAll('.as-stats-filters label')],top=f[0].getBoundingClientRect().top;
   const widths=Object.fromEntries(['Family','Metric','Compare','Aggregate','Limit'].map(k=>
-    [k,document.getElementById('asStat'+k)?.getBoundingClientRect().width||0]));
-  const compact=widths.Family<=130&&widths.Metric<=225&&widths.Compare<=150&&
-    widths.Aggregate<=165&&widths.Limit<=110;
-  return region.getBoundingClientRect().right<=innerWidth+1&&buttons.getBoundingClientRect().width>=250&&
-    line&&visible&&compact&&document.documentElement.scrollWidth<=innerWidth+3;
- },'R48 1366: five filters must fit one row without clipping or horizontal page scroll');
- await page.waitForTimeout(380); // screenshot after the deliberate short ECharts transition, never a correctness check
- await page.screenshot({path:path.join(out,'r48-all-stats-1366.png')});
- await page.screenshot({path:path.join(out,'r45-all-stats-1366.png')});
+   [k,document.getElementById('asStat'+k)?.getBoundingClientRect().width||0]));
+  return f.length===5&&f.every(e=>Math.abs(e.getBoundingClientRect().top-top)<2)&&
+   widths.Family<=130&&widths.Metric<=225&&widths.Compare<=150&&
+   widths.Aggregate<=165&&widths.Limit<=110&&
+   document.documentElement.scrollWidth<=innerWidth+3;
+ },'R52 five compact filters must remain aligned at 1366px');
+ await page.screenshot({path:path.join(out,'r52-top-groups-1366.png')});
  await page.setViewportSize({width:1600,height:900});
- await check(page,()=>{
-  const controls=[...document.querySelectorAll('.as-stats-filters label')];
-  const y=controls[0].getBoundingClientRect().top;
-  return controls.length===5&&controls.every(x=>Math.abs(x.getBoundingClientRect().top-y)<2);
- },'R48 1600 one-row filter regression');
- await page.waitForTimeout(350);
- await page.screenshot({path:path.join(out,'r48-all-stats-1600.png')});
- await page.screenshot({path:path.join(out,'r45-all-stats-1600.png')});
+ await page.screenshot({path:path.join(out,'r52-top-groups-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
- // Ranked groups open that group's analytics without losing the shared metric.
- await page.locator('.as-stats-rank-row').first().click();
- await page.waitForSelector('#asStatChart svg',{timeout:15000});
- await check(page,()=>state.workspaceMode==='group'&&state.analyticsPage==='stats'&&
-  state.statsConfig.compare==='people'&&asStatRows().people.every(e=>groupOf(e)===state.selectedGroup),
-  'R45 group comparison drilldown did not scope to group');
- await page.locator('#asStatCompare').selectOption('groups');
+ await page.locator('#asStatsScope').selectOption('group');
  await check(page,()=>{
-  const data=asStatRows(),all=Array.from({length:monthDays()},(_,i)=>i+1);
-  const total=asStatValue(data.ledger,state.statsConfig.family,state.statsConfig.metric,EMPLOYEES,all);
-  return data.people.length===EMPLOYEES.length&&data.rows.length===workspaceGroups().length&&
-    Math.abs(data.rows.reduce((x,r)=>x+r.raw,0)-total)<1e-8;
- },'R45 cross-group mode must include all groups, not only the selected team');
- await page.locator('#asStatCompare').selectOption('people');
- await check(page,()=>asStatRows().people.every(e=>groupOf(e)===state.selectedGroup),
-  'R45 back to group-member comparison must restore group scope');
- await page.screenshot({path:path.join(out,'r45-group-stats.png')});
- await page.locator('.as-stats-rank-row').first().click();
- await page.waitForSelector('#asStatChart svg',{timeout:15000});
- await check(page,()=>state.workspaceMode==='person'&&state.analyticsPage==='stats'&&
-  state.statsConfig.compare==='days'&&state.statsConfig.chart==='line'&&
-  state.statsConfig.aggregate==='total'&&asStatRows().people.length===1,
-  'R45 group member drilldown not scoped to individual');
- await page.screenshot({path:path.join(out,'r45-person-stats.png')});
+  const group=state.statsGroup||workspaceGroups()[0];
+  return state.workspaceMode==='stats'&&state.statsScope==='group'&&
+   !!document.getElementById('asStatsGroup')&&
+   asStatRows().people.length>0&&asStatRows().people.every(e=>groupOf(e)===group);
+ },'R52 team scope must not fall back to full-staff statistics');
+ await page.screenshot({path:path.join(out,'r52-team-statistics.png')});
+ await page.locator('#asStatsScope').selectOption('person');
+ await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
+  !!document.getElementById('asStatsPerson')&&asStatRows().people.length===1&&
+  state.statsConfig.compare==='days','R52 personal scope not one employee/daily trend');
+ await page.screenshot({path:path.join(out,'r52-person-statistics.png')});
  const rankedDay=Number(await page.locator('.as-stats-rank-row').first().getAttribute('data-as-rank'));
- if(!rankedDay)throw Error('R45 expected a real, nonzero daily metric in the selected demo employee');
- await page.locator('.as-stats-rank-row').first().click();
+ if(!rankedDay)throw Error('R52 expected positive daily metric for personal demo');
+ await page.locator('.as-stats-rank-row').first().dblclick();
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:16000});
- await check(page,day=>state.workspaceMode==='person'&&state.analyticsPage==='main'&&
-  state.chartDay===day&&state.selection.day===day&&
-  document.querySelector('.cal-day[data-day="'+day+'"].selected')!==null,
- rankedDay,'R45 ranked nonzero day must open the matching timeline and calendar');
+ await check(page,d=>state.workspaceMode==='person'&&state.analyticsPage==='main'&&
+  state.chartDay===d&&state.selection.day===d&&
+  !!document.querySelector('.cal-day[data-day="'+d+'"].selected'),
+  rankedDay,'R52 double-click ranked day should open matching timeline');
+ // The top-level navigation history must return to the statistical context.
+ await page.locator('#asNavBack').click();
+ await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
+  !!document.getElementById('asStatsPerson'),'R52 back navigation lost statistical context');
  // Legacy matrix/time-axis QA below starts from the normal All view.
  await page.locator('[data-workspace="all"]').click();
  await check(page,()=>state.workspaceMode==='all'&&state.analyticsPage==='main'&&
