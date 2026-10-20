@@ -28,6 +28,9 @@ function traditionalRows(){
       系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(manualStatusFor(a)||attendanceJudgmentSystem(a)),
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
       班内工时分钟:Math.round(a.workMinutes||0),加班候选分钟:Math.round(a.autoOvertime?.minutes||0),
+      加班自动纳入分钟:Math.round(activeAutoOvertimeSegments(a).reduce((sum,seg)=>sum+seg.minutes,0)),
+      加班自动排除分钟:Math.round((a.autoOvertime?.segments||[]).filter(seg=>seg.accepted===false)
+       .reduce((sum,seg)=>sum+seg.minutes,0)),
       午休证据:a.lunchEvidence||'',加班候选说明:a.autoOvertime?.reason||'',
       登记加班记录数:a.overtime?.length||0,
       异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班'})[k]).join('；'),
