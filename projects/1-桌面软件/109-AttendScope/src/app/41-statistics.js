@@ -267,7 +267,7 @@ function asStatRankBreakdown(row,data){
  const ranked=dimensions.map(d=>({...d,value:asStatValue(data.ledger,family,metric,d.people,d.days)}))
   .filter(d=>d.value>0).sort((a,b)=>b.value-a.value).slice(0,5);
  if(!ranked.length)return '<p class="as-rank-breakdown-empty">当前范围没有可细分记录</p>';
- return '<div class="as-rank-breakdown"><span>主要贡献明细（原始量）</span>'+
+ return '<div class="as-rank-breakdown">'+
   ranked.map(d=>'<div><span>'+escapeNameChar(d.label)+'</span><strong>'+
    asStatNumber(d.value)+' '+escapeNameChar(data.unit)+'</strong></div>').join('')+'</div>';
 }
@@ -312,17 +312,11 @@ function statisticsWorkspaceHtml(){
    '<strong>'+asStatNumber(r.value)+'</strong><span class="as-rank-unit">'+escapeNameChar(selected.effectiveUnit)+'</span>'+
    '<span class="as-rank-chevron" aria-hidden="true">⌄</span></button>'+
    '<div class="as-rank-detail" id="'+detailId+'" '+(expanded?'':'hidden')+'>'+
-   '<div class="as-rank-detail-grid">'+
-   '<span>统计对象<strong>'+escapeNameChar(r.label)+'</strong></span>'+
-   '<span>涉及人员<strong>'+r.peopleCount+' 人</strong></span>'+
-   '<span>应出勤<strong>'+r.scheduled+' 人日</strong></span>'+
-   (c.aggregate!=='total'?'<span>原始总量<strong>'+asStatNumber(r.raw)+' '+escapeNameChar(selected.unit)+'</strong></span>':'')+
-   '</div><div class="as-rank-breakdown-slot">'+(expanded?asStatRankBreakdown(r,selected):'')+
+   '<div class="as-rank-breakdown-slot">'+(expanded?asStatRankBreakdown(r,selected):'')+
    '</div><button class="as-rank-drill" type="button" data-as-drill="'+escapeNameChar(r.key)+'">进入下级分析 <span aria-hidden="true">↗</span></button></div></div>';
  }).join(''):'<p class="as-stats-empty">本月暂无该指标的记录</p>';
  return '<section class="as-stats" aria-label="考勤统计工作台">'+
-  '<header class="as-stats-heading"><div><h2>考勤统计</h2><span>'+
-  escapeNameChar(periodText())+' · '+escapeNameChar(scopedLabel)+' · '+selected.people.length+' 人</span></div>'+
+  '<header class="as-stats-heading"><h2>考勤统计</h2>'+
   '<div class="as-stats-heading-actions"><div class="as-stats-scope" aria-label="统计范围">'+
   '<label>范围<select id="asStatsScope">'+asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+'</select></label>'+
   selectionGroup+selectionPerson+'</div>'+
@@ -352,7 +346,7 @@ function statisticsWorkspaceHtml(){
    '<div class="as-stats-rank-table" id="asStatRankTable">'+ranking+'</div></div></div>'+
   '<div class="as-stats-foot"><span>'+escapeNameChar(warning)+'</span>'+
   (unavailable?'<strong>当前未导入此类记录</strong>':'')+
-  '<span>单击排行展开详情，双击或使用“进入下级分析”导航；图表按相同方式操作</span></div></section>';
+  '<span>单击展开 · 双击下钻</span></div></section>';
 }
 function asStatDrill(key){
  const row=asStatRows().rows.find(r=>r.key===key);
