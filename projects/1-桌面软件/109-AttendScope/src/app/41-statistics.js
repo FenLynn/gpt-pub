@@ -327,9 +327,7 @@ function renderStatisticsWorkspace(){
  // ranked item is at the top, just as it is in the ranking table.
  const rows=!isDay&&!line?data.visible.slice().reverse():data.visible;
  const cat=rows.map(x=>x.label),values=rows.map(x=>Number(x.value.toFixed(3)));
- const gradient=line?'#5799c7':new echarts.graphic.LinearGradient(0,0,!isDay?1:0,!isDay?0:1,
-  !isDay?[{offset:0,color:'#add8eb'},{offset:.55,color:'#6fb4d8'},{offset:1,color:'#347eae'}]:
-   [{offset:0,color:'#3f8fc2'},{offset:1,color:'#b4dced'}]);
+ const gradient=line?'#648d7e':asSoftBarGradient(!isDay);
  chart.setOption({animation:state.prefs?.motion!==false,animationDuration:290,
   grid:isDay||line?{top:23,bottom:40,left:52,right:21}:{top:14,bottom:30,left:92,right:42,containLabel:false},
   tooltip:{trigger:'axis',axisPointer:{type:'shadow'},formatter:p=>{
@@ -343,10 +341,11 @@ function renderStatisticsWorkspace(){
   yAxis:!isDay&&!line?{type:'category',data:cat,axisLabel:{fontSize:13,color:'#466477',width:79,overflow:'truncate'},
     axisLine:{show:false},axisTick:{show:false}}:
    {type:'value',min:0,axisLabel:{fontSize:12,color:'#73899c'},splitLine:{lineStyle:{color:'#eaf0f3'}},axisLine:{show:false}},
-  series:[{type:line?'line':'bar',data:values,barMaxWidth:22,smooth:false,symbolSize:7,
-   itemStyle:{color:gradient,borderRadius:line?0:!isDay?[0,5,5,0]:[5,5,0,0]},lineStyle:{width:2.5,color:'#5799c7'},
-   areaStyle:line?{color:'rgba(91,158,202,.07)'}:undefined,
-   showBackground:!line&&!isDay,backgroundStyle:{color:'#f0f5f8'}}]});
+  series:[{type:line?'line':'bar',data:values,barMaxWidth:16,smooth:false,symbolSize:6,
+   itemStyle:{color:gradient,opacity:line?1:.9,borderRadius:line?0:!isDay?[0,7,7,0]:[7,7,0,0]},
+   lineStyle:{width:2.2,color:'#648d7e'},
+   areaStyle:line?{color:'rgba(103,153,129,.06)'}:undefined,
+   showBackground:!line&&!isDay,backgroundStyle:{color:'rgba(107,149,130,.055)'}}]});
  // Rank cells and chart marks refer to the same comparison entity.
  const ranking=[...node.querySelectorAll('[data-as-rank]')];
  const emphasize=(key,show)=>{
