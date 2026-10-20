@@ -24,9 +24,26 @@ function strictDateTime(value){
   const parts=/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}(?::\d{2})?)$/.exec(value);
   return !!parts&&strictISODate(parts[1])&&validClock(parts[2]);
 }
+// A name-only file cannot distinguish two people with the same name.
+function validateImportIdentityRows(rows){
+ const byName=new Map(),byNumber=new Map();
+ for(const row of rows){
+  const name=String(aliases(row,['姓名','人员','员工姓名','name'])).trim();
+  const number=String(aliases(row,['员工编号','工号','员工ID','employeeId','Employee ID'])).trim();
+  if(!name||!number)continue;
+  if((byName.has(name)&&byName.get(name)!==number)||
+     (byNumber.has(number)&&byNumber.get(number)!==name))
+   throw new Error('同名异工号或同工号异姓名：当前姓名关联方式无法安全导入，请核实唯一身份');
+  byName.set(name,number);byNumber.set(number,name);
+ }
+}
 function importRosterPlan(names,kind){
   const unique=[...new Set(names.map(x=>String(x).trim()).filter(Boolean))];
   if(!unique.length)throw new Error('导入文件没有有效员工姓名');
+  const counts=new Map();
+  for(const e of EMPLOYEES)counts.set(e.name,(counts.get(e.name)||0)+1);
+  const ambiguous=unique.find(name=>(counts.get(name)||0)>1);
+  if(ambiguous&&!state.isDemo)throw new Error('名册中存在同名员工“'+ambiguous+'”；请先建立唯一员工编号映射，不能按姓名自动合并');
   const unknown=unique.filter(name=>!EMPLOYEES.some(e=>e.name===name));
   const resetDemo=state.isDemo&&(kind==='attendance'||unknown.length>0);
   if(resetDemo&&!window.confirm('当前工作空间包含演示人员与数据。导入将建立本月实际人员名册，并清除演示数据。是否继续？'))
@@ -55,11 +72,14 @@ function acceptImportedRows(kind,rows,plan,skipped=0){
   if(kind==='attendance')state.records=rows;
   else if(kind==='leave')state.leaves=rows;
   else if(kind==='trip')state.trips=rows;
+  else if(kind==='outing')state.outings=rows;
+  else if(kind==='overtime')state.overtimeEntries=rows;
   state.saved=false;rememberMonth();reanalyze();render();
-  toast('已导入 '+rows.length+' 条'+({attendance:'考勤',leave:'请假',trip:'出差'}[kind])+'记录；员工 '+EMPLOYEES.length+' 人'+(skipped?'；跳过无效行 '+skipped+' 条':''));
+  toast('已导入 '+rows.length+' 条'+({attendance:'考勤',leave:'请假',trip:'出差',outing:'外出',overtime:'加班'}[kind])+'记录；员工 '+EMPLOYEES.length+' 人'+(skipped?'；跳过无效行 '+skipped+' 条':''));
 }
 async function importAttendance(file){
   const t=await XLSX.readTable(file),parsed=[];
+  validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
     const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
     const datetime=importedDate(aliases(r,['打卡时间','时间','datetime','DateTime']));
@@ -83,6 +103,7 @@ async function importAttendance(file){
 }
 async function importLeaves(file){
   const t=await XLSX.readTable(file),parsed=[];
+  validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
     const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
     const date=importedDate(aliases(r,['日期','请假日期','date']));
@@ -102,6 +123,7 @@ async function importLeaves(file){
 }
 async function importTrips(file){
   const t=await XLSX.readTable(file),parsed=[];
+  validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
     const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
     const startDate=importedDate(aliases(r,['开始日期','起始日期','startDate']));
@@ -119,6 +141,64 @@ async function importTrips(file){
     ...r,source:file.name,sheet:t.sheet}));
   const meta=await persistImportedFile(file,'trip',out.length,importId);
   applyImportRoster(plan,meta);acceptImportedRows('trip',out,plan,t.rows.length-out.length);
+}
+/* R50: user-provided outing and overtime records are separate from inferred candidates.
+ * Multi-day outings use the same daily clock window; cross-midnight shifts need
+ * an approved shift policy and are explicitly rejected rather than guessed. */
+async function importOutings(file){
+ const t=await XLSX.readTable(file),parsed=[];
+ validateImportIdentityRows(t.rows);
+ t.rows.forEach((r,i)=>{
+  const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
+  const startDate=importedDate(aliases(r,['开始日期','日期','startDate','date']));
+  const endDate=importedDate(aliases(r,['结束日期','endDate'])||startDate);
+  if(!name||!strictISODate(startDate)||!strictISODate(endDate)||
+     startDate>endDate||startDate>monthISO()+'-'+pad(monthDays())||endDate<monthISO()+'-01')return;
+  const start=importClock(aliases(r,['开始时间','开始','start']),'');
+  const end=importClock(aliases(r,['结束时间','结束','end']),'');
+  if(!start||!end)return;
+  if(minutes(end)<=minutes(start))throw new Error('外出起止时间须在同一日内且结束晚于开始；跨日请拆分并人工核查');
+  parsed.push({name,startDate,endDate,start,end,row:sourceRow(r,i),
+   type:String(aliases(r,['类型','事项','type'])||'外出'),
+   note:String(aliases(r,['备注','说明','note'])||''),
+   place:String(aliases(r,['地点','目的地','place'])||'')});
+ });
+ if(!parsed.length)throw new Error('未识别到本月有效外出记录');
+ const plan=importRosterPlan(parsed.map(r=>r.name),'outing');
+ if(!plan.resetDemo&&state.outings.length&&
+    !window.confirm('本月已有外出记录，新文件将替换当前外出工作数据。是否继续？'))
+  throw new Error('已取消外出覆盖');
+ const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+ const out=parsed.map(r=>({id:'OI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
+  ...r,source:file.name,sheet:t.sheet}));
+ const meta=await persistImportedFile(file,'outing',out.length,importId);
+ applyImportRoster(plan,meta);acceptImportedRows('outing',out,plan,t.rows.length-out.length);
+}
+async function importOvertime(file){
+ const t=await XLSX.readTable(file),parsed=[];
+ validateImportIdentityRows(t.rows);
+ t.rows.forEach((r,i)=>{
+  const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
+  const date=importedDate(aliases(r,['日期','加班日期','date']));
+  if(!name||!strictISODate(date)||!date.startsWith(monthISO()+'-'))return;
+  const start=importClock(aliases(r,['开始时间','开始','start']),'');
+  const end=importClock(aliases(r,['结束时间','结束','end']),'');
+  if(!start||!end)return;
+  if(minutes(end)<=minutes(start))throw new Error('加班起止时间须在同一日内且结束晚于开始；跨日加班待班制核查');
+  parsed.push({name,date,start,end,row:sourceRow(r,i),
+   type:String(aliases(r,['类型','事项','type'])||'登记加班'),
+   note:String(aliases(r,['备注','说明','note'])||'')});
+ });
+ if(!parsed.length)throw new Error('未识别到本月有效登记加班记录');
+ const plan=importRosterPlan(parsed.map(r=>r.name),'overtime');
+ if(!plan.resetDemo&&state.overtimeEntries.length&&
+    !window.confirm('本月已有登记加班，新文件将替换当前加班工作数据。是否继续？'))
+  throw new Error('已取消加班覆盖');
+ const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+ const out=parsed.map(r=>({id:'OTI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
+  ...r,source:file.name,sheet:t.sheet}));
+ const meta=await persistImportedFile(file,'overtime',out.length,importId);
+ applyImportRoster(plan,meta);acceptImportedRows('overtime',out,plan,t.rows.length-out.length);
 }
 function leaveFor(empId,date){return state.leaves.filter(x=>x.employeeId===empId&&x.date===date)}
 function tripFor(empId,date){return state.trips.filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
