@@ -262,11 +262,20 @@ function analysisUnionMinutes(intervals){
  }
  return start===null?0:total+end-start;
 }
+function analysisUnionSegments(intervals){
+ const sorted=intervals.filter(([a,b])=>Number.isFinite(a)&&Number.isFinite(b)&&b>a)
+  .sort((a,b)=>a[0]-b[0]),merged=[];
+ for(const [a,b] of sorted){
+  const last=merged[merged.length-1];
+  if(last&&a<=last[1])last[1]=Math.max(last[1],b);
+  else merged.push([a,b]);
+ }
+ return merged;
+}
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?+RULES.overtimeMinMinutes:30;
- if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,reason:'打卡进出配对待核'};
- // Count only complete gate intervals, intersecting the eligible clock windows.
- // On a rest day, lunch never becomes inferred overtime.
+ if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,
+  reason:'打卡进出配对待核',segments:[]};
  const windows=isWorkday(day)?[[minutes(RULES.pmEnd),1440]]:
    [[0,minutes(RULES.amEnd)],[minutes(RULES.pmStart),1440]];
  const eligible=[];
@@ -277,24 +286,48 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
    if(to>from)eligible.push([from,to]);
   }
  }
- const total=analysisUnionMinutes(eligible);
- // Registered overtime is an independent fact: remove only its overlap with
- // the candidate intervals, never discard unrelated, fully-paired time.
- const deductions=[];
- for(const r of registered){
-  const start=minutes(r.start||''),end=minutes(r.end||'');
-  if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)continue;
-  for(const [a,b] of eligible){
-   const from=Math.max(start,a),to=Math.min(end,b);
-   if(to>from)deductions.push([from,to]);
+ const valid=analysisUnionSegments(eligible);
+ const registeredIntervals=analysisUnionSegments(registered.map(r=>[
+  minutes(r.start||''),minutes(r.end||'')]));
+ const unregistered=[];
+ for(const [begin,end] of valid){
+  let cursor=begin;
+  for(const [regStart,regEnd] of registeredIntervals){
+   if(regEnd<=cursor||regStart>=end)continue;
+   if(regStart>cursor)unregistered.push([cursor,Math.min(regStart,end)]);
+   cursor=Math.max(cursor,Math.min(end,regEnd));
+   if(cursor>=end)break;
   }
+  if(cursor<end)unregistered.push([cursor,end]);
  }
- const raw=Math.max(0,total-analysisUnionMinutes(deductions));
- const value=raw+1e-8>=minMinutes?raw:0;
- const reason=value?'完整进出记录推算，待核'+(deductions.length?'（已扣除登记重叠时段）':''):
-   deductions.length?'与已登记加班重叠或剩余时长不足阈值':
+ const segments=analysisUnionSegments(unregistered);
+ const raw=analysisUnionMinutes(segments);
+ const reached=raw+1e-8>=minMinutes;
+ const reason=reached?'完整进出记录自动推算，供人工核查'+
+   (registeredIntervals.length?'（已扣除登记重叠时段）':''):
+   registeredIntervals.length?'与已登记加班重叠或剩余时长不足阈值':
    '不足阈值或无完整加班进出';
- return {minutes:value,rawMinutes:raw,threshold:minMinutes,reason};
+ return {minutes:reached?raw:0,rawMinutes:raw,threshold:minMinutes,reason,
+  segments:reached?segments.map(([from,to])=>({from,to,minutes:to-from})):[]};
+}
+// A checkmark is an inclusion decision for calculated time, not formal approval.
+function activeAutoOvertimeSegments(a){
+ return (a.autoOvertime?.segments||[]).filter(s=>s.accepted!==false);
+}
+function setAutoOvertimeDecision(segmentId,accepted){
+ const found=[...state.analysis.values()].flatMap(a=>a.autoOvertime?.segments||[])
+  .find(s=>s.id===segmentId);
+ if(!found)return false;
+ const before=found.accepted!==false,next=!!accepted;
+ if(before===next)return true;
+ if(!state.overtimeReview)state.overtimeReview={};
+ if(next)delete state.overtimeReview[segmentId];
+ else state.overtimeReview[segmentId]=false;
+ state.revisions.push({id:'R'+(++state.revisionSeq),key:found.employeeId+'|'+found.date,
+  action:'auto-overtime-inclusion',segmentId,from:before,to:next,
+  time:new Date().toISOString(),note:'自动推算加班统计纳入选择（非审批）'});
+ state.saved=false;rememberMonth();reanalyze();render();
+ return true;
 }
 function analyzeDay(emp,d){
  const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date)
@@ -342,6 +375,11 @@ function analyzeDay(emp,d){
  const lunchEvidence=crossesLunch?'未分段（工时按班次扣午休）':
   morningPair&&lunchReturn?'有午休进出':'未明确';
  const autoOvertime=estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain);
+ autoOvertime.segments=autoOvertime.segments.map(seg=>{
+  const id='auto:'+emp.id+':'+date+':'+Math.round(seg.from*60)+'-'+Math.round(seg.to*60);
+  return {...seg,id,employeeId:emp.id,date,origin:'auto',
+   accepted:state.overtimeReview?.[id]!==false};
+ });
  if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length){
   status='未导入';severity='rest';return pack();
  }
