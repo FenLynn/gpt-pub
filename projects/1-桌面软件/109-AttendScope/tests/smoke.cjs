@@ -332,7 +332,8 @@ async function run(){
   const ledger=asStatLedger(),people=EMPLOYEES,days=Array.from({length:monthDays()},(_,i)=>i+1);
   const counts=k=>asStatValue(ledger,k,'count',people,days);
   const eligible=state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')&&people.some(e=>e.id===r.employeeId)).length;
-  return counts('punch')===eligible&&counts('leave')===state.leaves.length&&
+  const distinctPunchPeople=new Set(state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')).map(r=>r.employeeId)).size;
+  return counts('punch')===eligible&&asStatValue(ledger,'punch','people',people,days)===distinctPunchPeople&&counts('leave')===state.leaves.length&&
     counts('trip')===state.trips.length&&counts('outing')===state.outings.length&&
     counts('overtime')===state.overtimeEntries.length&&
     asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
@@ -361,6 +362,11 @@ async function run(){
      Math.abs(get('outing','hours')-1.5)<1e-8&&get('outing','count')===2&&
      Math.abs(get('overtime','hours')-1.5)<1e-8&&get('overtime','count')===2&&
      get('trip','days',all)===4&&get('trip','count',all)===2&&
+     get('trip','people',[10])===1&&get('trip','people',[11])===1&&
+     get('trip','people',[12])===1&&get('trip','people',[13])===0&&
+     get('trip','people',all)===1&&
+     get('leave','people',[day])===1&&get('outing','people',[day])===1&&
+     get('overtime','people',[day])===1&&
      Math.abs(get('trip','estimatedHours',all)-asStatWorkMinutes()*3/60)<1e-8;
   }finally{Object.assign(state,prior)}
  },'R45 overlap union or multi-day trip counting inconsistent');

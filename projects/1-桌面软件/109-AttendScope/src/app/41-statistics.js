@@ -66,6 +66,7 @@ function asStatLedger(){
   const d=Number(String(r.date||'').slice(8,10));
   if(!String(r.date||'').startsWith(monthISO()+'-'))return;
   add('leave','count',id,d,1);
+  add('leave','presence',id,d,1);
   putInterval('leave',id,d,r.start,r.end,true);
  });
  apply(state.trips,'trip',(r,id)=>{
@@ -78,6 +79,7 @@ function asStatLedger(){
    const key=id+'|'+d;
    if(!tripPersonDays.has(key)){
     tripPersonDays.add(key);
+    add('trip','presence',id,d,1);
     add('trip','days',id,d,1);
     if(isWorkday(d))add('trip','estimatedHours',id,d,asStatWorkMinutes()/60);
    }
@@ -91,6 +93,7 @@ function asStatLedger(){
   for(let d=1;d<=dayCount;d++){
    const date=isoDate(d);if(date<from||date>to)continue;
    if(first==null)first=d;
+   add('outing','presence',id,d,1);
    putInterval('outing',id,d,r.start,r.end,false);
   }
   if(first!=null)add('outing','count',id,first,1);
@@ -99,6 +102,7 @@ function asStatLedger(){
   if(!String(r.date||'').startsWith(monthISO()+'-'))return;
   const d=Number(String(r.date).slice(8,10));
   add('overtime','count',id,d,1);
+  add('overtime','presence',id,d,1);
   putInterval('overtime',id,d,r.start,r.end,false);
  });
  // Time intervals from multiple records can overlap. Union them per person/day,
@@ -118,7 +122,9 @@ function asStatLedger(){
  apply(state.records,'punch',(r,id)=>{
   const date=String(r.datetime||'').slice(0,10);
   if(!date.startsWith(monthISO()+'-'))return;
-  add('punch','count',id,Number(date.slice(8,10)),1);
+  const day=Number(date.slice(8,10));
+  add('punch','count',id,day,1);
+  add('punch','presence',id,day,1);
  });
  for(const a of state.analysis.values()){
   if(!isWorkday(a.day))continue;
@@ -134,11 +140,13 @@ function asStatValue(ledger,family,metric,persons,days){
  const ids=new Set(persons.map(e=>e.id));
  const dateSet=new Set(days);
  if(metric==='people'){
+  // Count distinct employee IDs in the selected date window, not only the
+  // first calendar day where a multi-day event happened to be recorded.
   const seen=new Set();
   for(const [key,value] of ledger){
    if(value<=0)continue;
    const [k,m,id,day]=key.split('|');
-   if(k===family&&m==='count'&&ids.has(id)&&dateSet.has(Number(day)))seen.add(id);
+   if(k===family&&m==='presence'&&ids.has(id)&&dateSet.has(Number(day)))seen.add(id);
   }
   return seen.size;
  }
