@@ -7,6 +7,8 @@ function asNavSnapshot(){
   selection:{...(state.selection||{type:'overall'})},chartDay:state.chartDay||null,
   chartTab:state.chartTab||'overview',dataSection:state.dataSection||'records',
   rawDataTab:state.rawDataTab||'attendance',insightTab:state.insightTab||'summary',
+  statsScope:state.statsScope||'all',statsGroup:state.statsGroup||'',
+  statsPersonId:state.statsPersonId||'',statsExpandedKey:state.statsExpandedKey||'',
   filter:state.filter||'main',statsConfig:state.statsConfig?{...state.statsConfig}:null};
 }
 function asNavTrack(){
@@ -49,6 +51,10 @@ function asNavGo(direction){
   state.dataSection=target.dataSection;
   state.rawDataTab=target.rawDataTab;
   state.insightTab=target.insightTab;
+  state.statsScope=target.statsScope;
+  state.statsGroup=target.statsGroup;
+  state.statsPersonId=target.statsPersonId;
+  state.statsExpandedKey=target.statsExpandedKey;
   state.filter=target.filter;
   state.statsConfig=target.statsConfig?{...target.statsConfig}:null;
   state.rawPage=1;state.timelineRange=null;
@@ -64,9 +70,11 @@ function render(){
   document.documentElement.style.setProperty('--ui-scale',String(state.prefs?.fontScale||1));
   document.documentElement.classList.toggle('reduce-animations',state.prefs?.motion===false);
   bind();
-  renderCalendar();
-  renderMatrix();
-  if(state.analyticsPage==='stats'&&['all','group','person'].includes(state.workspaceMode))renderStatisticsWorkspace();
+  if(state.workspaceMode!=='stats'){
+   renderCalendar();
+   renderMatrix();
+  }
+  if(state.workspaceMode==='stats')renderStatisticsWorkspace();
   else renderAnalysisPanel();
 }
 
@@ -122,8 +130,8 @@ function layoutHtml(){
   </header>
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
-    <aside class="sidebar">
-      ${state.workspaceMode==='classic'?`
+    ${state.workspaceMode==='stats'?'':'<aside class="sidebar">'}
+      ${state.workspaceMode==='stats'?'':state.workspaceMode==='classic'?`
       <section class="side-section calendar-section">
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>
         <div class="calendar-grid" id="calendar"></div>
@@ -171,7 +179,7 @@ function layoutHtml(){
         </div>
       </section>
 `:workspaceSidebarHtml()}
-    </aside>
+    ${state.workspaceMode==='stats'?'':'</aside>'}
 
     <main class="workspace">
       ${workspaceToolbarHtml()}
@@ -190,7 +198,7 @@ function layoutHtml(){
           <div class="analysis-body" id="analysisBody"></div>
         </section>
       </div>
-      ${state.analyticsPage==='stats'&&['all','group','person'].includes(state.workspaceMode)?'<section id="statisticsWorkspace" class="stats-workspace"></section>':''}
+      ${state.workspaceMode==='stats'?'<section id="statisticsWorkspace" class="stats-workspace"></section>':''}
     </main>
   </div>
 
