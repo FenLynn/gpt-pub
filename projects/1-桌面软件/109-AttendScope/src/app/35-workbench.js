@@ -134,6 +134,8 @@ function timelineFullInsightHtml(item){
   '</div></section>';
   if(item.lunchEvidence==='未分段（工时按班次扣午休）')
     summary+='<p class="insight-issue">午休未分段：班内工时按上午／下午时段计算，不能证明午休期间实际工作。</p>';
+  if(item.autoOvertime?.reason&&(item.autoOvertime.minutes>0||item.overtime?.length))
+    summary+='<p class="insight-evidence">加班判断：'+safeTableText(item.autoOvertime.reason)+'</p>';
   if(item.issues.length)summary+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
   const behavior='<section class="insight-flat-section behavior-summary-card"><div class="insight-card-head"><span>行为区间</span><b>全天</b></div>'+
     ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
