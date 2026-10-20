@@ -93,6 +93,8 @@ function layoutHtml(){
           ${importMenuRow('考勤记录','attendanceInput','sampleAttendance')}
           ${importMenuRow('请假','leaveInput','sampleLeave')}
           ${importMenuRow('出差','tripInput','sampleTrip')}
+          ${importMenuRow('外出','outingInput','sampleOuting')}
+          ${importMenuRow('登记加班','overtimeInput','sampleOvertime')}
           <div class="import-divider"></div>
           <button class="import-reset" id="resetDemo">恢复模拟数据</button>
         </div>
@@ -187,6 +189,8 @@ function layoutHtml(){
   <input class="hidden" id="attendanceInput" type="file" accept=".xlsx,.csv">
   <input class="hidden" id="leaveInput" type="file" accept=".xlsx,.csv">
   <input class="hidden" id="tripInput" type="file" accept=".xlsx,.csv">
+  <input class="hidden" id="outingInput" type="file" accept=".xlsx,.csv">
+  <input class="hidden" id="overtimeInput" type="file" accept=".xlsx,.csv">
   `;
 }
 
@@ -198,6 +202,8 @@ function bind(){
   document.getElementById('attendanceInput').onchange=e=>handleFile(e,importAttendance);
   document.getElementById('leaveInput').onchange=e=>handleFile(e,importLeaves);
   document.getElementById('tripInput').onchange=e=>handleFile(e,importTrips);
+  document.getElementById('outingInput').onchange=e=>handleFile(e,importOutings);
+  document.getElementById('overtimeInput').onchange=e=>handleFile(e,importOvertime);
 
   const filter=document.getElementById('statusFilter');
   const filterButton=document.getElementById('statusFilterButton');
@@ -280,6 +286,8 @@ function bind(){
   document.getElementById('sampleAttendance').onclick=downloadAttendance;
   document.getElementById('sampleLeave').onclick=downloadLeaves;
   document.getElementById('sampleTrip').onclick=downloadTrips;
+  document.getElementById('sampleOuting').onclick=downloadOutings;
+  document.getElementById('sampleOvertime').onclick=downloadOvertimeEntries;
   document.getElementById('resetDemo').onclick=()=>{
     if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
     Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='main'; state.chartTab='overview';
