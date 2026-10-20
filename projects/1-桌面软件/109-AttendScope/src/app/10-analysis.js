@@ -298,7 +298,6 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
  // Decide the 5-minute threshold on the continuous in→out evidence first.
  // Registered overtime is an accounting overlay, not an 'out' punch and must
  // NOT break one session into several independent threshold candidates.
- const sessions=valid.filter(([start,end])=>end-start+1e-8>=minMinutes);
  const residual=[],raw=[];
  for(const [begin,end] of valid){
   let cursor=begin,fragments=[];
