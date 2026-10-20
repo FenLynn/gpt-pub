@@ -254,10 +254,12 @@ function asStatRankBreakdown(row,data){
  if(row.type==='day'&&asStatScopeMode()==='person'){
   const a=state.analysis.get((asStatScopePerson()||'')+'|'+Number(row.key));
   if(!a)return '';
-  return '<div class="as-rank-breakdown"><span>当日打卡证据</span><p>首进 '+escapeNameChar(a.firstIn?.slice(0,5)||'—')+
-   ' · 末出 '+escapeNameChar(a.lastOut?.slice(0,5)||'—')+
-   ' · 班内工时 '+asStatNumber((a.workMinutes||0)/60)+' 小时</p>'+
-   (a.lunchEvidence?'<p>'+escapeNameChar(a.lunchEvidence)+'</p>':'')+'</div>';
+  const lines=[['首进',a.firstIn?.slice(0,5)||'—'],
+   ['末出',a.lastOut?.slice(0,5)||'—'],
+   ['班内工时',asStatNumber((a.workMinutes||0)/60)+' 小时']];
+  if(a.lunchEvidence)lines.push(['午休证据',a.lunchEvidence]);
+  return '<div class="as-rank-breakdown">'+lines.map(([k,v])=>
+   '<div><span>'+escapeNameChar(k)+'</span><strong>'+escapeNameChar(v)+'</strong></div>').join('')+'</div>';
  }
  const dimensions=row.type==='group'?row.people.map(e=>({label:e.name,people:[e],days:row.days})):
   row.type==='person'?row.days.map(d=>({label:pad(d)+' 日',people:row.people,days:[d]})):
