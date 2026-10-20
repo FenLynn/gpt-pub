@@ -71,7 +71,7 @@ function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records))return null;
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     employees:payload.employees||null,groups:payload.groups||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null};
 }
 async function connectProjectDir(){
   if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
@@ -146,7 +146,7 @@ function workingPayload(){
     employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
-    outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
+    outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,
       firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))};
@@ -193,5 +193,5 @@ function toast(msg,error=false){
   document.body.appendChild(el);setTimeout(()=>el.remove(),3200);
 }
 const demo=generateMock();
-state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;state.outings=demo.outings||[];state.overtimeEntries=demo.overtimeEntries||[];state.manualStatuses={};state.judgmentMode='initial';
+state.records=demo.records;state.leaves=demo.leaves;state.trips=demo.trips;state.outings=demo.outings||[];state.overtimeEntries=demo.overtimeEntries||[];state.manualStatuses={};state.overtimeReview={};state.judgmentMode='initial';
 rememberMonth();reanalyze();render();
