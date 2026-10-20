@@ -380,8 +380,8 @@ function analyzeDay(emp,d){
  // A recalculated interval must not inherit a past exclusion from a DIFFERENT
  // imported evidence set even if its visible clock boundaries are identical.
  const sourceEvidence=[
-  ...punches.map(p=>p.recordId||p.importId+'|'+p.datetime+'|'+p.direction),
-  ...overtime.map(p=>p.id||p.start+'|'+p.end)
+  ...punches.map(p=>[p.recordId||'',p.importId||'',p.datetime||p.time||'',p.direction||''].join('/')),
+  ...overtime.map(p=>[p.id||'',p.start||'',p.end||''].join('/'))
  ].join('|');
  let sourceHash=2166136261;
  for(let i=0;i<sourceEvidence.length;i++)
