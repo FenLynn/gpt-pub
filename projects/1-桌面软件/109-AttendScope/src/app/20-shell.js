@@ -70,10 +70,8 @@ function render(){
   document.documentElement.style.setProperty('--ui-scale',String(state.prefs?.fontScale||1));
   document.documentElement.classList.toggle('reduce-animations',state.prefs?.motion===false);
   bind();
-  if(state.workspaceMode!=='stats'){
-   renderCalendar();
-   renderMatrix();
-  }
+  renderCalendar();
+  if(state.workspaceMode!=='stats')renderMatrix();
   if(state.workspaceMode==='stats')renderStatisticsWorkspace();
   else renderAnalysisPanel();
 }
