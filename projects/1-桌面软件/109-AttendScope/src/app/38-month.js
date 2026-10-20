@@ -26,6 +26,10 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   state.imports=next.imports;state.saved=next.saved;
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   if(next.rules)Object.assign(RULES,next.rules);
+  if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
+  if(next.rules&&next.rules.gracePmStart==null)RULES.gracePmStart=Number(next.rules.grace??5);
+  if(next.rules&&next.rules.graceAmEnd==null)RULES.graceAmEnd=0;
+  if(next.rules&&next.rules.gracePmEnd==null)RULES.gracePmEnd=0;
   if(next.prefs)state.prefs={...state.prefs,...next.prefs};
   state.selection={type:'overall'};state.filter='main';state.chartTab='overview';
   state.chartDay=null;state.rawPage=1;state.timelineRange=null;
