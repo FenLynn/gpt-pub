@@ -231,13 +231,12 @@ function asStatRows(){
  if(compare==='days')counted.sort((a,b)=>+a.key-+b.key);
  else counted.sort((a,b)=>c.sort==='asc'?a.value-b.value||a.label.localeCompare(b.label,'zh-CN'):
   b.value-a.value||a.label.localeCompare(b.label,'zh-CN'));
- // Full rankings stay accessible in the list and exported CSV; only the plot
- // caps categorical names to 12 visible marks to avoid an unreadable 50-row grid.
- const chartRows=compare==='days'?counted:counted.slice(0,
-   c.limit==='all'?Math.min(counted.length,12):Number(c.limit)||10);
+ // The chart always shows every member/category. The ranking-limit selector
+ // ONLY limits the right-side list, never the plot or aggregate facts.
+ const chartRows=counted;
  const nonzero=counted.filter(r=>r.raw>0);
  const rankPool=compare==='days'?nonzero.sort((a,b)=>
-   c.sort==='asc'?a.value-b.value||a.key-b.key:b.value-a.value||a.key-b.key):nonzero;
+   c.sort==='asc'?a.value-b.value||a.key-b.key:b.value-a.value||a.key-b.key):counted;
  const rankRows=rankPool.slice(0,c.limit==='all'?rankPool.length:Number(c.limit)||10);
  const grand=asStatValue(ledger,c.family,c.metric,people,days);
  const scheduled=days.filter(isWorkday).length*people.length;
@@ -273,6 +272,22 @@ function asStatRankBreakdown(row,data){
   ranked.map(d=>'<div><span>'+escapeNameChar(d.label)+'</span><strong>'+
    asStatNumber(d.value)+' '+escapeNameChar(data.unit)+'</strong></div>').join('')+'</div>';
 }
+function statisticsSidebarControlsHtml(){
+ const mode=asStatScopeMode(),groups=workspaceGroups(),group=asStatScopeGroup()||groups[0]||'';
+ const people=EMPLOYEES.filter(e=>groupOf(e)===group);
+ const personId=asStatScopePerson()||people[0]?.id||EMPLOYEES[0]?.id||'';
+ const groupControl=mode!=='all'?'<label class="stats-side-field">组别<select id="asStatsGroup">'+
+   asStatOptions(groups.map(g=>[g,g]),group)+'</select></label>':'';
+ const personControl=mode==='person'?'<label class="stats-side-field">人员<select id="asStatsPerson">'+
+   asStatOptions(people.map(e=>[e.id,people.some(p=>p.id!==e.id&&p.name===e.name)?
+     e.name+' · '+e.id:e.name]),personId)+'</select></label>':'';
+ return '<div class="stats-side-heading">统计范围</div>'+
+  '<label class="stats-side-field">范围<select id="asStatsScope">'+
+  asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+
+  '</select></label>'+groupControl+personControl+
+  '<button id="asStatsExport" type="button" class="as-stats-export stats-side-export" '+
+  'title="导出当前指标完整明细 CSV">导出当前统计 <span aria-hidden="true">↗</span></button>';
+}
 function statisticsWorkspaceHtml(){
  const c=asStatPrefs(),met=asStatMetric(),mode=asStatScopeMode();
  const groups=workspaceGroups(),scopeGroup=asStatScopeGroup()||groups[0]||'';
@@ -295,15 +310,11 @@ function statisticsWorkspaceHtml(){
    !state.overtimeEntries?.length):false);
  const aggregates=[['total','总量'],['perPerson','人均'],['per100','每百应出勤人日']]
    .filter(x=>x[0]!=='perPerson'||(c.compare!=='people'&&mode!=='person'));
- const selectionGroup=(mode==='group'||mode==='person')?
-  '<label>组别<select id="asStatsGroup">'+asStatOptions(groups.map(g=>[g,g]),scopeGroup)+'</select></label>':'';
- const selectionPerson=mode==='person'?
-  '<label>人员<select id="asStatsPerson">'+asStatOptions(scopePeople.map(e=>[
-   e.id,scopePeople.some(x=>x.id!==e.id&&x.name===e.name)?e.name+' · '+e.id:e.name
-  ]),chosenPerson)+'</select></label>':'';
- const chartHint=selected.compare!=='days'&&selected.rows.length>selected.visible.length?
-  '图表显示前 '+selected.visible.length+' 项，右侧榜单可查看'+(c.limit==='all'?'全部':'更多')+'记录':'';
- const chartTitle=met[1]+' · '+(comparisons.find(x=>x[0]===c.compare)?.[1]||'统计');
+ const scopedTitle=mode==='all'?'全员（'+selected.people.length+'人）':
+  mode==='group'?scopeGroup+'（'+selected.people.length+'人）':
+   (selected.people[0]?.name||'个人')+
+    (selected.people[0]&&EMPLOYEES.filter(e=>e.name===selected.people[0].name).length>1?
+      ' · '+selected.people[0].id:'');
  const ranking=selected.rankRows.length?selected.rankRows.map((r,i)=>{
   const detailId='asRankDetail'+i,expanded=state.statsExpandedKey===r.type+'|'+r.key;
   return '<div class="as-rank-entry"><button class="as-stats-rank-row'+(expanded?' is-expanded':'')+
@@ -319,36 +330,27 @@ function statisticsWorkspaceHtml(){
  }).join(''):'<p class="as-stats-empty">本月暂无该指标的记录</p>';
  return '<section class="as-stats" aria-label="考勤统计工作台">'+
   '<header class="as-stats-heading"><h2>考勤统计</h2>'+
-  '<div class="as-stats-heading-actions"><div class="as-stats-scope" aria-label="统计范围">'+
-  '<label>范围<select id="asStatsScope">'+asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+'</select></label>'+
-  selectionGroup+selectionPerson+'</div>'+
-  '<button id="asStatsExport" type="button" class="as-stats-export" title="导出当前指标的明细 CSV">导出数据 ↗</button></div></header>'+
   '<div class="as-stats-filters" aria-label="统计图表筛选">'+
    '<label>业务<select id="asStatFamily">'+asStatOptions(AS_STAT_FAMILIES.map(f=>[f[0],f[1]]),c.family)+'</select></label>'+
    '<label>指标<select id="asStatMetric">'+asStatOptions(asStatVisibleMetrics(c.family,c.compare,mode).map(m=>[m[0],m[1]]),c.metric)+'</select></label>'+
-   '<label>对比对象<select id="asStatCompare">'+asStatOptions(comparisons,c.compare)+'</select></label>'+
-   '<label>统计方式<select id="asStatAggregate">'+asStatOptions(aggregates,c.aggregate)+'</select></label>'+
-   '<label>排序范围<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
+   '<label>对比<select id="asStatCompare">'+asStatOptions(comparisons,c.compare)+'</select></label>'+
+   '<label>统计<select id="asStatAggregate">'+asStatOptions(aggregates,c.aggregate)+'</select></label>'+
+   '<label>榜单<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
   '</div>'+
-  '<div class="as-stats-inline" aria-live="polite">'+
-   '<div><span>'+(c.aggregate==='total'?'范围总量':c.aggregate==='perPerson'?'人均':'每百人日')+'</span>'+
-   '<strong>'+asStatNumber(selected.total)+' <small>'+escapeNameChar(selected.effectiveUnit)+'</small></strong></div>'+
-   '<div><span>员工</span><strong>'+selected.people.length+' <small>人</small></strong></div>'+
-   '<div><span>应出勤</span><strong>'+selected.scheduled+' <small>人日</small></strong></div></div>'+
+  '<div class="as-stats-total" aria-live="polite"><span>'+
+   (c.aggregate==='total'?'范围总量':c.aggregate==='perPerson'?'范围人均':'每百人日')+'</span>'+
+   '<strong>'+asStatNumber(selected.total)+'<small>'+escapeNameChar(selected.effectiveUnit)+'</small></strong></div></header>'+
   '<div class="as-stats-visual"><div class="as-stats-chart"><div class="as-stats-chart-header">'+
-   '<h3>'+escapeNameChar(chartTitle)+'</h3>'+
+   '<span class="as-stats-chart-metric">'+escapeNameChar(met[1])+'</span>'+
+   '<h3 class="as-stats-chart-context">'+escapeNameChar(scopedTitle)+'</h3>'+
    '<div class="as-stats-chart-switch"><button type="button" data-as-chart="bar" aria-pressed="'+(c.chart==='bar')+'" class="'+(c.chart==='bar'?'active':'')+'">柱状</button>'+
    '<button type="button" data-as-chart="line" aria-pressed="'+(c.chart==='line')+'" class="'+(c.chart==='line'?'active':'')+
-   '" '+(selected.compare==='days'?'':'disabled title="日期趋势才适合折线图"')+'>折线</button></div></div>'+
-   '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表"></div>'+
-   (chartHint?'<p class="as-stats-chart-hint">'+escapeNameChar(chartHint)+'</p>':'')+
+    '" '+(selected.compare==='days'?'':'disabled title="日期趋势才适合折线图"')+'>折线</button></div></div>'+
+   '<div id="asStatChart" class="as-stats-chart-canvas" aria-label="交互式统计图表，包含本范围全部数据"></div>'+
    '<div class="as-stats-chart-empty">当前指标没有可绘制的记录</div></div>'+
-   '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜 · 点击展开</h3>'+
+   '<div class="as-stats-rank"><div class="as-stats-rank-head"><h3>排行榜</h3>'+
     '<button id="asStatSort" type="button" title="调整排名方向">'+(c.sort==='desc'?'降序 ↓':'升序 ↑')+'</button></div>'+
-   '<div class="as-stats-rank-table" id="asStatRankTable">'+ranking+'</div></div></div>'+
-  '<div class="as-stats-foot"><span>'+escapeNameChar(warning)+'</span>'+
-  (unavailable?'<strong>当前未导入此类记录</strong>':'')+
-  '<span>单击展开 · 双击下钻</span></div></section>';
+   '<div class="as-stats-rank-table" id="asStatRankTable">'+ranking+'</div></div></div></section>';
 }
 function asStatDrill(key){
  const row=asStatRows().rows.find(r=>r.key===key);
