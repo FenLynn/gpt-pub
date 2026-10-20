@@ -475,48 +475,29 @@ function analyzeDay(emp,d){
  const completePairs=attendanceDailyVisits(emp.id,date);
  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
    overtime=overtimeFor(emp.id,date),typ=dayType(d);
- let severity='normal',status='正常',issues=[],pairs=[],pending=null,pairingUncertain=false;
+ let severity='normal',status='正常',issues=[],pairs=completePairs,pending=null,pairingUncertain=false;
  const suspect=message=>{
   if(!issues.includes(message))issues.push(message);
   if(severity!=='problem')severity='suspect';
  };
+ const wholeVisits=attendanceVisitEvents(emp.id);
  for(let i=0;i<punches.length;i++){
   const p=punches[i],prev=punches[i-1];
   if(prev&&prev.direction===p.direction){
    const diff=Math.abs(minutes(p.time)-minutes(prev.time));
-   suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:'连续'+p.direction+
-     (p.direction==='进'?'（无离开记录，按连续在岗计算）':''));
-   // Additional 'in' punches inside one open visit do not prove an exit.
-   // Keep the original entry; only genuinely unpaired/contradictory punches
-   // can invalidate inferred overtime.
-   if(p.direction!=='进')pairingUncertain=true;
+   suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:
+    '连续'+p.direction+(p.direction==='进'?'（无离开记录，按连续在岗计算）':''));
+   if(p.direction==='出')pairingUncertain=true;
   }
-  if(p.direction==='进'){
-   if(!pending)pending=p;
-  }else if(p.direction==='出'){
-   if(pending){pairs.push([pending,p]);pending=null}
-   else{pairingUncertain=true;suspect('缺少对应进入记录')}
-  }
- }
- // A midnight boundary is not an 'out'. Match its next-day punch
- // before declaring an entry open or a next-day exit unpaired.
- const covered=new Set();
- for(const [start,end] of completePairs){
-  if(start.recordId)covered.add(start.recordId);
-  if(end.recordId)covered.add(end.recordId);
- }
- const missing=punches.filter(p=>!covered.has(p.recordId));
- if(missing.some(p=>p.direction==='进')){
-  suspect('存在未闭合进入记录');pairingUncertain=true;
- }
- if(missing.some(p=>p.direction==='出')){
-  suspect('缺少对应进入记录');pairingUncertain=true;
- }
- if(completePairs.length){
-  pairs=completePairs;
-  // The local noon/midnight split must not poison an otherwise complete
-  // in→out pair. Genuine extra exits still set pairingUncertain above.
-  pairingUncertain=missing.length>0;
+  const stamp=attendanceUtcMinute(date,p.time);
+  const matched=wholeVisits.some(v=>p.direction==='进'?
+    stamp>=v.from&&stamp<v.to:
+    stamp===v.to&&(v.exit.recordId===p.recordId||
+      (!p.recordId&&v.exit.datetime===p.datetime)));
+  if(matched)continue;
+  if(p.direction==='进'){suspect('存在未闭合进入记录');pending=p}
+  else suspect('缺少对应进入记录');
+  pairingUncertain=true;
  }
  const covers=(rows,start,end)=>rows.some(x=>minutes(x.start||'00:00')<=minutes(start)&&minutes(x.end||'24:00')>=minutes(end));
  const overlapEnough=(rows,start,end,need=180)=>rows.some(x=>
