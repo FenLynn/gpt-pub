@@ -272,7 +272,9 @@ function statisticsWorkspaceHtml(){
  const selectionGroup=(mode==='group'||mode==='person')?
   '<label>组别<select id="asStatsGroup">'+asStatOptions(groups.map(g=>[g,g]),scopeGroup)+'</select></label>':'';
  const selectionPerson=mode==='person'?
-  '<label>人员<select id="asStatsPerson">'+asStatOptions(scopePeople.map(e=>[e.id,e.name]),chosenPerson)+'</select></label>':'';
+  '<label>人员<select id="asStatsPerson">'+asStatOptions(scopePeople.map(e=>[
+   e.id,scopePeople.some(x=>x.id!==e.id&&x.name===e.name)?e.name+' · '+e.id:e.name
+  ]),chosenPerson)+'</select></label>':'';
  const chartHint=selected.compare!=='days'&&selected.rows.length>selected.visible.length?
   '图表显示前 '+selected.visible.length+' 项，右侧榜单可查看'+(c.limit==='all'?'全部':'更多')+'记录':'';
  const chartTitle=met[1]+' · '+(comparisons.find(x=>x[0]===c.compare)?.[1]||'统计');
