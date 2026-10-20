@@ -496,7 +496,7 @@ function renderStatisticsWorkspace(){
    axisTick:{show:false},axisLine:{lineStyle:{color:'#dfe9e3'}}},
   yAxis:{type:'value',min:0,axisLabel:{fontSize:11,color:'#80958c'},
    splitLine:{lineStyle:{color:'rgba(105,145,126,.10)'}},axisLine:{show:false}},
-  series:[{id:'statistics-primary',name:met?.[1]||'统计值',
+  series:[{id:'statistics-primary',name:asStatMetric()[1]||'统计值',
    type:line?'line':'bar',data:values,barMaxWidth:31,barMinHeight:values.some(v=>v>0)?1:0,
    smooth:false,showSymbol:true,symbol:'circle',symbolSize:5.5,
    itemStyle:{color:gradient,opacity:line?1:.79,borderRadius:line?0:[5,5,0,0]},
