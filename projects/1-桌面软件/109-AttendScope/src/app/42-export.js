@@ -6,7 +6,7 @@ async function captureImage(src){const i=new Image();i.src=src;await new Promise
 
 /* R63: faithfully compose chart, legends, context counts, and right-hand facts. */
 function r63Title(){return typeof attendTitle==='function'?attendTitle():'考勤'}
-function r63FileStem(){return r63Title().replace(/[\\/:*?"<>|\\x00-\\x1f]/g,'_').trim()||'考勤'}
+function r63FileStem(){return r63Title().replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').trim()||'考勤'}
 function r63ReportData(kind){
  if(kind==='stats'){
   const d=asStatRows(),p=asStatPrefs(),label=asStatFamily(p.family)[2].find(x=>x[0]===p.metric)?.[1]||'统计';
