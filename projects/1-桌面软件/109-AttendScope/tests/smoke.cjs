@@ -1020,22 +1020,27 @@ async function run(){
  if(!csv.suggestedFilename().includes('punch'))throw Error('R52 statistics CSV filename incorrect');
  await page.setViewportSize({width:1366,height:768});
  await check(page,()=>{
-  const f=[...document.querySelectorAll('.as-stats-filters label')],top=f[0].getBoundingClientRect().top;
-  const widths=Object.fromEntries(['Family','Metric','Compare','Aggregate','Limit'].map(k=>
-   [k,document.getElementById('asStat'+k)?.getBoundingClientRect().width||0]));
+  const f=[...document.querySelectorAll('.as-stats-filters label')],
+   side=document.getElementById('statsSidebarControls'),
+   box=side?.getBoundingClientRect(),
+   selects=['Family','Metric','Compare','Aggregate','Limit'].map(k=>document.getElementById('asStat'+k));
+  const tops=f.map(e=>e.getBoundingClientRect().top),
+   lefts=f.map(e=>e.getBoundingClientRect().left);
   const heading=document.querySelector('.as-stats-heading');
-  const title=heading.querySelector('h2').getBoundingClientRect();
-  const total=heading.querySelector('.as-stats-total').getBoundingClientRect();
-  const sidebar=document.getElementById('statsSidebarControls');
-  return f.length===5&&f.every(e=>Math.abs(e.getBoundingClientRect().top-top)<2)&&
-   widths.Family<=130&&widths.Metric<=175&&widths.Compare<=135&&
-   widths.Aggregate<=142&&widths.Limit<=105&&
-   Math.abs(title.top-total.top)<22&&
-   sidebar?.contains(document.getElementById('asStatsScope'))&&
-   sidebar?.contains(document.getElementById('asStatsExport'))&&
-   !document.querySelector('.as-stats-inline')&&!document.querySelector('.as-stats-foot')&&
+  const title=heading.querySelector('h2').getBoundingClientRect(),
+   total=heading.querySelector('.as-stats-total').getBoundingClientRect();
+  return f.length===5&&f.every((e,i)=>side.contains(e)&&selects[i]&&e.contains(selects[i]))&&
+   tops.every((t,i)=>i===0||t>tops[i-1]+22)&&
+   lefts.every(x=>Math.abs(x-lefts[0])<3)&&
+   selects.every(x=>x.getBoundingClientRect().right<=box.right+2)&&
+   Math.abs(title.top-total.top)<24&&
+   side.contains(document.getElementById('asStatsScope'))&&
+   side.contains(document.getElementById('asStatsExport'))&&
+   document.getElementById('asStatsExport').tagName==='BUTTON'&&
+   document.getElementById('asStatsExport').textContent.includes('导出')&&
+   !document.querySelector('.as-stats-heading .as-stats-filters')&&
    document.documentElement.scrollWidth<=innerWidth+3;
- },'R52 five compact filters must remain aligned at 1366px');
+ },'R69 statistics five selectors vertically aligned and export as sidebar button at 1366px');
  await page.screenshot({path:path.join(out,'r52-top-groups-1366.png')});
  await page.setViewportSize({width:1600,height:900});
  await page.screenshot({path:path.join(out,'r52-top-groups-1600.png')});
