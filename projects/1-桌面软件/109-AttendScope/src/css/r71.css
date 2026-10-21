@@ -187,3 +187,27 @@
 .r71-insights-rank{flex:0 0 auto!important;min-height:0!important}
 .r71-insights .r68-scope-rank{flex:0 0 auto!important}
 @media(max-height:800px){.r71-insights-trend{flex:1 1 140px!important;min-height:105px!important}}
+
+/* R72 · compact, full-width editable roster and explicit group registry. */
+.layout.workspace-mode-data>.workspace{padding-top:8px!important}
+.layout.workspace-mode-data .workspace-toolbar{margin:0 0 5px!important;min-height:26px!important}
+.layout.workspace-mode-data .r71-data-content{padding:0!important}
+.layout.workspace-mode-data .r71-content-head{margin:0 0 8px!important}
+.layout.workspace-mode-data .r72-roster-tools{display:flex;align-items:center;gap:9px;margin:0 0 8px;flex-wrap:wrap}
+.layout.workspace-mode-data .r72-roster-tools>span{font-size:13px}
+.layout.workspace-mode-data .r72-group-manager{display:flex;align-items:center;gap:8px;
+ border-top:1px solid #e5ecf2;padding:9px 0 7px;flex-wrap:wrap}
+.layout.workspace-mode-data .r72-group-manager strong{font-size:13px;font-weight:650;color:#526f83}
+.layout.workspace-mode-data .r72-group-manager select{min-width:155px;min-height:34px;font-size:13px}
+.layout.workspace-mode-data .r72-roster-bulk{padding:8px 0;margin:0 0 7px;gap:9px;border:0!important;
+ background:transparent!important;border-top:1px solid #e6edf3!important;border-bottom:1px solid #e6edf3!important}
+.layout.workspace-mode-data .r72-roster-bulk select{min-width:135px;font-size:13px}
+.layout.workspace-mode-data .r72-roster-list{max-height:calc(100vh - var(--topbar) - 262px);border:0!important}
+.layout.workspace-mode-data .r72-roster-list .r68-roster-entry{grid-template-columns:24px minmax(90px,1.2fr)
+ minmax(112px,1fr) 68px 80px 45px;gap:10px;min-height:37px;padding:5px 10px;font-size:13px}
+.layout.workspace-mode-data .r72-roster-list .r68-roster-entry select{width:100%;font-size:13px;
+ min-height:29px;border:1px solid #e0e9ef;background:transparent;border-radius:5px;color:#385d75}
+.r72-fixed-toggle{border:0;background:transparent;padding:5px 3px;color:#8495a5;
+ font-size:12px;font-weight:600;cursor:pointer}
+.r72-fixed-toggle.is-fixed{color:#32816a}
+.r72-fixed-toggle:hover{text-decoration:underline}

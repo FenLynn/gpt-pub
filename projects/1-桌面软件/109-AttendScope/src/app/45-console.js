@@ -19,39 +19,146 @@ function r68RosterRows(){
  const query=r68UI.search.trim().toLocaleLowerCase();
  return EMPLOYEES.filter(e=>{
   const g=state.groups?.[e.id]||'未分组';
-  if(r68UI.rosterFilter==='ungrouped'&&state.groups?.[e.id])return false;
+  if(r68UI.rosterFilter==='ungrouped'&&groupOf(e)!=='未分组')return false;
+  if(r68UI.rosterFilter==='fixed'&&!(state.fixedPeople||[]).includes(e.id))return false;
+  if(r68UI.rosterFilter==='temporary'&&(state.fixedPeople||[]).includes(e.id))return false;
   if(r68UI.rosterFilter==='new'&&!(state.imports||[]).some(x=>
    state.records.some(r=>r.employeeId===e.id&&r.importId===x.id)))return false;
   return !query||(e.name+' '+g).toLocaleLowerCase().includes(query);
  });
 }
+/* R72 roster: unique names, explicit groups, month membership and project-wide fixed staff. */
 function r68RosterHtml(){
- const rows=r68RosterRows(),groups=workspaceGroups(),chosen=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id));
- return r68SidebarHeader('员工名册','姓名是唯一身份；从考勤 CSV / Excel 自动识别，无需逐人录入。',
-  '<button class="r68-btn" id="r68PinRoster">固定为项目默认</button>')+
-  '<div class="r68-roster-tools"><input id="r68RosterSearch" placeholder="搜索姓名或组别" value="'+r68Esc(r68UI.search)+'" aria-label="搜索人员">'+
+ const rows=r68RosterRows(),groups=workspaceGroups().filter(g=>g!=='未分组'),
+  catalog=state.groupCatalog||[],chosen=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),
+  fixed=new Set(state.fixedPeople||[]);
+ const options='<option value="未分组">未分组</option>'+
+  groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('');
+ return r68SidebarHeader('人员与分组','导入自动发现人员；姓名唯一，固定人员自动进入新月份。',
+  '<button type="button" class="r68-btn" id="r72AddPerson">+ 新增人员</button>')+
+  '<div class="r68-roster-tools r72-roster-tools"><input id="r68RosterSearch" aria-label="搜索姓名或组别" placeholder="搜索姓名或组别" value="'+r68Esc(r68UI.search)+'">'+
   '<select id="r68RosterFilter" aria-label="人员筛选">'+
-   [['all','全部人员'],['ungrouped','未分组'],['new','本月导入人员']].map(([v,t])=>
+   [['all','所有人员'],['ungrouped','未分组'],['new','本月导入'],['fixed','固定人员'],['temporary','非固定人员']].map(([v,t])=>
     '<option value="'+v+'" '+(r68UI.rosterFilter===v?'selected':'')+'>'+t+'</option>').join('')+'</select>'+
-  '<span>'+rows.length+' / '+EMPLOYEES.length+' 人</span></div>'+
-  '<div class="r68-roster-bulk"><label><input id="r68SelectVisible" type="checkbox" '+(rows.length&&rows.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'> 全选当前筛选</label>'+
-    '<span>已选 '+chosen.length+' 人</span>'+
-    '<select id="r68BulkGroup" aria-label="批量设定组别"><option value="">选择组别…</option>'+
-    groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('')+
-    '<option value="__new__">+ 新建组别</option></select>'+
-    '<button type="button" class="r68-btn primary" id="r68ApplyGroup" '+(!chosen.length?'disabled':'')+'>批量应用</button></div>'+
-  '<div class="r68-roster-list" role="table" aria-label="人员名册">'+
-    '<div class="r68-roster-entry r68-roster-columns" role="row"><span></span><span>姓名</span><span>组别</span><span>来源</span><span>操作</span></div>'+
-    (rows.length?rows.map(e=>{
-     const g=state.groups?.[e.id]||'未分组';
-     const detected=state.records.some(r=>r.employeeId===e.id&&String(r.recordId||'').startsWith('import:'));
-     return '<div class="r68-roster-entry" role="row"><input type="checkbox" aria-label="选择 '+r68Esc(e.name)+'" data-r68-person="'+r68Esc(e.id)+'" '+
-      (r68UI.chosen.has(e.id)?'checked':'')+'><strong>'+r68Esc(e.name)+'</strong>'+
-      '<span>'+r68Pill(g,g==='未分组'?'warning':'neutral')+'</span>'+
-      '<small>'+(detected?'本月导入':'继承 / 演示')+'</small>'+
-      '<button class="r68-inline" data-edit-roster-group="'+r68Esc(e.id)+'">编辑</button></div>'
-    }).join(''):'<div class="r68-empty">当前筛选没有人员，可导入考勤文件自动建立名册。</div>')+
+  '<span>'+rows.length+' 人 · 固定 '+fixed.size+' 人</span></div>'+
+  '<div class="r72-group-manager"><strong>组别</strong>'+
+   '<select id="r72GroupToRemove" aria-label="管理已有组别"><option value="">选择组别…</option>'+
+   catalog.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('')+'</select>'+
+   '<button type="button" class="r68-btn" id="r72AddGroup">+ 新增组别</button>'+
+   '<button type="button" class="r68-btn" id="r72DeleteGroup">删除组别</button></div>'+
+  '<div class="r68-roster-bulk r72-roster-bulk"><label><input id="r68SelectVisible" type="checkbox" '+
+   (rows.length&&rows.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'> 全选当前筛选</label>'+
+   '<span>已选 '+chosen.length+' 人</span>'+
+   '<select id="r68BulkGroup" aria-label="批量分组">'+options+'</select>'+
+   '<button type="button" class="r68-btn" id="r68ApplyGroup" '+(!chosen.length?'disabled':'')+'>应用组别</button>'+
+   '<button type="button" class="r68-btn" id="r72FixSelected" '+(!chosen.length?'disabled':'')+'>设为固定</button>'+
+   '<button type="button" class="r68-btn" id="r72UnfixSelected" '+(!chosen.length?'disabled':'')+'>移出固定</button></div>'+
+  '<div class="r68-roster-list r72-roster-list" role="table" aria-label="人员名册">'+
+   '<div class="r68-roster-entry r68-roster-columns" role="row"><span></span><span>姓名</span><span>所属组别</span><span>固定</span><span>来源</span><span>操作</span></div>'+
+   (rows.length?rows.map(e=>{
+    const detected=state.records.some(r=>r.employeeId===e.id&&String(r.recordId||'').startsWith('import:'));
+    return '<div class="r68-roster-entry" role="row">'+
+     '<input type="checkbox" data-r68-person="'+r68Esc(e.id)+'" aria-label="选择 '+r68Esc(e.name)+'" '+
+      (r68UI.chosen.has(e.id)?'checked':'')+'><strong title="'+r68Esc(e.name)+'">'+r68Esc(e.name)+'</strong>'+
+     '<select data-r72-person-group="'+r68Esc(e.id)+'" aria-label="'+r68Esc(e.name)+'的组别">'+
+      '<option value="未分组" '+(groupOf(e)==='未分组'?'selected':'')+'>未分组</option>'+
+      groups.map(g=>'<option value="'+r68Esc(g)+'" '+(groupOf(e)===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
+     '</select>'+
+     '<button type="button" class="r72-fixed-toggle '+(fixed.has(e.id)?'is-fixed':'')+'" data-r72-toggle-fixed="'+r68Esc(e.id)+'" aria-pressed="'+fixed.has(e.id)+'">'+
+      (fixed.has(e.id)?'已固定':'临时')+'</button>'+
+     '<small>'+(detected?'本月导入':'已有名册')+'</small>'+
+     '<button type="button" class="r68-inline" data-r72-rename="'+r68Esc(e.id)+'">改名</button></div>';
+   }).join(''):'<div class="r68-empty">暂无人员。导入文件会自动识别姓名，也可手动新增。</div>')+
   '</div>';
+}
+function r72MarkDirty(action,details={}){
+ state.revisions.push({id:'R'+(++state.revisionSeq),key:'roster',action,...details,
+  time:new Date().toISOString()});
+ state.saved=false;rememberMonth();reanalyze();render();
+}
+/* Fixed staff are a project default, not a deletion or replacement of current
+ * month observations. Never touch frozen snapshots or previously saved months. */
+async function r72PersistRoster(){
+ const ids=new Set(state.fixedPeople||[]);
+ const selected=EMPLOYEES.filter(e=>ids.has(e.id));
+ const profile={...(state.projectProfile||{}),schemaVersion:1,pinRoster:true,
+  employees:selected.map(e=>({...e})),fixedPeople:selected.map(e=>e.id),
+  groups:Object.fromEntries(selected.map(e=>[e.id,groupOf(e)])),
+  groupCatalog:[...(state.groupCatalog||[])],savedAt:new Date().toISOString()};
+ if(!state.projectDir){state.projectProfile=profile;return}
+ try{
+  const config=await dir(state.projectDir,'config');
+  // Re-read to preserve external changes to import/rules defaults.
+  const disk=await readJSON(config,'project-profile.json')||{};
+  const merged={...disk,...profile};
+  await writeFile(config,'project-profile.json',JSON.stringify(merged,null,2));
+  state.projectProfile=merged;
+ }catch(e){toast('当前月份已更新，但固定名册写入项目目录失败：'+e.message,true)}
+}
+async function r72FixedPeople(ids,makeFixed){
+ const selected=new Set(state.fixedPeople||[]);
+ for(const id of ids)if(EMPLOYEES.some(e=>e.id===id)){
+  if(makeFixed)selected.add(id);else selected.delete(id);
+ }
+ state.fixedPeople=[...selected];
+ r72MarkDirty(makeFixed?'fix-people':'unfix-people',{employees:[...ids]});
+ await r72PersistRoster();
+}
+function r72AddPerson(){
+ const input=window.prompt('新增人员姓名（姓名唯一）','');if(input===null)return;
+ const name=normalizedPerson(input);
+ if(!name||name.length>50){toast('姓名须为 1–50 个字符',true);return}
+ if(EMPLOYEES.some(e=>normalizedPerson(e.name)===name)){toast('这个姓名已经存在',true);return}
+ EMPLOYEES.push({id:personIdentity(name),name,department:'未分类'});
+ state.groups[personIdentity(name)]='未分组';state.isDemo=false;
+ r72MarkDirty('add-person',{employeeId:personIdentity(name),name});
+}
+function r72RenamePerson(id){
+ const employee=EMPLOYEES.find(e=>e.id===id);if(!employee)return;
+ const input=window.prompt('修改姓名（必须唯一；本月关联记录会同步更名）',employee.name);
+ if(input===null)return;
+ const name=normalizedPerson(input);
+ if(!name||name.length>50||EMPLOYEES.some(e=>e.id!==id&&normalizedPerson(e.name)===name)){
+  toast('姓名不能为空、超过 50 字或与已有姓名重复',true);return;
+ }
+ if(name===employee.name)return;
+ if(!window.confirm('将「'+employee.name+'」改为「'+name+'」？本月打卡、业务记录和人工判定将按新身份关联，磁盘原件和已冻结快照不会改动。'))return;
+ const newId=personIdentity(name),oldName=employee.name;
+ for(const list of [state.records,state.leaves,state.trips,state.outings,state.overtimeEntries]){
+  for(const row of list||[])if(row.employeeId===id){
+   row.employeeId=newId;
+   if(row.name){if(!row.sourceName)row.sourceName=row.name;row.name=name}
+  }
+ }
+ employee.id=newId;employee.name=name;
+ state.groups[newId]=state.groups[id]||'未分组';if(id!==newId)delete state.groups[id];
+ state.fixedPeople=(state.fixedPeople||[]).map(x=>x===id?newId:x);
+ state.manualStatuses=Object.fromEntries(Object.entries(state.manualStatuses||{}).map(([key,v])=>
+  [key.startsWith(id+'|')?newId+key.slice(id.length):key,v]));
+ state.overtimeReview=Object.fromEntries(Object.entries(state.overtimeReview||{}).map(([key,v])=>
+  [key.replace('auto-visit:'+id+':','auto-visit:'+newId+':').replace('auto:'+id+':','auto:'+newId+':'),v]));
+ if(state.selection.employeeId===id)state.selection.employeeId=newId;
+ r68UI.chosen=new Set([...r68UI.chosen].map(x=>x===id?newId:x));
+ r72MarkDirty('rename-person',{employeeId:newId,from:oldName,to:name});
+ if((state.fixedPeople||[]).includes(newId))r72PersistRoster();
+}
+async function r72CreateGroup(){
+ const input=window.prompt('新组别名称（1–24 字）','');if(input===null)return;
+ const group=String(input).trim();
+ if(!group||group.length>24||group==='未分组'||(state.groupCatalog||[]).includes(group)){
+  toast('组别名称无效或已经存在',true);return;
+ }
+ state.groupCatalog=[...(state.groupCatalog||[]),group];
+ r72MarkDirty('create-group',{group});await r72PersistRoster();
+}
+async function r72DeleteGroup(group){
+ if(!group||!(state.groupCatalog||[]).includes(group))return;
+ const n=EMPLOYEES.filter(e=>groupOf(e)===group).length;
+ if(!window.confirm('删除组别「'+group+'」？'+n+' 位现有成员将改为未分组；原始记录不会删除。'))return;
+ state.groupCatalog=state.groupCatalog.filter(g=>g!==group);
+ for(const e of EMPLOYEES)if(groupOf(e)===group)state.groups[e.id]='未分组';
+ if(state.selectedGroup===group)state.selectedGroup='未分组';
+ r72MarkDirty('delete-group',{group,reassigned:n});await r72PersistRoster();
 }
 function r68RulesHtml(){
  const items=[
@@ -239,19 +346,29 @@ function r68RenderData(){
   r68RosterRows().forEach(p=>e.target.checked?r68UI.chosen.add(p.id):r68UI.chosen.delete(p.id));r68RefreshDataContent()
  });
  root.querySelector('#r68ApplyGroup')?.addEventListener('click',()=>{
-  const ids=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id));
-  if(!ids.length)return;
-  let value=root.querySelector('#r68BulkGroup').value;
-  if(value==='__new__')value=window.prompt('输入新组别名称（最多 24 字）','')||'';
-  value=String(value).trim();
-  if(!value||value.length>24){toast('请选择有效组别（1–24 字）',true);return}
-  if(!window.confirm('将 '+ids.length+' 位员工批量调整到「'+value+'」？仅影响当前月份，保存或固定后才长期生效。'))return;
-  for(const id of ids)state.groups[id]=value;
-  state.revisions.push({id:'R'+(++state.revisionSeq),key:'roster',action:'bulk-group',to:value,
-    employees:ids,time:new Date().toISOString(),note:'批量分组'});
-  state.saved=false;rememberMonth();reanalyze();render()
+  const ids=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),g=root.querySelector('#r68BulkGroup')?.value;
+  if(!ids.length||!g)return;
+  if(g!=='未分组'&&!(state.groupCatalog||[]).includes(g)){toast('请先创建组别',true);return}
+  for(const id of ids)state.groups[id]=g;
+  r72MarkDirty('bulk-group',{to:g,employees:ids});
  });
- root.querySelectorAll('[data-edit-roster-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editRosterGroup));
+ root.querySelectorAll('[data-r72-person-group]').forEach(select=>select.onchange=()=>{
+  const group=select.value;
+  if(group!=='未分组'&&!(state.groupCatalog||[]).includes(group))return;
+  state.groups[select.dataset.r72PersonGroup]=group;
+  r72MarkDirty('assign-group',{employeeId:select.dataset.r72PersonGroup,to:group});
+ });
+ root.querySelector('#r72AddPerson')?.addEventListener('click',r72AddPerson);
+ root.querySelector('#r72AddGroup')?.addEventListener('click',()=>r72CreateGroup());
+ root.querySelector('#r72DeleteGroup')?.addEventListener('click',()=>
+  r72DeleteGroup(root.querySelector('#r72GroupToRemove')?.value));
+ root.querySelector('#r72FixSelected')?.addEventListener('click',()=>
+  r72FixedPeople([...r68UI.chosen],true));
+ root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>
+  r72FixedPeople([...r68UI.chosen],false));
+ root.querySelectorAll('[data-r72-toggle-fixed]').forEach(b=>b.onclick=()=>r72FixedPeople(
+  [b.dataset.r72ToggleFixed],!(state.fixedPeople||[]).includes(b.dataset.r72ToggleFixed)));
+ root.querySelectorAll('[data-r72-rename]').forEach(b=>b.onclick=()=>r72RenamePerson(b.dataset.r72Rename));
  root.querySelector('#r68EditRules')?.addEventListener('click',()=>document.getElementById('settingsBtn').click());
  for(const [id,kind] of [['r68PinRoster','roster'],['r68PinImport','import'],['r68PinRules','rules']]){
   root.querySelector('#'+id)?.addEventListener('click',async()=>{p109Audit=await p109AuditProject();await p109PinDefaults(kind)});
