@@ -1573,12 +1573,12 @@ async function run(){
    try{
     EMPLOYEES=[{id:'E991',name:'同名员工',department:'测试'},
       {id:'E992',name:'同名员工',department:'测试'}];
-    try{importRosterPlan(['同名员工'],'leave');return false}
-    catch(e){if(!e.message.includes('同名'))return false}
-    try{validateImportIdentityRows([{姓名:'乙',工号:'01'},{姓名:'乙',工号:'02'}]);return false}
-    catch(e){return e.message.includes('同名异工号')}
+    const plan=importRosterPlan(['同名员工',' 同名员工 '],'leave');
+    return plan.people.length===1&&plan.people[0].id===personIdentity('同名员工')&&
+     plan.byName.get('同名员工')?.id===personIdentity('同名员工')&&
+     validateImportIdentityRows([{姓名:'乙',工号:'01'},{姓名:'乙',工号:'02'}])===true;
    }finally{EMPLOYEES=before}
- },'R50 ambiguous employee identity silently merged');
+ },'R62 same normalized name is one identity regardless of gate employee numbers');
  // R35: actual large XLSX bytes must round-trip, not just return matching preview fields.
  await check(page,async()=>{
    const rows=Array.from({length:6000},(_,i)=>({姓名:'测试'+i,打卡时间:'2026-10-09 08:31:04',进出:'进',备注:'测试数据'+i}));
