@@ -83,7 +83,7 @@ function workspaceSidebarHtml(){
   '<select class="side-select" id="'+(mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">'+
   (mode==='all'||mode==='group'?'<option value="">全部</option>':'')+
   groups.map(g=>'<option value="'+escapeNameChar(g)+'" '+(g===group?'selected':'')+'>'+escapeNameChar(g)+'</option>').join('')+'</select></div>';
- const personControl=mode==='data'?'':'<div class="side-inline"><label for="workspacePerson">人员</label>'+
+ const personControl=mode==='data'||mode==='project'?'':'<div class="side-inline"><label for="workspacePerson">人员</label>'+
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
