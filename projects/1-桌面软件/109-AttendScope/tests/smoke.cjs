@@ -1550,10 +1550,12 @@ async function run(){
  await page.locator('[data-config-column="row"] input[type=checkbox]').uncheck();
  await page.screenshot({path:path.join(out,'r14-iteration-columns.png')});
  await page.locator('[data-settings-section="appearance"]').click();
+ await page.locator('#settingAppTitle').fill('项目考勤');
  await page.locator('#settingFont').selectOption('1.08');
  await page.locator('#settingMotion').uncheck();
  await page.locator('#settingsApply').click();
  await check(page,()=>state.prefs.fontScale===1.08&&state.prefs.motion===false&&
+    state.prefs.appTitle==='项目考勤'&&document.title.startsWith('项目考勤')&&workingPayload().prefs.appTitle==='项目考勤'&&
     state.prefs.matrix.glow===1.4&&state.prefs.tableColumns.attendance.datetime.width===190&&
     state.prefs.tableColumns.attendance.row.visible===false&&workingPayload().prefs.matrix.glow===1.4,
   'Settings data persistence failed');
