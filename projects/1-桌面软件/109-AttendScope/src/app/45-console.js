@@ -321,7 +321,7 @@ async function r68FillDataRail(){
    '<div>原件 <strong>'+report.rawFileCount+'</strong></div></div>'+
    '<p class="r68-muted">'+(state.saved?'当前月份已保存':'当前月份有未保存修改')+
     ' · '+(report.issues?.length||0)+' 条检测提示</p>'+
-   '<button class="r68-btn" id="r68RailProject">打开项目总览 →</button></section>'+
+   '<button class="r68-btn" id="r68RailProject">查看月份与健康 →</button></section>'+
    '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>文件树</h3><span>'+tree.files+' 文件 · '+r68HumanBytes(tree.totalBytes)+'</span></div>'+
    '<div class="r68-filetree" aria-label="当前连接目录的实际文件树">'+r68TreeLine(state.projectDir.name||'项目','directory')+
     '<div class="r68-tree-children">'+tree.html+'</div></div></section>';
