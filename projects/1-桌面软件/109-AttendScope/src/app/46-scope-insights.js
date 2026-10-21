@@ -95,3 +95,6 @@ function r68ScopeRender(){
  });
 }
 renderScopeSummary=r68ScopeRender;
+// R40 storage initializes the first screen before this optional module loads.
+// Repaint once to activate the final data/scope renderers immediately.
+render();
