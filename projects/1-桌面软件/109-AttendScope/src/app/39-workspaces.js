@@ -90,7 +90,7 @@ function workspaceSidebarHtml(){
  // Statistical metrics live in one top-level workspace, not three sidebar clones.
  const view='';
  const sub=mode==='data'?'<div class="side-subnav">'+
-  [['records','原始记录'],['roster','员工名册'],['rules','工作规则'],['imports','导入与快照']].map(([id,name])=>
+  [['records','原始记录'],['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
  return '<div class="side-controls">'+view+groupControl+personControl+(mode==='data'?sub:'')+'</div>'+
    '<div class="side-bottom"><section class="side-calendar calendar-section">'+
