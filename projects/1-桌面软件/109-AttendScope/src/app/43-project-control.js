@@ -177,7 +177,7 @@ function p109ProjectView(report){
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>月份与冻结状态</b><span>'+report.months.length+' 个月份</span></div>'+
    (report.months.length?'<div class="p109-project-months">'+report.months.map(m=>
     '<div class="p109-project-month"><b>'+p109Escape(m.key)+'</b><span>'+p109Escape(m.state)+'</span>'+
-    '<small>'+m.employees+' 人 · '+m.imports+' 次导入 · '+m.revisions+' 项修订 · '+m.snapshots.length+' 次冻结'+
+    '<small>'+m.employees+' 人 · '+m.imports+' 次导入 · '+m.revisions+' 项修订 · '+(m.hasPrevious?'有上次保存 · ':'无备用状态 · ')+m.snapshots.length+' 次冻结'+
     (m.branches.length?' · '+m.branches.length+' 个修订副本':'')+'</small>'+
     (m.snapshots.length?'<details class="p109-snapshots"><summary>查看冻结版本（'+m.snapshots.length+'）</summary>'+
        m.snapshots.map(s=>'<div class="p109-snapshot-row"><code>'+p109Escape(s.id)+'</code><small>'+
