@@ -278,7 +278,7 @@ function r68ProjectMarkup(report,tree){
    '<span>上次保存</span><span>冻结</span><span>修订副本</span><span>操作</span></div>'+
    (months.length?months.map(m=>'<div class="r68-month-row"><strong>'+r68Esc(m.key)+'</strong>'+
     '<span>'+m.employees+'</span><span>'+m.raw+'</span><span>'+
-     r68Pill(m.hasWorking?'已保存':'缺失',m.hasWorking?'healthy':'warning')+'</span>'+
+     r68Pill(!m.hasWorking?'缺失':m.key===monthKey()&&!state.saved?'待保存':'已保存',m.hasWorking&&(m.key!==monthKey()||state.saved)?'healthy':'warning')+'</span>'+
     '<span>'+r68Pill(m.hasPrevious?'有':'无',m.hasPrevious?'neutral':'warning')+'</span>'+
     '<span>'+m.snapshots.length+'</span><span>'+m.branches.length+'</span>'+
     '<button class="r68-inline" data-r68-month="'+m.key+'">查看月份</button></div>').join(''):
