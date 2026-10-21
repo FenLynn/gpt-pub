@@ -122,7 +122,8 @@ function layoutHtml(){
     </div>
     <div class="top-actions">
       <button class="text-btn" id="exportTable">导出表格</button>
-      <button class="text-btn" id="printReport">PDF</button>
+      <button class="text-btn" id="captureView">截图</button>
+      <button class="text-btn" id="printReport">截图 PDF</button>
       <span class="action-divider"></span>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
@@ -313,7 +314,8 @@ function bind(){
 
   document.getElementById('connectDir').onclick=connectProjectDir;
   document.getElementById('exportTable').onclick=exportTraditionalTable;
-  document.getElementById('printReport').onclick=()=>window.print();
+  document.getElementById('captureView').onclick=captureCurrentView;
+  document.getElementById('printReport').onclick=captureAllPdf;
   document.getElementById('saveBtn').onclick=saveWorking;
   document.getElementById('restoreBtn').onclick=()=>document.getElementById('restoreInput').click();
   document.getElementById('restoreInput').onchange=async e=>{
