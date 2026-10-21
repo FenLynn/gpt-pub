@@ -222,6 +222,15 @@ async function run(){
  await check(page,()=>state.workspaceMode==='group'&&!!document.querySelector('#workspaceGroup'),'R39 left group filter did not drill down');
  await check(page,()=>!!document.querySelector('#workspaceGroup option[value=""]')&&!!document.querySelector('.r68-stacked-track'),
   'R41 group all-option or status composition chart missing');
+ await check(page,()=>{
+   const metrics=[...document.querySelectorAll('#scopeInsights .r70-metric-list .r68-kpi')];
+   const rank=document.querySelector('#scopeInsights .r68-rank-name');
+   return metrics.length===4&&metrics.every(el=>{
+    const style=getComputedStyle(el);
+    return style.borderTopWidth==='0px'&&style.backgroundColor==='rgba(0, 0, 0, 0)';
+   })&&rank&&parseFloat(getComputedStyle(rank).fontSize)>=13;
+  },'R70 group stats must use unboxed and legible rows');
+ await page.screenshot({path:path.join(out,'r70-group-flat.png')});
  await page.screenshot({path:path.join(out,'r41-group.png')});
  await page.screenshot({path:path.join(out,'r37-group.png')});
  await check(page,()=>{
@@ -400,6 +409,16 @@ async function run(){
  'R39 clearing date must preserve current workspace');
  await check(page,()=>state.workspaceMode==='data'&&!!document.querySelector('.side-calendar')&&
    rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
+ await page.locator('[data-data-section="overview"]').click();
+ await page.waitForSelector('#r69ProjectPane .r69-section-title',{timeout:15000});
+ await check(page,()=>{
+   const pane=document.querySelector('#r69ProjectPane');
+   const strip=pane.querySelector('.r70-project-facts,.r70-project-intro');
+   return !!strip&&![...pane.querySelectorAll('.r68-overview-cards > div')].some(el=>{
+    const s=getComputedStyle(el);return s.borderStyle!=='none'||s.backgroundColor==='rgb(255, 255, 255)';
+   })&&!document.querySelector('#r68DataRail .r68-rail-metrics');
+  },'R70 project overview must not contain isolated numerical tiles');
+ await page.screenshot({path:path.join(out,'r70-data-overview.png')});
  await page.locator('[data-data-section="roster"]').click();
  await check(page,()=>document.querySelectorAll('.r68-roster-entry:not(.r68-roster-columns)').length===EMPLOYEES.length,
   'R37 data management missing real roster');

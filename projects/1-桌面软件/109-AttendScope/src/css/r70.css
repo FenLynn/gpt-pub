@@ -138,3 +138,17 @@
  .layout.workspace-mode-data .r68-rule-grid{grid-template-columns:1fr}
 }
 @media(max-width:700px){.r70-project-intro{flex-direction:column!important;align-items:flex-start}}
+
+/* R70 refinement: the unconnected introduction is not a hidden legacy statistic tile. */
+.layout.workspace-mode-data .r70-project-intro>div{display:block!important;min-width:0;
+ background:transparent!important;border:0!important;border-radius:0!important;
+ box-shadow:none!important;padding:0!important}
+.layout.workspace-mode-data .r68-studio-summary>div:last-child{flex:0 0 auto}
+.layout.workspace-mode-data .r68-records-frame .inspector-bottom{
+ border:0!important;border-radius:0!important;box-shadow:none!important}
+.layout.workspace-mode-data .r68-records-frame .raw-toolbar{border-bottom:1px solid #e3eaf0!important}
+.layout.workspace-mode-data .r68-roster-tools input,.layout.workspace-mode-data .r68-roster-tools select{
+ font-size:13px}
+.layout.workspace-mode-data .r68-history-row:hover,.layout.workspace-mode-data .r68-template-row:hover,
+.layout.workspace-mode-data .r68-snapshot-row:hover{background:#f8fafc!important}
+.layout.workspace-mode-data .r68-rail-card .r68-tree-placeholder{font-size:13px;color:#7b8f9f;line-height:1.7}
