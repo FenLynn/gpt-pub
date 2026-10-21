@@ -40,16 +40,16 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const f=leaf(parts);
   if(op==='dir'){
    if(create)fs.mkdirSync(f,{recursive:true});
-   else if(!fs.existsSync(f)||!fs.statSync(f).isDirectory())throw Error('NotFoundError');
+   else if(!fs.existsSync(f)||!fs.statSync(f).isDirectory())return false;
    return true;
   }
   if(op==='file'){
    if(create){fs.mkdirSync(path.dirname(f),{recursive:true});if(!fs.existsSync(f))fs.writeFileSync(f,'')}
-   else if(!fs.existsSync(f))throw Error('NotFoundError');
+   else if(!fs.existsSync(f))return false;
    return true;
   }
   if(op==='read'){
-   if(!fs.existsSync(f)){const e=new Error('NotFoundError');e.name='NotFoundError';throw e}
+   if(!fs.existsSync(f))return null;
    return fs.readFileSync(f).toString('base64');
   }
   if(op==='write'){fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,Buffer.from(data,'base64'));return true}
@@ -66,15 +66,15 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const decode=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
   class FileHandle{
    constructor(parts){this.parts=parts;this.kind='file';this.name=parts.at(-1)}
-   async getFile(){return new File([decode(await call('read',this.parts))],this.name)}
+   async getFile(){const b=await call('read',this.parts);if(b===null)throw new DOMException('Missing','NotFoundError');return new File([decode(b)],this.name)}
    async createWritable(){const parts=this.parts;return {
     async write(v){await call('write',parts,false,await encode(v))},async close(){}};
    }
   }
   class DirHandle{
    constructor(parts=[]){this.parts=parts;this.kind='directory';this.name=parts.at(-1)||'考勤'}
-   async getDirectoryHandle(name,opt={}){const p=[...this.parts,name];await call('dir',p,!!opt.create);return new DirHandle(p)}
-   async getFileHandle(name,opt={}){const p=[...this.parts,name];await call('file',p,!!opt.create);return new FileHandle(p)}
+   async getDirectoryHandle(name,opt={}){const p=[...this.parts,name];if(!await call('dir',p,!!opt.create))throw new DOMException('Missing','NotFoundError');return new DirHandle(p)}
+   async getFileHandle(name,opt={}){const p=[...this.parts,name];if(!await call('file',p,!!opt.create))throw new DOMException('Missing','NotFoundError');return new FileHandle(p)}
    async *entries(){for(const x of await call('list',this.parts))yield [x.name,x.kind==='file'?
     new FileHandle([...this.parts,x.name]):new DirHandle([...this.parts,x.name])]}
   }
@@ -82,7 +82,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
  });
  const open=async()=>{
   await page.goto(pathToFileURL(path.join(diskRoot,'index.html')).href,{waitUntil:'load',timeout:60000});
-  await page.waitForFunction(()=>!!window.state&&!!document.querySelector('.topbar'),null,{timeout:15000});
+  await page.waitForFunction(()=>!!document.querySelector('.topbar'),null,{timeout:15000});
   await page.evaluate(()=>connectProjectDir());
  };
  try{
@@ -144,7 +144,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.sameVersionCodeOverlayKeepsData=await page.evaluate(()=>YEAR===2027&&MONTH===3&&state.records.length===4);
   report.oldBundledRulesDoNotMatchRuntime=!(Object.hasOwn(originalConfig,'amStart')&&Object.hasOwn(originalConfig,'pmStart'));
   report.oldBundledRosterStillSample=JSON.parse(fs.readFileSync(path.join(diskRoot,'config','employees.json'),'utf8')).employees.length!==
-   JSON.parse(fs.readFileSync(wpath.replace(unzipped,destination.replace('/考勤','')),'utf8')).employees.length;
+   JSON.parse(fs.readFileSync(path.join(diskRoot,'data','2027','03','working','state.json'),'utf8')).employees.length;
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
    !report.snapshotUnchanged||!report.reloadRestores||!report.relocatedRestores||
    !report.sameVersionCodeOverlayKeepsData||errors.length)throw Error('R64 lifecycle failure '+JSON.stringify({report,errors}));
