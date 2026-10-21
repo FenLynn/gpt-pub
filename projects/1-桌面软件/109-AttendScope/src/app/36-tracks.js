@@ -191,21 +191,44 @@ function mountAttendanceTimeline(a){
     ]
   };
   chart.setOption(option);
+  // R74: draw decision tags beside, rather than on top of, punch arrows.
   const syncAttendanceFlags=()=>{
     const layer=document.getElementById('attendanceFlagsLayer');
     if(!layer||!layer.isConnected)return;
     layer.replaceChildren();
-    const visible=state.timelineRange||range;
+    const visible=state.timelineRange||range,width=chart.getWidth(),height=chart.getHeight();
+    const placed=[];
     for(const flag of a.attendanceFlags||[]){
-     const at=minutes(flag.time);
-     if(at<visible.start||at>visible.end)continue;
-     const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[at,flag.kind==='late'?0:1]);
-     if(!pos||!Number.isFinite(pos[0])||!Number.isFinite(pos[1]))continue;
-     const el=document.createElement('span');el.className='r72-attendance-tag '+flag.kind;
-     el.textContent=flag.label;el.title=flag.label+' · '+flag.time+'（真实打卡证据）';
-     el.style.left=Math.max(24,Math.min(chart.getWidth()-24,pos[0]))+'px';
-     el.style.top=Math.max(5,pos[1]-23)+'px';layer.appendChild(el);
+      const at=minutes(flag.time);
+      if(at<visible.start||at>visible.end)continue;
+      const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[at,flag.kind==='late'?0:1]);
+      if(!pos||!Number.isFinite(pos[0])||!Number.isFinite(pos[1]))continue;
+      const tag=document.createElement('span');
+      tag.className='r72-attendance-tag r74-attendance-tag '+flag.kind;
+      tag.textContent=flag.label;
+      tag.dataset.r73Tip=flag.label+' · '+flag.time+'（对应实际打卡）';
+      tag.setAttribute('aria-label',flag.label+' · '+flag.time);
+      layer.appendChild(tag);
+      const w=tag.offsetWidth||58,h=tag.offsetHeight||23;
+      const baseY=Math.max(12,Math.min(height-125-h,pos[1]+(flag.kind==='early'?-13:-31)));
+      const preferred=pos[0]+15+w<=width-12?pos[0]+15:pos[0]-w-15;
+      const candidates=[
+        {x:preferred,y:baseY},
+        {x:pos[0]-w-15,y:baseY},
+        {x:pos[0]+15,y:baseY},
+        {x:preferred,y:baseY-27},
+        {x:preferred,y:baseY+27}
+      ];
+      const good=candidates.find(c=>c.x>=9&&c.x+w<=width-9&&c.y>=9&&
+       c.y+h<=height-109&&!placed.some(r=>c.x<r.x+r.w+5&&c.x+w+5>r.x&&
+         c.y<r.y+r.h+4&&c.y+h+4>r.y));
+      const chosen=good||{x:Math.max(10,Math.min(width-w-10,preferred)),y:baseY};
+      tag.style.left=chosen.x+'px';
+      tag.style.top=chosen.y+'px';
+      tag.dataset.anchorX=String(pos[0]);
+      placed.push({x:chosen.x,y:chosen.y,w,h});
     }
+    if(typeof r73WireTooltips==='function')r73WireTooltips();
   };
   // Locate the rendered slider track; the HTML marks must share its actual SVG bounds.
   const syncNavigator=()=>{

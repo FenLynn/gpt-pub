@@ -131,30 +131,31 @@ function timelineBehaviorSummaryRow(item,key){
   return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
-  const selected=state.insightTab==='behavior'?'behavior':'summary';
-  let summary=manualJudgmentHtml(item);
-  summary+='<section class="insight-flat-section attendance-card"><div class="insight-card-head"><span>考勤记录</span><b>'+item.punches.length+' 条</b></div><div class="insight-metric-list">'+
-    insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
-    insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-    insightMetric('在岗',fmtMinutes(item.presence))+
-    insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
-    (item.autoOvertime?.minutes?insightMetric('自动加班（已勾选）',
-      fmtMinutes(activeAutoOvertimeSegments(item).reduce((sum,seg)=>sum+seg.minutes,0))+' · 待核'):'')+
-  '</div></section>';
-  if(item.lunchEvidence==='未分段（工时按班次扣午休）')
-    summary+='<p class="insight-issue">午休未分段：班内工时按上午／下午时段计算，不能证明午休期间实际工作。</p>';
-  if(item.autoOvertime?.reason&&(item.autoOvertime.minutes>0||item.overtime?.length))
-    summary+='<p class="insight-evidence">加班判断：'+safeTableText(item.autoOvertime.reason)+'</p>';
-  if(item.issues.length)summary+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
-  const behavior='<section class="insight-flat-section behavior-summary-card"><div class="insight-card-head"><span>行为区间</span><b>全天</b></div>'+
+ const accepted=item.autoOvertime?.minutes?
+  activeAutoOvertimeSegments(item).reduce((sum,seg)=>sum+seg.minutes,0):0;
+ const metrics=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
+  insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
+  insightMetric('在岗',fmtMinutes(item.presence))+
+  insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
+  (item.autoOvertime?.minutes?insightMetric('自动加班',fmtMinutes(accepted)+' · 待核'):'');
+ let extra='';
+ if(item.lunchEvidence==='未分段（工时按班次扣午休）')
+  extra+='<p class="insight-issue">午休未分段：班内工时按班次估算</p>';
+ if(item.autoOvertime?.reason&&(item.autoOvertime.minutes>0||item.overtime?.length))
+  extra+='<p class="insight-evidence">加班判断：'+safeTableText(item.autoOvertime.reason)+'</p>';
+ if(item.issues.length)extra+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
+ return '<div class="r74-unified-insight">'+
+  '<section class="r74-insight-section r74-overview">'+
+   '<header class="r74-insight-head"><strong>概况</strong><span>考勤 '+item.punches.length+' 条</span></header>'+
+   manualJudgmentHtml(item)+
+   '<div class="r74-overview-metrics">'+metrics+'</div></section>'+
+  '<section class="r74-insight-section r74-behaviors">'+
+   '<header class="r74-insight-head"><strong>行为</strong><span>全天</span></header>'+
+   '<div class="r74-behavior-list">'+
     ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
-  '</section>';
-  return '<div class="insight-tabs" role="tablist">'+
-    '<button type="button" data-insight-tab="summary" class="'+(selected==='summary'?'active':'')+'" role="tab" aria-selected="'+(selected==='summary')+'">概况</button>'+
-    '<button type="button" data-insight-tab="behavior" class="'+(selected==='behavior'?'active':'')+'" role="tab" aria-selected="'+(selected==='behavior')+'">行为</button>'+
-  '</div>'+
-  '<div class="insight-pane '+(selected==='summary'?'active':'')+'" data-insight-pane="summary">'+summary+'</div>'+
-  '<div class="insight-pane '+(selected==='behavior'?'active':'')+'" data-insight-pane="behavior">'+behavior+'</div>';
+   '</div></section>'+
+  (extra?'<div class="r74-insight-evidence">'+extra+'</div>':'')+
+ '</div>';
 }
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx);

@@ -126,7 +126,7 @@ function r68RosterHtml(){
   groups=workspaceGroups().filter(g=>g!=='未分组'),catalog=state.groupCatalog||[],
   fixedShown=fixed.filter(e=>!r68UI.fixedSearch||e.name.toLocaleLowerCase().includes(r68UI.fixedSearch.toLocaleLowerCase())),
   choices='<option value="未分组">未分组</option>'+groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('');
- return r68SidebarHeader('人员与分组','当月人员不因取消固定而删除；右侧固定名单会带入以后新建的月份。')+
+ return '<div class="r74-roster-header">'+r68SidebarHeader('人员与分组','当月人员不因取消固定而删除；右侧固定名单会带入以后新建的月份。')+
   '<div class="r73-roster-top">'+
    '<div class="r73-roster-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
    '<input id="r68RosterSearch" aria-label="搜索当月姓名" placeholder="搜索当月姓名" value="'+r68Esc(r68UI.search)+'"></div>'+
@@ -134,7 +134,7 @@ function r68RosterHtml(){
    '<option value="all">全部组别</option><option value="未分组" '+(r68UI.groupFilter==='未分组'?'selected':'')+'>未分组</option>'+
    catalog.map(g=>'<option value="'+r68Esc(g)+'" '+(r68UI.groupFilter===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
    '</select><button type="button" id="r73EditGroups" class="r73-text-btn">编辑</button></div>'+
-   '<button type="button" class="r73-main-btn" id="r72AddPerson">+ 新增人员</button></div>'+
+   '<button type="button" class="r73-main-btn" id="r72AddPerson">+ 新增人员</button></div></div>'+
   '<div class="r73-transfer-shell">'+
    '<section class="r73-roster-pane r73-month-pane" aria-label="当月人员">'+
     '<header class="r73-pane-title"><div><strong>当月人员</strong><span>'+monthly.length+' / '+EMPLOYEES.length+' 人</span></div>'+

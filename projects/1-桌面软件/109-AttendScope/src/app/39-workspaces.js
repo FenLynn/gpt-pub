@@ -110,7 +110,7 @@ function workspaceToolbarHtml(){
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
   '</div><section id="scopeSummary" class="scope-summary"></section>';
  if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
- if(mode==='data')return '<div class="workspace-toolbar r71-data-toolbar"><strong>数据管理</strong></div>';
+ if(mode==='data')return '';
 
  return '';
 }

@@ -1,0 +1,108 @@
+/* R74: information architecture, not more cards. Workbench polish. */
+/* Data workspace: the active section heading is the ONLY heading. */
+.layout.workspace-mode-data>.workspace{padding-top:12px!important}
+.layout.workspace-mode-data .r74-roster-header{display:flex;align-items:center;gap:16px;
+ min-height:47px;min-width:0;margin:0 0 12px}
+.layout.workspace-mode-data .r74-roster-header .r71-content-head{
+ flex:0 0 auto;display:flex;align-items:center;gap:4px;margin:0!important;
+ padding:0!important;white-space:nowrap}
+.layout.workspace-mode-data .r74-roster-header .r71-content-head h3{
+ font-size:19px!important;line-height:1.35;margin:0!important;color:#29475f}
+.layout.workspace-mode-data .r74-roster-header .r71-heading-actions{display:none}
+.layout.workspace-mode-data .r74-roster-header .r73-roster-top{
+ display:flex;flex:1 1 auto;min-width:0;align-items:center;
+ gap:8px!important;margin:0!important;flex-wrap:nowrap!important}
+.layout.workspace-mode-data .r74-roster-header .r73-roster-search{
+ flex:1 1 190px!important;min-width:140px!important;width:auto}
+.layout.workspace-mode-data .r74-roster-header .r73-filter-group{
+ flex:0 0 auto!important;min-width:0}
+.layout.workspace-mode-data .r74-roster-header .r73-filter-group select{
+ min-width:110px;max-width:160px}
+.layout.workspace-mode-data .r74-roster-header .r73-main-btn{
+ flex:0 0 auto;white-space:nowrap;font-size:13px}
+.layout.workspace-mode-data .r73-transfer-shell{height:max(400px,calc(100dvh - var(--topbar) - 145px))}
+@media(max-width:1160px){
+ .layout.workspace-mode-data .r74-roster-header{gap:10px}
+ .layout.workspace-mode-data .r74-roster-header .r71-content-head h3{font-size:17px!important}
+ .layout.workspace-mode-data .r74-roster-header .r73-roster-top{gap:5px!important}
+ .layout.workspace-mode-data .r74-roster-header .r73-main-btn{padding:7px 9px}
+ .layout.workspace-mode-data .r74-roster-header .r73-filter-group select{min-width:100px}
+}
+@media(max-width:800px){
+ .layout.workspace-mode-data .r74-roster-header{flex-wrap:wrap;gap:5px}
+ .layout.workspace-mode-data .r74-roster-header .r73-roster-top{flex-basis:100%;min-width:0}
+}
+@media(max-width:580px){
+ .layout.workspace-mode-data .r74-roster-header .r73-roster-top{flex-wrap:wrap!important}
+}
+/* Timeline: subtle flat labels offset from arrow shafts; never centered over punch. */
+.workspace-mode-person .r72-attendance-flags{pointer-events:none;z-index:12}
+.workspace-mode-person .r74-attendance-tag{
+ display:inline-flex!important;align-items:center;justify-content:center;
+ width:max-content;max-width:130px;box-sizing:border-box;white-space:nowrap;
+ transform:none!important;pointer-events:auto;line-height:1.4;
+ font-size:11.5px;font-weight:680;padding:4px 7px;border-radius:5px;
+ border:1px solid rgba(208,151,84,.32);
+ background:rgba(255,248,233,.94);color:#926625;
+ box-shadow:0 2px 8px rgba(124,85,34,.055)}
+.workspace-mode-person .r74-attendance-tag.early{
+ background:rgba(255,246,246,.96);border-color:rgba(198,103,113,.29);color:#a95660}
+.workspace-mode-person .r74-attendance-tag.late{
+ background:rgba(255,248,233,.96);border-color:rgba(202,146,76,.29)}
+/* Individual panel: sections are visible together, not tabs, matching text hierarchy. */
+.workspace-mode-person .inspector-insight{overflow-y:auto!important;scrollbar-gutter:stable}
+.workspace-mode-person .r74-unified-insight{display:flex;flex-direction:column;
+ gap:0;padding:0 2px 8px;min-height:0}
+.workspace-mode-person .r74-insight-head{
+ display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+ padding:0 0 7px;border-bottom:1px solid #e3ebf1;margin:0 0 6px}
+.workspace-mode-person .r74-insight-head strong{
+ font-size:14px!important;line-height:1.45;font-weight:740;color:#3b5d77;
+ letter-spacing:0}
+.workspace-mode-person .r74-insight-head span{
+ color:#8b9eac;font-size:12.5px!important;font-weight:500}
+.workspace-mode-person .r74-insight-section{min-width:0;padding-top:10px}
+.workspace-mode-person .r74-insight-section:first-child{padding-top:0}
+.workspace-mode-person .r74-unified-insight .status-card{
+ padding:0 0 6px!important;margin:0!important}
+.workspace-mode-person .r74-unified-insight .status-control-row{
+ min-height:32px!important;gap:8px!important}
+.workspace-mode-person .r74-unified-insight .initial-judgment{
+ height:28px!important;min-width:78px!important;font-size:13px!important}
+.workspace-mode-person .r74-unified-insight .manual-status-buttons button{
+ height:28px!important;font-size:12.5px!important}
+.workspace-mode-person .r74-overview-metrics{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:0 14px;border-top:1px solid #edf2f5;padding-top:3px}
+.workspace-mode-person .r74-overview-metrics .insight-row{
+ min-height:32px!important;padding:6px 0!important;
+ border-bottom:1px solid #edf2f6;gap:4px!important}
+.workspace-mode-person .r74-overview-metrics .insight-row span{
+ font-size:13px!important;color:#708899!important;white-space:nowrap}
+.workspace-mode-person .r74-overview-metrics .insight-row strong{
+ font-size:14px!important;font-weight:730!important;white-space:nowrap}
+.workspace-mode-person .r74-behavior-list{display:flex;flex-direction:column}
+.workspace-mode-person .r74-behavior-list .insight-behavior-row{
+ display:flex!important;align-items:center!important;
+ min-height:29px!important;padding:5px 0!important;
+ border-top:0!important;border-bottom:1px solid #edf2f5!important;
+ margin:0!important;border-radius:0!important}
+.workspace-mode-person .r74-behavior-list .insight-behavior-row span,
+.workspace-mode-person .r74-behavior-list .insight-behavior-row strong{
+ font-size:13.5px!important;line-height:1.45}
+.workspace-mode-person .r74-behavior-list .insight-behavior-row.active{
+ background:#f4f8fb!important;padding:5px 5px!important}
+.workspace-mode-person .r74-insight-evidence{padding:4px 0 0}
+.workspace-mode-person .r74-insight-evidence .insight-issue,
+.workspace-mode-person .r74-insight-evidence .insight-evidence{
+ font-size:12.5px!important;line-height:1.5!important;margin:5px 0!important}
+@media(max-width:1450px){
+ .workspace-mode-person .r74-overview-metrics{gap:0 9px}
+ .workspace-mode-person .r74-overview-metrics .insight-row span{font-size:12px!important}
+ .workspace-mode-person .r74-overview-metrics .insight-row strong{font-size:13px!important}
+ .workspace-mode-person .r74-behavior-list .insight-behavior-row span,
+ .workspace-mode-person .r74-behavior-list .insight-behavior-row strong{font-size:13px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ .workspace-mode-person .r74-attendance-tag{transition:none!important}
+}

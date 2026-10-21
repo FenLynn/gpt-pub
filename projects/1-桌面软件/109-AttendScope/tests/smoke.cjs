@@ -466,7 +466,7 @@ async function run(){
    return state.dataSection===expected&&!!area.querySelector('.r71-data-shell')&&
     !area.querySelector('#r68DataRail')&&!!tip&&tip.dataset.r73Tip?.length>6&&!tip.hasAttribute('title')&&
     !area.querySelector('.r68-cardhead p')&&
-    !toolbar.textContent.includes('名册、规则与原始记录')&&
+    !document.querySelector('.r71-data-toolbar')&&(!toolbar||!toolbar.textContent.includes('名册、规则与原始记录'))&&
     document.documentElement.scrollWidth<=innerWidth+3&&
     (expected==='storage'||!area.querySelector('.r71-tree-section'));
   },tab,'R71 data sections must be single-column, without persistent help text or duplicate tree');
@@ -480,6 +480,16 @@ async function run(){
  await check(page,()=>document.querySelectorAll('.r73-month-pane .r73-person-row').length===EMPLOYEES.length,
   'R37 data management missing real roster');
  await page.screenshot({path:path.join(out,'r37-roster.png')});
+ await check(page,()=>{
+  const head=document.querySelector('.r74-roster-header');
+  const title=head?.querySelector('.r71-content-head')?.getBoundingClientRect();
+  const controls=head?.querySelector('.r73-roster-top')?.getBoundingClientRect();
+  return !!title&&!!controls&&
+   Math.abs((title.top+title.bottom)/2-(controls.top+controls.bottom)/2)<8&&
+   !document.querySelector('.workspace-toolbar.r71-data-toolbar')&&
+   document.documentElement.scrollWidth<=innerWidth+3;
+ },'R74 title, search and group editor share one row');
+ await page.screenshot({path:path.join(out,'r74-roster-one-row.png')});
  await page.locator('[data-data-section="rules"]').click();
  await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===8&&
    document.querySelector('.r68-rule-grid')?.textContent.includes('上午打卡容差')&&
@@ -1591,17 +1601,20 @@ async function run(){
  await check(page,()=>{
    const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key),insight=document.querySelector('.inspector-insight');
    return JSON.stringify(keys)===JSON.stringify(['in','out','trip','leave','outing','overtime'])&&
-     insight.querySelectorAll('[data-insight-tab]').length===2&&
-     document.querySelector('[data-insight-pane="summary"]')?.classList.contains('active')&&
-     ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('[data-insight-pane="summary"] .insight-row span')].some(x=>x.textContent===k));
- },'Behavior filter must keep complete personal summary and compact insight tabs');
- await page.locator('[data-insight-tab="behavior"]').click();
+     !!insight.querySelector('.r74-unified-insight')&&
+     insight.querySelectorAll('.r74-insight-head').length===2&&
+     !insight.querySelector('[data-insight-tab]')&&
+     ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('.r74-overview-metrics .insight-row span')].some(x=>x.textContent===k))&&
+     insight.querySelectorAll('.r74-behavior-list .insight-behavior-row').length===4;
+ },'R74 unified personal panel shows overview and behavior together');
  await check(page,()=>{
-   const pane=document.querySelector('[data-insight-pane="behavior"]'),rows=[...pane.querySelectorAll('.insight-behavior-row')];
-   return pane.classList.contains('active')&&rows.length===4&&
-     ['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
-     rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
- },'Behavior insight tab did not expose all four intervals');
+   const h=[...document.querySelectorAll('.r74-insight-head strong')];
+   const rows=[...document.querySelectorAll('.r74-behavior-list .insight-behavior-row')];
+   return h.length===2&&h[0].textContent==='概况'&&h[1].textContent==='行为'&&
+    Math.abs(parseFloat(getComputedStyle(h[0]).fontSize)-parseFloat(getComputedStyle(h[1]).fontSize))<.5&&
+    rows.length===4&&['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
+    rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
+ },'R74 matched overview/behavior typography and filters');
  await page.screenshot({path:path.join(out,'r29-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
@@ -1909,6 +1922,17 @@ async function run(){
     const text=[...document.querySelectorAll('.r72-attendance-tag')].map(el=>el.textContent);
     return text.includes('迟到')&&text.includes('上午早退');
    },{timeout:15000});
+   const positions=await flagPage.evaluate(()=>{
+    const layer=document.getElementById('attendanceFlagsLayer'),rect=layer.getBoundingClientRect();
+    return [...layer.querySelectorAll('.r74-attendance-tag')].map(tag=>{
+      const r=tag.getBoundingClientRect(),axis=Number(tag.dataset.anchorX);
+      return {text:tag.textContent,anchor:axis,left:r.left-rect.left,right:r.right-rect.left,
+        top:r.top-rect.top};
+    });
+   });
+   if(positions.length<2||positions.some(p=>!Number.isFinite(p.anchor)||
+       Math.min(Math.abs(p.left-p.anchor),Math.abs(p.right-p.anchor))<9||p.top<0))
+    throw Error('R74 labels must clear their event arrow shaft '+JSON.stringify(positions));
    const tags=await flagPage.locator('.r72-attendance-tag').count();
    if(tags<2)throw Error('R72 flags not visible in actual timeline');
    await flagPage.screenshot({path:path.join(out,'r72-timeline-late-early.png')});
