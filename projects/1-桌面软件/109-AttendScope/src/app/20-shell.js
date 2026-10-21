@@ -83,7 +83,7 @@ function layoutHtml(){
     <div class="brand">
       <div class="logo" aria-hidden="true"><span></span></div>
       <strong class="brand-title">${escapeNameChar(attendTitle())}</strong>
-      <span class="brand-mode">离线考勤</span>
+      <span class="brand-mode">${state.projectDir?"离线考勤":state.isDemo?"演示 · 待初始化":"未连接目录"}</span>
     </div>
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
     <div class="top-global-actions">
@@ -116,7 +116,7 @@ function layoutHtml(){
         </div>
       </div>
       <button class="text-btn" id="connectDir">目录</button>
-      <button class="text-btn" id="p109ProjectControl">项目</button>
+      <button class="text-btn" id="p109ProjectControl">${state.projectDir?"项目":"初始化"}</button>
       <button class="text-btn" id="saveBtn">保存</button>
       <button class="text-btn" id="restoreBtn">恢复</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
