@@ -115,7 +115,7 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 .workspace-mode-data .raw-table{height:calc(100% - 44px)}
 .data-note{padding:10px 2px;color:#6b8598;font-size:12px;line-height:1.7}
 .data-roster-table{max-height:calc(100vh - 235px);overflow:auto;border:1px solid var(--p109-border);border-radius:7px}
-.data-roster-head,.data-roster-row{display:grid;grid-template-columns:100px minmax(130px,1fr) minmax(120px,1fr) minmax(120px,1fr) 105px;
+.data-roster-head,.data-roster-row{display:grid;grid-template-columns:minmax(130px,1.3fr) minmax(120px,1fr) minmax(120px,1fr) 105px;
  align-items:center;gap:9px;padding:10px 13px}
 .data-roster-head{position:sticky;top:0;z-index:1;background:#f5f8fa;font-size:11px;color:#8297a6}
 .data-roster-row{border-top:1px solid var(--p109-border);font-size:12px;background:white;color:#667e8e}
@@ -143,7 +143,7 @@ html,body{background:#f6f8fa;color:var(--p109-text)}
 }
 @media(max-width:820px){
  .topbar{overflow-x:auto}.scope-stat-caption{display:none}
- .data-roster-head,.data-roster-row{grid-template-columns:65px minmax(80px,1fr) 70px 75px 80px}
+ .data-roster-head,.data-roster-row{grid-template-columns:minmax(90px,1.25fr) 70px 75px 80px}
  .data-rules-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 

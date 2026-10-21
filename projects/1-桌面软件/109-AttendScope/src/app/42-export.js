@@ -1,5 +1,5 @@
 /* R62 · Offline PNG captures and landscape A4 one-image-per-page PDF. */
-function captureStamp(){const d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())}
+function captureStamp(){const d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'_'+String(d.getMilliseconds()).padStart(3,'0')}
 function captureCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);return [c,g]}
 function captureLabel(g,s,x,y,size=13,color='#47627e'){g.font=size+'px "Microsoft YaHei",system-ui,sans-serif';g.fillStyle=color;g.fillText(String(s),x,y)}
 async function captureImage(src){const i=new Image();i.src=src;await new Promise((ok,no)=>{i.onload=ok;i.onerror=no});return i}

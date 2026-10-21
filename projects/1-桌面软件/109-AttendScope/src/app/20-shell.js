@@ -121,7 +121,7 @@ function layoutHtml(){
       <button class="primary-btn" id="freezeBtn">冻结</button>
     </div>
     <div class="top-actions">
-      <button class="text-btn" id="exportTable">导出表格</button>
+      <button class="text-btn" id="exportTable">导出表格</button><button class="text-btn" id="exportCsv">CSV</button>
       <button class="text-btn" id="captureView">截图</button>
       <button class="text-btn" id="printReport">截图 PDF</button>
       <span class="action-divider"></span>
@@ -314,6 +314,7 @@ function bind(){
 
   document.getElementById('connectDir').onclick=connectProjectDir;
   document.getElementById('exportTable').onclick=exportTraditionalTable;
+  document.getElementById('exportCsv').onclick=downloadCurrentCSV;
   document.getElementById('captureView').onclick=captureCurrentView;
   document.getElementById('printReport').onclick=captureAllPdf;
   document.getElementById('saveBtn').onclick=saveWorking;

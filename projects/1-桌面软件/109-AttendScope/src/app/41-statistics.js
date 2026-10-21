@@ -30,7 +30,8 @@ const AS_STAT_FAMILIES=[
  ['trip','出差',[['days','出差日数','人日'],['estimatedHours','折算出差工时','小时'],['count','出差记录数','次'],['people','涉及人数','人']]],
  ['outing','外出',[['hours','记载外出时长','小时'],['count','外出记录数','次'],['people','涉及人数','人']]],
  ['overtime','加班',[['hours','加班合计时长','小时'],['registeredHours','登记加班时长','小时'],
-  ['count','加班条目数','条'],['people','涉及人数','人'],
+  ['count','加班条目数','条'],['registeredCount','登记记录数','条'],
+  ['candidateCount','自动连续会话数','次'],['independentCount','独立加班次数','次'],['people','涉及人数','人'],
   ['candidateHours','自动推算候选工时','小时'],['candidateDays','加班候选人日','人日'],['candidatePeople','加班候选人数','人']]],
  ['punch','打卡',[['count','打卡记录数','次'],['people','打卡人数','人']]],
  ['status','考勤状态',[['normal','正常工作人日','人日'],['anomaly','异常工作人日','人日'],['absent','缺勤工作人日','人日'],['issue','异常及缺勤人日','人日'],['late','迟到人日','人日'],['early','早退人日','人日']]]
@@ -156,7 +157,10 @@ function asStatLedger(){
   const start=attendanceUtcMinute(date,r.start),
    finish=attendanceUtcMinute(date,r.end)+(clockEnd<clockStart?1440:0);
   if(finish<=start||finish-start>1440)return;
-  if(date.startsWith(monthISO()+'-'))add('overtime','count',id,Number(date.slice(8,10)),1);
+  if(date.startsWith(monthISO()+'-')){
+   add('overtime','count',id,Number(date.slice(8,10)),1);
+   add('overtime','registeredCount',id,Number(date.slice(8,10)),1);
+  }
   for(let day=1;day<=dayCount;day++){
    const dayStart=attendanceUtcMinute(isoDate(day)),dayEnd=dayStart+1440;
    if(start>=dayEnd||finish<=dayStart)continue;
@@ -181,8 +185,10 @@ function asStatLedger(){
    const session=seg.id||seg.sessionFrom+'|'+seg.sessionTo;
    if(!distinctSessions.has(session)){
     distinctSessions.add(session);
-    if(attendanceDateFromMinute(seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)))===a.date)
+    if(attendanceDateFromMinute(seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)))===a.date){
      add('overtime','count',a.employee.id,a.day,1);
+     add('overtime','candidateCount',a.employee.id,a.day,1);
+    }
    }
   }
   add('overtime','presence',a.employee.id,a.day,1);
@@ -228,6 +234,30 @@ function asStatLedger(){
   if(k==='anomaly'||k==='absent')add('status','issue',id,a.day,1);
   if(a.issues?.some(s=>String(s).includes('迟到')))add('status','late',id,a.day,1);
   if(a.issues?.some(s=>String(s).includes('早退')))add('status','early',id,a.day,1);
+ }
+ // Actual overtime events are connected intervals, not source record counts.
+ const physical=new Map(),seen=new Set();
+ const collect=(id,from,to)=>{if(!id||!Number.isFinite(from)||!Number.isFinite(to)||to<=from)return;
+  const v=physical.get(id)||[];v.push([from,to]);physical.set(id,v)};
+ for(const r of attendanceAdjacentRows('overtimeEntries')){
+  const start=attendanceUtcMinute(r.date,r.start),end=attendanceUtcMinute(r.date,r.end)+
+   (minutes(r.end)<minutes(r.start)?1440:0),id=r.employeeId;
+  const key=id+'|'+(r.id||r.importId+'|'+r.date+'|'+r.start+'|'+r.end);
+  if(seen.has(key))continue;seen.add(key);collect(id,start,end);
+ }
+ for(const a of state.analysis.values())for(const seg of activeAutoOvertimeSegments(a)){
+  const key='auto|'+seg.id;if(seen.has(key))continue;seen.add(key);
+  collect(a.employee.id,seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)),
+   seg.sessionTo??attendanceUtcMinute(a.date,attendanceClock(seg.to)));
+ }
+ for(const [id,list] of physical){
+  list.sort((a,b)=>a[0]-b[0]);let start=null,end=null;
+  const save=()=>{if(start==null)return;const date=attendanceDateFromMinute(start);
+    if(date.startsWith(monthISO()+'-'))add('overtime','independentCount',id,Number(date.slice(8,10)),1)};
+  for(const [from,to] of list){
+   if(start===null){start=from;end=to}else if(from<=end)end=Math.max(end,to);
+   else{save();start=from;end=to}
+  }save();
  }
  return cells;
 }

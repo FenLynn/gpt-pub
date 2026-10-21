@@ -262,9 +262,9 @@ function mountScopeAnalytics(people,work){
 }
 function dataPanelHtml(section){
  if(section==='roster'){
-  return '<div class="data-note">员工 ID 是记录关联的唯一键。组别可编辑；对于同名人员，请在正式导入前确认身份。</div>'+
-  '<div class="data-roster-table"><div class="data-roster-head"><span>人员 ID</span><span>姓名</span><span>部门</span><span>组别</span><span>操作</span></div>'+
-  EMPLOYEES.map(e=>'<div class="data-roster-row"><span>'+escapeNameChar(e.id)+'</span><strong>'+escapeNameChar(e.name)+'</strong>'+
+  return '<div class="data-note">以姓名作为唯一身份；不同闸机记录按姓名归并，组别仍可编辑。</div>'+
+  '<div class="data-roster-table"><div class="data-roster-head"><span>姓名</span><span>部门</span><span>组别</span><span>操作</span></div>'+
+  EMPLOYEES.map(e=>'<div class="data-roster-row"><strong>'+escapeNameChar(e.name)+'</strong>'+
    '<span>'+escapeNameChar(e.department)+'</span><span>'+escapeNameChar(groupOf(e))+'</span>'+
    '<button data-edit-roster-group="'+escapeNameChar(e.id)+'">修改组别</button></div>').join('')+'</div>';
  }

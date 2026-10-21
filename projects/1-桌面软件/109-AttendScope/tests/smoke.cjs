@@ -526,7 +526,8 @@ async function run(){
    const check=m=>asStatValue(ledger,'overtime',m,[e],[day]);
    if(Math.abs(check('hours')-126/60)>1e-8||
       Math.abs(check('candidateHours')-106/60)>1e-8||
-      check('count')!==2)return false;
+      check('count')!==2||check('registeredCount')!==1||
+      check('candidateCount')!==1||check('independentCount')!==1)return false;
    state.overtimeReview[withRegistered.autoOvertime.segments[0].id]=false;
    const excluded=analyzeDay(e,day);
    if(activeAutoOvertimeSegments(excluded).length||JSON.stringify(state.records)!==frozen)return false;

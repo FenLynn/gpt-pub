@@ -3,6 +3,18 @@ function downloadBlob(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),500);
 }
+function r62CsvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function downloadCurrentCSV(){
+ const rows=state.workspaceMode==='stats'?
+  asStatRows().visible.map(r=>({统计对象:r.label,业务:asStatFamily(asStatPrefs().family)[1],
+   指标:asStatMetric()[1],数值:r.value,单位:asStatRows().effectiveUnit})):traditionalRows();
+ if(!rows.length){toast('当前没有可导出数据',true);return}
+ const keys=Object.keys(rows[0]),lines=[keys.map(r62CsvCell).join(','),
+  ...rows.map(r=>keys.map(k=>r62CsvCell(r[k])).join(','))];
+ downloadBlob(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),
+  'AttendScope_'+monthKey()+'_'+(state.workspaceMode==='stats'?'统计':'明细')+'.csv');
+ toast('已导出 UTF-8 CSV');
+}
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
 function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
 function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(r=>({姓名:r.name,开始日期:r.startDate,结束日期:r.endDate,类型:r.type,地点:r.place,备注:r.note})),'出差'),'出差_'+monthKey()+'.xlsx')}
@@ -60,7 +72,7 @@ async function ensureProjectSkeleton(){
   if(!state.projectDir)return;
   const config=await dir(state.projectDir,'config'),calendar=await dir(config,'calendar');
   const m=await monthDirectory();
-  for(const part of ['raw','working','snapshots','branches','output'])await dir(m,part);
+  for(const part of ['raw','working','snapshots','output'])await dir(m,part);
   if(!await readJSON(state.projectDir,'project.json'))await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
   if(!await readJSON(config,'employees.json'))await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
   if(!await readJSON(config,'work_rules.json'))await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
@@ -177,8 +189,8 @@ async function saveWorking(){
       if(!verified||JSON.stringify(verified)!==JSON.stringify(JSON.parse(payload)))
        throw new Error('写入校验失败，保留上一有效版本');
       // Working is authoritative; config files are optional legacy defaults.
-      state.saved=true;rememberMonth();
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+      state.saved=true;rememberMonth();
       render();toast('已保存 '+monthKey()+' 的工作状态');return;
     }catch(e){toast('目录保存失败：'+e.message,true);return}
   }

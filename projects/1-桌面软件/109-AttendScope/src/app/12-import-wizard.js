@@ -126,16 +126,16 @@ function r62ImportProfile(){
 }
 let r62ImportDraft=null;
 function r62ColumnLabel(index){let s='';for(let i=index+1;i>0;i=Math.floor((i-1)/26))s=String.fromCharCode(65+(i-1)%26)+s;return s}
-function r62InferColumns(grid,headerRow){
+function r62InferColumns(grid,headerRow,skip=0){
  const rows=grid.rows||[],width=Math.max(0,...rows.slice(0,40).map(r=>r.cells.length));
- const headers=headerRow?rows[0]?.cells||[]:[];
+ const headers=headerRow?rows[skip]?.cells||[]:[];
  const scores={},result={};
  for(const [field] of R62_FIELDS[grid.kind]){
   const terms=R62_ALIASES[field]||[];
   const ranked=Array.from({length:width},(_,col)=>{
    const word=String(headers[col]??'').normalize('NFKC').toLowerCase().replace(/[\s_()]/g,'');
    let score=terms.some(x=>word===x.toLowerCase())?100:terms.some(x=>word.includes(x.toLowerCase()))?55:0;
-   const samples=rows.slice(headerRow?1:0,18).map(x=>x.cells[col]);
+   const samples=rows.slice(skip+(headerRow?1:0),skip+18).map(x=>x.cells[col]);
    if(field==='datetime')score+=samples.filter(v=>r62DateTime(v)&&r62Time(v)).length*2;
    if(field==='date'||field==='startDate'||field==='endDate')score+=samples.filter(v=>r62Date(v)).length;
    if(field==='name')score+=samples.filter(v=>typeof v==='string'&&
@@ -238,10 +238,10 @@ function r62WireImport(){
  const close=()=>{modal.remove();r62ImportDraft=null};
  modal.querySelector('#r62Close').onclick=close;
  modal.querySelector('#r62Cancel').onclick=close;
- modal.querySelector('#r62Header').onchange=e=>{d.header=e.target.checked;d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header);rerender()};
+ modal.querySelector('#r62Header').onchange=e=>{d.header=e.target.checked;d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);rerender()};
  modal.querySelector('#r62Skip').onchange=e=>{d.skip=Math.max(0,Math.min(100,Number(e.target.value)||0));rerender()};
  modal.querySelector('#r62Encoding')?.addEventListener('change',async e=>{
-  d.encoding=e.target.value;try{d.grid=await XLSX.readGrid(d.file,d.encoding);d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header);rerender()}
+  d.encoding=e.target.value;try{d.grid=await XLSX.readGrid(d.file,d.encoding);d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);rerender()}
   catch(err){toast(err.message,true)}
  });
  modal.querySelectorAll('[data-map]').forEach(el=>el.onchange=e=>{d.mapping[el.dataset.map]=Number(e.target.value);d.validated=null;
