@@ -272,7 +272,7 @@ function r68ProjectMarkup(report,tree){
    ['修订副本',months.reduce((n,m)=>n+m.branches.length,0)],
    ['项目文件',tree?.files||0],['总占用',r68HumanBytes(tree?.totalBytes||0)]
   ].map(([name,v])=>'<div><span>'+name+'</span><strong>'+v+'</strong></div>').join('')+'</div>'+
-  '<section class="r68-studio-card">'+r68SidebarHeader('月份状态','按实际磁盘文件展示，不以浏览器内存模拟持久化数据。',
+  '<section id="r68MonthsCard" class="r68-studio-card">'+r68SidebarHeader('月份状态','按实际磁盘文件展示，不以浏览器内存模拟持久化数据。',
    r68Pill(status,report?.level==='critical'?'critical':report?.level==='warning'?'warning':'healthy'))+
   '<div class="r68-month-table"><div class="r68-month-row heading"><span>月份</span><span>员工</span><span>原件</span><span>工作状态</span>'+
    '<span>上次保存</span><span>冻结</span><span>修订副本</span><span>操作</span></div>'+
@@ -283,16 +283,16 @@ function r68ProjectMarkup(report,tree){
     '<span>'+m.snapshots.length+'</span><span>'+m.branches.length+'</span>'+
     '<button class="r68-inline" data-r68-month="'+m.key+'">查看月份</button></div>').join(''):
     '<div class="r68-empty">目录内暂无保存过的月份。新项目请先导入并保存。</div>')+'</div></section>'+
-  '<section class="r68-studio-card">'+r68SidebarHeader('项目健康','只读检测 · 提醒缺失与冲突，绝不擅自覆盖原始打卡和冻结。')+
+  '<section id="r68HealthCard" class="r68-studio-card">'+r68SidebarHeader('项目健康','只读检测 · 提醒缺失与冲突，绝不擅自覆盖原始打卡和冻结。')+
    '<div class="r68-health-list">'+(issues.length?issues.map(i=>
     '<div class="r68-health-item">'+r68Pill(i.level==='critical'?'严重':i.level==='warning'?'提醒':'提示',
     i.level)+'<div><strong>'+r68Esc(i.message)+'</strong><small>'+r68Esc(i.where||'项目')+
      (i.fix?' · '+r68Esc(i.fix):'')+'</small></div></div>').join(''):
     '<div class="r68-empty">未发现本次扫描覆盖范围内的问题。</div>')+'</div>'+
    '<button class="r68-btn" id="r68IndexRepair" '+(!report?.safeIndexRepair?.length?'disabled':'')+'>补全有效月份索引（'+(report?.safeIndexRepair?.length||0)+'）</button></section>'+
-  '<section class="r68-studio-card">'+r68SidebarHeader('存储构成','实际读取已连接目录中的文件大小；不包含未知的外部磁盘空间。')+
+  '<section id="r68StorageCard" class="r68-studio-card">'+r68SidebarHeader('存储构成','实际读取已连接目录中的文件大小；不包含未知的外部磁盘空间。')+
     '<div class="r68-storage-bars">'+r68StorageBars(tree)+'</div></section>'+
-  '</div><aside class="r68-project-rail"><section class="r68-studio-card">'+
+  '</div><aside class="r68-project-rail"><section id="r68ProjectTree" class="r68-studio-card">'+
    r68SidebarHeader('项目文件树','展开目录浏览实际文件，不修改任何内容。')+
    '<div class="r68-filetree r68-overview-tree">'+(connected?r68TreeLine(state.projectDir.name,'directory')+
    '<div class="r68-tree-children">'+(tree?.html||'')+'</div>':
@@ -331,5 +331,6 @@ async function r68RenderProject(){
   else toast('此月份存在磁盘工作状态，请先用「目录」重新载入项目',true)
  });
  document.getElementById('r68RefreshProject')?.addEventListener('click',r68RenderProject);
+ document.querySelectorAll('[data-project-scroll]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.projectScroll)?.scrollIntoView({behavior:'smooth',block:'start'}));
 }
 renderDataWorkspace=r68RenderData;
