@@ -382,10 +382,10 @@ function analysisUnionSegments(intervals){
  return merged;
 }
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
- const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?Math.max(1,+RULES.overtimeMinMinutes):5;
+ const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?Math.max(20,+RULES.overtimeMinMinutes):20;
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,
   reason:'打卡进出配对待核',segments:[]};
- const windows=isWorkday(day)?[[minutes(RULES.pmEnd),1440]]:
+ const windows=isWorkday(day)?[[minutes(RULES.amEnd),minutes(RULES.pmStart)],[minutes(RULES.pmEnd),1440]]:
    [[0,1440]];
  const eligible=[];
  for(const [enter,exit] of pairs){
@@ -424,7 +424,7 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   // A 4-minute leftover from a 15-minute session is eligible; a separate
   // 4-minute punch session is not. Both are still non-overlapping with raw
   // registered entries in the statistics ledger.
-  if((item.qualifying||end-begin)+1e-8>=minMinutes){
+  if((item.qualifying||end-begin)>minMinutes+1e-8){
    for(const [from,to] of all)residual.push({from,to,minutes:to-from,
       sessionFrom:item.sessionFrom??begin,sessionTo:item.sessionTo??end,
       sessionId:item.id});
