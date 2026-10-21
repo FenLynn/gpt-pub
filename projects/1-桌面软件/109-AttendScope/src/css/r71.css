@@ -211,3 +211,14 @@
  font-size:12px;font-weight:600;cursor:pointer}
 .r72-fixed-toggle.is-fixed{color:#32816a}
 .r72-fixed-toggle:hover{text-decoration:underline}
+
+/* R72 final spacing: roster search + group registry share ONE toolbar line. */
+.layout.workspace-mode-data .r72-roster-tools{gap:7px;margin:0 0 6px;align-items:center}
+.layout.workspace-mode-data .r72-roster-tools>input{flex:1 1 190px;min-width:145px}
+.layout.workspace-mode-data .r72-roster-tools>select{flex:0 1 126px}
+.layout.workspace-mode-data .r72-group-manager{margin:0 0 0 auto;padding:0;border:0!important;
+ display:inline-flex;align-items:center;gap:5px;flex:0 1 auto}
+.layout.workspace-mode-data .r72-group-manager select{min-width:128px;max-width:165px}
+.layout.workspace-mode-data .r72-group-manager .r68-btn{padding:6px 8px;min-height:31px}
+.layout.workspace-mode-data .r72-roster-bulk{padding:5px 0;margin-bottom:5px}
+.layout.workspace-mode-data .r72-roster-list .r68-roster-entry{min-height:36px;padding:4px 10px}

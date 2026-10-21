@@ -1785,6 +1785,10 @@ async function run(){
    if(!state.groupCatalog.includes('R72自建分组'))throw Error('R72 group creation failed');
    state.groups[originalId]='R72自建分组';
    r72MarkDirty('assign-group',{employeeId:originalId,to:'R72自建分组'});
+   window.prompt=()=> 'R72更名组';
+   await r72RenameGroup('R72自建分组');
+   if(groupOf(EMPLOYEES.find(e=>e.id===originalId))!=='R72更名组'||
+      state.groupCatalog.includes('R72自建分组'))throw Error('R72 group rename association lost');
    await r72FixedPeople([originalId],true);
    if(!state.fixedPeople.includes(originalId))throw Error('R72 fixed entry missing');
    const originalRows=state.records.filter(r=>r.employeeId===originalId).length;
@@ -1798,8 +1802,8 @@ async function run(){
     throw Error('R72 original source name not retained');
    if(importRosterPlan([originalName],'attendance').byName.get(originalName).id!==id)
     throw Error('R72 original imported name must map to renamed canonical identity');
-   await r72DeleteGroup('R72自建分组');
-   if(groupOf(EMPLOYEES.find(e=>e.id===id))!=='未分组'||state.groupCatalog.includes('R72自建分组'))
+   await r72DeleteGroup('R72更名组');
+   if(groupOf(EMPLOYEES.find(e=>e.id===id))!=='未分组'||state.groupCatalog.includes('R72更名组'))
     throw Error('R72 delete group must reassign without deleting person');
    state.isDemo=false;rememberMonth();
    switchMonth(2028,2,true);
@@ -1812,6 +1816,30 @@ async function run(){
     throw Error('R72 unfix must preserve current month');
   }finally{window.prompt=previous}
  });
+ // R72 real SVG/DOM integration: prove both flags are rendered next to punches.
+ {
+  const flagPage=await browser.newPage({viewport:{width:1600,height:900}});
+  try{
+   await flagPage.goto(page.url(),{waitUntil:'load'});
+   await flagPage.evaluate(()=>{
+    const e=EMPLOYEES[0],date='2026-10-08';
+    state.records=[['08:36','进'],['11:30','出'],['13:25','进'],['17:10','出']].map(([time,direction],i)=>
+     ({recordId:'r72flag:'+i,employeeId:e.id,name:e.name,
+      datetime:date+' '+time,time,direction}));
+    state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
+    reanalyze();
+    state.workspaceMode='person';state.selection={type:'cell',employeeId:e.id,day:8};
+    state.chartTab='timeline';state.chartDay=8;render();
+   });
+   await flagPage.waitForFunction(()=>{
+    const text=[...document.querySelectorAll('.r72-attendance-tag')].map(el=>el.textContent);
+    return text.includes('迟到')&&text.includes('上午早退');
+   },{timeout:15000});
+   const tags=await flagPage.locator('.r72-attendance-tag').count();
+   if(tags<2)throw Error('R72 flags not visible in actual timeline');
+   await flagPage.screenshot({path:path.join(out,'r72-timeline-late-early.png')});
+  }finally{await flagPage.close()}
+ }
  await require('./lifecycle-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
