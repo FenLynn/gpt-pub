@@ -489,13 +489,13 @@ async function run(){
       activeAutoOvertimeSegments(analyzeDay(e,10)).length||
       JSON.stringify(state.records)!==original)return false;
    delete state.overtimeReview[reviewId];
-   // A seven-minute visit from 23:58 to 00:05 counts 2+5 minutes,
+   // A 27-minute visit from 23:58 to 00:25 counts 2+25 minutes,
    // whereas a four-minute visit cannot be pooled across midnight.
    state.overtimeEntries=[];
    state.records=[make('2026-10-09','23:58:00','进',3),
-     make('2026-10-10','00:05:00','出',4)];
+     make('2026-10-10','00:25:00','出',4)];
    if(!approx(analyzeDay(e,9).autoOvertime.minutes,2)||
-      !approx(analyzeDay(e,10).autoOvertime.minutes,5))return false;
+      !approx(analyzeDay(e,10).autoOvertime.minutes,25))return false;
    state.records=[make('2026-10-09','23:58:00','进',3),
      make('2026-10-10','00:02:00','出',5)];
    if(analyzeDay(e,9).autoOvertime.minutes||analyzeDay(e,10).autoOvertime.minutes)return false;
@@ -524,28 +524,26 @@ async function run(){
    state.timelineRange=null;
   }
  },'R61 weekend noon, midnight 4+2, cross-month 4+2, registration union and uniform staff labels');
- // R58: the fresh default is five minutes, assessed per isolated interval.
+ // R68: strictly more than 20 min after shift-end; never deduct grace.
  await check(page,()=>{
-  if(RULES.overtimeMinMinutes!==5)return false;
-  const pair=(begin,end)=>[{time:begin},{time:end}];
-  const evaluate=ls=>estimateOvertimeCandidate(ls,8,[]);
-  const short=evaluate([pair('17:11','17:14'),pair('18:00','18:04')]);
-  const exact=evaluate([pair('17:10','17:15')]);
-  const before=evaluate([pair('17:10:30','17:15:29')]);
-  const two=evaluate([pair('17:10','17:15'),pair('18:00','18:05')]);
-  const registered=estimateOvertimeCandidate([pair('17:10','17:25')],8,[
-    {start:'17:14',end:'17:22'}]);
-  const settings=settingsContent('rules');
-  return short.rawMinutes===7&&short.minutes===0&&short.segments.length===0&&
-   exact.minutes===5&&exact.segments.length===1&&
-   before.minutes===0&&before.rawMinutes<5&&
-   two.minutes===10&&two.segments.length===2&&
-   registered.minutes===7&&registered.rawMinutes===7&&
-   registered.segments.length===2&&
-   registered.segments.every(seg=>seg.sessionFrom===1030&&seg.sessionTo===1045)&&
-   settings.includes('id="r14OvertimeMin"')&&
-   settings.includes('step="1"')&&settings.includes('min="1"');
- },'R58 every disjoint interval requires its own editable five-minute threshold');
+  if(RULES.overtimeMinMinutes!==20)return false;
+  const pair=(a,b)=>[{time:a},{time:b}];
+  const calc=ls=>estimateOvertimeCandidate(ls,8,[]);
+  const boundary=calc([pair('17:09','17:30')]),late=calc([pair('17:09','17:35')]);
+  const before=calc([pair('17:09','17:29')]);
+  const morning=calc([pair('08:30','12:05')]);
+  const atNoon=calc([pair('08:30','12:00')]);
+  const acrossLunch=calc([pair('08:30','17:35')]);
+  const separate=calc([pair('17:10','17:22'),pair('18:00','18:12')]);
+  const registered=estimateOvertimeCandidate([pair('17:10','18:00')],8,[{start:'17:20',end:'17:35'}]);
+  const setting=settingsContent('rules');
+  return boundary.minutes===0&&before.minutes===0&&
+    late.minutes===25&&late.segments.length===1&&
+    morning.minutes===25&&atNoon.minutes===0&&
+    acrossLunch.minutes===25&&separate.minutes===0&&
+    registered.minutes===35&&registered.segments.length===2&&
+    setting.includes('id="r14OvertimeMin"')&&setting.includes('min="20"');
+ },'R68 >20min lunch/evening grace without deduction, no lunch spanning overcount');
  // R60: consecutive 'in' punches without an intervening 'out' are
  // ONE continuous attendance visit. Threshold checks the original visit,
  // while registered entries affect only accounting, not attendance identity.
@@ -559,7 +557,7 @@ async function run(){
   }));
   try{
    state.leaves=[];state.trips=[];state.outings=[];
-   state.overtimeEntries=[];RULES.overtimeMinMinutes=5;
+   state.overtimeEntries=[];RULES.overtimeMinMinutes=20;
    state.records=punch([['17:05','进'],['17:18','进'],['18:27','进'],['18:35','进'],['19:16','出']]);
    const frozen=JSON.stringify(state.records);
    const continuous=analyzeDay(e,day);
@@ -677,7 +675,7 @@ async function run(){
  // switchers must no longer compete with group/person selection.
  await check(page,()=>{
   const top=[...document.querySelectorAll('[data-workspace]')];
-  return top.length===5&&top.some(b=>b.dataset.workspace==='stats')&&
+  return top.length===6&&top.some(b=>b.dataset.workspace==='stats')&&
    document.querySelectorAll('.side-views [data-as-view="stats"]').length===0&&
    !!document.querySelector('.side-refinements')&&
    !!document.getElementById('asNavBack')&&!!document.getElementById('asNavForward');
