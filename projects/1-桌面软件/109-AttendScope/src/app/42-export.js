@@ -137,9 +137,16 @@ async function captureCurrentImage(kind){
   data:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height};
 }
 function captureBytes(data){return Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0))}
+async function r63Thumbnail(data){
+ const img=await captureImage(data),scale=Math.min(1,180/img.width,110/img.height);
+ const [canvas,g]=captureCanvas(Math.max(1,Math.round(img.width*scale)),Math.max(1,Math.round(img.height*scale)));
+ g.drawImage(img,0,0,canvas.width,canvas.height);
+ return canvas.toDataURL('image/jpeg',.65);
+}
 async function captureSave(item){
  if(!state.captureItems)state.captureItems=[];
- state.captureItems.push(item);if(state.captureItems.length>24)state.captureItems.splice(0,state.captureItems.length-24);
+ item.thumb=await r63Thumbnail(item.data);
+ state.captureItems.push(item);if(state.captureItems.length>16)state.captureItems.splice(0,state.captureItems.length-16);
  const bytes=captureBytes(item.data);
  if(state.projectDir){
   const month=await monthDirectory(),out=await dir(month,'output'),folder=await dir(out,'captures');
@@ -159,7 +166,7 @@ async function captureStoredFiles(){
  for await(const [name,handle] of folder.entries())if(handle.kind==='file'&&name.endsWith('.png'))matches.push([name,handle]);
  matches.sort((a,b)=>b[0].localeCompare(a[0]));
  const found=[];
- for(const [filename,handle] of matches.slice(0,20)){
+ for(const [filename,handle] of matches.slice(0,16)){
   const file=await handle.getFile();if(file.size>14*1024*1024)continue;
   const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
   for(let i=0;i<bytes.length;i+=12000)binary+=String.fromCharCode(...bytes.subarray(i,i+12000));
@@ -198,8 +205,8 @@ async function captureAllPdf(selected){
   const pdf=await capturePdf(items),name=r63Title()+'_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
   if(state.projectDir){const output=await dir(await monthDirectory(),'output');await writeFile(output,name,await pdf.arrayBuffer())}
   else downloadBlob(pdf,name);
-  toast('已导出 '+items.length+' 页横向 A4 PDF');
- }catch(e){toast('生成 PDF 失败：'+e.message,true)}
+  toast('已导出 '+items.length+' 页横向 A4 PDF');return true;
+ }catch(e){toast('生成 PDF 失败：'+e.message,true);return false}
 
 }
 
@@ -215,12 +222,14 @@ async function r63TogglePdfPicker(event){
  if(picker.hidden)return;
  const memory=(state.captureItems||[]).filter(x=>x.month===monthKey()).slice().reverse();
  const names=new Set(memory.map(x=>x.filename));
- const captures=[...memory,...previous.filter(x=>!names.has(x.filename))].slice(0,20);
+ const captures=[...memory,...previous.filter(x=>!names.has(x.filename))].slice(0,16);
+ await Promise.all(captures.map(async x=>{if(!x.thumb)x.thumb=await r63Thumbnail(x.data)}));
+ if(picker.hidden)return;
  picker._captures=captures;
  picker.innerHTML='<div class="r63-pdf-header"><strong>最近截图</strong><button type="button" id="r63PdfClose" aria-label="关闭">×</button></div>'+
   (captures.length?'<div class="r63-pdf-list">'+captures.map((x,i)=>
     '<label class="r63-pdf-row"><input type="checkbox" data-capture-index="'+i+'" checked>'+
-    '<img src="'+x.data+'" alt=""><span title="'+escapeNameChar(x.filename)+'">'+escapeNameChar(x.filename)+'</span></label>').join('')+'</div>':
+    '<img src="'+x.thumb+'" alt=""><span title="'+escapeNameChar(x.filename)+'">'+escapeNameChar(x.filename)+'</span></label>').join('')+'</div>':
    '<p class="r63-pdf-status">暂无截图。先点击旁边的「截图」保存需要的视图。</p>')+
   '<footer><span id="r63PdfCount">'+captures.length+' 张已选</span><button type="button" id="r63PdfExport" '+(captures.length?'':'disabled')+'>导出 PDF</button></footer>';
  picker.querySelector('#r63PdfClose').onclick=()=>{picker.hidden=true;button.setAttribute('aria-expanded','false')};
@@ -233,7 +242,8 @@ async function r63TogglePdfPicker(event){
    .map(x=>captures[Number(x.dataset.captureIndex)]);
   if(!chosen.length)return;
   const exportBtn=picker.querySelector('#r63PdfExport');exportBtn.disabled=true;exportBtn.textContent='导出中…';
-  await captureAllPdf(chosen);
+  const success=await captureAllPdf(chosen);
+  if(!success){exportBtn.disabled=false;exportBtn.textContent='导出 PDF';return}
   if(picker.isConnected){picker.hidden=true;button.setAttribute('aria-expanded','false')}
  };
 }
