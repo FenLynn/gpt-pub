@@ -38,7 +38,8 @@ function sectionCard(title,description,items){
 function settingsContent(section){
  switch(section){
  case 'appearance':return sectionCard('界面外观','遵循 MATQ / DavBridge 风格，减少装饰性注释，增强可读性。',
-   settingSelect('settingFont','全局字号',[['1','标准 · 100%'],['1.08','舒适 · 108%'],['1.16','放大 · 116%']])+
+   '<label class="r14-setting-row"><span>软件名称<small>顶部标题及导出文件使用此名称</small></span><input id="settingAppTitle" type="text" maxlength="28" placeholder="考勤"></label>'+ 
+    settingSelect('settingFont','全局字号',[['1','标准 · 100%'],['1.08','舒适 · 108%'],['1.16','放大 · 116%']])+
    settingCheck('settingMotion','平滑过渡动画','减少突兀闪烁，关闭后适用低性能设备')+
    settingCheck('settingBarLabels','在柱状图顶部显示数值','开启后在每根柱顶显示对应统计值；关闭后可悬停查看')+
    '<div class="r14-appearance-preview"><span>界面排版预览</span><strong>出勤情况 · 2026 年 10 月</strong><p>清晰的中文、统一的数字和克制的色彩</p><div><i class="green"></i><i class="yellow"></i><i class="red"></i><em>正常 · 异常 · 缺勤</em></div></div>');
@@ -95,7 +96,7 @@ function bindSettings(){
   content.innerHTML=settingsContent(section);
   const d=r14SettingsDraft,p=d.prefs;
   const set=(id,value)=>{const e=document.getElementById(id);if(e){if(e.type==='checkbox')e.checked=!!value;else e.value=String(value)}};
-  if(section==='appearance'){set('settingFont',p.fontScale||1);set('settingMotion',p.motion!==false);
+  if(section==='appearance'){set('settingAppTitle',p.appTitle||'考勤');set('settingFont',p.fontScale||1);set('settingMotion',p.motion!==false);
    set('settingBarLabels',p.showBarValues===true)}
   if(section==='matrix'){
    const m=p.matrix||{};set('settingIds',m.ids!==false);set('settingCrosshair',m.crosshair!==false);set('settingManualCheck',m.showManualCheck!==false);
@@ -133,7 +134,7 @@ function bindSettings(){
   if(!r14SettingsDraft)return;
   const d=r14SettingsDraft,p=d.prefs;
   const get=id=>document.getElementById(id),v=id=>get(id)?.value,ch=id=>get(id)?.checked;
-  if(section==='appearance'){p.fontScale=Number(v('settingFont')||p.fontScale||1);p.motion=!!ch('settingMotion');
+  if(section==='appearance'){p.appTitle=String(v('settingAppTitle')||'考勤').trim().slice(0,28)||'考勤';p.fontScale=Number(v('settingFont')||p.fontScale||1);p.motion=!!ch('settingMotion');
    p.showBarValues=!!ch('settingBarLabels')}
   if(section==='matrix'){p.matrix={ids:!!ch('settingIds'),crosshair:!!ch('settingCrosshair'),showManualCheck:!!ch('settingManualCheck'),glow:Number(v('settingGlow')||1),restContrast:Number(v('settingRestContrast')||1)}}
   if(section==='timeline'){
