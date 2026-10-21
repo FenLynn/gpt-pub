@@ -81,7 +81,7 @@ function layoutHtml(){
   <header class="topbar">
     <div class="brand">
       <div class="logo" aria-hidden="true"><span></span></div>
-      <strong class="brand-title">AttendScope</strong>
+      <strong class="brand-title">${escapeNameChar(attendTitle())}</strong>
       <span class="brand-mode">离线考勤</span>
     </div>
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
@@ -123,7 +123,7 @@ function layoutHtml(){
     <div class="top-actions">
       <button class="text-btn" id="exportTable">导出表格</button><button class="text-btn" id="exportCsv">CSV</button>
       <button class="text-btn" id="captureView">截图</button>
-      <button class="text-btn" id="printReport">截图 PDF</button>
+      <div class="r63-pdf-anchor"><button class="text-btn" id="printReport" aria-expanded="false" aria-controls="r63PdfPicker">PDF ▾</button><div id="r63PdfPicker" class="r63-pdf-picker" hidden></div></div>
       <span class="action-divider"></span>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
@@ -316,7 +316,7 @@ function bind(){
   document.getElementById('exportTable').onclick=exportTraditionalTable;
   document.getElementById('exportCsv').onclick=downloadCurrentCSV;
   document.getElementById('captureView').onclick=captureCurrentView;
-  document.getElementById('printReport').onclick=captureAllPdf;
+  document.getElementById('printReport').onclick=r63TogglePdfPicker;
   document.getElementById('saveBtn').onclick=saveWorking;
   document.getElementById('restoreBtn').onclick=()=>document.getElementById('restoreInput').click();
   document.getElementById('restoreInput').onchange=async e=>{
