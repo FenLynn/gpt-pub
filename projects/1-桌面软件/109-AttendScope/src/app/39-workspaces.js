@@ -97,7 +97,7 @@ function workspaceSidebarHtml(){
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
-  (mode==='data'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
+  (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
    '<div class="side-refinements"><div class="side-refinements-title">辅助筛选</div>'+sidebarFilterHtml()+'</div>')+'</div>';
 }
 function workspaceToolbarHtml(){
