@@ -19,7 +19,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
     const pinnedPeople=profile.pinRoster&&Array.isArray(profile.employees)?profile.employees:EMPLOYEES;
     const pinnedGroups=profile.pinRoster&&profile.groups?profile.groups:state.groups;
     const pinnedImport=profile.pinImport&&profile.importProfile?profile.importProfile:r62ImportProfile();
-    state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
+    state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...(profile.pinRules&&profile.workRules?profile.workRules:RULES)},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
      calendarOverrides:{...state.calendarOverrides},activeBranch:null});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
