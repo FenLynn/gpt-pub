@@ -203,7 +203,8 @@ function p109ProjectView(report){
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>安全管理</b><span>不会自动改写原始记录或冻结</span></div>'+
    '<div class="p109-project-actions"><button id="p109Rescan" type="button">重新检测</button>'+
     '<button id="p109Backup" type="button" '+(!report.initialized?'disabled':'')+'>备份整个项目 ZIP</button>'+
-    '<button id="p109RestoreZip" type="button">从 ZIP 恢复</button>'+
+    '<button id="p109RestoreZip" type="button">从 ZIP 恢复</button>'+ 
+    '<button id="p109UpgradeCode" type="button" '+(!report.initialized?'disabled':'')+'>安全更新程序</button>'+
     '<button id="p109RepairIndex" type="button" '+(!report.safeIndexRepair.length?'disabled':'')+'>补全月份索引（'+report.safeIndexRepair.length+'）</button></div>'+
     '<p class="p109-project-desc">自动整理仅补充确认存在的有效月份索引；缺失原件、数据冲突、损坏快照均只报告，不擅自合并。</p></div>'+
   '</div><footer><span>运行版本 '+P109_APP_VERSION+' · 数据结构 v'+P109_DATA_SCHEMA+'</span>'+
@@ -231,6 +232,7 @@ async function openProjectControl(mode='scan'){
   root.querySelector('#p109PinRoster').onclick=()=>p109PinDefaults('roster');
   root.querySelector('#p109PinImport').onclick=()=>p109PinDefaults('import');
   root.querySelector('#p109RestoreZip').onclick=()=>p109RestoreArchive();
+  root.querySelector('#p109UpgradeCode').onclick=()=>p109UpgradePick();
   root.querySelector('#p109RepairIndex').onclick=()=>p109RepairIndex(report);
   root.querySelectorAll('[data-p109-fork]').forEach(btn=>btn.onclick=async()=>{
     const [month,id]=btn.dataset.p109Fork.split('|');await p109ForkSnapshot(month,id)
@@ -358,7 +360,10 @@ async function p109RepairIndex(report=p109Audit){
 async function p109ArchiveWalk(folder,prefix,files,limits){
  for(const item of await p109Entries(folder)){
   if(item.name==='.'||item.name==='..'||item.name.includes('/')||item.name.includes('\\'))throw Error('不安全的文件名');
-  if(item.kind==='directory'){await p109ArchiveWalk(item.handle,prefix+item.name+'/',files,limits);continue}
+  if(item.kind==='directory'){
+   if(!prefix&&item.name==='backups')continue; // no recursive backup amplification
+   await p109ArchiveWalk(item.handle,prefix+item.name+'/',files,limits);continue
+  }
   const file=await item.handle.getFile();limits.bytes+=file.size;limits.count++;
   if(limits.count>5000||limits.bytes>160*1024*1024)throw Error('项目过大（上限 5000 文件或 160 MB），请通过系统文件管理器整体压缩');
   files.push({name:prefix+item.name,data:new Uint8Array(await file.arrayBuffer())});
