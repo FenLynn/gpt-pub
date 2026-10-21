@@ -214,11 +214,11 @@ function importMenuRow(title,input,sample){
 }
 
 function bind(){
-  document.getElementById('attendanceInput').onchange=e=>handleFile(e,importAttendance);
-  document.getElementById('leaveInput').onchange=e=>handleFile(e,importLeaves);
-  document.getElementById('tripInput').onchange=e=>handleFile(e,importTrips);
-  document.getElementById('outingInput').onchange=e=>handleFile(e,importOutings);
-  document.getElementById('overtimeInput').onchange=e=>handleFile(e,importOvertime);
+  document.getElementById('attendanceInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'attendance'));
+  document.getElementById('leaveInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'leave'));
+  document.getElementById('tripInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'trip'));
+  document.getElementById('outingInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'outing'));
+  document.getElementById('overtimeInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'overtime'));
 
   const filter=document.getElementById('statusFilter');
   const filterButton=document.getElementById('statusFilterButton');
