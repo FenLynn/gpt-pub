@@ -3,6 +3,66 @@ function captureStamp(){const d=new Date();return d.getFullYear()+pad(d.getMonth
 function captureCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);return [c,g]}
 function captureLabel(g,s,x,y,size=13,color='#47627e'){g.font=size+'px "Microsoft YaHei",system-ui,sans-serif';g.fillStyle=color;g.fillText(String(s),x,y)}
 async function captureImage(src){const i=new Image();i.src=src;await new Promise((ok,no)=>{i.onload=ok;i.onerror=no});return i}
+
+/* R63: faithfully compose chart, legends, context counts, and right-hand facts. */
+function r63Title(){return typeof attendTitle==='function'?attendTitle():'考勤'}
+function r63ReportData(kind){
+ if(kind==='stats'){
+  const d=asStatRows(),p=asStatPrefs(),label=asStatFamily(p.family)[2].find(x=>x[0]===p.metric)?.[1]||'统计';
+  return {heading:periodText()+' · '+d.rows.length+' 项 · '+label,
+   lines:[['范围',document.querySelector('.as-stats-chart-context')?.textContent?.trim()||periodText()],
+    ['统计指标',label],['范围总量',document.querySelector('.as-stats-total strong')?.textContent?.trim()||'—'],
+    ...d.rows.slice(0,12).map((x,i)=>[String(i+1)+'. '+x.label,Math.round(x.value*100)/100+' '+d.effectiveUnit])]};
+ }
+ const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],
+  day=state.chartDay||state.selection?.day||1,a=e&&state.analysis.get(e.id+'|'+day);
+ if(!a)return {heading:periodText(),lines:[['状态','暂无可用记录']]};
+ const auto=(a.autoOvertime?.segments||[]).filter(x=>x.accepted!==false).reduce((n,x)=>n+(x.minutes||0),0);
+ return {heading:e.name+' · '+isoDate(day),
+  lines:[['姓名',e.name],['日期',isoDate(day)],['最终判定',JUDGMENT_LABELS[attendanceJudgment(a)]||a.status||'—'],
+   ['打卡次数',a.punches.length+' 条'],['首进',a.firstIn?.slice(0,8)||'—'],
+   ['末出',a.lastOut?.slice(0,8)||'—'],['在岗',fmtMinutes(a.presence)],
+   ['班内工时',fmtMinutes(a.workMinutes??0)],['自动加班（已纳入）',fmtMinutes(auto)],
+   ['登记加班',a.overtime?.length+' 条'],['出差',a.trips?.length+' 条'],
+   ['请假',a.leaves?.length+' 条'],['外出',a.outings?.length+' 条'],
+   ['异常说明',(a.issues||[]).join('、')||'无']]};
+}
+function r63Legend(g,kind,x,y){
+ const o=OVERTIME_VISUALS;
+ const legend=kind==='matrix'?
+  [['正常','#78caa0'],['待核','#e6c36f'],['缺勤','#e58f90'],['非工作日','#e4eaf1']]:
+  kind==='stats'?(asStatPrefs().family==='overtime'?
+   [['登记加班',o.registered.top],['自动加班',o.auto.top]]:
+   [[asStatFamily(asStatPrefs().family)[1],asStatPalette(asStatPrefs().family,asStatPrefs().metric).top]]):
+  [['进','#1f5a9f'],['出','#8a5b3d'],['出差','#7d95d9'],['请假','#af94de'],
+   ['外出','#6eb3d3'],['登记加班',o.registered.top],['自动加班',o.auto.top]];
+ g.save();g.font='14px system-ui';for(const [label,color] of legend){
+  g.fillStyle=color;g.fillRect(x,y-10,13,13);g.fillStyle='#536980';g.fillText(label,x+19,y+2);
+  x+=g.measureText(label).width+46;
+ }g.restore();
+}
+function r63Compose(kind,visual){
+ const d=r63ReportData(kind),sidebar=kind==='matrix'?0:360;
+ const width=Math.max(1060,visual.width)+sidebar+58,top=131,height=Math.max(690,visual.height+top+25);
+ const [c,g]=captureCanvas(width,height);
+ captureLabel(g,r63Title()+' · '+({matrix:'月度考勤矩阵',stats:'统计分析',timeline:'个人考勤时间轴'}[kind]),26,43,25,'#284766');
+ captureLabel(g,kind==='matrix'?periodText()+' · '+(state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length:EMPLOYEES.length)+' 人':d.heading,26,75,16);
+ r63Legend(g,kind,26,108);g.drawImage(visual,25,top);
+ if(sidebar){
+  const x=Math.max(1060,visual.width)+46;g.strokeStyle='#e3eaf1';g.beginPath();g.moveTo(x-15,150);g.lineTo(x-15,height-22);g.stroke();
+  captureLabel(g,kind==='stats'?'统计信息 · 排行':'当日考勤信息',x,176,20,'#284766');
+  let y=208;for(const [key,value] of d.lines){
+   if(y>=height-52)break;
+   captureLabel(g,key,x,y,13,'#76899d');y+=22;
+   const str=String(value??'—');for(let i=0;i<Math.min(str.length,80);i+=26){
+    captureLabel(g,str.slice(i,i+26),x,y,14,'#294663');y+=20;
+   }
+   if(!str.length)y+=20;y+=12;
+  }
+ }
+ return c;
+}
+
 function captureMatrixCanvas(){
  const people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
  const w=Math.max(1260,165+monthDays()*32),h=Math.max(400,140+people.length*25);
@@ -61,26 +121,25 @@ function captureTimelineCanvas(){
  return canvas;
 }
 async function captureCurrentImage(kind){
- let canvas=null;
+ let visual=null;
  if(kind==='stats'||kind==='timeline'){
-  const el=document.getElementById(kind==='stats'?'asStatChart':'attendanceTimelineChart'),
-    chart=el&&window.echarts?.getInstanceByDom(el);
-  if(chart){
-   const image=await captureImage(chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:'#fff'}));
-   const [c,g]=captureCanvas(Math.max(image.width,1100),image.height+74);
-   captureLabel(g,'AttendScope  ·  '+(kind==='stats'?'统计图':'时间轴')+'  ·  '+periodText(),25,43,21);
-   g.drawImage(image,0,72);canvas=c;
+  const el=document.getElementById(kind==='stats'?'asStatChart':'attendanceTimelineChart');
+  const chart=el&&window.echarts?.getInstanceByDom(el);
+  if(chart&&!chart.isDisposed()){
+   const img=await captureImage(chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:'#fff'}));
+   const [canvas,g]=captureCanvas(img.width,img.height);g.drawImage(img,0,0);visual=canvas;
   }
  }
- if(!canvas)canvas=kind==='matrix'?captureMatrixCanvas():
-   kind==='stats'?captureStatisticsCanvas():captureTimelineCanvas();
- return {kind,filename:'AttendScope_'+kind+'_'+monthKey()+'_'+captureStamp()+'.png',
+ if(!visual)visual=kind==='matrix'?captureMatrixCanvas():
+  kind==='stats'?captureStatisticsCanvas():captureTimelineCanvas();
+ const canvas=r63Compose(kind,visual);
+ return {kind,month:monthKey(),filename:r63Title()+'_'+kind+'_'+monthKey()+'_'+captureStamp()+'.png',
   data:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height};
 }
 function captureBytes(data){return Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0))}
 async function captureSave(item){
  if(!state.captureItems)state.captureItems=[];
- state.captureItems.push(item);
+ state.captureItems.push(item);if(state.captureItems.length>24)state.captureItems.splice(0,state.captureItems.length-24);
  const bytes=captureBytes(item.data);
  if(state.projectDir){
   const month=await monthDirectory(),out=await dir(month,'output'),folder=await dir(out,'captures');
@@ -88,21 +147,25 @@ async function captureSave(item){
  }else downloadBlob(new Blob([bytes],{type:'image/png'}),item.filename);
 }
 async function captureCurrentView(){
- const kind=state.workspaceMode==='stats'?'stats':state.chartTab==='timeline'?'timeline':'matrix';
+ const kind=state.workspaceMode==='stats'?'stats':state.workspaceMode==='person'||state.chartTab==='timeline'?'timeline':'matrix';
  try{await captureSave(await captureCurrentImage(kind));toast('已保存截图：'+kind)}
  catch(e){toast('截图失败：'+e.message,true)}
 }
 async function captureStoredFiles(){
  if(!state.projectDir)return [];
- const folder=await dir(await dir(await monthDirectory(),'output'),'captures');
+ let folder;try{folder=await existingDir(await existingDir(await monthDirectory(),'output'),'captures')}
+ catch(e){if(e.name==='NotFoundError')return [];throw e}
+ const matches=[];
+ for await(const [name,handle] of folder.entries())if(handle.kind==='file'&&name.endsWith('.png'))matches.push([name,handle]);
+ matches.sort((a,b)=>b[0].localeCompare(a[0]));
  const found=[];
- for await(const [name,handle] of folder.entries()){
-  if(handle.kind!=='file'||!name.endsWith('.png'))continue;
-  const bytes=new Uint8Array(await (await handle.getFile()).arrayBuffer());
-  let binary='';for(let i=0;i<bytes.length;i+=12000)binary+=String.fromCharCode(...bytes.slice(i,i+12000));
-  found.push({filename:name,data:'data:image/png;base64,'+btoa(binary)});
+ for(const [filename,handle] of matches.slice(0,20)){
+  const file=await handle.getFile();if(file.size>14*1024*1024)continue;
+  const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+  for(let i=0;i<bytes.length;i+=12000)binary+=String.fromCharCode(...bytes.subarray(i,i+12000));
+  found.push({filename,month:monthKey(),data:'data:image/png;base64,'+btoa(binary)});
  }
- return found.sort((a,b)=>a.filename.localeCompare(b.filename));
+ return found;
 }
 async function capturePdf(items){
  const E=new TextEncoder(),parts=[],offset=[],ids=items.map((_,i)=>[i*3+3,i*3+4,i*3+5]);
@@ -128,15 +191,49 @@ async function capturePdf(items){
  put('trailer\n<< /Size '+(3+3*items.length)+' /Root 1 0 R >>\nstartxref\n'+at+'\n%%EOF');
  return new Blob(parts,{type:'application/pdf'});
 }
-async function captureAllPdf(){
+async function captureAllPdf(selected){
  try{
-  let list=state.captureItems||[];
-  const previous=await captureStoredFiles().catch(()=>[]);
-  list=[...previous,...list.filter(x=>!previous.some(y=>y.filename===x.filename))];
-  if(!list.length)list=await Promise.all(['matrix','stats','timeline'].map(captureCurrentImage));
-  const pdf=await capturePdf(list),name='AttendScope_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
+  const items=Array.isArray(selected)?selected:(state.captureItems||[]).filter(x=>x.month===monthKey());
+  if(!items.length){toast('请先截图，再从 PDF 菜单选择图片',true);return}
+  const pdf=await capturePdf(items),name=r63Title()+'_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
   if(state.projectDir){const output=await dir(await monthDirectory(),'output');await writeFile(output,name,await pdf.arrayBuffer())}
   else downloadBlob(pdf,name);
-  toast('已生成横向 PDF · '+list.length+' 页，每页一张截图');
+  toast('已导出 '+items.length+' 页横向 A4 PDF');
  }catch(e){toast('生成 PDF 失败：'+e.message,true)}
+
+}
+
+/* Explicit, transient image tray; no fabricated pages, all items checked by default. */
+async function r63TogglePdfPicker(event){
+ event?.stopPropagation();
+ const picker=document.getElementById('r63PdfPicker'),button=document.getElementById('printReport');
+ if(!picker)return;
+ if(!picker.hidden){picker.hidden=true;button.setAttribute('aria-expanded','false');return}
+ picker.hidden=false;button.setAttribute('aria-expanded','true');
+ picker.innerHTML='<p class="r63-pdf-status">正在读取最近截图…</p>';
+ let previous=[];try{previous=await captureStoredFiles()}catch(e){picker.innerHTML='<p class="r63-pdf-status">读取缓存失败：'+escapeNameChar(e.message)+'</p>';return}
+ if(picker.hidden)return;
+ const memory=(state.captureItems||[]).filter(x=>x.month===monthKey()).slice().reverse();
+ const names=new Set(memory.map(x=>x.filename));
+ const captures=[...memory,...previous.filter(x=>!names.has(x.filename))].slice(0,20);
+ picker._captures=captures;
+ picker.innerHTML='<div class="r63-pdf-header"><strong>最近截图</strong><button type="button" id="r63PdfClose" aria-label="关闭">×</button></div>'+
+  (captures.length?'<div class="r63-pdf-list">'+captures.map((x,i)=>
+    '<label class="r63-pdf-row"><input type="checkbox" data-capture-index="'+i+'" checked>'+
+    '<img src="'+x.data+'" alt=""><span title="'+escapeNameChar(x.filename)+'">'+escapeNameChar(x.filename)+'</span></label>').join('')+'</div>':
+   '<p class="r63-pdf-status">暂无截图。先点击旁边的「截图」保存需要的视图。</p>')+
+  '<footer><span id="r63PdfCount">'+captures.length+' 张已选</span><button type="button" id="r63PdfExport" '+(captures.length?'':'disabled')+'>导出 PDF</button></footer>';
+ picker.querySelector('#r63PdfClose').onclick=()=>{picker.hidden=true;button.setAttribute('aria-expanded','false')};
+ const sync=()=>{const n=picker.querySelectorAll('input[data-capture-index]:checked').length;
+  picker.querySelector('#r63PdfCount').textContent=n+' 张已选';
+  picker.querySelector('#r63PdfExport').disabled=!n};
+ picker.querySelectorAll('input[data-capture-index]').forEach(x=>x.onchange=sync);
+ picker.querySelector('#r63PdfExport').onclick=async()=>{
+  const chosen=[...picker.querySelectorAll('input[data-capture-index]:checked')]
+   .map(x=>captures[Number(x.dataset.captureIndex)]);
+  if(!chosen.length)return;
+  const exportBtn=picker.querySelector('#r63PdfExport');exportBtn.disabled=true;exportBtn.textContent='导出中…';
+  await captureAllPdf(chosen);
+  if(picker.isConnected){picker.hidden=true;button.setAttribute('aria-expanded','false')}
+ };
 }
