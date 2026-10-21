@@ -36,7 +36,9 @@ function importRosterPlan(names,kind){
  const resetDemo=state.isDemo&&(kind==='attendance'||unique.some(n=>!existing.has(n)));
  if(resetDemo&&!window.confirm('导入会替换当前演示人员和演示数据，是否继续？'))
   throw new Error('用户取消了演示数据替换');
- const people=resetDemo?[]:[...existing.values()];
+ const pinned=resetDemo?(state.projectProfile?.pinRoster?state.projectProfile.employees||[]:
+   EMPLOYEES.filter(e=>(state.fixedPeople||[]).includes(e.id))):[];
+ const people=resetDemo?pinned.map(e=>({...e,id:personIdentity(e.name),name:normalizedPerson(e.name)})):[...existing.values()];
  const byName=new Map(people.map(e=>[e.name,e]));
  for(const name of unique)if(!byName.has(name)){
   const e={id:personIdentity(name),name,department:'未分类'};
@@ -49,10 +51,15 @@ function applyImportRoster(plan,meta){
   if(plan.resetDemo){
     state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
     state.manualStatuses={};state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
-    state.imports=[meta];state.groups={};
+    state.imports=[meta];
+    const pinGroups=state.projectProfile?.groups||state.groups;
+    state.groups=Object.fromEntries(plan.people.filter(e=>(state.fixedPeople||[]).includes(e.id))
+      .map(e=>[e.id,pinGroups[e.id]||'未分组']));
+    state.groupCatalog=[...(state.projectProfile?.groupCatalog||[])];
   }
   EMPLOYEES=plan.people;
-  for(const e of EMPLOYEES)if(!state.groups[e.id])state.groups[e.id]=(e.department==='未分类'?'未分组':e.department+'组');
+  // Real imported employees are ungrouped unless explicitly assigned.
+  for(const e of EMPLOYEES)if(!state.groups[e.id])state.groups[e.id]='未分组';
   state.isDemo=!!state.isDemo&&!plan.resetDemo;
 }
 function acceptImportedRows(kind,rows,plan,skipped=0){

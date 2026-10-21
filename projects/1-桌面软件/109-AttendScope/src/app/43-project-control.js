@@ -329,8 +329,10 @@ async function p109PinDefaults(kind){
   const config=await dir(state.projectDir,'config');
   const profile=(await p109Json(config,'project-profile.json')).value||{schemaVersion:1};
   if(kind==='roster'){
-   profile.pinRoster=true;profile.employees=EMPLOYEES.map(e=>({...e}));
-   profile.groups={...state.groups};
+   profile.pinRoster=true;profile.employees=EMPLOYEES.filter(e=>(state.fixedPeople||[]).includes(e.id)).map(e=>({...e}));
+   profile.fixedPeople=profile.employees.map(e=>e.id);
+   profile.groups=Object.fromEntries(profile.employees.map(e=>[e.id,groupOf(e)]));
+   profile.groupCatalog=[...(state.groupCatalog||[])];
   }else if(kind==='rules'){
    profile.pinRules=true;profile.workRules={...RULES};
   }else{

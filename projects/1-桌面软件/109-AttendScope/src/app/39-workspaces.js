@@ -8,7 +8,7 @@ const WORKSPACE_ITEMS=[
  ['data','数据管理','database']
 ];
 function workspaceGroups(){
- return [...new Set(EMPLOYEES.map(e=>groupOf(e)))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
+ return [...new Set([...(state.groupCatalog||[]),...EMPLOYEES.map(e=>groupOf(e))])].sort((a,b)=>a.localeCompare(b,'zh-CN'));
 }
 function workspaceNavHtml(){
  return WORKSPACE_ITEMS.map(([id,label])=>

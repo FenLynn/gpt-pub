@@ -86,7 +86,8 @@ function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records)||Number(payload.schemaVersion)>2)return null;
   payload=r62MigratePayload(structuredClone(payload));
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
-    employees:payload.employees||null,groups:payload.groups||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
+    employees:payload.employees||null,groups:payload.groups||null,
+    fixedPeople:payload.fixedPeople||[],groupCatalog:payload.groupCatalog||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
     revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
 async function connectProjectDir(){
@@ -118,7 +119,11 @@ async function connectProjectDir(){
       }
       if(conf){
         const pinned=await readJSON(conf,'project-profile.json');
-        if(pinned?.schemaVersion===1)state.projectProfile=pinned;
+        if(pinned?.schemaVersion===1){
+         state.projectProfile=pinned;
+         state.fixedPeople=[...(pinned.fixedPeople||(pinned.pinRoster?pinned.employees?.map(e=>e.id):[])||[])];
+         state.groupCatalog=[...(pinned.groupCatalog||[])];
+        }
         const people=await readJSON(conf,'employees.json');
         if(people?.employees?.length){
           EMPLOYEES=people.employees.map(e=>({id:e.id,name:e.name,department:e.department||'未分类'}));
@@ -195,7 +200,7 @@ function workingPayload(){
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
-    groups:state.groups,
+    groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
     analysisEngineVersion:'R68',branch:state.activeBranch||null};
 }
