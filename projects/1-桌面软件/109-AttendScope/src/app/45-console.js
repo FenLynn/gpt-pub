@@ -90,7 +90,7 @@ function r68ImportsHtml(){
    '<div class="r68-empty">本月尚未导入真实文件。模拟数据不会冒充已保存的原件。</div>');
 }
 function r68FreezeHtml(){
- const month=monthKey(),detail=r68UI.latestReport?.months?.find(x=>x.key===month);
+ const month=monthKey(),detail=(r68UI.latestRoot===state.projectDir?r68UI.latestReport:null)?.months?.find(x=>x.key===month);
  const list=detail?.snapshots||[],branches=detail?.branches||[];
  return r68SidebarHeader('冻结与修订','不可变冻结作为基准，派生副本后修改不会覆盖主 working。',
   '<button class="r68-btn" id="r68FreezeNow">冻结当前月</button>')+
@@ -125,7 +125,7 @@ function r68DataMarkup(){
   '<aside class="r68-data-rail" id="r68DataRail">'+r68RailPlaceholder()+'</aside></div>';
 }
 function r68RailPlaceholder(){
- if(state.projectDir&&r68UI.latestTree&&r68UI.latestReport){
+ if(state.projectDir&&r68UI.latestRoot===state.projectDir&&r68UI.latestTree&&r68UI.latestReport){
   const report=r68UI.latestReport,tree=r68UI.latestTree;
   return '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>项目状态</h3>'+
    r68Pill(report.level==='critical'?'严重问题':report.level==='warning'?'需检查':'健康',
@@ -239,13 +239,13 @@ function r68StorageBars(tree){
 }
 async function r68FillDataRail(){
  const el=document.getElementById('r68DataRail');if(!el)return;
- const id=++r68UI.treeSerial;
- if(state.projectDir&&r68UI.latestTree&&Date.now()-(r68UI.latestScanAt||0)<3000)return;
+ const id=++r68UI.treeSerial,sourceRoot=state.projectDir;
+ if(sourceRoot&&r68UI.latestRoot===sourceRoot&&r68UI.latestTree&&Date.now()-(r68UI.latestScanAt||0)<3000)return;
  if(!state.projectDir){el.innerHTML=r68RailPlaceholder();el.querySelector('#r68RailProject')?.addEventListener('click',()=>navigateWorkspace('project'));return}
  try{
   const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
-  if(id!==r68UI.treeSerial||!el.isConnected)return;
-  r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
+  if(id!==r68UI.treeSerial||!el.isConnected||state.projectDir!==sourceRoot)return;
+  r68UI.latestRoot=sourceRoot;r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
   el.innerHTML='<section class="r68-rail-card"><div class="r68-rail-heading"><h3>项目状态</h3>'+
     r68Pill(report.level==='critical'?'严重问题':report.level==='warning'?'需检查':'健康',
       report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
@@ -305,15 +305,15 @@ function r68ProjectMarkup(report,tree){
 }
 async function r68RenderProject(){
  const node=document.getElementById('r68ProjectWorkspace');if(!node)return;
- const token=++r68UI.projectSerial;
+ const token=++r68UI.projectSerial,sourceRoot=state.projectDir;
  node.innerHTML='<div class="r68-loading">正在清点项目月份、工作状态与文件树…</div>';
  if(!state.projectDir){
   const report=await p109AuditProject();
-  if(token===r68UI.projectSerial&&node.isConnected)node.innerHTML=r68ProjectMarkup(report,null);
+  if(token===r68UI.projectSerial&&node.isConnected&&state.projectDir===sourceRoot)node.innerHTML=r68ProjectMarkup(report,null);
  }else try{
   const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
-  if(token!==r68UI.projectSerial||!node.isConnected)return;
-  r68UI.latestReport=report;r68UI.latestTree=tree;
+  if(token!==r68UI.projectSerial||!node.isConnected||state.projectDir!==sourceRoot)return;
+  r68UI.latestRoot=sourceRoot;r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
   node.innerHTML=r68ProjectMarkup(report,tree);
  }catch(e){
   if(token===r68UI.projectSerial&&node.isConnected)node.innerHTML='<div class="r68-note">读取项目失败：'+r68Esc(e.message)+'</div>';
