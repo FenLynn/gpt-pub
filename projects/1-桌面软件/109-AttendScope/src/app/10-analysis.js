@@ -28,6 +28,15 @@ function strictDateTime(value){
 function validateImportIdentityRows(rows){return true /* normalized name is the only identity */}
 function importRosterPlan(names,kind){
  const unique=[...new Set(names.map(normalizedPerson).filter(Boolean))];
+ const aliases={...(state.projectProfile?.nameAliases||{}),...(state.nameAliases||{})};
+ const canonical=original=>{
+  let name=normalizedPerson(original);
+  const visited=new Set();
+  while(aliases[name]&&!visited.has(name)){
+   visited.add(name);name=normalizedPerson(aliases[name]);
+  }
+  return name;
+ };
  if(!unique.length)throw new Error('导入文件没有有效姓名');
  const existing=new Map();
  for(const e of EMPLOYEES){const name=normalizedPerson(e.name);
@@ -39,10 +48,14 @@ function importRosterPlan(names,kind){
  const pinned=resetDemo?(state.projectProfile?.pinRoster?state.projectProfile.employees||[]:
    EMPLOYEES.filter(e=>(state.fixedPeople||[]).includes(e.id))):[];
  const people=resetDemo?pinned.map(e=>({...e,id:personIdentity(e.name),name:normalizedPerson(e.name)})):[...existing.values()];
- const byName=new Map(people.map(e=>[e.name,e]));
- for(const name of unique)if(!byName.has(name)){
-  const e={id:personIdentity(name),name,department:'未分类'};
-  people.push(e);byName.set(name,e);
+ const byCanonical=new Map(people.map(e=>[e.name,e])),byName=new Map();
+ for(const original of unique){
+  const name=canonical(original);
+  if(!byCanonical.has(name)){
+   const e={id:personIdentity(name),name,department:'未分类'};
+   people.push(e);byCanonical.set(name,e);
+  }
+  byName.set(original,byCanonical.get(name));
  }
  return {people,byName,resetDemo};
 }
@@ -94,7 +107,7 @@ async function importAttendance(file,prepared=null){
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>{
     const employee=plan.byName.get(r.name);
-    return {recordId:'import:'+importId+':'+r.row,importId,employeeId:employee.id,name:r.name,
+    return {recordId:'import:'+importId+':'+r.row,importId,employeeId:employee.id,name:employee.name,sourceName:r.name,
       datetime:r.datetime,time:r.time,direction:r.direction,source:file.name,sheet:t.sheet,row:r.row,scenario:'import'};
   });
   const meta=await persistImportedFile(file,'attendance',out.length,importId);
@@ -116,7 +129,7 @@ async function importLeaves(file,prepared=null){
   if(!plan.resetDemo&&state.leaves.length&&!window.confirm('本月已有请假记录，新文件将替换当前请假工作数据。是否继续？'))throw new Error('已取消请假覆盖');
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>({id:'LI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
-    ...r,source:file.name,sheet:t.sheet}));
+    ...r,name:plan.byName.get(r.name).name,sourceName:r.name,source:file.name,sheet:t.sheet}));
   const meta=await persistImportedFile(file,'leave',out.length,importId);
   applyImportRoster(plan,meta);acceptImportedRows('leave',out,plan,t.rows.length-out.length);
 }
@@ -137,7 +150,7 @@ async function importTrips(file,prepared=null){
   if(!plan.resetDemo&&state.trips.length&&!window.confirm('本月已有出差记录，新文件将替换当前出差工作数据。是否继续？'))throw new Error('已取消出差覆盖');
   const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
   const out=parsed.map(r=>({id:'TI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
-    ...r,source:file.name,sheet:t.sheet}));
+    ...r,name:plan.byName.get(r.name).name,sourceName:r.name,source:file.name,sheet:t.sheet}));
   const meta=await persistImportedFile(file,'trip',out.length,importId);
   applyImportRoster(plan,meta);acceptImportedRows('trip',out,plan,t.rows.length-out.length);
 }
@@ -169,7 +182,7 @@ async function importOutings(file,prepared=null){
   throw new Error('已取消外出覆盖');
  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
  const out=parsed.map(r=>({id:'OI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
-  ...r,source:file.name,sheet:t.sheet}));
+  ...r,name:plan.byName.get(r.name).name,sourceName:r.name,source:file.name,sheet:t.sheet}));
  const meta=await persistImportedFile(file,'outing',out.length,importId);
  applyImportRoster(plan,meta);acceptImportedRows('outing',out,plan,t.rows.length-out.length);
 }
@@ -195,7 +208,7 @@ async function importOvertime(file,prepared=null){
   throw new Error('已取消加班覆盖');
  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
  const out=parsed.map(r=>({id:'OTI-'+importId+'-'+r.row,importId,employeeId:plan.byName.get(r.name).id,
-  ...r,source:file.name,sheet:t.sheet}));
+  ...r,name:plan.byName.get(r.name).name,sourceName:r.name,source:file.name,sheet:t.sheet}));
  const meta=await persistImportedFile(file,'overtime',out.length,importId);
  applyImportRoster(plan,meta);acceptImportedRows('overtime',out,plan,t.rows.length-out.length);
 }
