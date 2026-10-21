@@ -162,7 +162,7 @@ async function persistImportedFile(file,type,count,importId){
 function projectPayload(){
   rememberMonth();
   return {schemaVersion:2,projectId:'P109-AttendScope',projectName:'AttendScope',appVersion:'0.1.0-preview',
-    analysisEngineVersion:'0.1.0',current:{year:YEAR,month:MONTH},
+    analysisEngineVersion:'R62',current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
