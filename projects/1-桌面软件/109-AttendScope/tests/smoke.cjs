@@ -105,6 +105,7 @@ async function run(){
  await page.locator('#printReport').click();
  await page.waitForSelector('#r63PdfPicker input');
  await check(page,()=>document.querySelectorAll('#r63PdfPicker input:checked').length===2,'R63 cached thumbnails default checked');
+ await page.screenshot({path:path.join(out,'r63-pdf-picker.png')});
  await page.locator('#r63PdfPicker input').first().uncheck();
  await check(page,async()=>{
   const box=document.getElementById('r63PdfPicker'),
@@ -114,6 +115,28 @@ async function run(){
   return pdf.includes('/Count 1')&&document.getElementById('r63PdfCount').textContent.includes('1 张');
  },'R63 selected one image generates exactly one PDF page and context data exists');
  await page.locator('#r63PdfClose').click();
+ // Save the actual exported PNGs for visual artifact review, including the
+ // live ECharts renderer, header/legend and the right-hand factual summaries.
+ const exported=await page.evaluate(async()=>{
+  const saved={workspaceMode:state.workspaceMode,selection:{...state.selection},
+   chartDay:state.chartDay,chartTab:state.chartTab};
+  const settle=()=>new Promise(ok=>requestAnimationFrame(()=>requestAnimationFrame(ok)));
+  const images={};
+  try{
+   images.matrix=(await captureCurrentImage('matrix')).data;
+   state.workspaceMode='stats';render();await settle();
+   images.stats=(await captureCurrentImage('stats')).data;
+   state.workspaceMode='person';state.selection={type:'person',employeeId:EMPLOYEES[0].id};
+   state.chartTab='timeline';state.chartDay=8;render();await settle();
+   images.timeline=(await captureCurrentImage('timeline')).data;
+  }finally{
+   state.workspaceMode=saved.workspaceMode;state.selection=saved.selection;
+   state.chartDay=saved.chartDay;state.chartTab=saved.chartTab;render();
+  }
+  return images;
+ });
+ for(const [type,data] of Object.entries(exported))
+  fs.writeFileSync(path.join(out,'r63-export-'+type+'.png'),Buffer.from(data.split(',')[1],'base64'));
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
   'R38 retired chart renderers remain active');
