@@ -92,7 +92,7 @@ function attendPlotHtml(ctx){
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
     if(day)return top+
-      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
+      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }

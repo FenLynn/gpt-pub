@@ -191,6 +191,22 @@ function mountAttendanceTimeline(a){
     ]
   };
   chart.setOption(option);
+  const syncAttendanceFlags=()=>{
+    const layer=document.getElementById('attendanceFlagsLayer');
+    if(!layer||!layer.isConnected)return;
+    layer.replaceChildren();
+    const visible=state.timelineRange||range;
+    for(const flag of a.attendanceFlags||[]){
+     const at=minutes(flag.time);
+     if(at<visible.start||at>visible.end)continue;
+     const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[at,flag.kind==='late'?0:1]);
+     if(!pos||!Number.isFinite(pos[0])||!Number.isFinite(pos[1]))continue;
+     const el=document.createElement('span');el.className='r72-attendance-tag '+flag.kind;
+     el.textContent=flag.label;el.title=flag.label+' · '+flag.time+'（真实打卡证据）';
+     el.style.left=Math.max(24,Math.min(chart.getWidth()-24,pos[0]))+'px';
+     el.style.top=Math.max(5,pos[1]-23)+'px';layer.appendChild(el);
+    }
+  };
   // Locate the rendered slider track; the HTML marks must share its actual SVG bounds.
   const syncNavigator=()=>{
     const preview=document.getElementById('r15PunchPreview');
@@ -257,8 +273,8 @@ function mountAttendanceTimeline(a){
       overlay.appendChild(box);
     }
   };
-  chart.on('finished',()=>{syncNavigator();syncOvertimeControls()});
-  requestAnimationFrame(()=>{syncNavigator();syncOvertimeControls()});
+  chart.on('finished',()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags()});
+  requestAnimationFrame(()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags()});
   chart.on('mouseover',p=>{
     const segment=p?.data?.segmentId;
     if(p.seriesId==='bands'&&segment){

@@ -175,3 +175,15 @@
  .layout.workspace-mode-data .r71-setup{width:100%;margin-top:75px!important}
  .layout.workspace-mode-data .r71-setup h3{font-size:18px}
 }
+
+/* R72: timestamp-anchored late/early labels, never changing source punches. */
+.r72-attendance-flags{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:9}
+.r72-attendance-tag{position:absolute;transform:translateX(-50%);white-space:nowrap;font-size:12px;
+ font-weight:735;line-height:1.4;padding:2px 5px;border-radius:4px;background:#fff3dc;
+ border:1px solid #e7c490;color:#925e25;box-shadow:0 1px 4px #3332}
+.r72-attendance-tag.early{color:#aa4f56;background:#fff1f1;border-color:#e9b9bc}
+/* Prioritize the chart, use previously unused space without scrolling the inspector. */
+.r71-insights-trend{flex:1 1 220px!important;min-height:140px!important}
+.r71-insights-rank{flex:0 0 auto!important;min-height:0!important}
+.r71-insights .r68-scope-rank{flex:0 0 auto!important}
+@media(max-height:800px){.r71-insights-trend{flex:1 1 140px!important;min-height:105px!important}}

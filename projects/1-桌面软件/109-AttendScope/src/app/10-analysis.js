@@ -507,6 +507,19 @@ function analyzeDay(emp,d){
  const morningLeave=trips.length>0||overlapEnough(leaves,RULES.amStart,RULES.amEnd)||overlapEnough(outings,RULES.amStart,RULES.amEnd);
  const afternoonLeave=trips.length>0||overlapEnough(leaves,RULES.pmStart,RULES.pmEnd)||overlapEnough(outings,RULES.pmStart,RULES.pmEnd);
  const lunchStart=minutes(RULES.amEnd),lunchEnd=minutes(RULES.pmStart);
+ const attendanceFlags=[];
+ // A shift-end exit is proven early only if no subsequent check-in
+ // on or before the boundary could establish a continued on-duty interval.
+ const earlyDeparture=(start,end,grace)=>{
+  const limit=minutes(end)-Math.max(0,Number(grace)||0);
+  const possibilities=pairs.filter(([x,y])=>minutes(x.time)<limit&&
+   minutes(y.time)>=minutes(start)&&minutes(y.time)<limit);
+  if(!possibilities.length)return null;
+  const last=possibilities.reduce((a,b)=>minutes(a[1].time)>minutes(b[1].time)?a:b);
+  if(punches.some(r=>r.direction==='进'&&minutes(r.time)>minutes(last[1].time)&&
+    minutes(r.time)<=limit))return null;
+  return last[1];
+ };
  const workMinutes=analysisPairMinutes(pairs,RULES.amStart,RULES.amEnd)+
   analysisPairMinutes(pairs,RULES.pmStart,RULES.pmEnd);
  const presence=pairs.reduce((sum,[x,y])=>sum+Math.max(0,minutes(y.time)-minutes(x.time)),0);
@@ -561,6 +574,7 @@ function analyzeDay(emp,d){
   if(firstIn&&!morningLeave){
    if(morningEvidence&&firstMinute>minutes(RULES.amStart)+morningGrace){
     severity='problem';issues.push('迟到');status='迟到';
+    attendanceFlags.push({kind:'late',label:'迟到',time:firstIn.time});
    }else if(!morningEvidence&&firstMinute>lunchStart){
     suspect('上午缺少完整出勤证据（待核）');
    }
@@ -571,13 +585,16 @@ function analyzeDay(emp,d){
    // establish a definite early departure.
    if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-afternoonEndGrace){
     severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
+    attendanceFlags.push({kind:'early',label:'早退',time:lastOut.time});
    }else if(!afternoonEvidence||pending){
     suspect('下午进出记录不完整（待核）');
    }
   }
-  if(morningPair&&!morningLeave&&minutes(morningPair[1].time)<lunchStart-morningEndGrace){
+  const morningExit=!morningLeave?earlyDeparture(RULES.amStart,RULES.amEnd,morningEndGrace):null;
+  if(morningExit){
    if(!pairingUncertain){
     if(!issues.includes('上午早退'))issues.push('上午早退');
+    attendanceFlags.push({kind:'early',label:'上午早退',time:morningExit.time});
     severity='problem';status=status.includes('迟到')?'迟到/早退':'早退';
    }else suspect('午休提前离岗（待核）');
   }
@@ -591,6 +608,7 @@ function analyzeDay(emp,d){
     // afternoon punches remain an uncertainty, never a fabricated absence.
     if(afternoonEvidence&&!pairingUncertain){
      issues.push('下午迟到');severity='problem';
+     attendanceFlags.push({kind:'late',label:'下午迟到',time:lunchReturn[0].time});
      status=status==='迟到'?'上午/下午迟到':status==='早退'?'迟到/早退':'下午迟到';
     }else suspect('午休返岗偏晚（待核）');
    }
@@ -603,7 +621,7 @@ function analyzeDay(emp,d){
  }
  function pack(){return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
-  lunchEvidence,autoOvertime,marker:''}}
+  lunchEvidence,autoOvertime,attendanceFlags,marker:''}}
  return pack();
 }
 function reanalyze(){

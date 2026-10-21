@@ -600,6 +600,26 @@ async function run(){
    state.timelineRange=null;
   }
  },'R61 weekend noon, midnight 4+2, cross-month 4+2, registration union and uniform staff labels');
+ // R72: a departure before 11:40 is only early when no return before the boundary.
+ await check(page,()=>{
+  const e=EMPLOYEES[0],day=8,date=isoDate(day);
+  const originals=[state.records,state.leaves,state.trips,state.outings];
+  const check=events=>{
+   state.records=events.map(([time,direction],i)=>({recordId:'R72:'+i,
+    employeeId:e.id,name:e.name,datetime:date+' '+time,time,direction}));
+   state.leaves=[];state.trips=[];state.outings=[];reanalyze();return state.analysis.get(e.id+'|'+day)};
+  try{
+   const early=check([['08:25','进'],['11:30','出'],['13:25','进'],['17:10','出']]);
+   if(!early.issues.includes('上午早退')||!early.attendanceFlags.some(f=>f.label==='上午早退'))return false;
+   if(check([['08:25','进'],['11:30','出'],['11:36','进'],['11:46','出'],
+    ['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
+   if(!check([['08:25','进'],['11:30','出'],['11:42','进'],['12:05','出'],
+    ['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
+   if(check([['08:25','进'],['11:40','出'],['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
+   const late=check([['08:36','进'],['11:40','出'],['13:25','进'],['17:10','出']]);
+   return late.attendanceFlags.some(f=>f.label==='迟到')&&RULES.graceAmEnd===0;
+  }finally{[state.records,state.leaves,state.trips,state.outings]=originals;reanalyze()}
+ },'R72 early departure return and zero-grace proof, with anchored late flags');
  // R68: strictly more than 20 min after shift-end; never deduct grace.
  await check(page,()=>{
   if(RULES.overtimeMinMinutes!==20)return false;
