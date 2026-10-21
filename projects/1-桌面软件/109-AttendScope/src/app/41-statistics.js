@@ -343,6 +343,23 @@ function asStatRankBreakdown(row,data){
   ranked.map(d=>'<div><span>'+escapeNameChar(d.label)+'</span><strong>'+
    asStatNumber(d.value)+' '+escapeNameChar(data.unit)+'</strong></div>').join('')+'</div>';
 }
+/* R69: all statistics filters belong to the sidebar, one control per row. */
+function asStatSidebarFiltersHtml(){
+ const c=asStatPrefs(),mode=asStatScopeMode();
+ const comparisons=mode==='person'?[['days','每日趋势']]:
+   mode==='group'?[['people','组内人员'],['days','每日趋势']]:
+   [['groups','各组对比'],['people','全员排名'],['days','每日趋势']];
+ const aggregates=[['total','总量'],['perPerson','人均'],['per100','每百应出勤人日']]
+  .filter(x=>x[0]!=='perPerson'||(c.compare!=='people'&&mode!=='person'));
+ return '<div class="r69-stats-section-title">图表筛选</div>'+
+  '<div class="as-stats-filters r69-side-stat-filters" aria-label="统计图表筛选">'+
+  '<label>业务<select id="asStatFamily">'+asStatOptions(AS_STAT_FAMILIES.map(f=>[f[0],f[1]]),c.family)+'</select></label>'+
+  '<label>指标<select id="asStatMetric">'+asStatOptions(asStatVisibleMetrics(c.family,c.compare,mode).map(m=>[m[0],m[1]]),c.metric)+'</select></label>'+
+  '<label>对比<select id="asStatCompare">'+asStatOptions(comparisons,c.compare)+'</select></label>'+
+  '<label>统计<select id="asStatAggregate">'+asStatOptions(aggregates,c.aggregate)+'</select></label>'+
+  '<label>榜单<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
+  '</div>';
+}
 function statisticsSidebarControlsHtml(){
  const mode=asStatScopeMode(),groups=workspaceGroups(),group=asStatScopeGroup()||groups[0]||'';
  const people=EMPLOYEES.filter(e=>groupOf(e)===group);
@@ -356,8 +373,9 @@ function statisticsSidebarControlsHtml(){
   '<label class="stats-side-field">范围<select id="asStatsScope">'+
   asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+
   '</select></label>'+groupControl+personControl+
-  '<button id="asStatsExport" type="button" class="as-stats-export stats-side-export" '+
-  'title="导出当前指标完整明细 CSV">导出当前统计 <span aria-hidden="true">↗</span></button>';
+  asStatSidebarFiltersHtml()+
+  '<button id="asStatsExport" type="button" class="as-stats-export stats-side-export r69-export-btn" '+
+  'title="将当前统计指标及范围导出为 CSV"><span aria-hidden="true">↓</span> 导出 CSV</button>';
 }
 function statisticsWorkspaceHtml(){
  const c=asStatPrefs(),met=asStatMetric(),mode=asStatScopeMode();
@@ -402,13 +420,6 @@ function statisticsWorkspaceHtml(){
  }).join(''):'<p class="as-stats-empty">本月暂无该指标的记录</p>';
  return '<section class="as-stats" aria-label="考勤统计工作台">'+
   '<header class="as-stats-heading"><h2>考勤统计</h2>'+
-  '<div class="as-stats-filters" aria-label="统计图表筛选">'+
-   '<label>业务<select id="asStatFamily">'+asStatOptions(AS_STAT_FAMILIES.map(f=>[f[0],f[1]]),c.family)+'</select></label>'+
-   '<label>指标<select id="asStatMetric">'+asStatOptions(asStatVisibleMetrics(c.family,c.compare,mode).map(m=>[m[0],m[1]]),c.metric)+'</select></label>'+
-   '<label>对比<select id="asStatCompare">'+asStatOptions(comparisons,c.compare)+'</select></label>'+
-   '<label>统计<select id="asStatAggregate">'+asStatOptions(aggregates,c.aggregate)+'</select></label>'+
-   '<label>榜单<select id="asStatLimit">'+asStatOptions([['5','前 5'],['10','前 10'],['all','全部']],String(c.limit))+'</select></label>'+
-  '</div>'+
   '<div class="as-stats-total" aria-live="polite"><span>'+
    (c.aggregate==='total'?'范围总量':c.aggregate==='perPerson'?'范围人均':'每百人日')+'</span>'+
    '<strong>'+asStatNumber(selected.total)+'<small>'+escapeNameChar(selected.effectiveUnit)+'</small></strong></div></header>'+
@@ -511,20 +522,20 @@ function renderStatisticsWorkspace(){
  };
  const exportButton=document.getElementById('asStatsExport');
  if(exportButton)exportButton.onclick=asStatExport;
- node.querySelector('#asStatFamily').onchange=e=>{
+ document.getElementById('asStatFamily').onchange=e=>{
   c.family=e.target.value;c.metric=asStatFamily(c.family)[2][0][0];
   if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';
   renderStatisticsWorkspace();
  };
- node.querySelector('#asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';renderStatisticsWorkspace()};
- node.querySelector('#asStatCompare').onchange=e=>{
+ document.getElementById('asStatMetric').onchange=e=>{c.metric=e.target.value;if(c.metric==='people'||c.metric==='candidatePeople')c.aggregate='total';renderStatisticsWorkspace()};
+ document.getElementById('asStatCompare').onchange=e=>{
   c.compare=e.target.value;
   c.chart=c.compare==='days'?'line':'bar';
   state.statsExpandedKey='';
   renderStatisticsWorkspace();
  };
- node.querySelector('#asStatAggregate').onchange=e=>{c.aggregate=e.target.value;renderStatisticsWorkspace()};
- node.querySelector('#asStatLimit').onchange=e=>{c.limit=e.target.value;renderStatisticsWorkspace()};
+ document.getElementById('asStatAggregate').onchange=e=>{c.aggregate=e.target.value;renderStatisticsWorkspace()};
+ document.getElementById('asStatLimit').onchange=e=>{c.limit=e.target.value;renderStatisticsWorkspace()};
  node.querySelector('#asStatSort').onclick=()=>{c.sort=c.sort==='desc'?'asc':'desc';renderStatisticsWorkspace()};
  node.querySelectorAll('[data-as-chart]').forEach(b=>b.onclick=()=>{c.chart=b.dataset.asChart;renderStatisticsWorkspace()});
  const toggleRank=(key,scroll=false)=>{
