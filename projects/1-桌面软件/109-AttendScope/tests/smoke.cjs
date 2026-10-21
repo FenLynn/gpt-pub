@@ -617,7 +617,9 @@ async function run(){
     ['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
    if(check([['08:25','进'],['11:40','出'],['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
    const late=check([['08:36','进'],['11:40','出'],['13:25','进'],['17:10','出']]);
-   return late.attendanceFlags.some(f=>f.label==='迟到')&&RULES.graceAmEnd===0;
+   const unclosed=check([['08:36','进']]);
+   return late.attendanceFlags.some(f=>f.label==='迟到')&&
+    unclosed.issues.includes('迟到')&&unclosed.attendanceFlags.some(f=>f.kind==='late')&&RULES.graceAmEnd===0;
   }finally{[state.records,state.leaves,state.trips,state.outings]=originals;reanalyze()}
  },'R72 early departure return and zero-grace proof, with anchored late flags');
  // R68: strictly more than 20 min after shift-end; never deduct grace.
@@ -1776,7 +1778,7 @@ async function run(){
   navigateWorkspace('data');state.dataSection='roster';render();
   if(!document.querySelector('#r72AddGroup')||!document.querySelector('#r72FixSelected'))
    throw Error('R72 roster actions not mounted');
-  const previous=window.prompt,person=EMPLOYEES[0],originalId=person.id;
+  const previous=window.prompt,person=EMPLOYEES[0],originalId=person.id,originalName=person.name;
   try{
    window.prompt=()=> 'R72自建分组';
    await r72CreateGroup();
@@ -1794,7 +1796,7 @@ async function run(){
     throw Error('R72 canonical rename lost linked records');
    if(originalRows&&!state.records.some(r=>r.employeeId===id&&r.sourceName))
     throw Error('R72 original source name not retained');
-   if(importRosterPlan([person.name],'attendance').byName.get(person.name).id!==id)
+   if(importRosterPlan([originalName],'attendance').byName.get(originalName).id!==id)
     throw Error('R72 original imported name must map to renamed canonical identity');
    await r72DeleteGroup('R72自建分组');
    if(groupOf(EMPLOYEES.find(e=>e.id===id))!=='未分组'||state.groupCatalog.includes('R72自建分组'))
