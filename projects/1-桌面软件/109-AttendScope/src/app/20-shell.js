@@ -116,6 +116,8 @@ function layoutHtml(){
       </div>
       <button class="text-btn" id="connectDir">目录</button>
       <button class="text-btn" id="saveBtn">保存</button>
+      <button class="text-btn" id="restoreBtn">恢复</button>
+      <input id="restoreInput" type="file" accept=".json,application/json" hidden>
       <button class="primary-btn" id="freezeBtn">冻结</button>
     </div>
     <div class="top-actions">
@@ -313,6 +315,12 @@ function bind(){
   document.getElementById('exportTable').onclick=exportTraditionalTable;
   document.getElementById('printReport').onclick=()=>window.print();
   document.getElementById('saveBtn').onclick=saveWorking;
+  document.getElementById('restoreBtn').onclick=()=>document.getElementById('restoreInput').click();
+  document.getElementById('restoreInput').onchange=async e=>{
+   const f=e.target.files?.[0];if(!f)return;
+   try{await restoreWorkingFile(f)}catch(err){toast('恢复失败：'+err.message,true)}
+   finally{e.target.value=''}
+  };
   document.getElementById('freezeBtn').onclick=freezeSnapshot;
 }
 
