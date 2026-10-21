@@ -3,7 +3,7 @@
   "projectId": "P109-AttendScope",
   "projectName": "AttendScope",
   "appVersion": "0.1.0-preview",
-  "analysisEngineVersion": "0.1.0",
+  "analysisEngineVersion": "R63",
   "timezone": "Asia/Shanghai",
   "current": {"year": 2026, "month": 10},
   "storageModel": "folder-first",
