@@ -78,7 +78,7 @@ function workspaceSidebarHtml(){
  const group=mode==='group'?state.selectedGroup:mode==='person'?groupOf(EMPLOYEES.find(e=>e.id===state.selection.employeeId)||EMPLOYEES[0]):'';
  const candidates=mode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):
    mode==='person'?EMPLOYEES.filter(e=>groupOf(e)===group):EMPLOYEES;
- const groupControl=mode==='data'?'':'<div class="side-inline"><label for="'+
+ const groupControl=mode==='data'||mode==='project'?'':'<div class="side-inline"><label for="'+
   (mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">组别</label>'+
   '<select class="side-select" id="'+(mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">'+
   (mode==='all'||mode==='group'?'<option value="">全部</option>':'')+
