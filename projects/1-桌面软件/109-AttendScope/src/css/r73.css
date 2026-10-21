@@ -139,6 +139,12 @@
  transform:translateX(-50%) rotate(45deg);width:11px;height:11px;background:#203141;
  border-right:1px solid rgba(255,255,255,.14);border-bottom:1px solid rgba(255,255,255,.14)}
 .r73-floating-tip.is-below:after{bottom:auto;top:-6px;transform:translateX(-50%) rotate(225deg)}
+.r73-floating-tip.is-side-right:after{left:-6px;right:auto;top:var(--r73-arrow-y);
+ bottom:auto;transform:translateY(-50%) rotate(45deg);border-right:0;
+ border-left:1px solid rgba(255,255,255,.14)}
+.r73-floating-tip.is-side-left:after{left:auto;right:-6px;top:var(--r73-arrow-y);
+ bottom:auto;transform:translateY(-50%) rotate(45deg);
+ border-bottom:0;border-top:1px solid rgba(255,255,255,.14)}
 .r71-help.r73-help{display:inline-flex;align-items:center;justify-content:center;
  width:29px;height:29px;border:0;border-radius:50%;background:transparent;
  color:#93a9b9;cursor:help;transition:background .2s,color .2s,transform .2s}

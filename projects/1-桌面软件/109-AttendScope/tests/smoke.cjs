@@ -1818,8 +1818,11 @@ async function run(){
     return {text:el.textContent,width:rect.width,top:rect.top,left:rect.left,
       bottom:rect.bottom,native:!!document.querySelector('.r73-help[title]')};
    });
-   if(tip.native||tip.width<140||tip.top<0||tip.left<0||tip.bottom>900)
+   if(tip.native||tip.width<140||tip.top<0||tip.left<0||tip.bottom>900||
+     (tip.top<90&&tip.left<400))
     throw Error('R73 tooltip should be custom and onscreen '+JSON.stringify(tip));
+   await roster.screenshot({path:path.join(out,'r73-help-tooltip.png')});
+   await roster.locator('#r68RosterSearch').click();
    await roster.screenshot({path:path.join(out,'r73-dual-roster.png')});
    await roster.setViewportSize({width:1366,height:768});
    const narrow=await roster.evaluate(()=>{

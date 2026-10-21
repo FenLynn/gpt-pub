@@ -36,14 +36,25 @@ function r73ShowTooltip(target){
  r73TipNode.style.left='0px';r73TipNode.style.top='0px';
  r73TipNode.classList.add('is-visible');
  const r=target.getBoundingClientRect(),w=r73TipNode.offsetWidth,h=r73TipNode.offsetHeight;
- let x=r.left+r.width/2-w/2;
+ let x=r.left+r.width/2-w/2, y=r.top-h-12,below=false,side='';
+ // A heading tooltip must never cover the app header or page title.
+ // When space allows, dock it beside the info symbol instead of above it.
+ if(r.top<180&&r.right+w+25<window.innerWidth){
+  side='right';x=r.right+15;y=r.top+r.height/2-h/2;
+ }else if(r.top<180&&r.left>w+25){
+  side='left';x=r.left-w-15;y=r.top+r.height/2-h/2;
+ }else{
+  x=Math.max(12,Math.min(window.innerWidth-w-12,x));
+  if(y<75){y=r.bottom+13;below=true}
+ }
  x=Math.max(12,Math.min(window.innerWidth-w-12,x));
- let y=r.top-h-12,below=false;
- if(y<12){y=r.bottom+12;below=true}
- if(y+h>window.innerHeight-10)y=Math.max(12,window.innerHeight-h-10);
+ y=Math.max(12,Math.min(window.innerHeight-h-12,y));
  r73TipNode.style.left=x+'px';r73TipNode.style.top=y+'px';
  r73TipNode.classList.toggle('is-below',below);
+ r73TipNode.classList.toggle('is-side-right',side==='right');
+ r73TipNode.classList.toggle('is-side-left',side==='left');
  r73TipNode.style.setProperty('--r73-arrow-x',Math.max(16,Math.min(w-16,r.left+r.width/2-x))+'px');
+ r73TipNode.style.setProperty('--r73-arrow-y',Math.max(14,Math.min(h-14,r.top+r.height/2-y))+'px');
 }
 function r73WireTooltips(){
  if(r73TipInstalled)return;r73TipInstalled=true;
