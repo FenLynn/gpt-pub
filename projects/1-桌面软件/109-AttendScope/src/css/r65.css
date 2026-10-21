@@ -48,3 +48,14 @@
 @media(max-width:700px){.p109-project-panel{max-height:96vh}.p109-project-body{padding:14px}
 .p109-project-panel>header,.p109-project-panel>footer{padding:12px 15px}
 .p109-project-month{grid-template-columns:80px auto}.p109-project-month small{grid-column:1/-1}}
+
+.p109-snapshots{grid-column:1/-1;border-top:1px solid #e7edf3;padding:6px 0 2px}
+.p109-snapshots summary{font-size:11px;color:#53779c;cursor:pointer;list-style:inside}
+.p109-snapshot-row{display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:7px}
+.p109-snapshot-row code{font-size:11px;color:#45607c}
+.p109-snapshot-row small{margin-left:auto;font-size:10px;color:#8599ae}
+.p109-snapshot-row button,.p109-branch-status button{border:1px solid #d9e5f2;border-radius:7px;
+ padding:5px 9px;background:#fff;color:#467cb5;cursor:pointer;font-size:11px}
+.p109-branch-status{padding:13px;background:#eff6ff;border-radius:10px;
+ font-size:12px;color:#4a6d92;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.r65-template-choice{white-space:nowrap;font-size:11px;color:#7388a3;display:inline-flex;align-items:center;gap:6px}
