@@ -203,6 +203,50 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.backToMain=await page.evaluate(()=>!state.activeBranch&&state.records.length===2&&
     Object.keys(state.manualStatuses).length===0);
 
+
+  // R68: real-folder-backed project inventory, actual tree, roster and insight screenshots.
+  await page.evaluate(()=>navigateWorkspace('project'));
+  await page.waitForSelector('.r68-month-row:not(.heading)',{timeout:30000});
+  report.projectMonthInventory=await page.evaluate(()=>{
+   const text=document.querySelector('.r68-month-table')?.textContent||'';
+   const tree=document.querySelector('.r68-overview-tree')?.textContent||'';
+   return text.includes('2026-10')&&text.includes('已保存')&&
+    tree.includes('state.json')&&tree.includes('审核门禁.csv')&&
+    !!document.querySelector('.r68-storage-bars .r68-storage-row')&&
+    document.querySelectorAll('[data-workspace]').length===6;
+  });
+  await page.screenshot({path:path.join(out,'r68-project-overview.png')});
+  await page.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});
+  await page.waitForSelector('.r68-roster-entry:not(.r68-roster-columns)');
+  report.rosterUi=await page.evaluate(()=>{
+   const card=document.querySelector('.r68-data-content');
+   return !!card&&!card.querySelector('.data-roster-head')&&
+    !!document.querySelector('#r68SelectVisible')&&
+    !!document.querySelector('#r68BulkGroup')&&
+    !!document.querySelector('.r68-data-rail .r68-filetree');
+  });
+  await page.locator('#r68SelectVisible').check();
+  await page.locator('#r68BulkGroup').selectOption({index:1});
+  await page.locator('#r68ApplyGroup').click();
+  report.batchGroupWorking=await page.evaluate(()=>{
+   const person=EMPLOYEES.find(e=>e.name==='测试甲');
+   return person&&!!state.groups[person.id]&&state.saved===false;
+  });
+  await page.evaluate(()=>saveWorking());
+  await page.screenshot({path:path.join(out,'r68-data-roster.png')});
+  await page.evaluate(()=>navigateWorkspace('all'));
+  await page.waitForSelector('.r68-scope-kpis');
+  report.scopeUi=await page.evaluate(()=>
+    !!document.querySelector('.r68-stacked-track')&&
+    !!document.querySelector('.r68-scope-rank')&&
+    !document.querySelector('#scopeStatusChart')&&
+    !document.querySelector('#scopeCompareChart'));
+  await page.screenshot({path:path.join(out,'r68-all-insights.png')});
+  await page.evaluate(()=>{state.selectedGroup=workspaceGroups()[0];navigateWorkspace('group')});
+  await page.waitForSelector('.r68-scope-rank');
+  await page.screenshot({path:path.join(out,'r68-group-insights.png')});
+  await page.evaluate(()=>navigateWorkspace('data'));
+
   const rawDir=path.join(fresh,'data','2026','10','raw','attendance'),
    impName=fs.readdirSync(rawDir)[0],rawFile=path.join(rawDir,impName,'审核门禁.csv');
   const savedRaw=fs.readFileSync(rawFile);fs.writeFileSync(rawFile,'tampered');
@@ -265,7 +309,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
    'rawCorruptionDetected','missingIndexDetected','safeIndexFixed','pinnedForNextMonth',
-   'backupZipValid','zipRestoreRaw','zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
+   'backupZipValid','zipRestoreRaw','zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData','projectMonthInventory','rosterUi','batchGroupWorking','scopeUi','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
    throw Error('R65 lifecycle failed '+JSON.stringify(report));
 
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
