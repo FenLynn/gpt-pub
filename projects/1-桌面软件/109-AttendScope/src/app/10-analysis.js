@@ -265,7 +265,9 @@ function attendanceNeighborDates(){
  return {first,last,previous:attendanceDateFromMinute(first-1),
   next:attendanceDateFromMinute(last)};
 }
+let r63AnalysisIndex=null;
 function attendanceAdjacentRows(field='records'){
+ if(r63AnalysisIndex?.adjacent.has(field))return r63AnalysisIndex.adjacent.get(field);
  const {first,last}=attendanceNeighborDates();
  const previous=attendanceDateFromMinute(first-1).slice(0,7),
    next=attendanceDateFromMinute(last).slice(0,7);
@@ -282,9 +284,12 @@ function attendanceAdjacentRows(field='records'){
    (record.employeeId||'')+'|'+(record.row||'');
   if(!found.has(id))found.set(id,record);
  }
- return [...found.values()];
+ const unique=[...found.values()];
+ if(r63AnalysisIndex)r63AnalysisIndex.adjacent.set(field,unique);
+ return unique;
 }
 function attendanceVisitEvents(employeeId){
+ if(r63AnalysisIndex?.visits.has(employeeId))return r63AnalysisIndex.visits.get(employeeId);
  const rows=attendanceAdjacentRows('records').filter(x=>x.employeeId===employeeId&&
    x.datetime&&['进','出'].includes(x.direction))
   .sort((a,b)=>a.datetime.localeCompare(b.datetime)||
@@ -305,6 +310,7 @@ function attendanceVisitEvents(employeeId){
   }
   pending=null;
  }
+ if(r63AnalysisIndex)r63AnalysisIndex.visits.set(employeeId,visits);
  return visits;
 }
 function attendanceDateIsWork(date){
@@ -457,7 +463,7 @@ function setAutoOvertimeDecision(segmentId,accepted){
  return true;
 }
 function analyzeDay(emp,d){
- const date=isoDate(d),punches=state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date)
+ const date=isoDate(d),punches=(r63AnalysisIndex?.daily.get(emp.id+'|'+date)||state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date))
    .sort((a,b)=>a.datetime.localeCompare(b.datetime));
  const completePairs=attendanceDailyVisits(emp.id,date);
  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
@@ -592,6 +598,19 @@ function analyzeDay(emp,d){
   lunchEvidence,autoOvertime,marker:''}}
  return pack();
 }
-function reanalyze(){state.analysis=new Map();for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++)state.analysis.set(`${e.id}|${d}`,analyzeDay(e,d))}
+function reanalyze(){
+ const index={adjacent:new Map(),visits:new Map(),daily:new Map()};
+ for(const row of state.records){
+  const date=String(row.datetime||'').slice(0,10),key=row.employeeId+'|'+date;
+  if(!index.daily.has(key))index.daily.set(key,[]);
+  index.daily.get(key).push(row);
+ }
+ r63AnalysisIndex=index;
+ try{
+  state.analysis=new Map();
+  for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++)
+   state.analysis.set(e.id+'|'+d,analyzeDay(e,d));
+ }finally{r63AnalysisIndex=null}
+}
 function statsFor(items){const total=items.length,problems=items.filter(x=>x.severity==='problem').length,suspects=items.filter(x=>x.severity==='suspect').length,normal=items.filter(x=>x.severity==='normal').length,rest=items.filter(x=>x.severity==='rest').length,excused=items.filter(x=>x.severity==='excused').length;return {total,problems,suspects,normal,rest,excused}}
 function workAnalyses(){return [...state.analysis.values()].filter(x=>isWorkday(x.day))}
