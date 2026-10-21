@@ -25,40 +25,27 @@ function strictDateTime(value){
   return !!parts&&strictISODate(parts[1])&&validClock(parts[2]);
 }
 // A name-only file cannot distinguish two people with the same name.
-function validateImportIdentityRows(rows){
- const byName=new Map(),byNumber=new Map();
- for(const row of rows){
-  const name=String(aliases(row,['姓名','人员','员工姓名','name'])).trim();
-  const number=String(aliases(row,['员工编号','工号','员工ID','employeeId','Employee ID'])).trim();
-  if(!name||!number)continue;
-  if((byName.has(name)&&byName.get(name)!==number)||
-     (byNumber.has(number)&&byNumber.get(number)!==name))
-   throw new Error('同名异工号或同工号异姓名：当前姓名关联方式无法安全导入，请核实唯一身份');
-  byName.set(name,number);byNumber.set(number,name);
- }
-}
+function validateImportIdentityRows(rows){return true /* normalized name is the only identity */}
 function importRosterPlan(names,kind){
-  const unique=[...new Set(names.map(x=>String(x).trim()).filter(Boolean))];
-  if(!unique.length)throw new Error('导入文件没有有效员工姓名');
-  const counts=new Map();
-  for(const e of EMPLOYEES)counts.set(e.name,(counts.get(e.name)||0)+1);
-  const ambiguous=unique.find(name=>(counts.get(name)||0)>1);
-  if(ambiguous&&!state.isDemo)throw new Error('名册中存在同名员工“'+ambiguous+'”；请先建立唯一员工编号映射，不能按姓名自动合并');
-  const unknown=unique.filter(name=>!EMPLOYEES.some(e=>e.name===name));
-  const resetDemo=state.isDemo&&(kind==='attendance'||unknown.length>0);
-  if(resetDemo&&!window.confirm('当前工作空间包含演示人员与数据。导入将建立本月实际人员名册，并清除演示数据。是否继续？'))
-    throw new Error('用户取消了演示数据替换');
-  const people=resetDemo?[]:EMPLOYEES.map(e=>({...e}));
-  const byName=new Map(people.map(e=>[e.name,e]));
-  let nextId=Math.max(0,...people.map(e=>Number(e.id.slice(1))||0));
-  for(const name of unique){
-    if(byName.has(name))continue;
-    const employee={id:'E'+String(++nextId).padStart(3,'0'),name,department:'未分类'};
-    people.push(employee);byName.set(name,employee);
-  }
-  return {people,byName,resetDemo};
+ const unique=[...new Set(names.map(normalizedPerson).filter(Boolean))];
+ if(!unique.length)throw new Error('导入文件没有有效姓名');
+ const existing=new Map();
+ for(const e of EMPLOYEES){const name=normalizedPerson(e.name);
+  if(name&&!existing.has(name))existing.set(name,{...e,id:personIdentity(name),name});
+ }
+ const resetDemo=state.isDemo&&(kind==='attendance'||unique.some(n=>!existing.has(n)));
+ if(resetDemo&&!window.confirm('导入会替换当前演示人员和演示数据，是否继续？'))
+  throw new Error('用户取消了演示数据替换');
+ const people=resetDemo?[]:[...existing.values()];
+ const byName=new Map(people.map(e=>[e.name,e]));
+ for(const name of unique)if(!byName.has(name)){
+  const e={id:personIdentity(name),name,department:'未分类'};
+  people.push(e);byName.set(name,e);
+ }
+ return {people,byName,resetDemo};
 }
 function applyImportRoster(plan,meta){
+  if(!plan.resetDemo)r62MigrateActive();
   if(plan.resetDemo){
     state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
     state.manualStatuses={};state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
@@ -77,11 +64,11 @@ function acceptImportedRows(kind,rows,plan,skipped=0){
   state.saved=false;rememberMonth();reanalyze();render();
   toast('已导入 '+rows.length+' 条'+({attendance:'考勤',leave:'请假',trip:'出差',outing:'外出',overtime:'加班'}[kind])+'记录；员工 '+EMPLOYEES.length+' 人'+(skipped?'；跳过无效行 '+skipped+' 条':''));
 }
-async function importAttendance(file){
-  const t=await XLSX.readTable(file),parsed=[];
+async function importAttendance(file,prepared=null){
+  const t=prepared||await XLSX.readTable(file),parsed=[];
   validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
-    const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
+    const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
     const datetime=importedDate(aliases(r,['打卡时间','时间','datetime','DateTime']));
     const direction=String(aliases(r,['进出','方向','状态','direction'])).trim();
     if(!name||!/^(进|出)$/.test(direction)||!strictDateTime(datetime))return;
@@ -104,12 +91,12 @@ async function importAttendance(file){
   const meta=await persistImportedFile(file,'attendance',out.length,importId);
   applyImportRoster(plan,meta);acceptImportedRows('attendance',out,plan,t.rows.length-out.length);
 }
-async function importLeaves(file){
-  const t=await XLSX.readTable(file),parsed=[];
+async function importLeaves(file,prepared=null){
+  const t=prepared||await XLSX.readTable(file),parsed=[];
   validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
-    const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
-    const date=importedDate(aliases(r,['日期','请假日期','date']));
+    const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名']));
+    const date=r62Date(aliases(r,['日期','请假日期','date']));
     if(!name||!strictISODate(date)||!date.startsWith(monthISO()+'-'))return;
     parsed.push({name,date,row:sourceRow(r,i),start:importClock(aliases(r,['开始时间','开始','start']),RULES.amStart),
       end:importClock(aliases(r,['结束时间','结束','end']),RULES.pmEnd),
@@ -124,13 +111,13 @@ async function importLeaves(file){
   const meta=await persistImportedFile(file,'leave',out.length,importId);
   applyImportRoster(plan,meta);acceptImportedRows('leave',out,plan,t.rows.length-out.length);
 }
-async function importTrips(file){
-  const t=await XLSX.readTable(file),parsed=[];
+async function importTrips(file,prepared=null){
+  const t=prepared||await XLSX.readTable(file),parsed=[];
   validateImportIdentityRows(t.rows);
   t.rows.forEach((r,i)=>{
-    const name=String(aliases(r,['姓名','人员','员工姓名'])).trim();
-    const startDate=importedDate(aliases(r,['开始日期','起始日期','startDate']));
-    const endDate=importedDate(aliases(r,['结束日期','截止日期','endDate'])||startDate);
+    const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名']));
+    const startDate=r62Date(aliases(r,['开始日期','起始日期','startDate']));
+    const endDate=r62Date(aliases(r,['结束日期','截止日期','endDate'])||startDate);
     if(!name||!strictISODate(startDate)||!strictISODate(endDate)
       ||startDate>endDate||startDate>monthISO()+'-'+pad(monthDays())||endDate<monthISO()+'-01')return;
     parsed.push({name,startDate,endDate,row:sourceRow(r,i),type:String(aliases(r,['类型','事项','type'])||'出差'),
@@ -148,13 +135,13 @@ async function importTrips(file){
 /* R50: user-provided outing and overtime records are separate from inferred candidates.
  * Multi-day outings use the same daily clock window; cross-midnight shifts need
  * an approved shift policy and are explicitly rejected rather than guessed. */
-async function importOutings(file){
- const t=await XLSX.readTable(file),parsed=[];
+async function importOutings(file,prepared=null){
+ const t=prepared||await XLSX.readTable(file),parsed=[];
  validateImportIdentityRows(t.rows);
  t.rows.forEach((r,i)=>{
-  const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
-  const startDate=importedDate(aliases(r,['开始日期','日期','startDate','date']));
-  const endDate=importedDate(aliases(r,['结束日期','endDate'])||startDate);
+  const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
+  const startDate=r62Date(aliases(r,['开始日期','日期','startDate','date']));
+  const endDate=r62Date(aliases(r,['结束日期','endDate'])||startDate);
   if(!name||!strictISODate(startDate)||!strictISODate(endDate)||
      startDate>endDate||startDate>monthISO()+'-'+pad(monthDays())||endDate<monthISO()+'-01')return;
   const start=importClock(aliases(r,['开始时间','开始','start']),'');
@@ -177,12 +164,12 @@ async function importOutings(file){
  const meta=await persistImportedFile(file,'outing',out.length,importId);
  applyImportRoster(plan,meta);acceptImportedRows('outing',out,plan,t.rows.length-out.length);
 }
-async function importOvertime(file){
- const t=await XLSX.readTable(file),parsed=[];
+async function importOvertime(file,prepared=null){
+ const t=prepared||await XLSX.readTable(file),parsed=[];
  validateImportIdentityRows(t.rows);
  t.rows.forEach((r,i)=>{
-  const name=String(aliases(r,['姓名','人员','员工姓名','name'])).trim();
-  const date=importedDate(aliases(r,['日期','加班日期','date']));
+  const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
+  const date=r62Date(aliases(r,['日期','加班日期','date']));
   if(!name||!strictISODate(date)||!date.startsWith(monthISO()+'-'))return;
   const start=importClock(aliases(r,['开始时间','开始','start']),'');
   const end=importClock(aliases(r,['结束时间','结束','end']),'');
