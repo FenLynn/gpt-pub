@@ -204,18 +204,32 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
     Object.keys(state.manualStatuses).length===0);
 
 
-  // R68: real-folder-backed project inventory, actual tree, roster and insight screenshots.
-  await page.evaluate(()=>navigateWorkspace('project'));
+  // R69: one data management route owns all project inventory and health categories.
+  await page.evaluate(()=>{state.dataSection='overview';navigateWorkspace('data')});
   await page.waitForSelector('.r68-month-row:not(.heading)',{timeout:30000});
+  await page.waitForSelector('.r68-data-rail .r68-filetree',{timeout:30000});
   report.projectMonthInventory=await page.evaluate(()=>{
-   const text=document.querySelector('.r68-month-table')?.textContent||'';
-   const tree=document.querySelector('.r68-overview-tree')?.textContent||'';
-   return text.includes('2026-10')&&text.includes('已保存')&&
+   const m=document.querySelector('.r68-month-table')?.textContent||'';
+   const tree=document.querySelector('.r68-data-rail .r68-filetree')?.textContent||'';
+   return m.includes('2026-10')&&m.includes('已保存')&&
     tree.includes('state.json')&&tree.includes('审核门禁.csv')&&
-    !!document.querySelector('.r68-storage-bars .r68-storage-row')&&
-    document.querySelectorAll('[data-workspace]').length===6;
+    !document.querySelector('[data-workspace="project"]')&&
+    document.querySelectorAll('[data-workspace]').length===5&&
+    ['overview','months','health','storage'].every(k=>!!document.querySelector('[data-data-section="'+k+'"]'));
   });
-  await page.screenshot({path:path.join(out,'r68-project-overview.png')});
+  await page.screenshot({path:path.join(out,'r69-data-project-overview.png')});
+  await page.locator('[data-data-section="storage"]').click();
+  await page.waitForSelector('.r68-storage-bars .r68-storage-row',{timeout:30000});
+  report.projectStorageCategory=await page.evaluate(()=>!!document.querySelector('#r68StorageCard')&&
+   !!document.querySelector('.r68-data-rail .r68-filetree'));
+  await page.screenshot({path:path.join(out,'r69-data-storage.png')});
+  await page.locator('[data-data-section="health"]').click();
+  await page.waitForSelector('#r68HealthCard');
+  report.projectHealthCategory=await page.evaluate(()=>!!document.querySelector('#r68HealthCard')&&
+   !!document.querySelector('#r68IndexRepair'));
+  await page.locator('[data-data-section="months"]').click();
+  await page.waitForSelector('.r68-month-row:not(.heading)');
+  report.projectMonthsCategory=await page.evaluate(()=>!!document.querySelector('#r68MonthsCard'));
   await page.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});
   await page.waitForSelector('.r68-roster-entry:not(.r68-roster-columns)');
   await page.waitForSelector('.r68-data-rail .r68-filetree',{timeout:30000});
@@ -310,7 +324,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
    'rawCorruptionDetected','missingIndexDetected','safeIndexFixed','pinnedForNextMonth',
-   'backupZipValid','zipRestoreRaw','zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData','projectMonthInventory','rosterUi','batchGroupWorking','scopeUi','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
+   'backupZipValid','zipRestoreRaw','zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData','projectMonthInventory','projectStorageCategory','projectHealthCategory','projectMonthsCategory','rosterUi','batchGroupWorking','scopeUi','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
    throw Error('R65 lifecycle failed '+JSON.stringify(report));
 
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
