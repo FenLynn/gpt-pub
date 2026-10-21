@@ -37,14 +37,14 @@ async function run(){
    {text:'闸机进通道',direction:'进',match:'contains'}
   ];
   if(r62MatchDirection('进1',rule)!=='进'||r62MatchDirection('我的闸机进通道X',rule)!=='进'||
-    r62MatchDirection('进123',rule)!=='')return false;
+    r62MatchDirection('进123',rule)!=='')throw Error('R62 internal check '+(++n));
   r62ImportDraft={file,grid,kind:'attendance',mapping:options,skip:0,header:true,
    encoding:'auto',rules:rule,validated:null};
   const parsed=r62BuildCanonical();
   if(parsed.rows.length!==2||parsed.rows[0].__rowNumber!==2||
      parsed.rows[0]['姓名']!=='李 四'||parsed.rows[0]['打卡时间']!=='2026-10-20 08:30:00'||
-     parsed.rows[1]['进出']!=='出')return false;
-  if(!r62PreviewHtml().includes('2 ·')||!r62PreviewHtml().includes('表头'))return false;
+     parsed.rows[1]['进出']!=='出')throw Error('R62 internal check '+(++n));
+  if(!r62PreviewHtml().includes('2 ·')||!r62PreviewHtml().includes('表头'))throw Error('R62 internal check '+(++n));
   const copy={employees:[{id:'E001',name:'李 四',department:'组1'}],
    groups:{E001:'科研组'},manualStatuses:{'E001|12':'normal'},
    records:[{recordId:'old',employeeId:'E001',name:'李 四'}],
@@ -52,14 +52,14 @@ async function run(){
   r62MigratePayload(copy);
   if(copy.employees[0].id!==personIdentity('李 四')||
     copy.records[0].employeeId!==copy.employees[0].id||
-    copy.manualStatuses[personIdentity('李 四')+'|12']!=='normal')return false;
+    copy.manualStatuses[personIdentity('李 四')+'|12']!=='normal')throw Error('R62 internal check '+(++n));
   const excelNumber=(Date.UTC(2026,9,20)-Date.UTC(1899,11,30))/86400000;
   const workbook=XLSX.writeXlsx([{姓名:'李四',日期:excelNumber}]);
   const xlsx=await XLSX.readGrid(new File([workbook],'serial.xlsx'));
-  if(!xlsx.rows.length||r62Date(xlsx.rows[1].cells[1])!=='2026-10-20')return false;
+  if(!xlsx.rows.length||r62Date(xlsx.rows[1].cells[1])!=='2026-10-20')throw Error('R62 internal check '+(++n));
   state.importProfile=oldProfile;r62ImportDraft=null;
   const matrix=await captureCurrentImage('matrix');
-  if(!matrix.data.startsWith('data:image/png;base64,'))return false;
+  if(!matrix.data.startsWith('data:image/png;base64,'))throw Error('R62 internal check '+(++n));
   const first=matrix,second=matrix;
   const pdf=await capturePdf([first,second]);
   const bytes=new Uint8Array(await pdf.arrayBuffer());
