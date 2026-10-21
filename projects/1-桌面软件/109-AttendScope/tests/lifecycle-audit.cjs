@@ -241,8 +241,10 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
     !!document.querySelector('#r68BulkGroup')&&
     !document.querySelector('.r68-data-rail')&&!document.querySelector('.r68-filetree');
   });
+  await page.evaluate(async()=>{const p=window.prompt;window.prompt=()=> '测试研发组';
+    try{await r72CreateGroup()}finally{window.prompt=p}});
   await page.locator('#r68SelectVisible').check();
-  await page.locator('#r68BulkGroup').selectOption({index:1});
+  await page.locator('#r68BulkGroup').selectOption('测试研发组');
   await page.locator('#r68ApplyGroup').click();
   report.batchGroupWorking=await page.evaluate(()=>{
    const person=EMPLOYEES.find(e=>e.name==='测试甲');

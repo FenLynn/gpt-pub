@@ -1,7 +1,7 @@
 /* Month-scoped datasets, with independent in-memory workspaces and global manual groups. */
 function rememberMonth(){
   state.monthStores.set(monthKey(),{
-    employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},fixedPeople:[...(state.fixedPeople||[])],groupCatalog:[...(state.groupCatalog||[])],isDemo:!!state.isDemo,
+    employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],isDemo:!!state.isDemo,
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
@@ -24,7 +24,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
     const catalog=profile.pinRoster&&Array.isArray(profile.groupCatalog)?
       profile.groupCatalog:(state.groupCatalog||[]);
     const pinnedImport=profile.pinImport&&profile.importProfile?profile.importProfile:r62ImportProfile();
-    state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},fixedPeople:[...pinnedFixed],groupCatalog:[...catalog],isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...(profile.pinRules&&profile.workRules?profile.workRules:RULES)},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
+    state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},fixedPeople:[...pinnedFixed],nameAliases:{...(profile.nameAliases||state.nameAliases||{})},groupCatalog:[...catalog],isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...(profile.pinRules&&profile.workRules?profile.workRules:RULES)},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
      calendarOverrides:{...state.calendarOverrides},activeBranch:null});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
@@ -32,8 +32,12 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   const next=state.monthStores.get(key);
   if(Array.isArray(next.employees))EMPLOYEES=next.employees.map(e=>({...e}));
   state.groups=next.groups?{...next.groups}:{...state.groups};
-  state.fixedPeople=[...(next.fixedPeople||state.projectProfile?.fixedPeople||[])];
-  state.groupCatalog=[...(next.groupCatalog||state.projectProfile?.groupCatalog||[...new Set(Object.values(state.groups).filter(g=>g&&g!=='未分组'))])];
+  const globalFixed=state.projectProfile?.pinRoster?
+    (state.projectProfile.fixedPeople||state.projectProfile.employees?.map(e=>e.id)||[]):null;
+  state.fixedPeople=[...(globalFixed??next.fixedPeople??[])];
+  state.nameAliases={...(next.nameAliases||{}),...(state.projectProfile?.nameAliases||{})};
+  state.groupCatalog=[...(state.projectProfile?.groupCatalog||next.groupCatalog||
+    [...new Set(Object.values(state.groups).filter(g=>g&&g!=='未分组'))])];
   state.isDemo=!!next.isDemo;
   state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
   state.revisions=next.revisions;state.revisionSeq=next.revisionSeq;
