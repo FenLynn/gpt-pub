@@ -23,17 +23,7 @@ const R62_ALIASES={
 };
 const R62_DEFAULT_DIRECTIONS=[
  {text:'进',direction:'进',match:'exact'},
- {text:'出',direction:'出',match:'exact'},
- {text:'进1',direction:'进',match:'exact'},
- {text:'进2',direction:'进',match:'exact'},
- {text:'出1',direction:'出',match:'exact'},
- {text:'出2',direction:'出',match:'exact'},
- {text:'进入',direction:'进',match:'contains'},
- {text:'离开',direction:'出',match:'contains'},
- {text:'入口',direction:'进',match:'contains'},
- {text:'出口',direction:'出',match:'contains'},
- {text:'checkin',direction:'进',match:'contains'},
- {text:'checkout',direction:'出',match:'contains'}
+ {text:'出',direction:'出',match:'exact'}
 ];
 function normalizedPerson(name){return String(name??'').normalize('NFKC').replace(/\s+/g,' ').trim()}
 function personIdentity(name){return 'name:'+encodeURIComponent(normalizedPerson(name))}
@@ -166,7 +156,7 @@ function r62PreviewHtml(){
   '<label class="r62-field">'+title+'<select data-map="'+key+'"><option value="-1">不使用</option>'+
   cols.map(i=>'<option value="'+i+'" '+(d.mapping[key]===i?'selected':'')+'>'+label(i)+'</option>').join('')+
   '</select></label>').join('');
- const preview=d.grid.rows.slice(0,36).map((r,i)=>{
+ const preview=d.grid.rows.slice(0,25).map((r,i)=>{
   const hidden=i<dataStart,head=d.header&&i===d.skip;
   return '<tr class="'+(hidden?'r62-skipped ':'')+(head?'r62-header':'')+'"><th>'+
    r.rowNumber+(head?' · 表头':hidden?' · 跳过':'')+'</th>'+
@@ -192,9 +182,10 @@ function r62PreviewHtml(){
    '</select></label>':'')+'</div>'+
   '<div class="r62-section-title">列映射 <small>识别不准确时直接修改；日期时间可选一列，或分别选择日期＋时间</small></div>'+
   '<div class="r62-mapping">'+mapping+'</div>'+
-  (d.kind==='attendance'?'<div class="r62-section-title">进出关键字 <small>按完全匹配优先；允许多条规则。不配置单独的闸机系统</small></div>'+
-   '<div class="r62-rules">'+rules+'<button id="r62AddRule">+ 添加规则</button></div>':'')+
-  '<div class="r62-section-title">原始数据预览 <small>灰色行会展示但不会导入；最多显示前 36 行</small></div>'+
+  (d.kind==='attendance'?'<div class="r62-section-title">进出识别 <small>默认「进 / 出」，特殊闸机可自定义</small></div>'+
+   '<details id="r63DirectionDetails" class="r63-rules-details" '+(d.rulesExpanded?'open':'')+'><summary>自定义识别规则 <em>'+d.rules.filter(r=>r.text.trim()).length+' 条 · 例如「进1」完全匹配为「进」</em></summary>'+
+   '<div class="r62-rules">'+rules+'<button id="r62AddRule">+ 添加规则</button></div></details>':'')+
+  '<div class="r62-section-title">数据预览 <small>前 25 行 · 灰色行不计入导入</small></div>'+
   '<div class="r62-grid-wrap"><table><thead><tr><th>行号</th>'+
    cols.map(i=>'<th>'+r62ColumnLabel(i)+'</th>').join('')+'</tr></thead><tbody>'+
    preview+'</tbody></table></div><p id="r62Validation" class="r62-validation">检查映射与关键字后点击「验证数据」。</p></div>'+
@@ -235,6 +226,7 @@ function r62BuildCanonical(){
 function r62WireImport(){
  const d=r62ImportDraft,modal=document.querySelector('.r62-overlay');if(!modal)return;
  const rerender=()=>r62ShowImport();
+ modal.querySelector('#r63DirectionDetails')?.addEventListener('toggle',e=>{d.rulesExpanded=e.target.open});
  const close=()=>{modal.remove();r62ImportDraft=null};
  modal.querySelector('#r62Close').onclick=close;
  modal.querySelector('#r62Cancel').onclick=close;
@@ -256,7 +248,10 @@ function r62WireImport(){
  const add=modal.querySelector('#r62AddRule');
  if(add)add.onclick=()=>{d.rules.push({text:'',direction:'进',match:'exact'});d.validated=null;rerender()};
  modal.querySelector('#r62Validate').onclick=()=>{
+  const validate=modal.querySelector('#r62Validate');
+  validate.disabled=true;validate.textContent='正在核对…';
   const result=r62BuildCanonical();d.validated=result;
+  validate.disabled=false;validate.textContent='验证数据';
   const msg=modal.querySelector('#r62Validation');
   msg.textContent='可导入 '+result.rows.length+' 行；跳过 '+result.failed.length+' 行'+
    (result.failed.length?'（'+result.failed.slice(0,6).map(f=>'第 '+f.row+' 行：'+f.reason).join('；')+'）':'');
@@ -267,6 +262,8 @@ function r62WireImport(){
   const data=d.validated;if(!data?.rows.length)return;
   if(data.failed.length&&!window.confirm('有 '+data.failed.length+' 行无法识别，将跳过这些行。是否继续？'))return;
   const button=modal.querySelector('#r62Commit');button.disabled=true;
+  button.textContent='正在导入…';
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   try{
    const converter={attendance:importAttendance,leave:importLeaves,trip:importTrips,
     outing:importOutings,overtime:importOvertime}[d.kind];
@@ -274,7 +271,7 @@ function r62WireImport(){
    await converter(d.file,{sheet:d.grid.sheet,rows:data.rows,headers:Object.keys(data.rows[0])});
    state.importProfile={...oldProfile,rules:d.rules.filter(r=>r.text.trim()).map(r=>({...r}))};
    state.saved=false;rememberMonth();close();render();
-  }catch(e){button.disabled=false;toast('导入失败：'+e.message,true)}
+  }catch(e){button.disabled=false;button.textContent='确认导入';toast('导入失败：'+e.message,true)}
  };
 }
 function r62ShowImport(){
@@ -282,12 +279,25 @@ function r62ShowImport(){
  const shell=document.createElement('div');shell.innerHTML=r62PreviewHtml();
  document.body.appendChild(shell.firstChild);r62WireImport();
 }
+let r63ReadingImport=false;
 async function r62OpenImport(file,kind){
+ if(r63ReadingImport){toast('正在处理上一个文件，请先完成导入',true);return}
+ if(file.size>40*1024*1024)throw new Error('文件超过 40 MB；请按月份拆分后导入');
+ r63ReadingImport=true;
+ const old=document.querySelector('#r63ImportBusy');old?.remove();
+ const indicator=document.createElement('div');indicator.id='r63ImportBusy';
+ indicator.className='r63-import-busy';indicator.setAttribute('role','status');
+ indicator.innerHTML='<span class="r63-spinner"></span><strong>正在读取文件</strong><small>表格在本机解析，请勿重复点击</small>';
+ document.body.appendChild(indicator);
+ try{
+ // Allow Chrome to paint the busy state before XLSX/CSV parsing starts.
+ await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
  const grid=await XLSX.readGrid(file);
  if(!grid.rows.length)throw new Error('文件中没有可预览的数据');
  const header=true,profile=r62ImportProfile();
  r62ImportDraft={file,kind,grid,header,skip:0,encoding:'auto',
   mapping:r62InferColumns({...grid,kind},header),
-  rules:profile.rules.map(r=>({...r})),validated:null};
+  rules:profile.rules.map(r=>({...r})),rulesExpanded:false,validated:null};
  r62ShowImport();
+ }finally{indicator.remove();r63ReadingImport=false}
 }
