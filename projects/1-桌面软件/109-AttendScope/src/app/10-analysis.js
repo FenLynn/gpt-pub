@@ -327,6 +327,11 @@ function attendanceVisitEligibleMinutes(visit){
   const date=attendanceDateFromMinute(cursor),a=Math.max(visit.from,cursor),
    z=Math.min(visit.to,cursor+1440),start=visit.from<cursor||!attendanceDateIsWork(date)?
     cursor:cursor+minutes(RULES.pmEnd);
+  // Noon overtime needs a completed morning departure, not an uninterrupted full day.
+  if(attendanceDateIsWork(date)&&visit.from<cursor+minutes(RULES.amEnd)&&
+     visit.to<=cursor+minutes(RULES.pmStart))
+   total+=Math.max(0,Math.min(z,cursor+minutes(RULES.pmStart))-
+       Math.max(a,cursor+minutes(RULES.amEnd)));
   total+=Math.max(0,z-Math.max(a,start));
  }
  return total;
@@ -392,6 +397,9 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   const a=minutes(enter.time),b=minutes(exit.time);
   const activeWindows=enter.sessionCarry?[[0,1440]]:windows;
   for(const [start,end] of activeWindows){
+   // A continuous visit extending into the afternoon is not a lunch OT session.
+   if(isWorkday(day)&&start===minutes(RULES.amEnd)&&
+      (a>=minutes(RULES.amEnd)||b>minutes(RULES.pmStart)))continue;
    const from=Math.max(a,start),to=Math.min(b,end);
    if(to>from)eligible.push([from,to,enter.sessionId||null,
      enter.sessionEligibleMinutes||0,enter.sessionFrom,enter.sessionTo]);
