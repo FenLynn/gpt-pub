@@ -83,7 +83,7 @@ async function ensureProjectSkeleton(){
   }
 }
 function normalizeSavedMonth(payload){
-  if(!payload||!Array.isArray(payload.records))return null;
+  if(!payload||!Array.isArray(payload.records)||Number(payload.schemaVersion)>2)return null;
   payload=r62MigratePayload(structuredClone(payload));
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     employees:payload.employees||null,groups:payload.groups||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
@@ -95,7 +95,13 @@ async function connectProjectDir(){
     const handle=await showDirectoryPicker({mode:'readwrite'});
     const project=await readJSON(handle,'project.json');
     if(project&&project.projectId!=='P109-AttendScope')throw new Error('所选目录不是有效的考勤项目，请更换目录，避免覆盖其他数据');
-    state.projectDir=handle;
+    if(!project){
+      p109PendingDirectory=handle;
+      await openProjectControl('initialize');
+      return;
+    }
+    if(Number(project.schemaVersion)>2)throw new Error('这个项目来自更新的数据版本，请先升级软件');
+    state.projectDir=handle;p109PendingDirectory=null;
     if(project?.projectId==='P109-AttendScope'){
       const conf=await existingDir(handle,'config').catch(()=>null);
       if(conf){
@@ -111,6 +117,8 @@ async function connectProjectDir(){
         }
       }
       if(conf){
+        const pinned=await readJSON(conf,'project-profile.json');
+        if(pinned?.schemaVersion===1)state.projectProfile=pinned;
         const people=await readJSON(conf,'employees.json');
         if(people?.employees?.length){
           EMPLOYEES=people.employees.map(e=>({id:e.id,name:e.name,department:e.department||'未分类'}));
@@ -139,7 +147,11 @@ async function connectProjectDir(){
       const key=active.year+'-'+pad(active.month);
       if(state.monthStores.has(key))switchMonth(active.year,active.month,false,false);
     }
-    await ensureProjectSkeleton();render();toast(project?'已连接并载入月度工作空间':'已创建项目目录');
+    await ensureProjectSkeleton();render();toast('已连接并载入月度工作空间');
+    try{p109Audit=await p109AuditProject(handle);
+      if(p109Audit.issues.some(x=>x.level==='critical'))toast('发现严重数据问题，点击「项目」查看健康检查',true);
+    }catch(error){console.warn('健康检查尚未完成',error?.message||error)}
+
   }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true)}
 }
 async function persistImportedFile(file,type,count,importId){
@@ -161,8 +173,8 @@ async function persistImportedFile(file,type,count,importId){
 }
 function projectPayload(){
   rememberMonth();
-  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:'0.1.0-preview',
-    analysisEngineVersion:'R63',current:{year:YEAR,month:MONTH},
+  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:'0.2.0-preview',
+    analysisEngineVersion:'R65',current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
@@ -173,7 +185,7 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     // All derived analyses are recalculated from raw facts and manual decisions.
-    analysisEngineVersion:'R63'};
+    analysisEngineVersion:'R65'};
 }
 async function saveWorking(){
   const payload=JSON.stringify(workingPayload(),null,2);
@@ -216,8 +228,8 @@ async function restoreWorkingFile(file){
 }
 async function freezeSnapshot(){
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
-    appVersion:'0.1.0-preview',sourceImports:state.imports,parentSnapshot:null};
-  const snapshot={manifest:{...manifest,analysisEngineVersion:'R63',workingSchema:2},config:{
+    appVersion:'0.2.0-preview',sourceImports:state.imports,parentSnapshot:null};
+  const snapshot={manifest:{...manifest,analysisEngineVersion:'R65',workingSchema:2},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
  },working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
