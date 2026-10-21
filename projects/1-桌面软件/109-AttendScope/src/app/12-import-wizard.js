@@ -179,7 +179,8 @@ function r62PreviewHtml(){
   (d.file.name.toLowerCase().endsWith('.csv')?'<label>CSV 编码 <select id="r62Encoding">'+
    [['auto','自动'],['utf-8','UTF-8'],['gb18030','GB18030/GBK']].map(([v,t])=>
     '<option value="'+v+'" '+(d.encoding===v?'selected':'')+'>'+t+'</option>').join('')+
-   '</select></label>':'')+'</div>'+
+   '</select></label>':'')+
+   '<label class="r65-template-choice"><input type="checkbox" id="r65SaveTemplate" '+(d.saveTemplate?'checked':'')+'> 此映射下月复用</label></div>'+
   '<div class="r62-section-title">列映射 <small>识别不准确时直接修改；日期时间可选一列，或分别选择日期＋时间</small></div>'+
   '<div class="r62-mapping">'+mapping+'</div>'+
   (d.kind==='attendance'?'<div class="r62-section-title">进出识别 <small>默认「进 / 出」，特殊闸机可自定义</small></div>'+
@@ -230,6 +231,7 @@ function r62WireImport(){
  const close=()=>{modal.remove();r62ImportDraft=null};
  modal.querySelector('#r62Close').onclick=close;
  modal.querySelector('#r62Cancel').onclick=close;
+ modal.querySelector('#r65SaveTemplate').onchange=e=>{d.saveTemplate=e.target.checked};
  modal.querySelector('#r62Header').onchange=e=>{d.header=e.target.checked;d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);rerender()};
  modal.querySelector('#r62Skip').onchange=e=>{d.skip=Math.max(0,Math.min(100,Number(e.target.value)||0));rerender()};
  modal.querySelector('#r62Encoding')?.addEventListener('change',async e=>{
@@ -269,7 +271,14 @@ function r62WireImport(){
     outing:importOutings,overtime:importOvertime}[d.kind];
    const oldProfile=state.importProfile;
    await converter(d.file,{sheet:d.grid.sheet,rows:data.rows,headers:Object.keys(data.rows[0])});
-   state.importProfile={...oldProfile,rules:d.rules.filter(r=>r.text.trim()).map(r=>({...r}))};
+   const nextProfile={...oldProfile,rules:d.rules.filter(r=>r.text.trim()).map(r=>({...r}))};
+   if(d.saveTemplate){
+    nextProfile.templates={...(nextProfile.templates||{}),
+     [d.kind]:{header:d.header,skip:d.skip,
+       labels:d.grid.rows[d.skip]?.cells.map(x=>String(x??'').trim())||[],
+       mapping:{...d.mapping},encoding:d.encoding}};
+   }
+   state.importProfile=nextProfile;
    state.saved=false;rememberMonth();close();render();
   }catch(e){button.disabled=false;button.textContent='确认导入';toast('导入失败：'+e.message,true)}
  };
@@ -295,9 +304,13 @@ async function r62OpenImport(file,kind){
  const grid=await XLSX.readGrid(file);
  if(!grid.rows.length)throw new Error('文件中没有可预览的数据');
  const header=true,profile=r62ImportProfile();
+ const saved=profile.templates?.[kind];
+ const currentLabels=grid.rows[0]?.cells.map(x=>String(x??'').trim())||[];
+ const matches=saved?.header===true&&saved.skip===0&&Array.isArray(saved.labels)&&
+   saved.labels.length===currentLabels.length&&saved.labels.every((x,i)=>x===currentLabels[i]);
  r62ImportDraft={file,kind,grid,header,skip:0,encoding:'auto',
-  mapping:r62InferColumns({...grid,kind},header),
-  rules:profile.rules.map(r=>({...r})),rulesExpanded:false,validated:null};
+  mapping:matches?{...saved.mapping}:r62InferColumns({...grid,kind},header),
+  rules:profile.rules.map(r=>({...r})),rulesExpanded:false,saveTemplate:false,validated:null};
  r62ShowImport();
  }finally{indicator.remove();r63ReadingImport=false}
 }
