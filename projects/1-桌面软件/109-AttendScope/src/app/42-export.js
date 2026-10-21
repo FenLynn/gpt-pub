@@ -6,13 +6,14 @@ async function captureImage(src){const i=new Image();i.src=src;await new Promise
 
 /* R63: faithfully compose chart, legends, context counts, and right-hand facts. */
 function r63Title(){return typeof attendTitle==='function'?attendTitle():'考勤'}
+function r63FileStem(){return r63Title().replace(/[\\/:*?"<>|\\x00-\\x1f]/g,'_').trim()||'考勤'}
 function r63ReportData(kind){
  if(kind==='stats'){
   const d=asStatRows(),p=asStatPrefs(),label=asStatFamily(p.family)[2].find(x=>x[0]===p.metric)?.[1]||'统计';
   return {heading:periodText()+' · '+d.rows.length+' 项 · '+label,
    lines:[['范围',document.querySelector('.as-stats-chart-context')?.textContent?.trim()||periodText()],
     ['统计指标',label],['范围总量',document.querySelector('.as-stats-total strong')?.textContent?.trim()||'—'],
-    ...d.rows.slice(0,12).map((x,i)=>[String(i+1)+'. '+x.label,Math.round(x.value*100)/100+' '+d.effectiveUnit])]};
+    ...(d.rankRows||d.rows).slice(0,12).map((x,i)=>[String(i+1)+'. '+x.label,Math.round(x.value*100)/100+' '+d.effectiveUnit])]};
  }
  const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],
   day=state.chartDay||state.selection?.day||1,a=e&&state.analysis.get(e.id+'|'+day);
@@ -133,7 +134,7 @@ async function captureCurrentImage(kind){
  if(!visual)visual=kind==='matrix'?captureMatrixCanvas():
   kind==='stats'?captureStatisticsCanvas():captureTimelineCanvas();
  const canvas=r63Compose(kind,visual);
- return {kind,month:monthKey(),filename:r63Title()+'_'+kind+'_'+monthKey()+'_'+captureStamp()+'.png',
+ return {kind,month:monthKey(),filename:r63FileStem()+'_'+kind+'_'+monthKey()+'_'+captureStamp()+'.png',
   data:canvas.toDataURL('image/png'),width:canvas.width,height:canvas.height};
 }
 function captureBytes(data){return Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0))}
@@ -202,7 +203,7 @@ async function captureAllPdf(selected){
  try{
   const items=Array.isArray(selected)?selected:(state.captureItems||[]).filter(x=>x.month===monthKey());
   if(!items.length){toast('请先截图，再从 PDF 菜单选择图片',true);return}
-  const pdf=await capturePdf(items),name=r63Title()+'_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
+  const pdf=await capturePdf(items),name=r63FileStem()+'_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
   if(state.projectDir){const output=await dir(await monthDirectory(),'output');await writeFile(output,name,await pdf.arrayBuffer())}
   else downloadBlob(pdf,name);
   toast('已导出 '+items.length+' 页横向 A4 PDF');return true;
