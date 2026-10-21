@@ -110,8 +110,71 @@ function r68RecordsHtml(){return '<div class="r68-records-head">'+r68SidebarHead
   '<button id="rawFloat" class="raw-float-btn" title="弹出原始表格">⛶</button></div>'+
   '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section></div>';
 }
+/* R69 · The project inventory is a CATEGORY of Data Management, never a top-level route. */
+const R69_PROJECT_SECTIONS=new Set(['overview','months','health','storage']);
+function r69IsProjectSection(key){return R69_PROJECT_SECTIONS.has(key)}
+function r69NavigateData(section='overview'){
+ state.dataSection=R69_PROJECT_SECTIONS.has(section)?section:'overview';
+ if(state.workspaceMode==='data'){
+  document.querySelectorAll('[data-data-section]').forEach(b=>b.classList.toggle('active',b.dataset.dataSection===state.dataSection));
+  renderDataWorkspace();
+ }else navigateWorkspace('data');
+}
+function r69ProjectError(err){
+ const node=document.getElementById('r69ProjectPane');
+ if(node&&r69IsProjectSection(state.dataSection))
+  node.innerHTML='<section class="r68-studio-card"><p class="r68-note">项目扫描失败：'+r68Esc(err.message)+'</p>'+
+   '<button class="r68-btn" id="r69Retry">重新检测</button></section>';
+ node?.querySelector('#r69Retry')?.addEventListener('click',()=>r69RefreshInventory());
+}
+async function r69RefreshInventory(){
+ r68UI.latestScanAt=0;r68UI.latestReport=null;r68UI.latestTree=null;
+ r68UI.treeSerial++;
+ if(state.workspaceMode==='data')r68RenderData();
+}
+function r69PaintProjectSection(report,tree){
+ const node=document.getElementById('r69ProjectPane');
+ if(!node||!r69IsProjectSection(state.dataSection))return;
+ const original=document.createElement('div');original.innerHTML=r68ProjectMarkup(report,tree);
+ const cards={
+  overview:['.r68-overview-cards','#r68MonthsCard','#r68HealthCard'],
+  months:['#r68MonthsCard'],health:['#r68HealthCard'],
+  storage:['#r68StorageCard']
+ };
+ const tab=state.dataSection;
+ const content=cards[tab].map(sel=>original.querySelector(sel)?.outerHTML||'').join('');
+ const caption={overview:['项目概况','所有已保存月份、健康情况与长期状态'],
+  months:['月份库存','每个月的原始数据、工作状态、备用状态与冻结修订'],
+  health:['项目健康检测','逐项提示缺失、损坏和版本冲突；检测始终只读'],
+  storage:['存储与文件','按本地文件实际大小归类；右侧显示当前文件夹树']};
+ const name=caption[tab],connected=!!state.projectDir;
+ const actions='<div class="r69-project-actions">'+
+  '<button class="r68-btn" id="r68ScanAgain" type="button">重新扫描</button>'+
+  '<button class="r68-btn" id="r68ProjectBackup" type="button" '+(!connected?'disabled':'')+'>完整 ZIP 备份</button>'+
+  '<button class="r68-btn" id="r68OpenProjectControl" type="button">初始化 / 恢复 / 更新</button></div>';
+ node.innerHTML='<div class="r69-section-title"><div><h2>'+name[0]+'</h2><p>'+name[1]+'</p></div>'+
+  r68Pill(!connected?'未连接':report.level==='critical'?'严重问题':report.level==='warning'?'待检查':'正常',
+   !connected?'warning':report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
+  content+actions;
+ node.querySelector('#r68ScanAgain')?.addEventListener('click',r69RefreshInventory);
+ node.querySelector('#r68ProjectBackup')?.addEventListener('click',()=>p109BackupProject());
+ node.querySelector('#r68OpenProjectControl')?.addEventListener('click',()=>openProjectControl());
+ node.querySelector('#r68IndexRepair')?.addEventListener('click',async()=>{
+  await p109RepairIndex(report);await r69RefreshInventory();
+ });
+ node.querySelectorAll('[data-r68-month]').forEach(b=>b.onclick=()=>{
+  const [y,m]=b.dataset.r68Month.split('-').map(Number);
+  if(monthExists(y,m)){
+   state.dataSection='records';switchMonth(y,m);render();
+  }else toast('磁盘存在此月份，但尚未载入内存；请重新连接项目目录',true);
+ });
+}
+
 function r68DataMarkup(){
  const section=state.dataSection||'records';
+ if(r69IsProjectSection(section))return '<div class="r68-data-studio r69-project-data">'+
+  '<div class="r68-data-main" id="r69ProjectPane"><div class="r68-loading">正在核对本地项目状态…</div></div>'+
+  '<aside class="r68-data-rail" id="r68DataRail">'+r68RailPlaceholder()+'</aside></div>';
  return '<div class="r68-data-studio"><div class="r68-data-main"><div class="r68-studio-summary">'+
   '<div><span>人员</span><strong>'+EMPLOYEES.length+'</strong></div>'+
   '<div><span>打卡</span><strong>'+state.records.length.toLocaleString()+'</strong></div>'+
@@ -134,14 +197,14 @@ function r68RailPlaceholder(){
    '<div>冻结 <strong>'+report.snapshotCount+'</strong></div>'+
    '<div>修订 <strong>'+report.months.reduce((x,m)=>x+m.branches.length,0)+'</strong></div>'+
    '<div>原件 <strong>'+report.rawFileCount+'</strong></div></div>'+
-   '<button class="r68-btn" id="r68RailProject">打开项目总览 →</button></section>'+
+   '<button class="r68-btn" id="r68RailProject">查看月份与健康 →</button></section>'+
    '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>文件树</h3><span>'+tree.files+
    ' 文件 · '+r68HumanBytes(tree.totalBytes)+'</span></div>'+
    '<div class="r68-filetree">'+r68TreeLine(state.projectDir.name,'directory')+
    '<div class="r68-tree-children">'+tree.html+'</div></div></section>';
  }
  return '<section class="r68-rail-card"><h3>项目状态</h3><p>'+(state.projectDir?'正在读取本地文件…':'尚未连接项目目录')+'</p>'+
-  '<button class="r68-btn" id="r68RailProject">打开项目总览</button></section>'+
+  '<button class="r68-btn" id="r68RailProject">查看项目状态</button></section>'+
   '<section class="r68-rail-card"><h3>文件树</h3><div id="r68RailTree" class="r68-tree-placeholder">'+(state.projectDir?'正在读取文件结构…':'连接目录后显示实际文件树')+'</div></section>';
 }
 function r68RenderData(){
@@ -179,11 +242,11 @@ function r68RenderData(){
   root.querySelector('#'+id)?.addEventListener('click',async()=>{p109Audit=await p109AuditProject();await p109PinDefaults(kind)});
  }
  root.querySelector('#r68FreezeNow')?.addEventListener('click',()=>freezeSnapshot());
- root.querySelector('#r68OpenProject')?.addEventListener('click',()=>navigateWorkspace('project'));
+ root.querySelector('#r68OpenProject')?.addEventListener('click',()=>r69NavigateData('months'));
  root.querySelectorAll('[data-r68-fork]').forEach(b=>b.onclick=()=>{
   const [month,id]=b.dataset.r68Fork.split('|');return p109ForkSnapshot(month,id)
  });
- root.querySelector('#r68RailProject')?.addEventListener('click',()=>navigateWorkspace('project'));
+ root.querySelector('#r68RailProject')?.addEventListener('click',()=>r69NavigateData('overview'));
  if((state.dataSection||'records')==='records')mountRawTable(state.selection.type==='date'?
   {type:'date',day:state.selection.day,items:[]}:{type:'overall',items:workAnalyses()});
  r68FillDataRail();
@@ -240,8 +303,11 @@ function r68StorageBars(tree){
 async function r68FillDataRail(){
  const el=document.getElementById('r68DataRail');if(!el)return;
  const id=++r68UI.treeSerial,sourceRoot=state.projectDir;
- if(sourceRoot&&r68UI.latestRoot===sourceRoot&&r68UI.latestTree&&Date.now()-(r68UI.latestScanAt||0)<3000)return;
- if(!state.projectDir){el.innerHTML=r68RailPlaceholder();el.querySelector('#r68RailProject')?.addEventListener('click',()=>navigateWorkspace('project'));return}
+ if(sourceRoot&&r68UI.latestRoot===sourceRoot&&r68UI.latestTree&&r68UI.latestReport&&Date.now()-(r68UI.latestScanAt||0)<3000){
+   r69PaintProjectSection(r68UI.latestReport,r68UI.latestTree);return;
+  }
+ if(!state.projectDir){el.innerHTML=r68RailPlaceholder();el.querySelector('#r68RailProject')?.addEventListener('click',()=>r69NavigateData('overview'));
+    if(r69IsProjectSection(state.dataSection))p109AuditProject().then(report=>r69PaintProjectSection(report,null)).catch(e=>r69ProjectError(e));return}
  try{
   const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
   if(id!==r68UI.treeSerial||!el.isConnected||state.projectDir!==sourceRoot)return;
@@ -259,8 +325,9 @@ async function r68FillDataRail(){
    '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>文件树</h3><span>'+tree.files+' 文件 · '+r68HumanBytes(tree.totalBytes)+'</span></div>'+
    '<div class="r68-filetree" aria-label="当前连接目录的实际文件树">'+r68TreeLine(state.projectDir.name||'项目','directory')+
     '<div class="r68-tree-children">'+tree.html+'</div></div></section>';
-  el.querySelector('#r68RailProject').onclick=()=>navigateWorkspace('project');
- }catch(e){if(id===r68UI.treeSerial){el.innerHTML='<div class="r68-note">文件扫描失败：'+r68Esc(e.message)+'</div>'}}
+  el.querySelector('#r68RailProject').onclick=()=>r69NavigateData('overview');
+   r69PaintProjectSection(report,tree);
+ }catch(e){if(id===r68UI.treeSerial){el.innerHTML='<div class="r68-note">文件扫描失败：'+r68Esc(e.message)+'</div>';r69ProjectError(e)}}
 }
 function r68ProjectMarkup(report,tree){
  const months=report?.months||[],issues=report?.issues||[],connected=!!state.projectDir;
