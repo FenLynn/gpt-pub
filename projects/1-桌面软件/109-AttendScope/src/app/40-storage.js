@@ -162,7 +162,7 @@ async function persistImportedFile(file,type,count,importId){
 function projectPayload(){
   rememberMonth();
   return {schemaVersion:2,projectId:'P109-AttendScope',projectName:'AttendScope',appVersion:'0.1.0-preview',
-    analysisEngineVersion:'R62',current:{year:YEAR,month:MONTH},
+    analysisEngineVersion:'R63',current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
@@ -173,7 +173,7 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     // All derived analyses are recalculated from raw facts and manual decisions.
-    analysisEngineVersion:'R62'};
+    analysisEngineVersion:'R63'};
 }
 async function saveWorking(){
   const payload=JSON.stringify(workingPayload(),null,2);
@@ -217,7 +217,7 @@ async function restoreWorkingFile(file){
 async function freezeSnapshot(){
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
     appVersion:'0.1.0-preview',sourceImports:state.imports,parentSnapshot:null};
-  const snapshot={manifest:{...manifest,analysisEngineVersion:'R62',workingSchema:2},config:{
+  const snapshot={manifest:{...manifest,analysisEngineVersion:'R63',workingSchema:2},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
  },working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
