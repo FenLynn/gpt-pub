@@ -1663,6 +1663,7 @@ async function run(){
    return !!row&&row.业务标记.length>0;
  },'R35 export lost behavior tags');
 
+ await require('./lifecycle-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R63',remote:remote.length,errors:errors.length,layout}));
