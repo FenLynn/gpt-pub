@@ -174,8 +174,8 @@ async function persistImportedFile(file,type,count,importId){
 function projectPayload(){
   rememberMonth();
   return {schemaVersion:2,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:'0.2.0-preview',
-    analysisEngineVersion:'R65',current:{year:YEAR,month:MONTH},
-    months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
+    analysisEngineVersion:'R66',current:{year:YEAR,month:MONTH},
+    months:[...state.monthStores.keys()].sort(),activeBranch:state.activeBranch||null,updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
@@ -185,14 +185,19 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
     // All derived analyses are recalculated from raw facts and manual decisions.
-    analysisEngineVersion:'R65'};
+    analysisEngineVersion:'R66',branch:state.activeBranch||null};
 }
 async function saveWorking(){
   const payload=JSON.stringify(workingPayload(),null,2);
   if(state.projectDir){
     try{
       await ensureProjectSkeleton();
-      const m=await monthDirectory(),w=await dir(m,'working');
+      const m=await monthDirectory();let w;
+      if(state.activeBranch?.month===monthKey()){
+       const branches=await dir(m,'branches');
+       const branch=await existingDir(branches,state.activeBranch.id);
+       w=await dir(branch,'working');
+      }else w=await dir(m,'working');
       // Keep a verified last-good copy before replacing the working state.
       const old=await readJSON(w,'state.json');
       if(old?.records)await writeFile(w,'state.previous.json',JSON.stringify(old,null,2));
@@ -203,7 +208,7 @@ async function saveWorking(){
       // Working is authoritative; config files are optional legacy defaults.
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
       state.saved=true;rememberMonth();
-      render();toast('已保存 '+monthKey()+' 的工作状态');return;
+      render();toast('已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'));return;
     }catch(e){toast('目录保存失败：'+e.message,true);return}
   }
   downloadBlob(new Blob([payload],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_working.json');
@@ -228,8 +233,8 @@ async function restoreWorkingFile(file){
 }
 async function freezeSnapshot(){
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
-    appVersion:'0.2.0-preview',sourceImports:state.imports,parentSnapshot:null};
-  const snapshot={manifest:{...manifest,analysisEngineVersion:'R65',workingSchema:2},config:{
+    appVersion:'0.2.0-preview',sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
+  const snapshot={manifest:{...manifest,analysisEngineVersion:'R66',workingSchema:2},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
  },working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
