@@ -196,6 +196,13 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.projectProfile.pinImport&&EMPLOYEES.length===1&&!!state.importProfile.templates?.attendance);
   if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
   await page.locator('#p109ProjectControl').click();
+  await page.waitForTimeout(300);
+  console.log('R65_PANEL_DEBUG '+JSON.stringify(await page.evaluate(()=>({
+   busy:p109ProjectBusy,connected:!!state.projectDir,pending:!!p109PendingDirectory,
+   overlay:document.querySelector('.p109-project-overlay')?.outerHTML.slice(0,1100),
+   notice:document.querySelector('.toast')?.textContent,
+   backup:!!document.querySelector('#p109Backup')
+  }))));
   await page.waitForSelector('#p109Backup');
   const download=page.waitForEvent('download',{timeout:60000});
   await page.locator('#p109Backup').click();
