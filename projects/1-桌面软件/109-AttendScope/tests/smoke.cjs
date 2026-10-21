@@ -682,7 +682,7 @@ async function run(){
  // switchers must no longer compete with group/person selection.
  await check(page,()=>{
   const top=[...document.querySelectorAll('[data-workspace]')];
-  return top.length===6&&top.some(b=>b.dataset.workspace==='stats')&&
+  return top.length===5&&top.some(b=>b.dataset.workspace==='stats')&&
    document.querySelectorAll('.side-views [data-as-view="stats"]').length===0&&
    !!document.querySelector('.side-refinements')&&
    !!document.getElementById('asNavBack')&&!!document.getElementById('asNavForward');
@@ -721,10 +721,12 @@ async function run(){
  },'R52 redundant individual metrics or categorical line chart not pruned');
  await check(page,()=>{
   const refinements=document.querySelector('.side-refinements');
-  const title=document.querySelector('.side-refinements-title');
-  return !!refinements&&title?.textContent==='辅助筛选'&&
-   refinements.getBoundingClientRect().left>document.querySelector('.sidebar').getBoundingClientRect().left+12;
- },'R52 matrix sidebar retains its subordinate filters');
+  const sidebar=document.querySelector('.sidebar').getBoundingClientRect(),
+   lower=refinements?.getBoundingClientRect();
+  return !!refinements&&!document.querySelector('.side-refinements-title')&&
+   Math.abs(lower.left-sidebar.left)<24&&
+   parseFloat(getComputedStyle(refinements).borderLeftWidth)===0;
+ },'R69 lower-left filters stay flush without an auxiliary heading');
  await check(page,()=>{
   const a=document.getElementById('asNavBack'),b=document.getElementById('asNavForward');
   return a.querySelector('svg path')&&b.querySelector('svg path')&&
@@ -851,7 +853,7 @@ async function run(){
   const label=document.querySelector('.as-stats-filters label');
   const line=document.querySelector('[data-as-chart="line"]');
   return selected?.value==='all'&&!!label?.querySelector('select')&&
-   ['inline-flex','flex'].includes(getComputedStyle(label).display)&&
+   getComputedStyle(label).display==='flex'&&
    asStatPrefs().compare==='people'&&!!line?.disabled;
  },'R55 categorical chart must disable chronological line mode');
  // R58: each statistical family gets its own accessible gradient and hover shade.
