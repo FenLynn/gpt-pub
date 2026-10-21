@@ -208,19 +208,19 @@ async function run(){
  },'R39 1600px responsive calendar/matrix regression');
  await page.screenshot({path:path.join(out,'r39-all-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
- await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===5&&
-   !!document.querySelector('#scopeInsights .scope-insight-numbers')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
+ await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===6&&
+   !!document.querySelector('#scopeInsights .r68-scope-kpis')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
  await check(page,()=>{
    const day=Array.from({length:monthDays()},(_,i)=>i+1).filter(isWorkday);
    const work=workAnalyses().filter(a=>day.includes(a.day));
    const n=work.filter(a=>attendanceJudgment(a)==='anomaly').length;
-   return +document.querySelectorAll('#scopeInsights .scope-insight-numbers strong')[2].textContent===n&&
-      !!document.querySelector('#scopeCompareChart svg');
+   return +document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[2].textContent===n&&
+      !!document.querySelector('.r68-scope-rank .r68-rank-row');
  },'R40 all-staff scoped analytics failed');
  await page.locator('#workspaceScopeGroup').selectOption({index:1});
  await check(page,()=>state.workspaceMode==='group'&&!!document.querySelector('#workspaceGroup'),'R39 left group filter did not drill down');
- await check(page,()=>!!document.querySelector('#workspaceGroup option[value=""]')&&!!document.querySelector('#scopeStatusChart svg'),
+ await check(page,()=>!!document.querySelector('#workspaceGroup option[value=""]')&&!!document.querySelector('.r68-stacked-track'),
   'R41 group all-option or status composition chart missing');
  await page.screenshot({path:path.join(out,'r41-group.png')});
  await page.screenshot({path:path.join(out,'r37-group.png')});
@@ -233,7 +233,7 @@ async function run(){
  await check(page,()=>{
    const work=workAnalyses().filter(a=>isWorkday(a.day)&&groupOf(a.employee)===state.selectedGroup);
    const x=work.filter(a=>attendanceJudgment(a)==='absent').length;
-   return Number(document.querySelectorAll('#scopeInsights .scope-insight-numbers strong')[3].textContent)===x;
+   return Number(document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[3].textContent)===x;
  },'R40 group charts must use group-only data');
  await check(page,()=>{
   const row=document.querySelector('.matrix .m-name[data-emp]');
@@ -401,17 +401,17 @@ async function run(){
  await check(page,()=>state.workspaceMode==='data'&&!!document.querySelector('.side-calendar')&&
    rawTabulator?.getDataCount()===state.records.length,'R37 data page evidence browser missing');
  await page.locator('[data-data-section="roster"]').click();
- await check(page,()=>document.querySelectorAll('.data-roster-row').length===EMPLOYEES.length,
+ await check(page,()=>document.querySelectorAll('.r68-roster-entry:not(.r68-roster-columns)').length===EMPLOYEES.length,
   'R37 data management missing real roster');
  await page.screenshot({path:path.join(out,'r37-roster.png')});
  await page.locator('[data-data-section="rules"]').click();
- await check(page,()=>document.querySelectorAll('.data-rules-grid>div').length===9&&
-   document.querySelector('.data-rules-grid')?.textContent.includes('上午上班冗余')&&
-   document.querySelector('.data-rules-grid')?.textContent.includes('下午下班冗余')&&
-   !!document.getElementById('dataEditRules'),
+ await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===8&&
+   document.querySelector('.r68-rule-grid')?.textContent.includes('上午打卡容差')&&
+   document.querySelector('.r68-rule-grid')?.textContent.includes('下午打卡容差')&&
+   !!document.getElementById('r68EditRules'),
   'R37 data management missing rules');
  await page.locator('[data-data-section="imports"]').click();
- await check(page,()=>!!document.querySelector('.data-import-history'),'R37 imports not available');
+ await check(page,()=>!!document.querySelector('.r68-history')||!!document.querySelector('.r68-empty'),'R37 imports not available');
  await page.locator('[data-data-section="records"]').click();
  await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:15000});
  // R37: all-staff layout remains usable at 1366x768 without horizontal page clipping.
@@ -420,7 +420,7 @@ async function run(){
  await check(page,()=>{
    const matrix=document.querySelector('.matrix-wrap').getBoundingClientRect();
    return matrix.right<=innerWidth+2&&document.documentElement.scrollWidth<=innerWidth+3&&
-    !!document.querySelector('#scopeInsights .scope-insight-numbers');
+    !!document.querySelector('#scopeInsights .r68-scope-kpis');
  },'R37 1366px all-staff viewport overflow');
  await check(page,()=>{
    const cal=document.querySelector('.side-calendar').getBoundingClientRect(),
