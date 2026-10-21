@@ -110,6 +110,7 @@ function r62MigratePayload(data){
  return data;
 }
 function r62MigrateActive(){
+ const previousPerson=EMPLOYEES.find(e=>e.id===state.selection?.employeeId)?.name||null;
  const data={employees:EMPLOYEES,groups:state.groups,records:state.records,
   leaves:state.leaves,trips:state.trips,outings:state.outings,
   overtimeEntries:state.overtimeEntries,manualStatuses:state.manualStatuses,
@@ -117,9 +118,7 @@ function r62MigrateActive(){
  r62MigratePayload(data);
  EMPLOYEES=data.employees;state.groups=data.groups;
  state.manualStatuses=data.manualStatuses;state.overtimeReview=data.overtimeReview;
- if(state.selection?.employeeId)state.selection.employeeId=personIdentity(
-  EMPLOYEES.find(e=>e.id===state.selection.employeeId)?.name||
-  state.records.find(x=>x.employeeId===state.selection.employeeId)?.name||'')||state.selection.employeeId;
+ if(previousPerson)state.selection.employeeId=personIdentity(previousPerson);
 }
 function r62ImportProfile(){
  if(!state.importProfile)state.importProfile={rules:R62_DEFAULT_DIRECTIONS.map(r=>({...r}))};
