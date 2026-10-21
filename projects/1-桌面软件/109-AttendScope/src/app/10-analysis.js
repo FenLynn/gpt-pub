@@ -594,7 +594,7 @@ function analyzeDay(emp,d){
   const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
   const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
   if(firstIn&&!morningLeave){
-   if(morningEvidence&&firstMinute>minutes(RULES.amStart)+morningGrace){
+   if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart){
     severity='problem';issues.push('迟到');status='迟到';
     attendanceFlags.push({kind:'late',label:'迟到',time:firstIn.time});
    }else if(!morningEvidence&&firstMinute>lunchStart){
