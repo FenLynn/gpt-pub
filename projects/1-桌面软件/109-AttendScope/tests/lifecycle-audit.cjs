@@ -226,14 +226,8 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.projectProfile.pinImport&&EMPLOYEES.length===1&&!!state.importProfile.templates?.attendance);
   if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
   await page.locator('#p109ProjectControl').click();
-  await page.waitForTimeout(300);
-  console.log('R65_PANEL_DEBUG '+JSON.stringify(await page.evaluate(()=>({
-   busy:p109ProjectBusy,connected:!!state.projectDir,pending:!!p109PendingDirectory,
-   overlay:document.querySelector('.p109-project-overlay')?.outerHTML.slice(0,1100),
-   notice:document.querySelector('.toast')?.textContent,
-   backup:!!document.querySelector('#p109Backup')
-  }))));
   await page.waitForSelector('#p109Backup');
+  await page.screenshot({path:path.join(out,'r67-project-health.png')});
   const download=page.waitForEvent('download',{timeout:60000});
   await page.locator('#p109Backup').click();
   const outZip=path.join(tmp,'working-backup.zip');await (await download).saveAs(outZip);
@@ -248,10 +242,28 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await open();
   report.zipRestoreWorking=await page.evaluate(()=>YEAR===2026&&MONTH===10&&state.records.length===2&&
    EMPLOYEES.some(x=>x.name==='测试甲'));
+
+  // R67 update only program assets; verify data remains byte-for-byte intact.
+  const releaseZip=path.join(out,'P109-考勤-R67-可更新离线版.zip'),
+   pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
+  if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
+  const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
+   beforeOriginal=fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
+  await page.locator('#p109ProjectControl').click();
+  await page.waitForSelector('#p109UpgradeCode');
+  const updateChoice=page.waitForEvent('filechooser',{timeout:30000});
+  await page.locator('#p109UpgradeCode').click();
+  await (await updateChoice).setFiles({name:'P109-update.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
+  report.codeUpdateDataUntouched=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')).equals(beforeWorking)&&
+   fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv')).equals(beforeOriginal);
+  report.preUpdateBackup=fs.readdirSync(path.join(restoreDir,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
+  report.releaseZipNoData=cp.spawnSync('python3',['-m','zipfile','-t',releaseZip],{encoding:'utf8'}).status===0;
+
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
    'rawCorruptionDetected','missingIndexDetected','safeIndexFixed','pinnedForNextMonth',
-   'backupZipValid','zipRestoreRaw','zipRestoreWorking','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
+   'backupZipValid','zipRestoreRaw','zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
    throw Error('R65 lifecycle failed '+JSON.stringify(report));
 
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
