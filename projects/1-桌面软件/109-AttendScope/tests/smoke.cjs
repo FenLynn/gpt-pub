@@ -68,6 +68,52 @@ async function run(){
     (text.match(/\/Type \/Page \/Parent/g)||[]).length===2&&
     text.includes('/MediaBox [0 0 842 595]')&&pdf.size>4000;
  },'R62 CSV/XLSX preview, manual rules, normalized names, screenshot and offline PDF regressions');
+ // R63: real browser flow for a newly created month and actual CSV/XLSX UI.
+ await page.evaluate(()=>switchMonth(2026,12,true));
+ await page.locator('#attendanceInput').setInputFiles({name:'新月份.csv',mimeType:'text/csv',
+  buffer:Buffer.from('姓名,日期,时间,进出\n新员工甲,2026-12-08,08:25,进\n新员工甲,2026-12-08,11:45,出\n新员工甲,2026-12-08,13:25,进\n新员工甲,2026-12-08,17:25,出')});
+ await page.waitForSelector('.r62-overlay',{timeout:30000});
+ await check(page,()=>r62ImportDraft.rules.length===2&&!document.querySelector('#r63DirectionDetails').open&&
+  !document.querySelector('#r63ImportBusy')&&r62PreviewHtml().includes('新员工甲'),
+  'R63 compact preview and minimal default rules');
+ await page.screenshot({path:path.join(out,'r63-fresh-month-import.png')});
+ await page.locator('#r62Validate').click();
+ await check(page,()=>r62ImportDraft.validated?.rows.length===4,'R63 December CSV canonical rows');
+ await page.locator('#r62Commit').click();
+ await page.waitForFunction(()=>state.imports.length===1&&state.records.length===4,{timeout:60000});
+ await check(page,()=>MONTH===12&&EMPLOYEES.length===1&&EMPLOYEES[0].name==='新员工甲'&&
+  state.analysis.get(EMPLOYEES[0].id+'|8').punches.length===4,'R63 real December import');
+ await page.evaluate(()=>switchMonth(2027,1,true));
+ await page.evaluate(async()=>{const b=XLSX.writeXlsx([
+  {姓名:'新员工乙',打卡时间:'2027-01-06 08:29:00',进出:'进'},
+  {姓名:'新员工乙',打卡时间:'2027-01-06 17:25:00',进出:'出'}]);
+  await r62OpenImport(new File([b],'新月份.xlsx'),'attendance');
+ });
+ await page.waitForSelector('.r62-overlay');
+ await page.locator('#r62Validate').click();
+ await check(page,()=>r62ImportDraft.validated?.rows.length===2,'R63 XLSX preview');
+ await page.locator('#r62Commit').click();
+ await page.waitForFunction(()=>state.records.length===2&&state.imports.length===1,{timeout:60000});
+ await check(page,()=>YEAR===2027&&MONTH===1&&EMPLOYEES[0].name==='新员工乙','R63 real January XLSX import');
+ await page.evaluate(()=>switchMonth(2026,10));
+ await check(page,()=>EMPLOYEES.length===50&&state.records.length>3500,'R63 restored October baseline');
+ await page.locator('#printReport').click();
+ await page.waitForSelector('#r63PdfClose');
+ await check(page,()=>document.querySelector('#r63PdfExport').disabled,'R63 no synthetic PDF pages');
+ await page.locator('#r63PdfClose').click();
+ await page.evaluate(async()=>{state.captureItems=[await captureCurrentImage('matrix'),await captureCurrentImage('timeline')]});
+ await page.locator('#printReport').click();
+ await page.waitForSelector('#r63PdfPicker input');
+ await check(page,()=>document.querySelectorAll('#r63PdfPicker input:checked').length===2,'R63 cached thumbnails default checked');
+ await page.locator('#r63PdfPicker input').first().uncheck();
+ await check(page,async()=>{
+  const box=document.getElementById('r63PdfPicker'),
+   selected=[...box.querySelectorAll('input:checked')].map(x=>box._captures[+x.dataset.captureIndex]);
+  if(selected.length!==1||!r63ReportData('timeline').lines.some(x=>x[0]==='在岗'))return false;
+  const pdf=new TextDecoder('latin1').decode(await (await capturePdf(selected)).arrayBuffer());
+  return pdf.includes('/Count 1')&&document.getElementById('r63PdfCount').textContent.includes('1 张');
+ },'R63 selected one image generates exactly one PDF page and context data exists');
+ await page.locator('#r63PdfClose').click();
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
   'R38 retired chart renderers remain active');
@@ -1596,7 +1642,7 @@ async function run(){
 
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R34',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R63',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
