@@ -194,6 +194,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   });
   report.pinnedForNextMonth=await page.evaluate(()=>state.projectProfile?.pinRoster&&
    state.projectProfile.pinImport&&EMPLOYEES.length===1&&!!state.importProfile.templates?.attendance);
+  if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
   await page.locator('#p109ProjectControl').click();
   await page.waitForSelector('#p109Backup');
   const download=page.waitForEvent('download',{timeout:60000});
