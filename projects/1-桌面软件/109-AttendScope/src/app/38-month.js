@@ -33,6 +33,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   state.activeBranch=next.activeBranch||null;
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   if(next.rules)Object.assign(RULES,next.rules);
+  RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);
   if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.gracePmStart==null)RULES.gracePmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.graceAmEnd==null)RULES.graceAmEnd=0;
