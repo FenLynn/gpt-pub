@@ -44,7 +44,7 @@ async function run(){
   if(parsed.rows.length!==2||parsed.rows[0].__rowNumber!==2||
      parsed.rows[0]['姓名']!=='李 四'||parsed.rows[0]['打卡时间']!=='2026-10-20 08:30:00'||
      parsed.rows[1]['进出']!=='出')throw Error('R62 canonical columns failed');
-  if(!r62PreviewHtml().includes('2 ·')||!r62PreviewHtml().includes('表头'))throw Error('R62 visible but skipped header failed');
+  if(!r62PreviewHtml().includes('1 · 表头')||!r62PreviewHtml().includes('<th>2</th>'))throw Error('R62 visible but skipped header failed');
   const copy={employees:[{id:'E001',name:'李 四',department:'组1'}],
    groups:{E001:'科研组'},manualStatuses:{'E001|12':'normal'},
    records:[{recordId:'old',employeeId:'E001',name:'李 四'}],
