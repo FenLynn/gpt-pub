@@ -174,6 +174,36 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    return a.months.some(m=>m.key==='2026-10'&&m.imports===1&&m.raw===1)&&
     !a.issues.some(x=>x.level==='critical')&&a.verifiedRaw===1;
   });
+
+  // R66: edit a frozen revision in a separate folder, never overwrite main working.
+  await page.evaluate(()=>freezeSnapshot());
+  const frozenBase=path.join(fresh,'data','2026','10','snapshots'),
+   freezeId=fs.readdirSync(frozenBase)[0],
+   frozenPath=path.join(frozenBase,freezeId,'snapshot.json'),
+   frozenBytes=fs.readFileSync(frozenPath),
+   mainPath=path.join(fresh,'data','2026','10','working','state.json'),
+   mainBytes=fs.readFileSync(mainPath);
+  await page.evaluate(id=>p109ForkSnapshot('2026-10',id),freezeId);
+  report.branchCreated=await page.evaluate(()=>!!state.activeBranch?.id&&state.activeBranch.parentSnapshotId);
+  await page.evaluate(()=>{
+    const id=EMPLOYEES.find(x=>x.name==='测试甲').id;
+    state.selection={type:'cell',employeeId:id,day:8};
+    setManualStatusForCurrent('absent');
+  });
+  await page.evaluate(()=>saveWorking());
+  const branchId=await page.evaluate(()=>state.activeBranch.id),
+   branchPath=path.join(fresh,'data','2026','10','branches',branchId,'working','state.json');
+  report.branchIsolated=fs.existsSync(branchPath)&&
+   fs.readFileSync(mainPath).equals(mainBytes)&&
+   fs.readFileSync(frozenPath).equals(frozenBytes)&&
+   Object.keys(JSON.parse(fs.readFileSync(branchPath,'utf8')).manualStatuses||{}).length===1;
+  await page.reload({waitUntil:'load'});await page.evaluate(()=>connectProjectDir());
+  report.branchReopened=await page.evaluate(()=>state.activeBranch?.id===JSON.parse(JSON.stringify(state.activeBranch))?.id&&
+    state.activeBranch?.parentSnapshotId===Object.keys({[state.activeBranch.parentSnapshotId]:true})[0]);
+  await page.evaluate(()=>p109ReturnToMain());
+  report.backToMain=await page.evaluate(()=>!state.activeBranch&&state.records.length===2&&
+    Object.keys(state.manualStatuses).length===0);
+
   const rawDir=path.join(fresh,'data','2026','10','raw','attendance'),
    impName=fs.readdirSync(rawDir)[0],rawFile=path.join(rawDir,impName,'审核门禁.csv');
   const savedRaw=fs.readFileSync(rawFile);fs.writeFileSync(rawFile,'tampered');
@@ -221,7 +251,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
    'rawCorruptionDetected','missingIndexDetected','safeIndexFixed','pinnedForNextMonth',
-   'backupZipValid','zipRestoreRaw','zipRestoreWorking'].includes(k)&&!v))
+   'backupZipValid','zipRestoreRaw','zipRestoreWorking','branchCreated','branchIsolated','branchReopened','backToMain'].includes(k)&&!v))
    throw Error('R65 lifecycle failed '+JSON.stringify(report));
 
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
