@@ -414,6 +414,7 @@ async function run(){
  await check(page,()=>{
    const pane=document.querySelector('#r69ProjectPane');
    const strip=pane.querySelector('.r70-project-facts,.r70-project-intro');
+   if(!state.projectDir&&(pane.querySelector('#r68MonthsCard')||pane.querySelector('#r68HealthCard')))return false;
    return !!strip&&![...pane.querySelectorAll('.r68-overview-cards > div')].some(el=>{
     const s=getComputedStyle(el);return s.borderStyle!=='none'||s.backgroundColor==='rgb(255, 255, 255)';
    })&&!document.querySelector('#r68DataRail .r68-rail-metrics');

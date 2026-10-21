@@ -152,3 +152,11 @@
 .layout.workspace-mode-data .r68-history-row:hover,.layout.workspace-mode-data .r68-template-row:hover,
 .layout.workspace-mode-data .r68-snapshot-row:hover{background:#f8fafc!important}
 .layout.workspace-mode-data .r68-rail-card .r68-tree-placeholder{font-size:13px;color:#7b8f9f;line-height:1.7}
+
+/* Empty state is a focused first-use action, not a wall of blank inventory. */
+.layout.workspace-mode-data .r68-data-studio:has(.r70-project-intro){
+ grid-template-columns:minmax(0,1fr)!important}
+.layout.workspace-mode-data .r68-data-studio:has(.r70-project-intro)>.r68-data-rail{
+ display:none!important}
+.layout.workspace-mode-data .r68-data-studio:has(.r70-project-intro) .r69-project-actions{
+ border-top:0;margin-top:0;padding-top:8px}

@@ -22,6 +22,13 @@ r68ProjectMarkup=function(report,tree){
 const r70BasePaint=r69PaintProjectSection;
 r69PaintProjectSection=function(report,tree){
  r70BasePaint(report,tree);
+ /* Empty-project overview: avoid repeating three variations of "no data". Each
+  * destination remains individually accessible from Data Management navigation. */
+ if(!state.projectDir&&state.dataSection==='overview'){
+  const pane=document.getElementById('r69ProjectPane');
+  pane?.querySelector('#r68MonthsCard')?.remove();
+  pane?.querySelector('#r68HealthCard')?.remove();
+ }
  document.getElementById('r70Begin')?.addEventListener('click',()=>openProjectControl());
 };
 function r70FlattenDataRail(){
