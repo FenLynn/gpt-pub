@@ -1,1 +1,14 @@
-{"schemaVersion":1,"effectiveFrom":"2026-01-01","morning":{"start":"08:30","end":"12:00"},"afternoon":{"start":"14:00","end":"17:30"},"graceMinutes":5,"duplicatePunchSeconds":120}
+{
+  "schemaVersion": 1,
+  "amStart": "08:30",
+  "amEnd": "11:40",
+  "pmStart": "13:30",
+  "pmEnd": "17:10",
+  "grace": 5,
+  "graceAmStart": 5,
+  "graceAmEnd": 0,
+  "gracePmStart": 5,
+  "gracePmEnd": 0,
+  "dupSeconds": 120,
+  "overtimeMinMinutes": 5
+}
