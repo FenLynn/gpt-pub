@@ -84,7 +84,7 @@ async function r72PersistRoster(){
  const profile={...(state.projectProfile||{}),schemaVersion:1,pinRoster:true,
   employees:selected.map(e=>({...e})),fixedPeople:selected.map(e=>e.id),
   groups:Object.fromEntries(selected.map(e=>[e.id,groupOf(e)])),
-  groupCatalog:[...(state.groupCatalog||[])],savedAt:new Date().toISOString()};
+  groupCatalog:[...(state.groupCatalog||[])],nameAliases:{...(state.nameAliases||{})},savedAt:new Date().toISOString()};
  if(!state.projectDir){state.projectProfile=profile;return}
  try{
   const config=await dir(state.projectDir,'config');
@@ -109,8 +109,15 @@ function r72AddPerson(){
  const name=normalizedPerson(input);
  if(!name||name.length>50){toast('姓名须为 1–50 个字符',true);return}
  if(EMPLOYEES.some(e=>normalizedPerson(e.name)===name)){toast('这个姓名已经存在',true);return}
+ if(state.isDemo){
+  if(!window.confirm('当前是演示数据。新增真实人员前需要清空演示人员与记录，是否继续？'))return;
+  EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
+  state.overtimeEntries=[];state.groups={};state.groupCatalog=[];state.fixedPeople=[];
+  state.nameAliases={};state.imports=[];state.manualStatuses={};state.overtimeReview={};
+  state.revisions=[];state.revisionSeq=0;state.isDemo=false;
+ }
  EMPLOYEES.push({id:personIdentity(name),name,department:'未分类'});
- state.groups[personIdentity(name)]='未分组';state.isDemo=false;
+ state.groups[personIdentity(name)]='未分组';
  r72MarkDirty('add-person',{employeeId:personIdentity(name),name});
 }
 function r72RenamePerson(id){
@@ -130,6 +137,11 @@ function r72RenamePerson(id){
    if(row.name){if(!row.sourceName)row.sourceName=row.name;row.name=name}
   }
  }
+ state.nameAliases={...(state.nameAliases||{})};
+ for(const [original,current] of Object.entries(state.nameAliases)){
+  if(normalizedPerson(current)===oldName)state.nameAliases[original]=name;
+ }
+ state.nameAliases[oldName]=name;
  employee.id=newId;employee.name=name;
  state.groups[newId]=state.groups[id]||'未分组';if(id!==newId)delete state.groups[id];
  state.fixedPeople=(state.fixedPeople||[]).map(x=>x===id?newId:x);

@@ -1794,6 +1794,8 @@ async function run(){
     throw Error('R72 canonical rename lost linked records');
    if(originalRows&&!state.records.some(r=>r.employeeId===id&&r.sourceName))
     throw Error('R72 original source name not retained');
+   if(importRosterPlan([person.name],'attendance').byName.get(person.name).id!==id)
+    throw Error('R72 original imported name must map to renamed canonical identity');
    await r72DeleteGroup('R72自建分组');
    if(groupOf(EMPLOYEES.find(e=>e.id===id))!=='未分组'||state.groupCatalog.includes('R72自建分组'))
     throw Error('R72 delete group must reassign without deleting person');
@@ -1802,6 +1804,8 @@ async function run(){
    if(EMPLOYEES.length!==1||EMPLOYEES[0].id!==id||state.records.length!==0)
     throw Error('R72 new month should inherit ONLY fixed people, no prior raw');
    await r72FixedPeople([id],false);
+   switchMonth(2026,10);
+   if(state.fixedPeople.includes(id))throw Error('R72 removing a fixed person must persist across month switches');
    if(state.fixedPeople.includes(id)||!EMPLOYEES.some(e=>e.id===id))
     throw Error('R72 unfix must preserve current month');
   }finally{window.prompt=previous}

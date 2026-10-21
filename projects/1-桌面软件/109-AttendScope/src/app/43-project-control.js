@@ -256,7 +256,7 @@ async function p109InitializeProject(root){
   state.projectDir=root; p109PendingDirectory=null;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
-  state.manualStatuses={};state.overtimeReview={};state.groups={};state.fixedPeople=[];state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
+  state.manualStatuses={};state.overtimeReview={};state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
   state.monthStores=new Map();state.saved=false;
   state.importProfile={rules:R62_DEFAULT_DIRECTIONS.map(x=>({...x})),templates:{}};
   state.calendarOverrides={};state.selection={type:'overall'};
