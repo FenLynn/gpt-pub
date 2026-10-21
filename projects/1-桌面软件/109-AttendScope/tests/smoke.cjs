@@ -543,6 +543,10 @@ async function run(){
   const separate=calc([pair('17:10','17:22'),pair('18:00','18:12')]);
   const registered=estimateOvertimeCandidate([pair('17:10','18:00')],8,[{start:'17:20',end:'17:35'}]);
   const setting=settingsContent('rules');
+  console.log('R68_OVERTIME_DIAG '+JSON.stringify({
+   min:RULES.overtimeMinMinutes,boundary,before,late,morning,atNoon,acrossLunch,separate,registered,
+   settingsHas:setting.includes('min="20"')
+  }));
   return boundary.minutes===0&&before.minutes===0&&
     late.minutes===25&&late.segments.length===1&&
     morning.minutes===25&&atNoon.minutes===0&&
