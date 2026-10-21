@@ -66,7 +66,8 @@ function render(){
   if(typeof r14Prefs==='function')r14Prefs();
   if(!state.analysisTab) state.analysisTab='overview';
   if(typeof disposeAttendCharts==='function')disposeAttendCharts();
-  document.getElementById('app').innerHTML=layoutHtml();
+  document.title=attendTitle()+' · 离线考勤分析';
+   document.getElementById('app').innerHTML=layoutHtml();
   document.documentElement.style.setProperty('--ui-scale',String(state.prefs?.fontScale||1));
   document.documentElement.classList.toggle('reduce-animations',state.prefs?.motion===false);
   bind();
