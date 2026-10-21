@@ -169,6 +169,12 @@ function p109ProjectView(report){
     '<div class="p109-project-issue '+p109Escape(x.level)+'"><b>'+p109Escape(x.message)+'</b>'+
     '<small>'+p109Escape(x.where)+(x.fix?' · '+p109Escape(x.fix):'')+'</small></div>').join('')+'</div>':
     '<p class="p109-empty">未发现已检查项目结构的问题。原文件哈希与 Windows 权限须单独验证。</p>')+'</div>'+
+  '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>下月默认配置</b><span>可选固定，不强制</span></div>'+
+   '<div class="p109-project-actions"><button id="p109PinRoster" type="button" '+(!report.initialized?'disabled':'')+'>'+
+    (report.configuration.pinnedRoster?'✓ 名册已固定 · 更新':'固定当前名册')+'</button>'+
+    '<button id="p109PinImport" type="button" '+(!report.initialized?'disabled':'')+'>'+
+    (report.configuration.pinnedImport?'✓ 导入规则已固定 · 更新':'固定当前导入规则')+'</button></div>'+
+    '<p class="p109-project-desc">固定后供新建月份使用；不会回写历史月份或修改原始文件。仅点击确认时保存。</p></div>'+
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>安全管理</b><span>不会自动改写原始记录或冻结</span></div>'+
    '<div class="p109-project-actions"><button id="p109Rescan" type="button">重新检测</button>'+
     '<button id="p109Backup" type="button" '+(!report.initialized?'disabled':'')+'>备份整个项目 ZIP</button>'+
@@ -197,6 +203,8 @@ async function openProjectControl(mode='scan'){
    close();await p109InitializeProject(p109PendingDirectory||state.projectDir)
   });
   root.querySelector('#p109Backup').onclick=()=>p109BackupProject();
+  root.querySelector('#p109PinRoster').onclick=()=>p109PinDefaults('roster');
+  root.querySelector('#p109PinImport').onclick=()=>p109PinDefaults('import');
   root.querySelector('#p109RestoreZip').onclick=()=>p109RestoreArchive();
   root.querySelector('#p109RepairIndex').onclick=()=>p109RepairIndex(report);
   root.addEventListener('click',e=>{if(e.target===root)close()});
@@ -229,6 +237,29 @@ async function p109InitializeProject(root){
  }catch(e){p109Status('初始化失败，请检查目录权限：'+e.message,true)}
  finally{p109ProjectBusy=false}
 }
+
+async function p109PinDefaults(kind){
+ if(!state.projectDir||!p109Audit?.initialized)return;
+ const label=kind==='roster'?'员工名册和分组':'导入关键字及列映射模板';
+ if(!window.confirm('将本月'+label+'固定为以后新建月份的默认配置？历史月份保持原样。'))return;
+ try{
+  const config=await dir(state.projectDir,'config');
+  const profile=(await p109Json(config,'project-profile.json')).value||{schemaVersion:1};
+  if(kind==='roster'){
+   profile.pinRoster=true;profile.employees=EMPLOYEES.map(e=>({...e}));
+   profile.groups={...state.groups};
+  }else{
+   profile.pinImport=true;
+   profile.importProfile=structuredClone(r62ImportProfile());
+  }
+  profile.savedAt=new Date().toISOString();
+  await writeFile(config,'project-profile.json',JSON.stringify(profile,null,2));
+  state.projectProfile=profile;
+  p109Status('已固定当前'+label+'，可在后续月份复用');
+  await openProjectControl();
+ }catch(e){p109Status('固定配置失败：'+e.message,true)}
+}
+
 async function p109RepairIndex(report=p109Audit){
  if(!report?.initialized||!report.safeIndexRepair?.length||!state.projectDir)return;
  const targets=report.safeIndexRepair.slice();
