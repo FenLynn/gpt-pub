@@ -219,7 +219,12 @@ async function p109InitializeProject(root){
   state.importProfile={rules:R62_DEFAULT_DIRECTIONS.map(x=>({...x})),templates:{}};
   state.calendarOverrides={};state.selection={type:'overall'};
   rememberMonth();reanalyze();
-  await ensureProjectSkeleton();await saveWorking();
+  await ensureProjectSkeleton();
+  const cfg=await dir(root,'config');
+  await writeFile(cfg,'employees.json',JSON.stringify({schemaVersion:2,employees:[]},null,2));
+  await writeFile(cfg,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
+  await writeFile(cfg,'project-profile.json',JSON.stringify({schemaVersion:1,pinRoster:false,pinImport:false},null,2));
+  await saveWorking();
   render();p109Status('空白项目已初始化并保存，可以开始导入'); 
  }catch(e){p109Status('初始化失败，请检查目录权限：'+e.message,true)}
  finally{p109ProjectBusy=false}
@@ -286,7 +291,9 @@ async function p109RestoreArchive(){
     const entry=info.files.find(x=>x.path===f.name);
     if(!entry||entry.bytes!==f.data.byteLength||entry.sha256!==(await p109Hash(f.data)))throw Error('备份校验失败：'+f.name);
    }
+   p109ProjectBusy=false; // Browser requires picker to run from the actual user input event
    const root=await showDirectoryPicker({mode:'readwrite'});
+   p109ProjectBusy=true;
    if((await p109Entries(root)).length)throw Error('目标目录不是空文件夹。为了保护已有项目，恢复只允许写入空目录');
    if(!window.confirm('已校验备份 '+payload.length+' 个文件。即将恢复到所选空目录。继续？'))return;
    for(const f of payload){
@@ -310,12 +317,12 @@ async function p109ZipBuild(files){
  const manifest={schemaVersion:1,projectId:'P109-AttendScope',exportedAt:new Date().toISOString(),
   files:[]};
  for(const f of files)manifest.files.push({path:f.name,bytes:f.data.length,sha256:await p109Hash(f.data)});
- const zip=XLSX.writeArchive([...files,{name:'p109-backup-manifest.json',data:JSON.stringify(manifest,null,2)}]);
- return {zip,manifest};
+ const body=XLSX.writeArchive([...files,{name:'p109-backup-manifest.json',data:JSON.stringify(manifest,null,2)}]);
+ return {zip:new Blob([body],{type:'application/zip'}),manifest};
 }
 async function p109ZipRead(file){
  const data=new Uint8Array(await file.arrayBuffer()),view=new DataView(data.buffer);
- const td=new TextDecoder(),files=[];let cursor=0;
+ const td=new TextDecoder(),files=[],unique=new Set();let cursor=0;
  const u16=x=>view.getUint16(x,true),u32=x=>view.getUint32(x,true);
  while(cursor+4<data.length&&u32(cursor)===0x04034b50){
   if(cursor+30>data.length)throw Error('ZIP 头部损坏');
@@ -326,6 +333,8 @@ async function p109ZipRead(file){
   if(begin>data.length||begin+size>data.length)throw Error('ZIP 文件长度异常');
   const name=td.decode(data.subarray(cursor+30,cursor+30+namelen));
   if(!name||name.startsWith('/')||name.includes('\\')||name.split('/').some(x=>!x||x==='.'||x==='..')||/^[A-Za-z]:/.test(name))throw Error('ZIP 包含不安全路径');
+  if(unique.has(name))throw Error('ZIP 内存在重复文件路径：'+name);
+  unique.add(name);
   if(files.length>=5000)throw Error('超过恢复文件数上限');
   files.push({name,data:data.slice(begin,begin+size)});
   cursor=begin+size;
