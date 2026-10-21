@@ -202,6 +202,7 @@ function layoutHtml(){
         </section>
       </div>
       ${state.workspaceMode==='stats'?'<section id="statisticsWorkspace" class="stats-workspace"></section>':''}
+      ${state.workspaceMode==='project'?'<section id="r68ProjectWorkspace" class="r68-project-workspace"></section>':''}
     </main>
   </div>
 
