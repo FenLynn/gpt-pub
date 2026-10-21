@@ -10,7 +10,7 @@ function r63FileStem(){return r63Title().replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').t
 function r63ReportData(kind){
  if(kind==='stats'){
   const d=asStatRows(),p=asStatPrefs(),label=asStatFamily(p.family)[2].find(x=>x[0]===p.metric)?.[1]||'统计';
-  return {heading:periodText()+' · '+d.rows.length+' 项 · '+label,
+  return {heading:(document.querySelector('.as-stats-chart-context')?.textContent?.trim()||'当前范围')+' · '+periodText()+' · '+d.rows.length+' 项 · '+label,
    lines:[['范围',document.querySelector('.as-stats-chart-context')?.textContent?.trim()||periodText()],
     ['统计指标',label],['范围总量',document.querySelector('.as-stats-total strong')?.textContent?.trim()||'—'],
     ...(d.rankRows||d.rows).slice(0,12).map((x,i)=>[String(i+1)+'. '+x.label,Math.round(x.value*100)/100+' '+d.effectiveUnit])]};
