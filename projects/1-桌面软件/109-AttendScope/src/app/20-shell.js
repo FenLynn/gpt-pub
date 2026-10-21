@@ -315,6 +315,7 @@ function bind(){
   };
 
   document.getElementById('connectDir').onclick=connectProjectDir;
+  document.getElementById('p109ProjectControl').onclick=()=>openProjectControl();
   document.getElementById('exportTable').onclick=exportTraditionalTable;
   document.getElementById('exportCsv').onclick=downloadCurrentCSV;
   document.getElementById('captureView').onclick=captureCurrentView;
