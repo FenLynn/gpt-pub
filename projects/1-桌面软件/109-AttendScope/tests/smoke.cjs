@@ -460,6 +460,9 @@ async function run(){
    const area=document.getElementById('analysisBody');
    const toolbar=document.querySelector('.workspace-toolbar');
    const tip=area.querySelector('.r71-help');
+   const empty=area.querySelector('.r71-setup');
+   if(empty){const a=empty.getBoundingClientRect(),b=area.getBoundingClientRect();
+    if(Math.abs((a.left+a.right)/2-(b.left+b.right)/2)>35)return false;}
    return state.dataSection===expected&&!!area.querySelector('.r71-data-shell')&&
     !area.querySelector('#r68DataRail')&&!!tip&&tip.title.length>6&&
     !area.querySelector('.r68-cardhead p')&&
