@@ -106,24 +106,60 @@ function captureStatisticsCanvas(){
  return canvas;
 }
 function captureTimelineCanvas(){
- const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],day=state.chartDay||state.selection?.day||1;
- const a=state.analysis.get(e.id+'|'+day),[canvas,g]=captureCanvas(1320,440);
- const x=v=>105+1100*Math.max(0,Math.min(1440,v))/1440;
- const tracks=['进出','出差','请假','外出','加班'],loc={trip:1,leave:2,outing:3,overtime:4};
- tracks.forEach((n,i)=>{const y=56+i*66;captureLabel(g,n,26,y);g.strokeStyle='#e4ecf3';g.beginPath();g.moveTo(100,y);g.lineTo(1230,y);g.stroke()});
- if(a){
-  const chart=r14TrackData(a);
-  for(const band of chart.bars||[]){
-   const row=loc[band.track];if(row===undefined)continue;
-   g.globalAlpha=band.accepted===false?.28:.82;
-   g.fillStyle=band.track==='overtime'?(band.origin==='auto'?
-    OVERTIME_VISUALS.auto.top:OVERTIME_VISUALS.registered.top):
-    ({trip:'#7d95d9',leave:'#af94de',outing:'#6eb3d3'})[band.track];
-   g.fillRect(x(band.value[0]),43+row*66,Math.max(2,x(band.value[1])-x(band.value[0])),22);
-   g.globalAlpha=1;
+ const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],
+  day=state.chartDay||state.selection?.day||1,a=e&&state.analysis.get(e.id+'|'+day);
+ const [canvas,g]=captureCanvas(1320,535);
+ const left=100,right=1240,width=right-left,top=66,rowHeight=67;
+ const x=t=>left+width*Math.max(0,Math.min(1440,Number(t)||0))/1440;
+ const cy=i=>top+i*rowHeight;
+ const labels=['进','出','出差','请假','外出','加班'];
+ const palette=['#1f5a9f','#8a5b3d','#7d95d9','#af94de','#6eb3d3','#c876a0'];
+ // Every lane remains present even with no records. Work windows are faint guides.
+ labels.forEach((label,i)=>{
+  const yy=cy(i),isBehavior=i>=2;
+  if(isBehavior){g.fillStyle='#f8fafc';g.fillRect(left,yy-28,width,56)}
+  if(a&&isWorkday(a.day)&&state.prefs?.timelineTracks?.rules!==false){
+   for(const [a,b] of [[RULES.amStart,RULES.amEnd],[RULES.pmStart,RULES.pmEnd]]){
+    g.fillStyle='rgba(108,139,179,.055)';g.fillRect(x(minutes(a)),yy-28,x(minutes(b))-x(minutes(a)),56);
+   }
   }
-  for(const event of chart.events||[]){const minute=Number(event.value[0]);
-   g.fillStyle='#527fba';g.fillRect(x(minute)-1,44,3,24)}
+  captureLabel(g,label,23,yy+5,16,palette[i]);
+  g.strokeStyle='#dce6ef';g.lineWidth=1;g.beginPath();
+  g.moveTo(left,yy+29);g.lineTo(right,yy+29);g.stroke();
+ });
+ if(a){
+  const model=r14TrackData(a,{start:0,end:1440,key:'export'},width);
+  for(const bar of model.bars||[]){
+   const row=Number(bar.value[2]);if(row<2||row>5)continue;
+   const from=x(bar.value[0]),to=x(bar.value[1]),y=cy(row)-25;
+   const grad=g.createLinearGradient(from,y,to,y);
+   const colors=bar.track==='overtime'?
+    (bar.accepted===false?OVERTIME_VISUALS.excluded:
+     OVERTIME_VISUALS[bar.origin==='auto'?'auto':'registered']):
+    ({trip:{top:'#aeb8ec',bottom:'#6b7fd7'},leave:{top:'#d4c5f0',bottom:'#8a6fd1'},
+      outing:{top:'#acdce9',bottom:'#3c9dc4'}})[bar.track];
+   if(!colors)continue;
+   grad.addColorStop(0,colors.top);grad.addColorStop(1,colors.bottom);
+   g.globalAlpha=bar.accepted===false?.58:.9;g.fillStyle=grad;
+   g.fillRect(from,y,Math.max(2,to-from),50);g.globalAlpha=1;
+  }
+  const baseline=(cy(0)+cy(1))/2;
+  for(const ev of model.events||[]){
+   const xx=x(ev.value[0]),incoming=ev.direction==='进';
+   const origin=incoming?cy(0)-24:cy(1)+24,target=baseline+(incoming?-3:3);
+   g.strokeStyle=incoming?palette[0]:palette[1];g.lineWidth=3;
+   g.beginPath();g.moveTo(xx,origin);g.lineTo(xx,target);g.stroke();
+   g.fillStyle=g.strokeStyle;g.beginPath();g.moveTo(xx,target);
+   g.lineTo(xx-6,target+(incoming?-9:9));
+   g.lineTo(xx+6,target+(incoming?-9:9));g.closePath();g.fill();
+   if(ev.count>1)captureLabel(g,'×'+ev.count,xx+6,origin,12,g.fillStyle);
+  }
+ }
+ for(let hour=0;hour<=24;hour+=3){
+  const xx=x(hour*60);
+  g.strokeStyle='#dce6ef';g.beginPath();g.moveTo(xx,cy(5)+41);
+  g.lineTo(xx,cy(5)+48);g.stroke();
+  captureLabel(g,pad(hour)+':00',xx-17,cy(5)+69,12,'#71859b');
  }
  return canvas;
 }
