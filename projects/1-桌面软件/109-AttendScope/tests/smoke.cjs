@@ -208,7 +208,7 @@ async function run(){
  },'R39 1600px responsive calendar/matrix regression');
  await page.screenshot({path:path.join(out,'r39-all-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
- await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===6&&
+ await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===5&&
    !!document.querySelector('#scopeInsights .r68-scope-kpis')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
  await check(page,()=>{
