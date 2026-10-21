@@ -44,7 +44,10 @@ function r63Legend(g,kind,x,y){
 }
 function r63Compose(kind,visual){
  const d=r63ReportData(kind),sidebar=kind==='matrix'?0:360;
- const width=Math.max(1060,visual.width)+sidebar+58,top=131,height=Math.max(690,visual.height+top+25);
+ const infoHeight=sidebar?d.lines.reduce((n,[_,value])=>n+34+
+  Math.max(1,Math.ceil(Math.min(80,String(value??'—').length)/26))*20,0)+255:0;
+ const width=Math.max(1060,visual.width)+sidebar+58,top=131,
+  height=Math.max(690,visual.height+top+25,infoHeight);
  const [c,g]=captureCanvas(width,height);
  captureLabel(g,r63Title()+' · '+({matrix:'月度考勤矩阵',stats:'统计分析',timeline:'个人考勤时间轴'}[kind]),26,43,25,'#284766');
  captureLabel(g,kind==='matrix'?periodText()+' · '+(state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length:EMPLOYEES.length)+' 人':d.heading,26,75,16);
