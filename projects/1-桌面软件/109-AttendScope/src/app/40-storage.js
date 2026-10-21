@@ -146,6 +146,18 @@ async function connectProjectDir(){
       const active=project.current||{year:YEAR,month:MONTH};
       const key=active.year+'-'+pad(active.month);
       if(state.monthStores.has(key))switchMonth(active.year,active.month,false,false);
+      const branchRef=project.activeBranch;
+      if(branchRef?.id&&/^[A-Za-z0-9-]+$/.test(branchRef.id)&&
+        /^\d{4}-(0[1-9]|1[0-2])$/.test(branchRef.month)){
+       const [by,bm]=branchRef.month.split('-'),data=await existingDir(handle,'data'),
+        y=await existingDir(data,by),m=await existingDir(y,bm),
+        branches=await existingDir(m,'branches'),branch=await existingDir(branches,branchRef.id),
+        branchWork=await existingDir(branch,'working');
+       const branchPayload=normalizeSavedMonth(await readJSON(branchWork,'state.json'));
+       if(!branchPayload)throw new Error('当前独立修订工作区损坏，已拒绝载入以防覆盖主状态');
+       state.monthStores.set(branchRef.month,{...branchPayload,activeBranch:branchRef,saved:true});
+       switchMonth(Number(by),Number(bm),false,false);
+      }
     }
     await ensureProjectSkeleton();render();toast('已连接并载入月度工作空间');
     try{p109Audit=await p109AuditProject(handle);
