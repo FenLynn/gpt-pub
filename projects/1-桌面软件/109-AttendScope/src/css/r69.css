@@ -1,0 +1,93 @@
+/* R69 · Consolidate project inventory into Data Management; clean sidebar alignment. */
+.side-refinements{
+ margin:6px 0 0!important;
+ padding:3px 0 0!important;
+ border-left:0!important;
+ background:transparent!important;
+}
+.side-refinements-title{display:none!important}
+.layout:not(.workspace-mode-classic) .side-bottom .side-refinements .side-filter{
+ margin:0!important;
+ padding:4px 0!important;
+ grid-template-columns:64px minmax(0,1fr)!important;
+ gap:7px!important;
+ align-items:center!important;
+ width:100%;
+}
+.side-refinements .side-filter .side-label{padding:0!important;margin:0!important;text-indent:0!important}
+.side-refinements .side-filter .status-filter-control,
+.side-refinements .side-filter .judgment-mode-switch{margin:0!important;min-width:0;width:100%!important}
+.side-refinements .side-filter .status-filter-button{height:31px!important}
+.r69-data-nav{gap:2px}
+.r69-data-nav .r69-nav-category{font-size:10px;letter-spacing:.045em;text-transform:none;
+ font-weight:680;color:#9bacbb;margin:13px 9px 6px;padding-top:12px;border-top:1px solid #e8eef3}
+.r69-data-nav .r69-nav-category:first-child{border:0;margin-top:0;padding-top:0}
+.r69-data-nav button{min-height:30px;padding:7px 10px!important;border-radius:7px!important;line-height:1.4}
+.r69-data-nav button.active{background:#eaf3f9;color:#2b719c;border-left:2px solid #6ba7c5;
+ padding-left:8px!important}
+.r69-project-data .r68-data-main{gap:14px}
+.r69-project-data .r68-overview-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.r69-project-data #r69ProjectPane{display:flex;flex-direction:column;gap:14px;min-height:310px}
+.r69-project-data #r69ProjectPane>.r68-studio-card{width:100%}
+.r69-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;
+ padding:3px 3px 5px;color:#344e66}
+.r69-section-title h2{margin:0 0 5px;font-size:18px;font-weight:735}
+.r69-section-title p{margin:0;font-size:11.5px;color:#92a4b5;line-height:1.5}
+.r69-project-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+ border-top:1px solid #edf2f6;padding:13px 1px 2px}
+.r69-project-actions button{min-height:34px}
+.r69-project-data .r68-month-table{min-width:0}
+.r69-project-data .r68-health-list{max-height:50vh}
+.r69-project-data .r68-data-rail{top:calc(var(--topbar) + 10px)}
+/* Statistical workbench: every filter lives on the left, one field per row. */
+.layout.workspace-mode-stats .stats-side-controls{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ min-height:0;gap:9px!important;padding:16px 8px 18px!important;overflow-y:auto;
+}
+.layout.workspace-mode-stats .stats-side-heading{margin:0 0 2px!important;padding:0 2px;
+ font-weight:730;color:#527089}
+.layout.workspace-mode-stats .stats-side-field{
+ display:flex!important;flex-direction:column!important;gap:6px!important;max-width:none!important;
+ min-width:0!important;width:100%!important;color:#71889b;font-size:11.5px!important;line-height:1.4
+}
+.layout.workspace-mode-stats .stats-side-field select{height:35px!important;width:100%!important}
+.layout.workspace-mode-stats .r69-stats-section-title{
+ margin:9px 0 1px;border-top:1px solid #e5edf3;padding:14px 2px 0;
+ font-size:11.5px;font-weight:735;color:#527089}
+.layout.workspace-mode-stats .stats-side-controls .r69-side-stat-filters{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ gap:9px!important;width:100%;padding:0!important;margin:0!important;
+ border:none!important;border-radius:0!important;background:transparent!important;
+ box-shadow:none!important;
+}
+.layout.workspace-mode-stats .r69-side-stat-filters label{
+ display:flex!important;flex:0 0 auto!important;flex-direction:column!important;align-items:stretch!important;
+ gap:6px!important;width:100%!important;max-width:none!important;min-width:0!important;
+ margin:0!important;font-size:11.5px!important;font-weight:590;white-space:normal;
+ color:#71889b}
+.layout.workspace-mode-stats .r69-side-stat-filters label:nth-child(n){
+ display:flex!important;grid-template-columns:none!important;
+ width:100%!important;max-width:none!important;min-width:0!important
+}
+.layout.workspace-mode-stats .r69-side-stat-filters select{
+ display:block!important;width:100%!important;max-width:none!important;min-width:0!important;
+ height:35px!important;padding:0 24px 0 9px!important;border-radius:7px;
+ font-size:12px!important;background-color:#fff}
+.layout.workspace-mode-stats .r69-export-btn{
+ flex:0 0 auto;display:flex!important;align-items:center;justify-content:center!important;
+ min-height:38px;width:100%;margin:11px 0 0;padding:10px 12px!important;gap:9px;
+ background:#487fb5!important;border:1px solid #487fb5!important;border-radius:9px;
+ color:#fff!important;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 9px #2f6eab17}
+.layout.workspace-mode-stats .r69-export-btn:hover{background:#326da7!important;border-color:#326da7!important}
+.layout.workspace-mode-stats .r69-export-btn span{color:#fff!important;font-size:18px;line-height:1}
+.layout.workspace-mode-stats .as-stats-heading{gap:22px}
+.layout.workspace-mode-stats .as-stats-heading .as-stats-total{margin-left:auto}
+/* Make the remaining filters usable on short screens without stealing calendar height. */
+.layout.workspace-mode-stats .side-controls{min-height:0;overflow-y:auto;scrollbar-width:thin}
+@media(max-width:1120px){
+ .r69-project-data .r68-overview-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+ .r69-project-data .r68-overview-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .r69-section-title{align-items:flex-start}
+}
