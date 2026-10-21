@@ -547,12 +547,19 @@ async function run(){
    min:RULES.overtimeMinMinutes,boundary,before,late,morning,atNoon,acrossLunch,separate,registered,
    settingsHas:setting.includes('min="20"')
   }));
-  return boundary.minutes===0&&before.minutes===0&&
+  const verdict=boundary.minutes===0&&before.minutes===0&&
     late.minutes===25&&late.segments.length===1&&
     morning.minutes===25&&atNoon.minutes===0&&
     acrossLunch.minutes===25&&separate.minutes===0&&
     registered.minutes===35&&registered.segments.length===2&&
     setting.includes('id="r14OvertimeMin"')&&setting.includes('min="20"');
+  if(!verdict)throw Error('R68_OT_CASES '+JSON.stringify({
+   min:RULES.overtimeMinMinutes,boundary:boundary.minutes,before:before.minutes,
+   late:late.minutes,morning:morning.minutes,atNoon:atNoon.minutes,acrossLunch:acrossLunch.minutes,
+   separate:separate.minutes,registered:registered.minutes,registeredSegments:registered.segments.length,
+   settings:setting.includes('min="20"')
+  }));
+  return true;
  },'R68 >20min lunch/evening grace without deduction, no lunch spanning overcount');
  // R60: consecutive 'in' punches without an intervening 'out' are
  // ONE continuous attendance visit. Threshold checks the original visit,
