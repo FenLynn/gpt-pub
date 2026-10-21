@@ -218,6 +218,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.screenshot({path:path.join(out,'r68-project-overview.png')});
   await page.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});
   await page.waitForSelector('.r68-roster-entry:not(.r68-roster-columns)');
+  await page.waitForSelector('.r68-data-rail .r68-filetree',{timeout:30000});
   report.rosterUi=await page.evaluate(()=>{
    const card=document.querySelector('.r68-data-content');
    return !!card&&!card.querySelector('.data-roster-head')&&
