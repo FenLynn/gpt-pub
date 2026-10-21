@@ -29,7 +29,7 @@ function p109Same(a,b){return JSON.stringify(a)===JSON.stringify(b)}
 async function p109AuditProject(root=state.projectDir){
  const report={at:new Date().toISOString(),connected:!!root,initialized:false,months:[],
   issues:[],orphans:[],monthIndex:[],detectedMonths:[],snapshotCount:0,rawFileCount:0,
-  rootName:root?.name||'',appVersion:P109_APP_VERSION,safeIndexRepair:[],configuration:{}};
+  rootName:root?.name||'',appVersion:P109_APP_VERSION,safeIndexRepair:[],configuration:{},verifiedRaw:0,unverifiedRaw:0};
  if(!root){p109Issue(report.issues,'info','NO_DIRECTORY','项目','尚未连接本地项目目录','连接或初始化项目');return report}
  const [project,data,config]=await Promise.all([p109Json(root,'project.json'),p109Child(root,'data'),p109Child(root,'config')]);
  if(!project.exists){
@@ -110,9 +110,17 @@ async function p109AuditProject(root=state.projectDir){
    }
    for(const imp of payload?.imports||[]){
     const sub=raw&&await p109Child(raw,imp.type),folder=sub&&await p109Child(sub,imp.id);
-    if(!folder||!await p109File(folder,imp.name))
-     p109Issue(report.issues,'critical','MISSING_RAW',key,
-      '导入清单缺失原文件 '+imp.type+'/'+imp.id+'/'+imp.name,'从完整备份找回');
+    const original=folder&&await p109File(folder,imp.name);
+    if(!original)p109Issue(report.issues,'critical','MISSING_RAW',key,
+     '导入清单缺失原文件 '+imp.type+'/'+imp.id+'/'+imp.name,'从完整备份找回');
+    else if(imp.sha256){
+     const file=await original.getFile();
+     if(file.size<=16*1024*1024&&report.verifiedRaw<120){
+      const digest=await p109Hash(new Uint8Array(await file.arrayBuffer()));report.verifiedRaw++;
+      if(digest!==imp.sha256)p109Issue(report.issues,'critical','RAW_HASH_MISMATCH',key,
+       '原文件校验不一致：'+imp.name,'检查历史完整备份，不要覆盖');
+     }else report.unverifiedRaw++;
+    }
    }
    if(snapshots)for(const item of (await p109Entries(snapshots)).filter(x=>x.kind==='directory')){
     const snap=await p109Json(item.handle,'snapshot.json');
@@ -153,7 +161,7 @@ function p109ProjectView(report){
   '<div class="p109-project-body"><div class="p109-project-summary"><span class="p109-health '+p109Escape(level)+'">'+p109Escape(name)+'</span>'+
    '<strong>'+report.months.length+' 个月份</strong><strong>'+report.snapshotCount+' 个冻结</strong>'+
    '<strong>'+report.rawFileCount+' 份原文件</strong></div>'+
-  '<p class="p109-project-desc">'+(report.connected?'当前目录：'+p109Escape(report.rootName):
+  '<p class="p109-project-desc">'+(report.connected?'当前目录：'+p109Escape(report.rootName)+' · 原文件校验 '+report.verifiedRaw+' / 未核 '+report.unverifiedRaw:
    '未连接本地目录。当前为演示/内存工作区，无法确定磁盘上有哪些工作状态。')+'</p>'+
   (!report.initialized?'<div class="p109-project-init"><p>本项目尚未初始化。可创建空白工作区，或连接已有项目目录；不修改任何未识别文件。</p>'+
    '<div class="p109-project-actions"><button id="p109CreateBlank" type="button" class="primary-btn" '+(!report.connected?'disabled':'')+'>初始化空白项目</button>'+
@@ -305,6 +313,10 @@ async function p109BackupProject(){
 }
 async function p109RestoreArchive(){
  if(!window.showDirectoryPicker){p109Status('该浏览器不支持写入本地目录',true);return}
+ let target;
+ try{target=await showDirectoryPicker({mode:'readwrite'});
+  if((await p109Entries(target)).length)throw Error('恢复仅允许选择空目录，防止覆盖已有项目');
+ }catch(e){if(e.name!=='AbortError')p109Status('选择恢复目录失败：'+e.message,true);return}
  const chooser=document.createElement('input');chooser.type='file';chooser.accept='.zip,application/zip';
  chooser.onchange=async()=>{
   const file=chooser.files?.[0];if(!file)return;
@@ -322,10 +334,8 @@ async function p109RestoreArchive(){
     const entry=info.files.find(x=>x.path===f.name);
     if(!entry||entry.bytes!==f.data.byteLength||entry.sha256!==(await p109Hash(f.data)))throw Error('备份校验失败：'+f.name);
    }
-   p109ProjectBusy=false; // Browser requires picker to run from the actual user input event
-   const root=await showDirectoryPicker({mode:'readwrite'});
-   p109ProjectBusy=true;
-   if((await p109Entries(root)).length)throw Error('目标目录不是空文件夹。为了保护已有项目，恢复只允许写入空目录');
+   const root=target;
+   if((await p109Entries(root)).length)throw Error('恢复目录不再为空，拒绝覆盖');
    if(!window.confirm('已校验备份 '+payload.length+' 个文件。即将恢复到所选空目录。继续？'))return;
    for(const f of payload){
     const parts=f.name.split('/'),fileName=parts.pop();let folder=root;
