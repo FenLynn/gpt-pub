@@ -1819,7 +1819,7 @@ async function run(){
       bottom:rect.bottom,native:!!document.querySelector('.r73-help[title]')};
    });
    if(tip.native||tip.width<140||tip.top<0||tip.left<0||tip.bottom>900||
-     (tip.top<90&&tip.left<400))
+     (tip.top<46))
     throw Error('R73 tooltip should be custom and onscreen '+JSON.stringify(tip));
    await roster.screenshot({path:path.join(out,'r73-help-tooltip.png')});
    await roster.locator('#r68RosterSearch').click();
