@@ -1134,6 +1134,18 @@ async function run(){
     Math.abs(line?.shape.y2-line?.shape.y1)<=rowHeight;
  },'R57 automatic overtime should draw a solid gradient and punch arrows must fill the lane height');
  await page.screenshot({path:path.join(out,'r57-solid-overtime-timeline.png')});
+ const r63PopulatedTimeline=await page.evaluate(async()=>{
+  const e=EMPLOYEES.find(x=>x.id===state.selection.employeeId),
+   d=state.chartDay||state.selection.day,
+   a=e&&state.analysis.get(e.id+'|'+d);
+  if(!a||a.punches.length<2)throw Error('R63 needs a non-empty real timeline fixture');
+  const image=await captureCurrentImage('timeline');
+  if(!image.data.startsWith('data:image/png;base64,')||image.width<1400)
+   throw Error('R63 populated timeline image invalid');
+  return image.data;
+ });
+ fs.writeFileSync(path.join(out,'r63-export-populated-timeline.png'),
+  Buffer.from(r63PopulatedTimeline.split(',')[1],'base64'));
  // R53: an inferred segment has an independent, persistent inclusion toggle.
  // Use existing synthetic/demo records only; revert revisions after the test.
  const overtimePick=await page.evaluate(()=>{
