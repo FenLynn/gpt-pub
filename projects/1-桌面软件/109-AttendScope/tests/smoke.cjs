@@ -115,28 +115,10 @@ async function run(){
   return pdf.includes('/Count 1')&&document.getElementById('r63PdfCount').textContent.includes('1 张');
  },'R63 selected one image generates exactly one PDF page and context data exists');
  await page.locator('#r63PdfClose').click();
- // Save the actual exported PNGs for visual artifact review, including the
- // live ECharts renderer, header/legend and the right-hand factual summaries.
- const r63ImagesForReview=await page.evaluate(async()=>{
-  const saved={workspaceMode:state.workspaceMode,selection:{...state.selection},
-   chartDay:state.chartDay,chartTab:state.chartTab};
-  const settle=()=>new Promise(ok=>requestAnimationFrame(()=>requestAnimationFrame(ok)));
-  const images={};
-  try{
-   images.matrix=(await captureCurrentImage('matrix')).data;
-   state.workspaceMode='stats';render();await settle();
-   images.stats=(await captureCurrentImage('stats')).data;
-   state.workspaceMode='person';state.selection={type:'person',employeeId:EMPLOYEES[0].id};
-   state.chartTab='timeline';state.chartDay=8;render();await settle();
-   images.timeline=(await captureCurrentImage('timeline')).data;
-  }finally{
-   state.workspaceMode=saved.workspaceMode;state.selection=saved.selection;
-   state.chartDay=saved.chartDay;state.chartTab=saved.chartTab;render();
-  }
-  return images;
- });
- for(const [type,data] of Object.entries(r63ImagesForReview))
-  fs.writeFileSync(path.join(out,'r63-export-'+type+'.png'),Buffer.from(data.split(',')[1],'base64'));
+ // Export the matrix in its native workspace; do not perturb navigation state
+ // before the long-standing personal chart interaction regression.
+ const r63Matrix=await page.evaluate(async()=>(await captureCurrentImage('matrix')).data);
+ fs.writeFileSync(path.join(out,'r63-export-matrix.png'),Buffer.from(r63Matrix.split(',')[1],'base64'));
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
   'R38 retired chart renderers remain active');
@@ -188,6 +170,8 @@ async function run(){
    !document.querySelector('.workspace-mode-person .inspector-plot')?.textContent.includes('常规每日分布'),
  'R43 personal navigation must open first-day timeline without redundant titles');
  await page.screenshot({path:path.join(out,'r43-person-first-day.png')});
+ const r63Timeline=await page.evaluate(async()=>(await captureCurrentImage('timeline')).data);
+ fs.writeFileSync(path.join(out,'r63-export-timeline.png'),Buffer.from(r63Timeline.split(',')[1],'base64'));
  const secondPerson=await page.locator('#workspacePerson option').nth(1).getAttribute('value');
  await page.locator('#workspacePerson').selectOption(secondPerson);
  await check(page,(personId)=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&
@@ -1076,6 +1060,8 @@ async function run(){
    asStatRows().people.length>0&&asStatRows().people.every(e=>groupOf(e)===group);
  },'R52 team scope must not fall back to full-staff statistics');
  await page.screenshot({path:path.join(out,'r52-team-statistics.png')});
+ const r63Stats=await page.evaluate(async()=>(await captureCurrentImage('stats')).data);
+ fs.writeFileSync(path.join(out,'r63-export-stats.png'),Buffer.from(r63Stats.split(',')[1],'base64'));
  await page.locator('#asStatsScope').selectOption('person');
  await check(page,()=>state.workspaceMode==='stats'&&state.statsScope==='person'&&
   !!document.getElementById('asStatsPerson')&&asStatRows().people.length===1&&
