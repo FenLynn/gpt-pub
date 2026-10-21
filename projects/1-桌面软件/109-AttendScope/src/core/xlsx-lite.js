@@ -58,7 +58,7 @@
     if(!rows.length)return {sheet:first.getAttribute('name')||'Sheet1',rows:[]};
     const headers=rows[0].map(x=>String(x??'').trim());
     const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;return obj;});
-    return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects};
+    return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects,rawRows:rows.map(r=>({cells:Array.from(r),rowNumber:r.__rowNumber}))};
   }
   function parseCsvText(text){
     const rows=[]; let row=[], cur='', q=false;
@@ -79,8 +79,40 @@
     const headers=rows[0].map(x=>String(x).trim());
     return rows.slice(1).map((r,i)=>r.some(v=>String(v??'')!=='')?{...Object.fromEntries(headers.map((h,j)=>[h,r[j]??''])),__rowNumber:i+2}:null).filter(Boolean);
   }
+  function parseDelimited(text){
+    const first=String(text||'').replace(/^\uFEFF/,'');
+    const head=first.split(/\r?\n/).slice(0,4).join('\n');
+    const options=[',',';','\t'];
+    const count=d=>{let quoted=false,n=0;for(const c of head){if(c==='"')quoted=!quoted;else if(c===d&&!quoted)n++}return n};
+    const delim=options.sort((a,b)=>count(b)-count(a))[0];
+    let row=[],field='',quoted=false;const rows=[];
+    for(let i=0;i<first.length;i++){
+      const c=first[i];
+      if(c==='"'){if(quoted&&first[i+1]==='"'){field+='"';i++}else quoted=!quoted}
+      else if(!quoted&&c===delim){row.push(field);field=''}
+      else if(!quoted&&(c==='\n'||c==='\r')){if(c==='\r'&&first[i+1]==='\n')i++;
+        row.push(field);if(row.some(x=>x.trim()!==''))rows.push(row);
+        row=[];field='';
+      }else field+=c;
+    }
+    row.push(field);if(row.some(x=>x.trim()!==''))rows.push(row);
+    return rows.map((cells,i)=>({cells,rowNumber:i+1}));
+  }
+  async function readGrid(file,encoding='auto'){
+    const name=file.name.toLowerCase();
+    if(name.endsWith('.xlsx')){
+      const table=await readXlsx(file);
+      return {sheet:table.sheet,rows:table.rawRows||[],encoding:'xlsx'};
+    }
+    if(!name.endsWith('.csv'))throw new Error('请选择 .xlsx 或 .csv 文件');
+    const bytes=await file.arrayBuffer();let text='';
+    try{text=new TextDecoder(encoding==='auto'?'utf-8':encoding,{fatal:true}).decode(bytes)}
+    catch(e){if(encoding!=='auto')throw new Error('无法按指定编码解析 CSV：'+encoding);
+      text=new TextDecoder('gb18030').decode(bytes);}
+    return {sheet:'CSV',encoding,rows:parseDelimited(text)};
+  }
   async function readTable(file){
-    const name=file.name.toLowerCase(); if(name.endsWith('.csv')) return {sheet:'CSV',headers:[],rows:parseCsvText(await file.text())};
+    const name=file.name.toLowerCase(); if(name.endsWith('.csv')) {const g=await readGrid(file);const h=g.rows[0]?.cells.map(v=>String(v).trim())||[];return {sheet:'CSV',headers:h,rawRows:g.rows,rows:g.rows.slice(1).map(r=>({...Object.fromEntries(h.map((k,i)=>[k,r.cells[i]??''])),__rowNumber:r.rowNumber}))};}
     if(name.endsWith('.xlsx')) return readXlsx(file); throw new Error('目前支持 .xlsx 和 .csv。');
   }
   const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[n]=c>>>0}return t})();
@@ -103,5 +135,5 @@
       {name:'xl/worksheets/sheet1.xml',data:sheet}
     ]; return zipStore(files);
   }
-  global.AttendScopeXLSX={readTable,writeXlsx,parseCsvText};
+  global.AttendScopeXLSX={readTable,readGrid,writeXlsx,parseCsvText,parseDelimited};
 })(window);
