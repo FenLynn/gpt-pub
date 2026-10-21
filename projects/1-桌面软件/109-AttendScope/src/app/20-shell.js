@@ -116,6 +116,7 @@ function layoutHtml(){
         </div>
       </div>
       <button class="text-btn" id="connectDir">目录</button>
+      <button class="text-btn" id="p109ProjectControl">项目</button>
       <button class="text-btn" id="saveBtn">保存</button>
       <button class="text-btn" id="restoreBtn">恢复</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
