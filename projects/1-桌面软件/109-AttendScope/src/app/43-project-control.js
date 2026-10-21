@@ -52,7 +52,7 @@ async function p109AuditProject(root=state.projectDir){
  if(!data)p109Issue(report.issues,'warning','NO_DATA','data/','缺少数据目录，可从备份恢复或建立空白月份');
  const rules=await p109Json(config,'work_rules.json'),people=await p109Json(config,'employees.json'),profile=await p109Json(config,'project-profile.json');
  report.configuration={legacyRules:!!rules.exists,legacyPeople:!!people.exists,
-   pinnedRoster:profile.value?.pinRoster===true,pinnedImport:profile.value?.pinImport===true,
+   pinnedRoster:profile.value?.pinRoster===true,pinnedImport:profile.value?.pinImport===true,pinnedRules:profile.value?.pinRules===true,
    template:profile.value?.importProfile?.templates?Object.keys(profile.value.importProfile.templates):[]};
  for(const [name,obj] of [['work_rules.json',rules],['employees.json',people],['project-profile.json',profile]])
   if(obj.error)p109Issue(report.issues,'warning','BROKEN_CONFIG','config/'+name,obj.error);
@@ -120,7 +120,7 @@ async function p109AuditProject(root=state.projectDir){
       if(digest!==imp.sha256)p109Issue(report.issues,'critical','RAW_HASH_MISMATCH',key,
        '原文件校验不一致：'+imp.name,'检查历史完整备份，不要覆盖');
      }else report.unverifiedRaw++;
-    }
+    }else report.unverifiedRaw++;
    }
    if(snapshots)for(const item of (await p109Entries(snapshots)).filter(x=>x.kind==='directory')){
     const snap=await p109Json(item.handle,'snapshot.json');
@@ -169,7 +169,7 @@ function p109ProjectView(report){
   '<div class="p109-project-body"><div class="p109-project-summary"><span class="p109-health '+p109Escape(level)+'">'+p109Escape(name)+'</span>'+
    '<strong>'+report.months.length+' 个月份</strong><strong>'+report.snapshotCount+' 个冻结</strong>'+
    '<strong>'+report.rawFileCount+' 份原文件</strong></div>'+
-  '<p class="p109-project-desc">'+(report.connected?'当前目录：'+p109Escape(report.rootName)+' · 原文件校验 '+report.verifiedRaw+' / 未核 '+report.unverifiedRaw:
+  '<p class="p109-project-desc">'+(report.connected?'当前目录：'+p109Escape(report.rootName)+' · '+periodText()+' '+(state.saved?'工作已保存':'有未保存修改')+' · 原文件校验 '+report.verifiedRaw+' / 未核 '+report.unverifiedRaw:
    '未连接本地目录。当前为演示/内存工作区，无法确定磁盘上有哪些工作状态。')+'</p>'+
   (!report.initialized?'<div class="p109-project-init"><p>本项目尚未初始化。可创建空白工作区，或连接已有项目目录；不修改任何未识别文件。</p>'+
    '<div class="p109-project-actions"><button id="p109CreateBlank" type="button" class="primary-btn" '+(!report.connected?'disabled':'')+'>初始化空白项目</button>'+
@@ -196,7 +196,9 @@ function p109ProjectView(report){
    '<div class="p109-project-actions"><button id="p109PinRoster" type="button" '+(!report.initialized?'disabled':'')+'>'+
     (report.configuration.pinnedRoster?'✓ 名册已固定 · 更新':'固定当前名册')+'</button>'+
     '<button id="p109PinImport" type="button" '+(!report.initialized?'disabled':'')+'>'+
-    (report.configuration.pinnedImport?'✓ 导入规则已固定 · 更新':'固定当前导入规则')+'</button></div>'+
+    (report.configuration.pinnedImport?'✓ 导入规则已固定 · 更新':'固定当前导入规则')+'</button>'+ 
+    '<button id="p109PinRules" type="button" '+(!report.initialized?'disabled':'')+'>'+ 
+    (report.configuration.pinnedRules?'✓ 考勤规则已固定 · 更新':'固定当前考勤规则')+'</button></div>'+
     '<p class="p109-project-desc">固定后供新建月份使用；不会回写历史月份或修改原始文件。仅点击确认时保存。</p></div>'+
   (report.activeBranch?'<div class="p109-branch-status">当前正在编辑独立修订副本 '+
    p109Escape(report.activeBranch.id)+' · 不覆盖原月份 working <button type="button" id="p109ReturnMain">返回主工作状态</button></div>':'')+
@@ -231,6 +233,7 @@ async function openProjectControl(mode='scan'){
   root.querySelector('#p109Backup').onclick=()=>p109BackupProject();
   root.querySelector('#p109PinRoster').onclick=()=>p109PinDefaults('roster');
   root.querySelector('#p109PinImport').onclick=()=>p109PinDefaults('import');
+  root.querySelector('#p109PinRules').onclick=()=>p109PinDefaults('rules');
   root.querySelector('#p109RestoreZip').onclick=()=>p109RestoreArchive();
   root.querySelector('#p109UpgradeCode').onclick=()=>p109UpgradePick();
   root.querySelector('#p109RepairIndex').onclick=()=>p109RepairIndex(report);
@@ -320,7 +323,7 @@ async function p109ReturnToMain(){
 
 async function p109PinDefaults(kind){
  if(!state.projectDir||!p109Audit?.initialized)return;
- const label=kind==='roster'?'员工名册和分组':'导入关键字及列映射模板';
+ const label=kind==='roster'?'员工名册和分组':kind==='rules'?'考勤时段与加班规则':'导入关键字及列映射模板';
  if(!window.confirm('将本月'+label+'固定为以后新建月份的默认配置？历史月份保持原样。'))return;
  try{
   const config=await dir(state.projectDir,'config');
@@ -328,6 +331,8 @@ async function p109PinDefaults(kind){
   if(kind==='roster'){
    profile.pinRoster=true;profile.employees=EMPLOYEES.map(e=>({...e}));
    profile.groups={...state.groups};
+  }else if(kind==='rules'){
+   profile.pinRules=true;profile.workRules={...RULES};
   }else{
    profile.pinImport=true;
    profile.importProfile=structuredClone(r62ImportProfile());
