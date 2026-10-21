@@ -66,7 +66,7 @@ function r63Compose(kind,visual){
 function captureMatrixCanvas(){
  const people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
  const w=Math.max(1260,165+monthDays()*32),h=Math.max(400,140+people.length*25);
- const [canvas,g]=captureCanvas(w,h);captureLabel(g,'AttendScope  ·  月度考勤矩阵',26,43,23,'#27456b');
+ const [canvas,g]=captureCanvas(w,h);captureLabel(g,r63Title()+' · 月度考勤矩阵',26,43,23,'#27456b');
  captureLabel(g,periodText()+'  /  '+people.length+' 人',26,72);
  for(let d=1;d<=monthDays();d++)captureLabel(g,pad(d),166+(d-1)*32,108,12);
  people.forEach((p,row)=>{
@@ -83,7 +83,7 @@ function captureMatrixCanvas(){
 function captureStatisticsCanvas(){
  const data=asStatRows(),rows=data.visible||[],w=Math.max(1230,rows.length*28+90),h=720;
  const [canvas,g]=captureCanvas(w,h),left=70,bottom=587,max=Math.max(1,...rows.map(x=>x.value||0));
- captureLabel(g,'AttendScope  ·  统计分析',26,42,23,'#27456b');
+ captureLabel(g,r63Title()+' · 统计分析',26,42,23,'#27456b');
  captureLabel(g,periodText()+'  ·  '+rows.length+' 项 / '+data.effectiveUnit,26,69);
  const palette=asStatPalette(asStatPrefs().family,asStatPrefs().metric);
  rows.forEach((r,i)=>{
@@ -99,7 +99,7 @@ function captureStatisticsCanvas(){
 function captureTimelineCanvas(){
  const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],day=state.chartDay||state.selection?.day||1;
  const a=state.analysis.get(e.id+'|'+day),[canvas,g]=captureCanvas(1320,530);
- captureLabel(g,'AttendScope  ·  个人考勤时间轴',26,42,23,'#27456b');
+ captureLabel(g,r63Title()+' · 个人考勤时间轴',26,42,23,'#27456b');
  captureLabel(g,e.name+'  ·  '+isoDate(day),26,72);
  const x=v=>105+1100*Math.max(0,Math.min(1440,v))/1440;
  const tracks=['进出','出差','请假','外出','加班'],loc={trip:1,leave:2,outing:3,overtime:4};
