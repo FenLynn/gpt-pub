@@ -44,7 +44,7 @@ async function p109AuditProject(root=state.projectDir){
  if(meta?.projectId!=='P109-AttendScope'){
   p109Issue(report.issues,'critical','WRONG_PROJECT','project.json','项目身份不符，拒绝整理和修改');return report
  }
- report.initialized=true;report.meta=meta;report.monthIndex=Array.isArray(meta.months)?
+ report.initialized=true;report.meta=meta;report.activeBranch=meta.activeBranch||null;report.monthIndex=Array.isArray(meta.months)?
   meta.months.filter(p109KnownMonth):[];
  report.schemaVersion=meta.schemaVersion;
  if(Number(meta.schemaVersion)>P109_DATA_SCHEMA)
@@ -63,10 +63,10 @@ async function p109AuditProject(root=state.projectDir){
  for(const yr of years.filter(x=>x.kind==='directory'&&/^\d{4}$/.test(x.name))){
   for(const mn of (await p109Entries(yr.handle)).filter(x=>x.kind==='directory'&&/^(0[1-9]|1[0-2])$/.test(x.name))){
    const key=yr.name+'-'+mn.name;discovered.add(key);
-   const m={key,hasWorking:false,hasPrevious:false,raw:0,snapshots:[],revisions:0,
+   const m={key,hasWorking:false,hasPrevious:false,raw:0,snapshots:[],branches:[],revisions:0,
     imports:0,employees:0,issues:[],state:'无工作状态'};
    const work=await p109Child(mn.handle,'working'),raw=await p109Child(mn.handle,'raw'),
-    snapshots=await p109Child(mn.handle,'snapshots');
+    snapshots=await p109Child(mn.handle,'snapshots'),branches=await p109Child(mn.handle,'branches');
    const current=await p109Json(work,'state.json'),previous=await p109Json(work,'state.previous.json');
    m.hasWorking=current.exists&&!current.error&&!!current.value?.records;
    m.hasPrevious=previous.exists&&!previous.error&&!!previous.value?.records;
@@ -124,7 +124,7 @@ async function p109AuditProject(root=state.projectDir){
    }
    if(snapshots)for(const item of (await p109Entries(snapshots)).filter(x=>x.kind==='directory')){
     const snap=await p109Json(item.handle,'snapshot.json');
-    m.snapshots.push({id:item.name,valid:!!snap.value?.working&&!snap.error});
+    m.snapshots.push({id:item.name,valid:!!snap.value?.working&&!snap.error,createdAt:snap.value?.manifest?.createdAt||'',parent:snap.value?.manifest?.parentSnapshot||null});
     report.snapshotCount++;
     if(!snap.value?.working||snap.error)
      p109Issue(report.issues,'critical','BROKEN_SNAPSHOT',key+'/'+item.name,'冻结文件无效或损坏');
@@ -132,6 +132,14 @@ async function p109AuditProject(root=state.projectDir){
       snap.value.manifest?.year!==Number(yr.name)||snap.value.manifest?.month!==Number(mn.name))
      p109Issue(report.issues,'warning','SNAPSHOT_MISMATCH',key+'/'+item.name,'快照标识或月份元数据不一致');
    }
+   if(branches)for(const br of (await p109Entries(branches)).filter(x=>x.kind==='directory')){
+    const work=await p109Child(br.handle,'working'),saved=await p109Json(work,'state.json');
+    m.branches.push({id:br.name,valid:!!saved.value?.records&&!saved.error});
+    if(!saved.value?.records||saved.error)p109Issue(report.issues,'warning','BROKEN_BRANCH',key+'/'+br.name,
+      '独立修订工作区损坏或没有保存文件');
+   }
+   if(meta.activeBranch?.month===key&&!m.branches.some(x=>x.id===meta.activeBranch.id&&x.valid))
+    p109Issue(report.issues,'critical','MISSING_ACTIVE_BRANCH',key,'当前选中的独立修订分支缺失');
    report.months.push(m);
   }
  }
@@ -169,7 +177,14 @@ function p109ProjectView(report){
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>月份与冻结状态</b><span>'+report.months.length+' 个月份</span></div>'+
    (report.months.length?'<div class="p109-project-months">'+report.months.map(m=>
     '<div class="p109-project-month"><b>'+p109Escape(m.key)+'</b><span>'+p109Escape(m.state)+'</span>'+
-    '<small>'+m.employees+' 人 · '+m.imports+' 次导入 · '+m.revisions+' 项修订 · '+m.snapshots.length+' 次冻结</small></div>').join('')+'</div>':
+    '<small>'+m.employees+' 人 · '+m.imports+' 次导入 · '+m.revisions+' 项修订 · '+m.snapshots.length+' 次冻结'+
+    (m.branches.length?' · '+m.branches.length+' 个修订副本':'')+'</small>'+
+    (m.snapshots.length?'<details class="p109-snapshots"><summary>查看冻结版本（'+m.snapshots.length+'）</summary>'+
+       m.snapshots.map(s=>'<div class="p109-snapshot-row"><code>'+p109Escape(s.id)+'</code><small>'+
+        p109Escape(s.createdAt? s.createdAt.slice(0,19).replace('T',' ') : '日期未知')+
+        (s.parent?' · 源于 '+p109Escape(s.parent):'')+'</small>'+
+        (s.valid?'<button type="button" data-p109-fork="'+p109Escape(m.key)+'|'+p109Escape(s.id)+'">派生修订</button>':'<span>损坏</span>')+'</div>').join('')+'</details>':'')+
+    '</div>').join('')+'</div>':
     '<p class="p109-empty">没有在本地项目目录中发现已保存的月份。</p>')+'</div>'+
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>健康检查</b><span>'+
     p109Count(report,'critical')+' 严重 · '+p109Count(report,'warning')+' 提醒</span></div>'+
@@ -183,6 +198,8 @@ function p109ProjectView(report){
     '<button id="p109PinImport" type="button" '+(!report.initialized?'disabled':'')+'>'+
     (report.configuration.pinnedImport?'✓ 导入规则已固定 · 更新':'固定当前导入规则')+'</button></div>'+
     '<p class="p109-project-desc">固定后供新建月份使用；不会回写历史月份或修改原始文件。仅点击确认时保存。</p></div>'+
+  (report.activeBranch?'<div class="p109-branch-status">当前正在编辑独立修订副本 '+
+   p109Escape(report.activeBranch.id)+' · 不覆盖原月份 working <button type="button" id="p109ReturnMain">返回主工作状态</button></div>':'')+
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>安全管理</b><span>不会自动改写原始记录或冻结</span></div>'+
    '<div class="p109-project-actions"><button id="p109Rescan" type="button">重新检测</button>'+
     '<button id="p109Backup" type="button" '+(!report.initialized?'disabled':'')+'>备份整个项目 ZIP</button>'+
@@ -215,6 +232,10 @@ async function openProjectControl(mode='scan'){
   root.querySelector('#p109PinImport').onclick=()=>p109PinDefaults('import');
   root.querySelector('#p109RestoreZip').onclick=()=>p109RestoreArchive();
   root.querySelector('#p109RepairIndex').onclick=()=>p109RepairIndex(report);
+  root.querySelectorAll('[data-p109-fork]').forEach(btn=>btn.onclick=async()=>{
+    const [month,id]=btn.dataset.p109Fork.split('|');await p109ForkSnapshot(month,id)
+  });
+  root.querySelector('#p109ReturnMain')?.addEventListener('click',()=>p109ReturnToMain());
   root.addEventListener('click',e=>{if(e.target===root)close()});
  }catch(e){document.querySelector('.p109-project-overlay')?.remove();p109Status('项目扫描失败：'+e.message,true)}
 }
@@ -244,6 +265,55 @@ async function p109InitializeProject(root){
   render();p109Status('空白项目已初始化并保存，可以开始导入'); 
  }catch(e){p109Status('初始化失败，请检查目录权限：'+e.message,true)}
  finally{p109ProjectBusy=false}
+}
+
+
+async function p109ForkSnapshot(month,snapshotId){
+ if(!state.projectDir||!p109KnownMonth(month)||!/^F[a-z0-9-]+$/i.test(snapshotId))return;
+ if(!state.saved&&!window.confirm('当前存在未保存工作，请先保存；放弃这些修改并从冻结版本建立独立副本？'))return;
+ if(!window.confirm('根据 '+month+' 的冻结 '+snapshotId+' 创建独立修订工作区？主 working 和原快照将保持不变。'))return;
+ try{
+  const [yr,mo]=month.split('-'),m=await monthDirectory(Number(yr),Number(mo)),
+   snaps=await existingDir(m,'snapshots'),folder=await existingDir(snaps,snapshotId),
+   snap=await readJSON(folder,'snapshot.json');
+  if(!snap?.working||snap.manifest?.snapshotId!==snapshotId||
+    snap.manifest.year!==Number(yr)||snap.manifest.month!==Number(mo))
+   throw Error('冻结来源不合法或已经损坏');
+  const normalized=normalizeSavedMonth(snap.working);
+  if(!normalized)throw Error('快照数据结构不兼容，不能派生副本');
+  const branches=await dir(m,'branches'),id='B'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
+   ref={id,month,parentSnapshotId:snapshotId};
+  const exists=await p109Child(branches,id);if(exists)throw Error('修订标识发生冲突，已中止');
+  const branch=await dir(branches,id),work=await dir(branch,'working');
+  const manifest={schemaVersion:1,...ref,createdAt:new Date().toISOString(),appVersion:P109_APP_VERSION};
+  await writeFile(branch,'branch.json',JSON.stringify(manifest,null,2));
+  await writeFile(work,'state.json',JSON.stringify({...snap.working,context:'branch',branch:ref},null,2));
+  rememberMonth();
+  state.monthStores.set(month,{...normalized,activeBranch:ref,saved:true});
+  switchMonth(Number(yr),Number(mo),false,false);
+  state.activeBranch=ref;
+  await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+  document.querySelector('.p109-project-overlay')?.remove();
+  p109Status('已创建独立修订 '+id+'，后续保存不会修改原工作状态');
+ }catch(e){p109Status('派生快照失败：'+e.message,true)}
+}
+async function p109ReturnToMain(){
+ const ref=state.activeBranch;
+ if(!ref||!state.projectDir)return;
+ if(!state.saved&&!window.confirm('独立副本有未保存修改；放弃并返回主工作状态？'))return;
+ try{
+  const [y,m]=ref.month.split('-'),folder=await monthDirectory(Number(y),Number(m)),
+   working=await existingDir(folder,'working'),source=await readJSON(working,'state.json'),
+   main=normalizeSavedMonth(source);
+  if(!main)throw Error('主 working 不完整，拒绝切换');
+  rememberMonth();
+  state.monthStores.set(ref.month,{...main,activeBranch:null,saved:true});
+  switchMonth(Number(y),Number(m),false,false);
+  state.activeBranch=null;
+  await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+  document.querySelector('.p109-project-overlay')?.remove();
+  p109Status('已返回主工作状态，独立修订副本仍保存在磁盘');
+ }catch(e){p109Status('返回主状态失败：'+e.message,true)}
 }
 
 async function p109PinDefaults(kind){
