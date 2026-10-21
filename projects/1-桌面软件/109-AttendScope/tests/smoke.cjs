@@ -208,12 +208,6 @@ async function run(){
  },'R39 1600px responsive calendar/matrix regression');
  await page.screenshot({path:path.join(out,'r39-all-1600.png')});
  await page.setViewportSize({width:1920,height:1080});
- console.log('R68_ENTRY_DIAG '+JSON.stringify(await page.evaluate(()=>({
-  mode:state.workspaceMode,nav:document.querySelectorAll('[data-workspace]').length,
-  fn:String(renderScopeSummary).slice(0,90),
-  side:document.querySelector('#scopeInsights')?.innerHTML.slice(0,500),
-  kpis:document.querySelectorAll('#scopeInsights .r68-scope-kpis').length
- }))));
  await check(page,()=>state.workspaceMode==='all'&&document.querySelectorAll('[data-workspace]').length===6&&
    !!document.querySelector('#scopeInsights .r68-scope-kpis')&&!!document.querySelector('.matrix-wrap'),'R37 full-staff entry not mounted');
  await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
@@ -543,10 +537,6 @@ async function run(){
   const separate=calc([pair('17:10','17:22'),pair('18:00','18:12')]);
   const registered=estimateOvertimeCandidate([pair('17:10','18:00')],8,[{start:'17:20',end:'17:35'}]);
   const setting=settingsContent('rules');
-  console.log('R68_OVERTIME_DIAG '+JSON.stringify({
-   min:RULES.overtimeMinMinutes,boundary,before,late,morning,atNoon,acrossLunch,separate,registered,
-   settingsHas:setting.includes('min="20"')
-  }));
   const verdict=boundary.minutes===0&&before.minutes===0&&
     late.minutes===25&&late.segments.length===1&&
     morning.minutes===25&&atNoon.minutes===0&&
@@ -1681,7 +1671,7 @@ async function run(){
  await require('./lifecycle-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R67',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R68',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
