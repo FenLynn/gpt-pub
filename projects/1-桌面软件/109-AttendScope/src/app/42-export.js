@@ -2,7 +2,15 @@
 function captureStamp(){const d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'_'+String(d.getMilliseconds()).padStart(3,'0')}
 function captureCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);return [c,g]}
 function captureLabel(g,s,x,y,size=13,color='#47627e'){g.font=size+'px "Microsoft YaHei",system-ui,sans-serif';g.fillStyle=color;g.fillText(String(s),x,y)}
-async function captureImage(src){const i=new Image();i.src=src;await new Promise((ok,no)=>{i.onload=ok;i.onerror=no});return i}
+async function captureImage(src){
+ const image=new Image();
+ await new Promise((resolve,reject)=>{
+  image.onload=resolve;
+  image.onerror=()=>reject(new Error('无法解码导出的图片，已取消损坏图片的使用'));
+  image.src=src;
+ });
+ return image;
+}
 
 /* R63: faithfully compose chart, legends, context counts, and right-hand facts. */
 function r63Title(){return typeof attendTitle==='function'?attendTitle():'考勤'}
@@ -125,8 +133,15 @@ async function captureCurrentImage(kind){
   const el=document.getElementById(kind==='stats'?'asStatChart':'attendanceTimelineChart');
   const chart=el&&window.echarts?.getInstanceByDom(el);
   if(chart&&!chart.isDisposed()){
-   const img=await captureImage(chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:'#fff'}));
-   const [canvas,g]=captureCanvas(img.width,img.height);g.drawImage(img,0,0);visual=canvas;
+   try{
+    const data=chart.getDataURL({type:'png',pixelRatio:2,backgroundColor:'#fff'});
+    const img=await captureImage(data);
+    const [canvas,g]=captureCanvas(img.width,img.height);g.drawImage(img,0,0);visual=canvas;
+   }catch(error){
+    // Some SVG-backed ECharts instances return an image Chrome cannot decode.
+    // Never abandon the report: redraw from the same authoritative facts.
+    console.warn('图表原图无法解码，改用离线归档绘图',error?.message||error);
+   }
   }
  }
  if(!visual)visual=kind==='matrix'?captureMatrixCanvas():
