@@ -145,6 +145,77 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.oldBundledRulesDoNotMatchRuntime=!(Object.hasOwn(originalConfig,'amStart')&&Object.hasOwn(originalConfig,'pmStart'));
   report.oldBundledRosterStillSample=JSON.parse(fs.readFileSync(path.join(diskRoot,'config','employees.json'),'utf8')).employees.length!==
    JSON.parse(fs.readFileSync(path.join(diskRoot,'data','2027','03','working','state.json'),'utf8')).employees.length;
+
+  // R65 actual clean-install and project health/recovery workflow.
+  const fresh=path.join(tmp,'fresh-install','考勤');fs.mkdirSync(fresh,{recursive:true});
+  for(const name of ['index.html','src','README.md'])
+   fs.cpSync(path.join(root,name),path.join(fresh,name),{recursive:true});
+  const cleanZip=path.join(out,'P109-考勤-R65-首次初始化.zip');
+  const packed=cp.spawnSync('python3',['-c',zipScript,fresh,cleanZip],{encoding:'utf8'});
+  if(packed.status!==0)throw Error('R65 packaging '+packed.stderr);
+  diskRoot=fresh;
+  await open();
+  await page.waitForSelector('#p109CreateBlank');
+  report.initializationPrompt=await page.evaluate(()=>!state.projectDir&&!!p109PendingDirectory);
+  await page.locator('#p109CreateBlank').click();
+  await page.waitForFunction(()=>state.saved&&!state.isDemo&&EMPLOYEES.length===0&&!!state.projectDir,{timeout:45000});
+  report.blankProjectCreated=fs.existsSync(path.join(fresh,'project.json'))&&
+   JSON.parse(fs.readFileSync(path.join(fresh,'config','employees.json'),'utf8')).employees.length===0;
+  await page.locator('#attendanceInput').setInputFiles({name:'审核门禁.csv',mimeType:'text/csv',
+   buffer:Buffer.from('姓名,日期,时间,进出\n测试甲,2026-10-08,08:20,进\n测试甲,2026-10-08,18:00,出')});
+  await page.waitForSelector('#r65SaveTemplate');
+  await page.locator('#r65SaveTemplate').check();
+  await page.locator('#r62Validate').click();await page.locator('#r62Commit').click();
+  await page.waitForFunction(()=>state.records.length===2&&EMPLOYEES.length===1);
+  await page.evaluate(()=>saveWorking());
+  report.importTemplateStored=await page.evaluate(()=>!!state.importProfile.templates?.attendance);
+  report.healthAfterImport=await page.evaluate(async()=>{
+   const a=await p109AuditProject();
+   return a.months.some(m=>m.key==='2026-10'&&m.imports===1&&m.raw===1)&&
+    !a.issues.some(x=>x.level==='critical')&&a.verifiedRaw===1;
+  });
+  const rawDir=path.join(fresh,'data','2026','10','raw','attendance'),
+   impName=fs.readdirSync(rawDir)[0],rawFile=path.join(rawDir,impName,'审核门禁.csv');
+  const savedRaw=fs.readFileSync(rawFile);fs.writeFileSync(rawFile,'tampered');
+  report.rawCorruptionDetected=await page.evaluate(async()=>
+   (await p109AuditProject()).issues.some(x=>x.code==='RAW_HASH_MISMATCH'));
+  fs.writeFileSync(rawFile,savedRaw);
+  const indexPath=path.join(fresh,'project.json'),meta=JSON.parse(fs.readFileSync(indexPath,'utf8'));
+  fs.writeFileSync(indexPath,JSON.stringify({...meta,months:[]}));
+  report.missingIndexDetected=await page.evaluate(async()=>
+    (await p109AuditProject()).safeIndexRepair.includes('2026-10'));
+  await page.evaluate(async()=>p109RepairIndex(await p109AuditProject()));
+  report.safeIndexFixed=JSON.parse(fs.readFileSync(indexPath,'utf8')).months.includes('2026-10')&&
+   fs.existsSync(path.join(fresh,'project.index.previous.json'));
+  await page.evaluate(async()=>{
+   p109Audit=await p109AuditProject();
+   await p109PinDefaults('roster');await p109PinDefaults('import');
+   switchMonth(2026,11,true);
+  });
+  report.pinnedForNextMonth=await page.evaluate(()=>state.projectProfile?.pinRoster&&
+   state.projectProfile.pinImport&&EMPLOYEES.length===1&&!!state.importProfile.templates?.attendance);
+  await page.locator('#p109ProjectControl').click();
+  await page.waitForSelector('#p109Backup');
+  const download=page.waitForEvent('download',{timeout:60000});
+  await page.locator('#p109Backup').click();
+  const outZip=path.join(tmp,'working-backup.zip');await (await download).saveAs(outZip);
+  report.backupZipValid=cp.spawnSync('python3',['-m','zipfile','-t',outZip],{encoding:'utf8'}).status===0;
+  const restoreDir=path.join(tmp,'restored','考勤');fs.mkdirSync(restoreDir,{recursive:true});
+  diskRoot=restoreDir;
+  const choose=page.waitForEvent('filechooser',{timeout:30000});
+  await page.locator('#p109RestoreZip').click();
+  await (await choose).setFiles({name:'restore.zip',mimeType:'application/zip',buffer:fs.readFileSync(outZip)});
+  await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('恢复完成'),null,{timeout:60000});
+  report.zipRestoreRaw=fs.existsSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
+  await open();
+  report.zipRestoreWorking=await page.evaluate(()=>YEAR===2026&&MONTH===10&&state.records.length===2&&
+   EMPLOYEES.some(x=>x.name==='测试甲'));
+  if(Object.entries(report).some(([k,v])=>[
+   'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
+   'rawCorruptionDetected','missingIndexDetected','safeIndexFixed','pinnedForNextMonth',
+   'backupZipValid','zipRestoreRaw','zipRestoreWorking'].includes(k)&&!v))
+   throw Error('R65 lifecycle failed '+JSON.stringify(report));
+
   if(!report.unzippedFileBoot||!report.emptyNewMonth||report.savedRecords!==4||
    !report.snapshotUnchanged||!report.reloadRestores||!report.relocatedRestores||
    !report.sameVersionCodeOverlayKeepsData||errors.length)throw Error('R64 lifecycle failure '+JSON.stringify({report,errors}));
