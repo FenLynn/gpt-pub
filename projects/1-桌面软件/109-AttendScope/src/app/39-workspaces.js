@@ -89,7 +89,9 @@ function workspaceSidebarHtml(){
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
  // Statistical metrics live in one top-level workspace, not three sidebar clones.
- const view='';
+ const view=mode==='project'?'<div class="side-subnav r68-project-shortcuts">'+
+  [['r68MonthsCard','月份状态'],['r68HealthCard','健康检测'],['r68StorageCard','存储构成'],['r68ProjectTree','文件结构']].map(([id,name])=>
+  '<button type="button" data-project-scroll="'+id+'">'+name+'</button>').join('')+'</div>':'';
  const sub=mode==='data'?'<div class="side-subnav">'+
   [['records','原始记录'],['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
