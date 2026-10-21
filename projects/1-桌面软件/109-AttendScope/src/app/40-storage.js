@@ -12,7 +12,7 @@ function downloadCurrentCSV(){
  const keys=Object.keys(rows[0]),lines=[keys.map(r62CsvCell).join(','),
   ...rows.map(r=>keys.map(k=>r62CsvCell(r[k])).join(','))];
  downloadBlob(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),
-  'AttendScope_'+monthKey()+'_'+(state.workspaceMode==='stats'?'统计':'明细')+'.csv');
+  r63FileStem()+'_'+monthKey()+'_'+(state.workspaceMode==='stats'?'统计':'明细')+'.csv');
  toast('已导出 UTF-8 CSV');
 }
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
@@ -94,7 +94,7 @@ async function connectProjectDir(){
   try{
     const handle=await showDirectoryPicker({mode:'readwrite'});
     const project=await readJSON(handle,'project.json');
-    if(project&&project.projectId!=='P109-AttendScope')throw new Error('所选目录不是 AttendScope 项目，请更换目录，避免覆盖其他数据');
+    if(project&&project.projectId!=='P109-AttendScope')throw new Error('所选目录不是有效的考勤项目，请更换目录，避免覆盖其他数据');
     state.projectDir=handle;
     if(project?.projectId==='P109-AttendScope'){
       const conf=await existingDir(handle,'config').catch(()=>null);
@@ -161,7 +161,7 @@ async function persistImportedFile(file,type,count,importId){
 }
 function projectPayload(){
   rememberMonth();
-  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:'AttendScope',appVersion:'0.1.0-preview',
+  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:'0.1.0-preview',
     analysisEngineVersion:'R63',current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),updatedAt:new Date().toISOString()};
 }
@@ -194,7 +194,7 @@ async function saveWorking(){
       render();toast('已保存 '+monthKey()+' 的工作状态');return;
     }catch(e){toast('目录保存失败：'+e.message,true);return}
   }
-  downloadBlob(new Blob([payload],{type:'application/json'}),'AttendScope_'+monthKey()+'_working.json');
+  downloadBlob(new Blob([payload],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_working.json');
   state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
 }
 async function restoreWorkingFile(file){
@@ -204,7 +204,7 @@ async function restoreWorkingFile(file){
  if(!Number.isInteger(yr)||yr<2000||yr>2100||!Number.isInteger(mo)||mo<1||mo>12)
   throw new Error('工作文件缺少有效年月');
  const normalized=normalizeSavedMonth(working);
- if(!normalized)throw new Error('文件不是 AttendScope 工作状态或冻结快照');
+ if(!normalized)throw new Error('文件不是有效的考勤工作状态或冻结快照');
  if(!window.confirm('将导入 '+yr+' 年 '+mo+' 月工作状态（包括人工修订）。同月未保存的内容将被替换。是否继续？'))return;
  rememberMonth();
  const key=yr+'-'+pad(mo),before=state.monthStores.get(key);
@@ -231,7 +231,7 @@ async function freezeSnapshot(){
       await writeFile(folder,'snapshot.json',txt);toast('已冻结 '+monthKey()+' · '+id);return;
     }catch(e){toast('冻结失败：'+e.message,true);return}
   }
-  downloadBlob(new Blob([txt],{type:'application/json'}),'AttendScope_'+monthKey()+'_'+id+'.json');
+  downloadBlob(new Blob([txt],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_'+id+'.json');
   toast('已下载不可变冻结快照 '+id);
 }
 function toast(msg,error=false){
