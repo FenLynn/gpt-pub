@@ -1,12 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "projectId": "P109-AttendScope",
-  "projectName": "AttendScope",
-  "appVersion": "0.1.0-preview",
-  "analysisEngineVersion": "R63",
+  "projectName": "考勤",
+  "appVersion": "0.2.0-preview",
+  "analysisEngineVersion": "R67",
   "timezone": "Asia/Shanghai",
-  "current": {"year": 2026, "month": 10},
+  "current": {
+    "year": 2026,
+    "month": 10
+  },
   "storageModel": "folder-first",
   "offlineOnly": true,
-  "notes": "运行时不请求网络；GitHub Pages 仅用于静态预览。"
+  "notes": "这是仓库演示元数据，不是实际用户工作状态。首次使用请采用无数据初始包并连接目录初始化。"
 }
