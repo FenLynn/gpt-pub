@@ -45,10 +45,10 @@ function r68ScopeRender(){
    '<span class="warn" style="width:'+pct(tally.anomaly)+'%" title="异常 '+tally.anomaly+' 人日"></span>'+
    '<span class="bad" style="width:'+pct(tally.absent)+'%" title="缺勤 '+tally.absent+' 人日"></span></div>'+
   '<section class="r71-insights-trend"><div class="r68-scope-section-title">每日异常趋势'+
-   '<button class="r71-help" type="button" title="点击日期可定位到考勤矩阵" aria-label="说明：点击趋势图日期可定位">ⓘ</button></div>'+
+   '<button class="r71-help" type="button" data-r73-tip="点击日期可定位到考勤矩阵" aria-label="说明：点击趋势图日期可定位">ⓘ</button></div>'+
    '<div id="scopeDailyChart" class="r68-scope-daily"></div></section>'+
   '<section class="r71-insights-rank"><div class="r68-scope-section-title">'+label+'风险排行'+
-   '<button class="r71-help" type="button" title="按当前筛选后的工作人日计算；点击排行可下钻，完整排行见统计分析" aria-label="说明：排行口径与操作">ⓘ</button></div>'+
+   '<button class="r71-help" type="button" data-r73-tip="按当前筛选后的工作人日计算；点击排行可下钻，完整排行见统计分析" aria-label="说明：排行口径与操作">ⓘ</button></div>'+
    '<div class="r68-rank-switch" role="group" aria-label="排行指标">'+
    [['issue','异常及缺勤'],['absent','缺勤'],['rate','异常率']].map(([id,n])=>
     '<button type="button" data-r68-rank="'+id+'" class="'+(mode===id?'active':'')+'" aria-pressed="'+(mode===id)+'">'+n+'</button>').join('')+'</div>'+
@@ -61,6 +61,7 @@ function r68ScopeRender(){
      '<span class="r68-rank-track"><i style="width:'+(value?Math.max(3,value/max*100):0).toFixed(1)+'%"></i></span>'+
      '<strong>'+(mode==='rate'?value.toFixed(1)+'%':value)+'</strong></button>';
    }).join(''):'<div class="r71-rank-empty">暂无可比较数据</div>')+'</div></section></div>';
+ r73WireTooltips();
  const chart=initAttendChart(document.getElementById('scopeDailyChart'));
  if(chart){
   chart.setOption({animation:false,grid:{left:28,right:8,top:12,bottom:24},

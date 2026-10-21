@@ -3,74 +3,171 @@
 'use strict';
 const R68_SECTIONS={records:'原始记录',roster:'名册与分组',rules:'工作规则',
  templates:'导入模板',imports:'导入历史',freezes:'冻结与修订'};
-const r68UI={chosen:new Set(),search:'',rosterFilter:'all',projectSerial:0,treeSerial:0,rankMode:'issue'};
+const r68UI={chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
 function r68Esc(s){return escapeNameChar(String(s??''))}
 function r68HumanBytes(bytes){return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB'}
 function r68Pill(text,kind='neutral'){return '<span class="r68-pill '+kind+'">'+r68Esc(text)+'</span>'}
 function r71Hint(text){
- return '<button class="r71-help" type="button" title="'+r68Esc(text)+
-  '" aria-label="说明：'+r68Esc(text)+'">ⓘ</button>';
+ const tip=r68Esc(text);
+ return '<button class="r71-help r73-help" type="button" data-r73-tip="'+tip+
+ '" aria-label="说明：'+tip+'">'+
+ '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+ '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5h.01"/></svg></button>';
+}
+/* R73: one properly positioned accessible tooltip above all panels, never native title.
+   Delegation survives app rerenders; focus and pointer work identically. */
+let r73TipTarget=null,r73TipNode=null,r73TipInstalled=false;
+function r73HideTooltip(){
+ if(r73TipTarget?.getAttribute('aria-describedby')==='r73FloatingTip')
+  r73TipTarget.removeAttribute('aria-describedby');
+ r73TipTarget=null;
+ if(r73TipNode)r73TipNode.classList.remove('is-visible');
+}
+function r73ShowTooltip(target){
+ const label=target?.dataset?.r73Tip;if(!label)return;
+ if(!r73TipNode){
+  r73TipNode=document.createElement('div');r73TipNode.id='r73FloatingTip';
+  r73TipNode.className='r73-floating-tip';r73TipNode.setAttribute('role','tooltip');
+  document.body.appendChild(r73TipNode);
+ }
+ if(r73TipTarget!==target)r73HideTooltip();
+ r73TipTarget=target;r73TipNode.textContent=label;
+ target.setAttribute('aria-describedby','r73FloatingTip');
+ r73TipNode.style.left='0px';r73TipNode.style.top='0px';
+ r73TipNode.classList.add('is-visible');
+ const r=target.getBoundingClientRect(),w=r73TipNode.offsetWidth,h=r73TipNode.offsetHeight;
+ let x=r.left+r.width/2-w/2;
+ x=Math.max(12,Math.min(window.innerWidth-w-12,x));
+ let y=r.top-h-12,below=false;
+ if(y<12){y=r.bottom+12;below=true}
+ if(y+h>window.innerHeight-10)y=Math.max(12,window.innerHeight-h-10);
+ r73TipNode.style.left=x+'px';r73TipNode.style.top=y+'px';
+ r73TipNode.classList.toggle('is-below',below);
+ r73TipNode.style.setProperty('--r73-arrow-x',Math.max(16,Math.min(w-16,r.left+r.width/2-x))+'px');
+}
+function r73WireTooltips(){
+ if(r73TipInstalled)return;r73TipInstalled=true;
+ document.addEventListener('pointerover',e=>{
+  const target=e.target.closest?.('[data-r73-tip]');
+  if(target&&target!==r73TipTarget)r73ShowTooltip(target)
+ });
+ document.addEventListener('pointerout',e=>{
+  if(r73TipTarget&&r73TipTarget.contains(e.target)&&
+   !r73TipTarget.contains(e.relatedTarget))r73HideTooltip()
+ });
+ document.addEventListener('focusin',e=>{
+  if(e.target.matches?.('[data-r73-tip]'))r73ShowTooltip(e.target)
+ });
+ document.addEventListener('focusout',e=>{
+  if(e.target===r73TipTarget)r73HideTooltip()
+ });
+ document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+   if(r68UI.groupEditorOpen){r73ToggleGroupEditor(false);e.preventDefault()}
+   else r73HideTooltip()
+  }
+ });
+ document.addEventListener('scroll',r73HideTooltip,true);
+ window.addEventListener('resize',r73HideTooltip);
 }
 function r68SidebarHeader(title,subtitle,actions=''){
  return '<header class="r68-cardhead r71-content-head"><h3>'+title+'</h3>'+
   (subtitle?r71Hint(subtitle):'')+'<div class="r71-heading-actions">'+actions+'</div></header>';
 }
-function r68RosterRows(){
- const query=r68UI.search.trim().toLocaleLowerCase();
- return EMPLOYEES.filter(e=>{
-  const g=state.groups?.[e.id]||'未分组';
-  if(r68UI.rosterFilter==='ungrouped'&&groupOf(e)!=='未分组')return false;
-  if(r68UI.rosterFilter==='fixed'&&!(state.fixedPeople||[]).includes(e.id))return false;
-  if(r68UI.rosterFilter==='temporary'&&(state.fixedPeople||[]).includes(e.id))return false;
-  if(r68UI.rosterFilter==='new'&&!(state.imports||[]).some(x=>
-   state.records.some(r=>r.employeeId===e.id&&r.importId===x.id)))return false;
-  return !query||(e.name+' '+g).toLocaleLowerCase().includes(query);
- });
+/* R73: two distinct populations. Left = current month's observations; right =
+   durable fixed roster (including people not occurring in the current month). */
+function r73FixedRoster(){
+ const ids=new Set(state.fixedPeople||[]);
+ const candidates=new Map();
+ for(const e of state.projectProfile?.employees||[])if(e?.id)candidates.set(e.id,e);
+ for(const e of EMPLOYEES)if(e?.id)candidates.set(e.id,e);
+ return [...ids].map(id=>candidates.get(id)).filter(Boolean).sort((a,b)=>
+  a.name.localeCompare(b.name,'zh-CN'));
 }
-/* R72 roster: unique names, explicit groups, month membership and project-wide fixed staff. */
+function r68RosterRows(){
+ const term=r68UI.search.trim().toLocaleLowerCase();
+ return EMPLOYEES.filter(e=>
+  (r68UI.groupFilter==='all'||groupOf(e)===r68UI.groupFilter)&&
+  (!term||(e.name+' '+groupOf(e)).toLocaleLowerCase().includes(term)));
+}
+function r73GroupEditorHtml(){
+ if(!r68UI.groupEditorOpen)return '';
+ const groups=(state.groupCatalog||[]);
+ return '<div class="r73-modal-backdrop" id="r73GroupBackdrop">'+
+  '<section class="r73-modal" role="dialog" aria-modal="true" aria-labelledby="r73ModalTitle">'+
+  '<header><div><h3 id="r73ModalTitle">编辑组别</h3><p>组别由手动创建，不随导入自动生成。</p></div>'+
+  '<button type="button" class="r73-icon-btn" id="r73CloseGroups" aria-label="关闭组别编辑">×</button></header>'+
+  '<div class="r73-editor-list">'+(groups.length?groups.map(g=>
+   '<div class="r73-editor-row" data-r73-group="'+r68Esc(g)+'">'+
+   '<input aria-label="组别名称" maxlength="24" value="'+r68Esc(g)+'">'+
+   '<button type="button" data-r73-save-group="'+r68Esc(g)+'">保存</button>'+
+   '<button type="button" class="danger" data-r73-delete-group="'+r68Esc(g)+'">删除</button></div>').join(''):
+   '<p class="r73-editor-empty">还没有自定义组别</p>')+'</div>'+
+  '<form id="r73GroupCreateForm" class="r73-group-create"><input id="r73NewGroup" maxlength="24" placeholder="输入新组别名称" aria-label="新组别名称" required>'+
+  '<button type="submit">新增组别</button></form>'+
+  '<footer>删除组别只会将其成员调整为“未分组”，不会删除人员和原始记录。</footer>'+
+  '</section></div>';
+}
 function r68RosterHtml(){
- const rows=r68RosterRows(),groups=workspaceGroups().filter(g=>g!=='未分组'),
-  catalog=state.groupCatalog||[],chosen=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),
-  fixed=new Set(state.fixedPeople||[]);
- const options='<option value="未分组">未分组</option>'+
-  groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('');
- return r68SidebarHeader('人员与分组','导入自动发现人员；姓名唯一，固定人员自动进入新月份。',
-  '<button type="button" class="r68-btn" id="r72AddPerson">+ 新增人员</button>')+
-  '<div class="r68-roster-tools r72-roster-tools"><input id="r68RosterSearch" aria-label="搜索姓名或组别" placeholder="搜索姓名或组别" value="'+r68Esc(r68UI.search)+'">'+
-  '<select id="r68RosterFilter" aria-label="人员筛选">'+
-   [['all','所有人员'],['ungrouped','未分组'],['new','本月导入'],['fixed','固定人员'],['temporary','非固定人员']].map(([v,t])=>
-    '<option value="'+v+'" '+(r68UI.rosterFilter===v?'selected':'')+'>'+t+'</option>').join('')+'</select>'+
-  '<span>'+rows.length+' 人 · 固定 '+fixed.size+' 人</span>'+
-  '<div class="r72-group-manager"><strong>组别</strong>'+
-   '<select id="r72GroupToRemove" aria-label="管理已有组别"><option value="">选择组别…</option>'+
-   catalog.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('')+'</select>'+
-   '<button type="button" class="r68-btn" id="r72AddGroup">+ 新增组别</button>'+
-   '<button type="button" class="r68-btn" id="r72RenameGroup">改名</button>'+
-   '<button type="button" class="r68-btn" id="r72DeleteGroup">删除</button></div></div>'+
-  '<div class="r68-roster-bulk r72-roster-bulk"><label><input id="r68SelectVisible" type="checkbox" '+
-   (rows.length&&rows.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'> 全选当前筛选</label>'+
-   '<span>已选 '+chosen.length+' 人</span>'+
-   '<select id="r68BulkGroup" aria-label="批量分组">'+options+'</select>'+
-   '<button type="button" class="r68-btn" id="r68ApplyGroup" '+(!chosen.length?'disabled':'')+'>应用组别</button>'+
-   '<button type="button" class="r68-btn" id="r72FixSelected" '+(!chosen.length?'disabled':'')+'>设为固定</button>'+
-   '<button type="button" class="r68-btn" id="r72UnfixSelected" '+(!chosen.length?'disabled':'')+'>移出固定</button></div>'+
-  '<div class="r68-roster-list r72-roster-list" role="table" aria-label="人员名册">'+
-   '<div class="r68-roster-entry r68-roster-columns" role="row"><span></span><span>姓名</span><span>所属组别</span><span>固定</span><span>来源</span><span>操作</span></div>'+
-   (rows.length?rows.map(e=>{
-    const detected=state.records.some(r=>r.employeeId===e.id&&String(r.recordId||'').startsWith('import:'));
-    return '<div class="r68-roster-entry" role="row">'+
-     '<input type="checkbox" data-r68-person="'+r68Esc(e.id)+'" aria-label="选择 '+r68Esc(e.name)+'" '+
-      (r68UI.chosen.has(e.id)?'checked':'')+'><strong title="'+r68Esc(e.name)+'">'+r68Esc(e.name)+'</strong>'+
-     '<select data-r72-person-group="'+r68Esc(e.id)+'" aria-label="'+r68Esc(e.name)+'的组别">'+
-      '<option value="未分组" '+(groupOf(e)==='未分组'?'selected':'')+'>未分组</option>'+
-      groups.map(g=>'<option value="'+r68Esc(g)+'" '+(groupOf(e)===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
-     '</select>'+
-     '<button type="button" class="r72-fixed-toggle '+(fixed.has(e.id)?'is-fixed':'')+'" data-r72-toggle-fixed="'+r68Esc(e.id)+'" aria-pressed="'+fixed.has(e.id)+'">'+
-      (fixed.has(e.id)?'已固定':'临时')+'</button>'+
-     '<small>'+(detected?'本月导入':'已有名册')+'</small>'+
-     '<button type="button" class="r68-inline" data-r72-rename="'+r68Esc(e.id)+'">改名</button></div>';
-   }).join(''):'<div class="r68-empty">暂无人员。导入文件会自动识别姓名，也可手动新增。</div>')+
-  '</div>';
+ const monthly=r68RosterRows(),fixed=r73FixedRoster(),fixedIds=new Set(state.fixedPeople||[]),
+  selected=[...r68UI.chosen].filter(id=>monthly.some(e=>e.id===id)),
+  selectedFixed=[...r68UI.fixedChosen].filter(id=>fixedIds.has(id)),
+  groups=workspaceGroups().filter(g=>g!=='未分组'),catalog=state.groupCatalog||[],
+  fixedShown=fixed.filter(e=>!r68UI.fixedSearch||e.name.toLocaleLowerCase().includes(r68UI.fixedSearch.toLocaleLowerCase())),
+  choices='<option value="未分组">未分组</option>'+groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('');
+ return r68SidebarHeader('人员与分组','当月人员不因取消固定而删除；右侧固定名单会带入以后新建的月份。')+
+  '<div class="r73-roster-top">'+
+   '<div class="r73-roster-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
+   '<input id="r68RosterSearch" aria-label="搜索当月姓名" placeholder="搜索当月姓名" value="'+r68Esc(r68UI.search)+'"></div>'+
+   '<div class="r73-filter-group"><select id="r73GroupFilter" aria-label="筛选组别">'+
+   '<option value="all">全部组别</option><option value="未分组" '+(r68UI.groupFilter==='未分组'?'selected':'')+'>未分组</option>'+
+   catalog.map(g=>'<option value="'+r68Esc(g)+'" '+(r68UI.groupFilter===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
+   '</select><button type="button" id="r73EditGroups" class="r73-text-btn">编辑</button></div>'+
+   '<button type="button" class="r73-main-btn" id="r72AddPerson">+ 新增人员</button></div>'+
+  '<div class="r73-transfer-shell">'+
+   '<section class="r73-roster-pane r73-month-pane" aria-label="当月人员">'+
+    '<header class="r73-pane-title"><div><strong>当月人员</strong><span>'+monthly.length+' / '+EMPLOYEES.length+' 人</span></div>'+
+     '<label><input id="r68SelectVisible" type="checkbox" '+(monthly.length&&monthly.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'>全选</label></header>'+
+    '<div class="r73-assign-tools"><span>已选 '+selected.length+'</span>'+
+     '<select id="r68BulkGroup" aria-label="为选中人员指定组别">'+choices+'</select>'+
+     '<button type="button" id="r68ApplyGroup" '+(!selected.length?'disabled':'')+'>设组别</button></div>'+
+    '<div class="r73-roster-scroll" id="r73MonthList" role="table" aria-label="当月人员名单">'+
+     (monthly.length?monthly.map(e=>{
+      const currentGroup=groupOf(e);
+      return '<div class="r73-person-row" role="row">'+
+       '<input type="checkbox" data-r68-person="'+r68Esc(e.id)+'" aria-label="选择 '+r68Esc(e.name)+'" '+(r68UI.chosen.has(e.id)?'checked':'')+'>'+
+       '<strong>'+r68Esc(e.name)+'</strong>'+
+       '<select data-r72-person-group="'+r68Esc(e.id)+'" aria-label="'+r68Esc(e.name)+'所属组别">'+
+         '<option value="未分组" '+(currentGroup==='未分组'?'selected':'')+'>未分组</option>'+
+         groups.map(g=>'<option value="'+r68Esc(g)+'" '+(currentGroup===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
+       '</select>'+
+       (fixedIds.has(e.id)?'<span class="r73-pinned-mark" '+ 'data-r73-tip="已加入长期固定人员">✓</span>':'')+
+       '<button class="r73-rename" type="button" data-r72-rename="'+r68Esc(e.id)+'" aria-label="修改 '+r68Esc(e.name)+'的姓名">改名</button></div>';
+     }).join(''):'<div class="r73-list-empty">当前筛选没有人员</div>')+'</div>'+
+   '</section>'+
+   '<nav class="r73-transfer-controls" aria-label="固定名单操作">'+
+    '<button type="button" class="r73-transfer-add" id="r72FixSelected" '+(!selected.some(id=>!fixedIds.has(id))?'disabled':'')+
+       ' data-r73-tip="将左侧选中的人员添加到长期固定名单"><span aria-hidden="true">→</span><small>添加</small></button>'+
+    '<button type="button" class="r73-transfer-remove" id="r72UnfixSelected" '+(!selectedFixed.length?'disabled':'')+
+       ' data-r73-tip="从长期固定名单移除右侧选中的人员，不删除当月人员或打卡"><span aria-hidden="true">←</span><small>移除</small></button>'+
+   '</nav>'+
+   '<section class="r73-roster-pane r73-fixed-pane" aria-label="长期固定人员">'+
+    '<header class="r73-pane-title"><div><strong>长期固定人员</strong><span>'+fixed.length+' 人</span></div>'+
+     '<label><input id="r73SelectFixed" type="checkbox" '+(fixedShown.length&&fixedShown.every(e=>r68UI.fixedChosen.has(e.id))?'checked':'')+'>全选</label></header>'+
+    '<div class="r73-fixed-filter"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
+     '<input id="r73FixedSearch" aria-label="搜索固定人员" placeholder="搜索固定姓名" value="'+r68Esc(r68UI.fixedSearch)+'"></div>'+
+    '<div class="r73-roster-scroll" id="r73FixedList" role="table" aria-label="长期固定人员名单">'+
+     (fixedShown.length?fixedShown.map(e=>{
+       const exists=EMPLOYEES.some(p=>p.id===e.id),
+         group=state.groups?.[e.id]||state.projectProfile?.groups?.[e.id]||'未分组';
+       return '<div class="r73-person-row r73-fixed-row" role="row">'+
+        '<input type="checkbox" data-r73-fixed-person="'+r68Esc(e.id)+'" aria-label="选择固定人员 '+r68Esc(e.name)+'" '+(r68UI.fixedChosen.has(e.id)?'checked':'')+'>'+
+        '<strong>'+r68Esc(e.name)+'</strong><span class="r73-group-tag">'+r68Esc(group)+'</span>'+
+        (!exists?'<span class="r73-other-month" data-r73-tip="该人员不在当前月份，但仍属于长期固定名单">跨月</span>':'')+
+        '<button type="button" data-r73-remove-one="'+r68Esc(e.id)+'" class="r73-row-remove" aria-label="从固定名单移除 '+r68Esc(e.name)+'">×</button></div>';
+     }).join(''):'<div class="r73-list-empty">'+(fixed.length?'未找到匹配人员':'选择左侧人员，点击“添加 →”')+'</div>')+
+    '</div>'+
+   '</section></div>'+r73GroupEditorHtml();
 }
 function r72MarkDirty(action,details={}){
  state.revisions.push({id:'R'+(++state.revisionSeq),key:'roster',action,...details,
@@ -80,29 +177,37 @@ function r72MarkDirty(action,details={}){
 /* Fixed staff are a project default, not a deletion or replacement of current
  * month observations. Never touch frozen snapshots or previously saved months. */
 async function r72PersistRoster(){
- const ids=new Set(state.fixedPeople||[]);
- const selected=EMPLOYEES.filter(e=>ids.has(e.id));
- const profile={...(state.projectProfile||{}),schemaVersion:1,pinRoster:true,
-  employees:selected.map(e=>({...e})),fixedPeople:selected.map(e=>e.id),
-  groups:Object.fromEntries(selected.map(e=>[e.id,groupOf(e)])),
-  groupCatalog:[...(state.groupCatalog||[])],nameAliases:{...(state.nameAliases||{})},savedAt:new Date().toISOString()};
- if(!state.projectDir){state.projectProfile=profile;return}
+ const ids=new Set(state.fixedPeople||[]),catalog=new Map();
+ for(const e of state.projectProfile?.employees||[])if(e?.id)catalog.set(e.id,{...e});
+ for(const e of EMPLOYEES)if(e?.id)catalog.set(e.id,{...e});
+ const people=[...ids].map(id=>catalog.get(id)).filter(Boolean);
+ const groups=Object.fromEntries(people.map(e=>{
+  const g=state.groups?.[e.id]??state.projectProfile?.groups?.[e.id]??'未分组';
+  return [e.id,(state.groupCatalog||[]).includes(g)?g:'未分组'];
+ }));
+ const next={...(state.projectProfile||{}),schemaVersion:1,pinRoster:true,
+  employees:people,fixedPeople:people.map(e=>e.id),groups,
+  groupCatalog:[...(state.groupCatalog||[])],nameAliases:{...(state.nameAliases||{})},
+  savedAt:new Date().toISOString()};
+ if(!state.projectDir){state.projectProfile=next;return}
  try{
   const config=await dir(state.projectDir,'config');
-  // Re-read to preserve external changes to import/rules defaults.
   const disk=await readJSON(config,'project-profile.json')||{};
-  const merged={...disk,...profile};
+  const merged={...disk,...next};
   await writeFile(config,'project-profile.json',JSON.stringify(merged,null,2));
   state.projectProfile=merged;
- }catch(e){toast('当前月份已更新，但固定名册写入项目目录失败：'+e.message,true)}
+ }catch(e){toast('固定名单已在界面更新，但项目目录写入失败：'+e.message,true)}
 }
 async function r72FixedPeople(ids,makeFixed){
- const selected=new Set(state.fixedPeople||[]);
- for(const id of ids)if(EMPLOYEES.some(e=>e.id===id)){
-  if(makeFixed)selected.add(id);else selected.delete(id);
- }
- state.fixedPeople=[...selected];
- r72MarkDirty(makeFixed?'fix-people':'unfix-people',{employees:[...ids]});
+ const next=new Set(state.fixedPeople||[]),monthIds=new Set(EMPLOYEES.map(e=>e.id));
+ const globalIds=new Set(r73FixedRoster().map(e=>e.id));
+ const eligible=ids.filter(id=>makeFixed?monthIds.has(id):globalIds.has(id));
+ if(!eligible.length)return;
+ for(const id of eligible)if(makeFixed)next.add(id);else next.delete(id);
+ state.fixedPeople=[...next];
+ r68UI.chosen=new Set([...r68UI.chosen].filter(id=>!eligible.includes(id)));
+ r68UI.fixedChosen=new Set([...r68UI.fixedChosen].filter(id=>!eligible.includes(id)));
+ r72MarkDirty(makeFixed?'fix-people':'unfix-people',{employees:eligible});
  await r72PersistRoster();
 }
 function r72AddPerson(){
@@ -155,8 +260,13 @@ function r72RenamePerson(id){
  r72MarkDirty('rename-person',{employeeId:newId,from:oldName,to:name});
  if((state.fixedPeople||[]).includes(newId))r72PersistRoster();
 }
-async function r72CreateGroup(){
- const input=window.prompt('新组别名称（1–24 字）','');if(input===null)return;
+function r73ToggleGroupEditor(open){
+ r68UI.groupEditorOpen=!!open;r68RefreshDataContent();
+ if(open)document.getElementById('r73NewGroup')?.focus();
+ else document.getElementById('r73EditGroups')?.focus();
+}
+async function r72CreateGroup(value){
+ const input=value===undefined?window.prompt('新组别名称（1–24 字）',''):value;if(input===null)return;
  const group=String(input).trim();
  if(!group||group.length>24||group==='未分组'||(state.groupCatalog||[]).includes(group)){
   toast('组别名称无效或已经存在',true);return;
@@ -164,9 +274,9 @@ async function r72CreateGroup(){
  state.groupCatalog=[...(state.groupCatalog||[]),group];
  r72MarkDirty('create-group',{group});await r72PersistRoster();
 }
-async function r72RenameGroup(group){
+async function r72RenameGroup(group,value){
  if(!group||!(state.groupCatalog||[]).includes(group))return;
- const input=window.prompt('修改组别名称（旧月份内容保持不变）',group);
+ const input=value===undefined?window.prompt('修改组别名称（旧月份内容保持不变）',group):value;
  if(input===null)return;
  const next=String(input).trim();
  if(!next||next.length>24||next==='未分组'||
@@ -176,6 +286,10 @@ async function r72RenameGroup(group){
  if(next===group)return;
  state.groupCatalog=state.groupCatalog.map(g=>g===group?next:g);
  for(const e of EMPLOYEES)if(groupOf(e)===group)state.groups[e.id]=next;
+ if(state.projectProfile?.groups){
+  state.projectProfile.groups=Object.fromEntries(Object.entries(state.projectProfile.groups)
+   .map(([id,g])=>[id,g===group?next:g]));
+ }
  if(state.selectedGroup===group)state.selectedGroup=next;
  r72MarkDirty('rename-group',{from:group,to:next});
  await r72PersistRoster();
@@ -186,6 +300,10 @@ async function r72DeleteGroup(group){
  if(!window.confirm('删除组别「'+group+'」？'+n+' 位现有成员将改为未分组；原始记录不会删除。'))return;
  state.groupCatalog=state.groupCatalog.filter(g=>g!==group);
  for(const e of EMPLOYEES)if(groupOf(e)===group)state.groups[e.id]='未分组';
+ if(state.projectProfile?.groups){
+  state.projectProfile.groups=Object.fromEntries(Object.entries(state.projectProfile.groups)
+   .map(([id,g])=>[id,g===group?'未分组':g]));
+ }
  if(state.selectedGroup===group)state.selectedGroup='未分组';
  r72MarkDirty('delete-group',{group,reassigned:n});await r72PersistRoster();
 }
@@ -365,41 +483,66 @@ function r68RenderData(){
  if(typeof disposeRawTable==='function')disposeRawTable();
  body.innerHTML=r68DataMarkup();
  const root=body;
- root.querySelector('#r68RosterSearch')?.addEventListener('input',e=>{r68UI.search=e.target.value;r68RefreshDataContent()});
- root.querySelector('#r68RosterFilter')?.addEventListener('change',e=>{r68UI.rosterFilter=e.target.value;r68RefreshDataContent()});
+ root.querySelector('#r68RosterSearch')?.addEventListener('input',e=>{
+  r68UI.search=e.target.value;r68RefreshDataContent('r68RosterSearch',e.target.selectionStart)
+ });
+ root.querySelector('#r73FixedSearch')?.addEventListener('input',e=>{
+  r68UI.fixedSearch=e.target.value;r68RefreshDataContent('r73FixedSearch',e.target.selectionStart)
+ });
+ root.querySelector('#r73GroupFilter')?.addEventListener('change',e=>{
+  r68UI.groupFilter=e.target.value;r68UI.chosen.clear();r68RefreshDataContent()
+ });
  root.querySelectorAll('[data-r68-person]').forEach(c=>c.onchange=()=>{
   if(c.checked)r68UI.chosen.add(c.dataset.r68Person);else r68UI.chosen.delete(c.dataset.r68Person);
   r68RefreshDataContent()
  });
  root.querySelector('#r68SelectVisible')?.addEventListener('change',e=>{
-  r68RosterRows().forEach(p=>e.target.checked?r68UI.chosen.add(p.id):r68UI.chosen.delete(p.id));r68RefreshDataContent()
+  r68RosterRows().forEach(p=>e.target.checked?r68UI.chosen.add(p.id):r68UI.chosen.delete(p.id));
+  r68RefreshDataContent()
+ });
+ root.querySelectorAll('[data-r73-fixed-person]').forEach(c=>c.onchange=()=>{
+  if(c.checked)r68UI.fixedChosen.add(c.dataset.r73FixedPerson);
+  else r68UI.fixedChosen.delete(c.dataset.r73FixedPerson);
+  r68RefreshDataContent()
+ });
+ root.querySelector('#r73SelectFixed')?.addEventListener('change',e=>{
+  const term=r68UI.fixedSearch.toLocaleLowerCase();
+  r73FixedRoster().filter(p=>!term||p.name.toLocaleLowerCase().includes(term)).forEach(p=>
+   e.target.checked?r68UI.fixedChosen.add(p.id):r68UI.fixedChosen.delete(p.id));
+  r68RefreshDataContent()
  });
  root.querySelector('#r68ApplyGroup')?.addEventListener('click',()=>{
   const ids=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),g=root.querySelector('#r68BulkGroup')?.value;
   if(!ids.length||!g)return;
-  if(g!=='未分组'&&!(state.groupCatalog||[]).includes(g)){toast('请先创建组别',true);return}
+  if(g!=='未分组'&&!(state.groupCatalog||[]).includes(g)){toast('请先在组别编辑里创建该组别',true);return}
   for(const id of ids)state.groups[id]=g;
   r72MarkDirty('bulk-group',{to:g,employees:ids});
+  if(ids.some(id=>(state.fixedPeople||[]).includes(id)))r72PersistRoster();
  });
  root.querySelectorAll('[data-r72-person-group]').forEach(select=>select.onchange=()=>{
-  const group=select.value;
+  const group=select.value,id=select.dataset.r72PersonGroup;
   if(group!=='未分组'&&!(state.groupCatalog||[]).includes(group))return;
-  state.groups[select.dataset.r72PersonGroup]=group;
-  r72MarkDirty('assign-group',{employeeId:select.dataset.r72PersonGroup,to:group});
+  state.groups[id]=group;r72MarkDirty('assign-group',{employeeId:id,to:group});
+  if((state.fixedPeople||[]).includes(id))r72PersistRoster();
  });
  root.querySelector('#r72AddPerson')?.addEventListener('click',r72AddPerson);
- root.querySelector('#r72AddGroup')?.addEventListener('click',()=>r72CreateGroup());
- root.querySelector('#r72DeleteGroup')?.addEventListener('click',()=>
-  r72DeleteGroup(root.querySelector('#r72GroupToRemove')?.value));
- root.querySelector('#r72RenameGroup')?.addEventListener('click',()=>
-  r72RenameGroup(root.querySelector('#r72GroupToRemove')?.value));
- root.querySelector('#r72FixSelected')?.addEventListener('click',()=>
-  r72FixedPeople([...r68UI.chosen],true));
- root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>
-  r72FixedPeople([...r68UI.chosen],false));
- root.querySelectorAll('[data-r72-toggle-fixed]').forEach(b=>b.onclick=()=>r72FixedPeople(
-  [b.dataset.r72ToggleFixed],!(state.fixedPeople||[]).includes(b.dataset.r72ToggleFixed)));
  root.querySelectorAll('[data-r72-rename]').forEach(b=>b.onclick=()=>r72RenamePerson(b.dataset.r72Rename));
+ root.querySelector('#r72FixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.chosen],true));
+ root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.fixedChosen],false));
+ root.querySelectorAll('[data-r73-remove-one]').forEach(b=>b.onclick=()=>r72FixedPeople([b.dataset.r73RemoveOne],false));
+ root.querySelector('#r73EditGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(true));
+ root.querySelector('#r73CloseGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(false));
+ root.querySelector('#r73GroupBackdrop')?.addEventListener('click',e=>{
+  if(e.target.id==='r73GroupBackdrop')r73ToggleGroupEditor(false)
+ });
+ root.querySelector('#r73GroupCreateForm')?.addEventListener('submit',async e=>{
+  e.preventDefault();await r72CreateGroup(root.querySelector('#r73NewGroup')?.value||'');
+ });
+ root.querySelectorAll('[data-r73-save-group]').forEach(b=>b.onclick=async()=>{
+  const group=b.dataset.r73SaveGroup;
+  await r72RenameGroup(group,b.closest('.r73-editor-row')?.querySelector('input')?.value);
+ });
+ root.querySelectorAll('[data-r73-delete-group]').forEach(b=>b.onclick=()=>r72DeleteGroup(b.dataset.r73DeleteGroup));
  root.querySelector('#r68EditRules')?.addEventListener('click',()=>document.getElementById('settingsBtn').click());
  for(const [id,kind] of [['r68PinRoster','roster'],['r68PinImport','import'],['r68PinRules','rules']]){
   root.querySelector('#'+id)?.addEventListener('click',async()=>{p109Audit=await p109AuditProject();await p109PinDefaults(kind)});
@@ -415,16 +558,22 @@ function r68RenderData(){
  root.querySelectorAll('.r68-note').forEach(note=>{
   const btn=document.createElement('button');btn.type='button';
   btn.className='r71-help r71-note-help';btn.textContent='ⓘ 说明';
-  btn.title=note.textContent.trim();
+  btn.dataset.r73Tip=note.textContent.trim();
   btn.setAttribute('aria-label','说明：'+note.textContent.trim());
   note.replaceWith(btn);
  });
- r68FillDataRail();
+ r68FillDataRail();r73WireTooltips();
 }
-function r68RefreshDataContent(){
- const input=document.activeElement,caret=input?.id==='r68RosterSearch'?input.selectionStart:null;
+function r68RefreshDataContent(focusId,position){
+ const active=focusId||(['r68RosterSearch','r73FixedSearch'].includes(document.activeElement?.id)?
+   document.activeElement.id:null);
+ const caret=position??(active?document.activeElement?.selectionStart:null);
+ const a=document.getElementById('r73MonthList')?.scrollTop||0;
+ const b=document.getElementById('r73FixedList')?.scrollTop||0;
  r68RenderData();
- if(caret!==null){const next=document.getElementById('r68RosterSearch');next?.focus();next?.setSelectionRange(caret,caret)}
+ if(document.getElementById('r73MonthList'))document.getElementById('r73MonthList').scrollTop=a;
+ if(document.getElementById('r73FixedList'))document.getElementById('r73FixedList').scrollTop=b;
+ if(active){const next=document.getElementById(active);next?.focus();if(caret!=null)next?.setSelectionRange(caret,caret)}
 }
 function r68TreeLine(name,kind,detail=''){
  return '<span class="r68-tree-icon '+kind+'">'+(kind==='directory'?'▣':'▤')+'</span>'+

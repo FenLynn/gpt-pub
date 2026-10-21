@@ -233,12 +233,13 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.waitForSelector('.r68-month-row:not(.heading)');
   report.projectMonthsCategory=await page.evaluate(()=>!!document.querySelector('#r68MonthsCard'));
   await page.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});
-  await page.waitForSelector('.r68-roster-entry:not(.r68-roster-columns)');
+  await page.waitForSelector('.r73-month-pane .r73-person-row');
   report.rosterUi=await page.evaluate(()=>{
    const card=document.querySelector('.r71-data-content');
    return !!card&&!card.querySelector('.data-roster-head')&&
     !!document.querySelector('#r68SelectVisible')&&
     !!document.querySelector('#r68BulkGroup')&&
+    !!document.querySelector('#r73FixedList')&&!!document.querySelector('#r72FixSelected')&&
     !document.querySelector('.r68-data-rail')&&!document.querySelector('.r68-filetree');
   });
   await page.evaluate(async()=>{const p=window.prompt;window.prompt=()=> '测试研发组';

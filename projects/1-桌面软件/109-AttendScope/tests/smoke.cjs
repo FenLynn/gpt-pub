@@ -464,7 +464,7 @@ async function run(){
    if(empty){const a=empty.getBoundingClientRect(),b=area.getBoundingClientRect();
     if(Math.abs((a.left+a.right)/2-(b.left+b.right)/2)>35)return false;}
    return state.dataSection===expected&&!!area.querySelector('.r71-data-shell')&&
-    !area.querySelector('#r68DataRail')&&!!tip&&tip.title.length>6&&
+    !area.querySelector('#r68DataRail')&&!!tip&&tip.dataset.r73Tip?.length>6&&!tip.hasAttribute('title')&&
     !area.querySelector('.r68-cardhead p')&&
     !toolbar.textContent.includes('名册、规则与原始记录')&&
     document.documentElement.scrollWidth<=innerWidth+3&&
@@ -477,7 +477,7 @@ async function run(){
  await page.waitForSelector('#r69ProjectPane .r71-section-title',{timeout:16000});
 
  await page.locator('[data-data-section="roster"]').click();
- await check(page,()=>document.querySelectorAll('.r68-roster-entry:not(.r68-roster-columns)').length===EMPLOYEES.length,
+ await check(page,()=>document.querySelectorAll('.r73-month-pane .r73-person-row').length===EMPLOYEES.length,
   'R37 data management missing real roster');
  await page.screenshot({path:path.join(out,'r37-roster.png')});
  await page.locator('[data-data-section="rules"]').click();
@@ -1773,10 +1773,81 @@ async function run(){
    return !!row&&row.业务标记.length>0;
  },'R35 export lost behavior tags');
 
+ // R73 dual-list: two real columns, bidirectional pinning, group editor and refined tooltip.
+ {
+  const roster=await browser.newPage({viewport:{width:1600,height:900}});
+  roster.on('dialog',dialog=>dialog.accept());
+  try{
+   await roster.goto(url,{waitUntil:'load'});
+   await roster.locator('[data-workspace="data"]').click();
+   await roster.locator('[data-data-section="roster"]').click();
+   await roster.waitForSelector('#r73MonthList .r73-person-row');
+   const layout=await roster.evaluate(()=>{
+    const left=document.getElementById('r73MonthList').getBoundingClientRect(),
+      right=document.getElementById('r73FixedList').getBoundingClientRect();
+    return {left:left.width,right:right.width,spaced:left.right<right.left,
+      month:document.querySelectorAll('#r73MonthList .r73-person-row').length,
+      fixed:document.querySelectorAll('#r73FixedList .r73-person-row').length,
+      overflow:document.documentElement.scrollWidth-innerWidth};
+   });
+   if(!layout.spaced||layout.left<260||layout.right<260||layout.month!==50||
+    layout.fixed!==0||layout.overflow>3)throw Error('R73 dual lists geometry '+JSON.stringify(layout));
+   await roster.locator('[data-r68-person]').first().check();
+   await roster.locator('[data-r68-person]').nth(1).check();
+   await roster.locator('#r72FixSelected').click();
+   await roster.waitForFunction(()=>document.querySelectorAll('#r73FixedList .r73-person-row').length===2);
+   if(await roster.locator('#r73MonthList .r73-person-row').count()!==50)
+    throw Error('R73 pin unexpectedly removed monthly staff');
+   await roster.locator('[data-r73-fixed-person]').first().check();
+   await roster.locator('#r72UnfixSelected').click();
+   await roster.waitForFunction(()=>document.querySelectorAll('#r73FixedList .r73-person-row').length===1);
+   if(await roster.locator('#r73MonthList .r73-person-row').count()!==50)
+    throw Error('R73 unpin unexpectedly removed monthly staff');
+   await roster.locator('#r73EditGroups').click();
+   await roster.waitForSelector('.r73-modal[role="dialog"]');
+   await roster.locator('#r73NewGroup').fill('R73浏览器组');
+   await roster.locator('#r73GroupCreateForm button').click();
+   await roster.waitForFunction(()=>[...document.querySelectorAll('.r73-editor-row input')]
+    .some(input=>input.value==='R73浏览器组'));
+   await roster.locator('#r73CloseGroups').click();
+   if(await roster.locator('.r73-modal').count())throw Error('R73 group editor not closed');
+   await roster.locator('.r73-help').first().hover();
+   await roster.waitForSelector('#r73FloatingTip.is-visible');
+   const tip=await roster.evaluate(()=>{
+    const el=document.getElementById('r73FloatingTip'),rect=el.getBoundingClientRect();
+    return {text:el.textContent,width:rect.width,top:rect.top,left:rect.left,
+      bottom:rect.bottom,native:!!document.querySelector('.r73-help[title]')};
+   });
+   if(tip.native||tip.width<140||tip.top<0||tip.left<0||tip.bottom>900)
+    throw Error('R73 tooltip should be custom and onscreen '+JSON.stringify(tip));
+   await roster.screenshot({path:path.join(out,'r73-dual-roster.png')});
+   await roster.setViewportSize({width:1366,height:768});
+   const narrow=await roster.evaluate(()=>{
+    const l=document.querySelector('.r73-month-pane').getBoundingClientRect(),
+      r=document.querySelector('.r73-fixed-pane').getBoundingClientRect();
+    return {left:l.width,right:r.width,rightEnd:r.right,page:document.documentElement.scrollWidth};
+   });
+   if(narrow.left<235||narrow.right<235||narrow.rightEnd>1367||narrow.page>1369)
+    throw Error('R73 1366 desktop clipping '+JSON.stringify(narrow));
+   await roster.screenshot({path:path.join(out,'r73-dual-roster-1366.png')});
+   const independent=await roster.evaluate(()=>{
+    // Simulate a month with only one attendee while retaining an off-month fixed person.
+    const expected=r73FixedRoster().length;
+    EMPLOYEES=EMPLOYEES.filter(e=>!state.fixedPeople.includes(e.id));
+    reanalyze();render();return {left:EMPLOYEES.length,right:r73FixedRoster().length,expected};
+   });
+   if(independent.right!==1||independent.right!==independent.expected||
+    await roster.locator('#r73FixedList .r73-person-row').count()!==1)
+    throw Error('R73 off-month pinned staff went missing '+JSON.stringify(independent));
+   await roster.locator('#r73SelectFixed').check();
+   await roster.locator('#r72UnfixSelected').click();
+   await roster.waitForFunction(()=>document.querySelectorAll('#r73FixedList .r73-person-row').length===0);
+  }finally{await roster.close()}
+ }
  // R72: roster identity editing, group creation/deletion, fixed staff only.
  await page.evaluate(async()=>{
   navigateWorkspace('data');state.dataSection='roster';render();
-  if(!document.querySelector('#r72AddGroup')||!document.querySelector('#r72FixSelected'))
+  if(!document.querySelector('#r73EditGroups')||!document.querySelector('#r72FixSelected'))
    throw Error('R72 roster actions not mounted');
   const previous=window.prompt,person=EMPLOYEES[0],originalId=person.id,originalName=person.name;
   try{
