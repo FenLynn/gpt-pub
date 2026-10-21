@@ -5,7 +5,8 @@ function rememberMonth(){
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
-    rules:{...RULES},prefs:{...state.prefs}
+    rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
+    calendarOverrides:{...state.calendarOverrides}
   });
 }
 function monthExists(year,month){return state.monthStores.has(year+'-'+pad(month))}
@@ -14,7 +15,8 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   const key=year+'-'+pad(month);
   if(!state.monthStores.has(key)){
     if(!create){toast('该月份尚未创建，请点击「新建月份」',true);return false}
-    state.monthStores.set(key,{employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs}});
+    state.monthStores.set(key,{employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
+     calendarOverrides:{...state.calendarOverrides}});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
   YEAR=year;MONTH=month;
@@ -31,6 +33,8 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   if(next.rules&&next.rules.graceAmEnd==null)RULES.graceAmEnd=0;
   if(next.rules&&next.rules.gracePmEnd==null)RULES.gracePmEnd=0;
   if(next.prefs)state.prefs={...state.prefs,...next.prefs};
+  if(next.importProfile)state.importProfile=structuredClone(next.importProfile);
+  if(next.calendarOverrides)state.calendarOverrides={...state.calendarOverrides,...next.calendarOverrides};
   state.selection={type:'overall'};state.filter='main';state.chartTab='overview';
   state.chartDay=null;state.rawPage=1;state.timelineRange=null;
   reanalyze();render();
