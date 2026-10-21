@@ -72,9 +72,10 @@ async function ensureProjectSkeleton(){
 }
 function normalizeSavedMonth(payload){
   if(!payload||!Array.isArray(payload.records))return null;
+  payload=r62MigratePayload(structuredClone(payload));
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     employees:payload.employees||null,groups:payload.groups||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
 async function connectProjectDir(){
   if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
@@ -112,7 +113,13 @@ async function connectProjectDir(){
           const data=await existingDir(handle,'data');
           const year=await existingDir(data,yr),month=await existingDir(year,mo);
           const work=await existingDir(month,'working');
-          const stored=normalizeSavedMonth(await readJSON(work,'state.json'));
+          let payload;
+          try{payload=await readJSON(work,'state.json')}catch(e){
+           payload=await readJSON(work,'state.previous.json');
+           if(payload)toast('检测到损坏的工作文件，已使用上一有效版本：'+key,true);
+           else throw e;
+          }
+          const stored=normalizeSavedMonth(payload);
           if(stored)state.monthStores.set(key,stored);
         }catch(e){if(e.name!=='NotFoundError')throw e}
       }
@@ -148,13 +155,13 @@ function projectPayload(){
 }
 function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
-    employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},
+    employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},importProfile:r62ImportProfile(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,
-    analysis:[...state.analysis.values()].map(a=>({employeeId:a.employee.id,date:a.date,severity:a.severity,status:a.status,
-      firstIn:a.firstIn,lastOut:a.lastOut,presence:a.presence,issues:a.issues,marker:a.marker}))};
+    // All derived analyses are recalculated from raw facts and manual decisions.
+    analysisEngineVersion:'R62'};
 }
 async function saveWorking(){
   const payload=JSON.stringify(workingPayload(),null,2);
@@ -162,10 +169,14 @@ async function saveWorking(){
     try{
       await ensureProjectSkeleton();
       const m=await monthDirectory(),w=await dir(m,'working');
+      // Keep a verified last-good copy before replacing the working state.
+      const old=await readJSON(w,'state.json');
+      if(old?.records)await writeFile(w,'state.previous.json',JSON.stringify(old,null,2));
       await writeFile(w,'state.json',payload);
-      const config=await dir(state.projectDir,'config');
-      await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
-      await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
+      const verified=await readJSON(w,'state.json');
+      if(!verified||JSON.stringify(verified)!==JSON.stringify(JSON.parse(payload)))
+       throw new Error('写入校验失败，保留上一有效版本');
+      // Working is authoritative; config files are optional legacy defaults.
       state.saved=true;rememberMonth();
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
       render();toast('已保存 '+monthKey()+' 的工作状态');return;
@@ -174,10 +185,29 @@ async function saveWorking(){
   downloadBlob(new Blob([payload],{type:'application/json'}),'AttendScope_'+monthKey()+'_working.json');
   state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
 }
+async function restoreWorkingFile(file){
+ let source;try{source=JSON.parse(await file.text())}catch(e){throw new Error('无法解析 JSON，文件可能不完整')}
+ const working=source?.working||source;
+ const yr=Number(working?.year),mo=Number(working?.month);
+ if(!Number.isInteger(yr)||yr<2000||yr>2100||!Number.isInteger(mo)||mo<1||mo>12)
+  throw new Error('工作文件缺少有效年月');
+ const normalized=normalizeSavedMonth(working);
+ if(!normalized)throw new Error('文件不是 AttendScope 工作状态或冻结快照');
+ if(!window.confirm('将导入 '+yr+' 年 '+mo+' 月工作状态（包括人工修订）。同月未保存的内容将被替换。是否继续？'))return;
+ rememberMonth();
+ const key=yr+'-'+pad(mo),before=state.monthStores.get(key);
+ state.monthStores.set(key,{...normalized,saved:false});
+ try{
+  if(!switchMonth(yr,mo,false,false))throw new Error('无法打开导入月份');
+  state.saved=false;rememberMonth();render();toast('工作状态已恢复，建议检查后保存');
+ }catch(e){if(before)state.monthStores.set(key,before);else state.monthStores.delete(key);throw e}
+}
 async function freezeSnapshot(){
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
     appVersion:'0.1.0-preview',sourceImports:state.imports,parentSnapshot:null};
-  const snapshot={manifest,config:{employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}},working:workingPayload()};
+  const snapshot={manifest:{...manifest,analysisEngineVersion:'R62',workingSchema:2},config:{
+ employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
+ },working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
   if(state.projectDir){
     try{
