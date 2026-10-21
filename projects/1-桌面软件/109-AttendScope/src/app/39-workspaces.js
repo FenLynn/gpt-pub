@@ -5,8 +5,7 @@ const WORKSPACE_ITEMS=[
  ['group','分组分析','layers'],
  ['person','个人分析','person'],
  ['stats','统计分析','chart'],
- ['data','数据管理','database'],
- ['project','项目总览','folder-check']
+ ['data','数据管理','database']
 ];
 function workspaceGroups(){
  return [...new Set(EMPLOYEES.map(e=>groupOf(e)))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
@@ -89,19 +88,21 @@ function workspaceSidebarHtml(){
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
     escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
  // Statistical metrics live in one top-level workspace, not three sidebar clones.
- const view=mode==='project'?'<div class="side-subnav r68-project-shortcuts">'+
-  [['r68MonthsCard','月份状态'],['r68HealthCard','健康检测'],['r68StorageCard','存储构成'],['r68ProjectTree','文件结构']].map(([id,name])=>
-  '<button type="button" data-project-scroll="'+id+'">'+name+'</button>').join('')+'</div>':'';
- const sub=mode==='data'?'<div class="side-subnav">'+
-  [['records','原始记录'],['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
-  '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+'</div>':'';
- return '<div class="side-controls">'+view+groupControl+personControl+(mode==='data'?sub:'')+'</div>'+
+ const sub=mode==='data'?'<div class="side-subnav r69-data-nav">'+
+  '<div class="r69-nav-category">项目状态</div>'+
+  [['overview','项目概况'],['months','月份库存'],['health','健康检测'],['storage','存储与文件']].map(([id,name])=>
+   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
+  '<div class="r69-nav-category">数据维护</div>'+
+  [['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['records','原始记录'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
+   '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
+  '</div>':'';
+ return '<div class="side-controls">'+groupControl+personControl+sub+'</div>'+
    '<div class="side-bottom"><section class="side-calendar calendar-section">'+
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
-   '<div class="side-refinements"><div class="side-refinements-title">辅助筛选</div>'+sidebarFilterHtml()+'</div>')+'</div>';
+   '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';
@@ -110,7 +111,7 @@ function workspaceToolbarHtml(){
   '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
  if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
  if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 名册、规则与原始记录</span></div></div>';
- if(mode==='project')return '<div class="workspace-toolbar"><div><strong>项目总览</strong><span>所有月份 · 存储库存 · 健康状态</span></div><button type="button" class="r68-quiet" id="r68RefreshProject">重新扫描</button></div>';
+
  return '';
 }
 function bindWorkspaceNavigation(){
@@ -164,7 +165,7 @@ function navigateWorkspace(mode){
   render();return;
  }
  if(state.statsConfig)state.statsConfig.compare=asStatDefaultCompare(mode);
- if(mode==='all'||mode==='group'||mode==='data'||mode==='project'){state.selection={type:'overall'};state.chartTab='overview'}
+ if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
  if(mode==='person'){
   // An explicit visit to Personal starts on day 1 in timeline mode.
