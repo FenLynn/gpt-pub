@@ -94,7 +94,7 @@ async function run(){
  await check(page,()=>r62ImportDraft.validated?.rows.length===2,'R63 XLSX preview');
  await page.locator('#r62Commit').click();
  await page.waitForFunction(()=>state.records.length===2&&state.imports.length===1,{timeout:60000});
- await check(page,()=>YEAR===2027&&MONTH===1&&EMPLOYEES[0].name==='新员工乙','R63 real January XLSX import');
+ await check(page,()=>YEAR===2027&&MONTH===1&&EMPLOYEES.some(e=>e.name==='新员工乙')&&state.records.every(r=>r.name==='新员工乙'),'R63 real January XLSX import');
  await page.evaluate(()=>switchMonth(2026,10));
  await check(page,()=>EMPLOYEES.length===50&&state.records.length>3500,'R63 restored October baseline');
  await page.locator('#printReport').click();
