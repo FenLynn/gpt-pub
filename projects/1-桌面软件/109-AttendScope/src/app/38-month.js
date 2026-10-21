@@ -15,7 +15,11 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   const key=year+'-'+pad(month);
   if(!state.monthStores.has(key)){
     if(!create){toast('该月份尚未创建，请点击「新建月份」',true);return false}
-    state.monthStores.set(key,{employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
+    const profile=state.projectProfile||{};
+    const pinnedPeople=profile.pinRoster&&Array.isArray(profile.employees)?profile.employees:EMPLOYEES;
+    const pinnedGroups=profile.pinRoster&&profile.groups?profile.groups:state.groups;
+    const pinnedImport=profile.pinImport&&profile.importProfile?profile.importProfile:r62ImportProfile();
+    state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
      calendarOverrides:{...state.calendarOverrides}});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
