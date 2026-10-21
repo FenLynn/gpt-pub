@@ -72,7 +72,7 @@ function render(){
   document.documentElement.classList.toggle('reduce-animations',state.prefs?.motion===false);
   bind();
   renderCalendar();
-  if(!['stats','project'].includes(state.workspaceMode))renderMatrix();
+  if(state.workspaceMode!=='stats')renderMatrix();
   if(state.workspaceMode==='stats')renderStatisticsWorkspace();
   else renderAnalysisPanel();
 }
@@ -202,7 +202,7 @@ function layoutHtml(){
         </section>
       </div>
       ${state.workspaceMode==='stats'?'<section id="statisticsWorkspace" class="stats-workspace"></section>':''}
-      ${state.workspaceMode==='project'?'<section id="r68ProjectWorkspace" class="r68-project-workspace"></section>':''}
+      
     </main>
   </div>
 
@@ -447,7 +447,7 @@ function analysisContext(){
 function renderAnalysisPanel(){
   if(state.workspaceMode==='all'||state.workspaceMode==='group'){renderScopeSummary();return}
   if(state.workspaceMode==='data'){renderDataWorkspace();return}
-  if(state.workspaceMode==='project'){r68RenderProject();return}
+  
   const body=document.getElementById('analysisBody'); if(!body)return;
   if(typeof disposeAnalysisCharts==='function')disposeAnalysisCharts();
   const ctx=analysisContext();
