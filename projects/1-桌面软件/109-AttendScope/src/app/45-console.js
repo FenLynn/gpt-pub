@@ -7,8 +7,13 @@ const r68UI={chosen:new Set(),search:'',rosterFilter:'all',projectSerial:0,treeS
 function r68Esc(s){return escapeNameChar(String(s??''))}
 function r68HumanBytes(bytes){return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB'}
 function r68Pill(text,kind='neutral'){return '<span class="r68-pill '+kind+'">'+r68Esc(text)+'</span>'}
+function r71Hint(text){
+ return '<button class="r71-help" type="button" title="'+r68Esc(text)+
+  '" aria-label="说明：'+r68Esc(text)+'">ⓘ</button>';
+}
 function r68SidebarHeader(title,subtitle,actions=''){
- return '<header class="r68-cardhead"><div><h3>'+title+'</h3><p>'+subtitle+'</p></div>'+actions+'</header>';
+ return '<header class="r68-cardhead r71-content-head"><h3>'+title+'</h3>'+
+  (subtitle?r71Hint(subtitle):'')+'<div class="r71-heading-actions">'+actions+'</div></header>';
 }
 function r68RosterRows(){
  const query=r68UI.search.trim().toLocaleLowerCase();
@@ -135,57 +140,67 @@ async function r69RefreshInventory(){
 function r69PaintProjectSection(report,tree){
  const node=document.getElementById('r69ProjectPane');
  if(!node||!r69IsProjectSection(state.dataSection))return;
- const original=document.createElement('div');original.innerHTML=r68ProjectMarkup(report,tree);
- const cards={
-  overview:['.r68-overview-cards','#r68MonthsCard','#r68HealthCard'],
-  months:['#r68MonthsCard'],health:['#r68HealthCard'],
-  storage:['#r68StorageCard']
- };
- const tab=state.dataSection;
- const content=cards[tab].map(sel=>original.querySelector(sel)?.outerHTML||'').join('');
- const caption={overview:['项目概况','所有已保存月份、健康情况与长期状态'],
-  months:['月份库存','每个月的原始数据、工作状态、备用状态与冻结修订'],
-  health:['项目健康检测','逐项提示缺失、损坏和版本冲突；检测始终只读'],
-  storage:['存储与文件','按本地文件实际大小归类；右侧显示当前文件夹树']};
- const name=caption[tab],connected=!!state.projectDir;
- const actions='<div class="r69-project-actions">'+
-  '<button class="r68-btn" id="r68ScanAgain" type="button">重新扫描</button>'+
-  '<button class="r68-btn" id="r68ProjectBackup" type="button" '+(!connected?'disabled':'')+'>完整 ZIP 备份</button>'+
-  '<button class="r68-btn" id="r68OpenProjectControl" type="button">初始化 / 恢复 / 更新</button></div>';
- node.innerHTML='<div class="r69-section-title"><div><h2>'+name[0]+'</h2><p>'+name[1]+'</p></div>'+
-  r68Pill(!connected?'未连接':report.level==='critical'?'严重问题':report.level==='warning'?'待检查':'正常',
-   !connected?'warning':report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
-  content+actions;
+ const tab=state.dataSection,connected=!!state.projectDir;
+ const captions={overview:['项目概况','查看真实保存的月份、冻结状态与健康问题'],
+  months:['月份库存','月份内容来自项目磁盘，而非临时浏览器状态'],
+  health:['健康检测','只读检测，不自动覆盖用户的原始记录或冻结'],
+  storage:['存储与文件','实际磁盘大小与文件目录，不修改原文件']};
+ const [title,description]=captions[tab];
+ const buttons=connected?'<button class="r68-btn" type="button" id="r68ScanAgain">重新扫描</button>'+
+  '<button class="r68-btn" type="button" id="r68ProjectBackup">备份 ZIP</button>'+
+  '<button class="r68-btn" type="button" id="r68OpenProjectControl">管理项目</button>':'';
+ let content='';
+ if(!connected){
+  content='<div class="r70-project-intro r71-setup" role="region" aria-label="项目连接">'+
+   '<h3>连接项目，开始使用</h3><div class="r71-setup-actions">'+
+   '<button class="r68-btn primary" type="button" id="r68OpenProjectControl">连接 / 初始化</button>'+
+   '<button class="r68-btn" type="button" id="r71RestoreZip">恢复 ZIP 备份</button></div></div>';
+ }else{
+  const host=document.createElement('div');host.innerHTML=r68ProjectMarkup(report,tree);
+  const pick=selector=>host.querySelector(selector)?.outerHTML||'';
+  const months=report.months||[],issues=report.issues||[];
+  if(tab==='overview'){
+   const facts=[['月份',months.length],['原始文件',report.rawFileCount||0],
+    ['冻结',report.snapshotCount||0],['修订',months.reduce((n,m)=>n+m.branches.length,0)],
+    ['占用',r68HumanBytes(tree?.totalBytes||0)]];
+   content='<div class="r70-project-facts r71-facts">'+facts.map(([n,v])=>
+    '<span><em>'+n+'</em><strong>'+v+'</strong></span>').join('')+'</div>'+
+    pick('#r68MonthsCard')+(issues.length?pick('#r68HealthCard'):'');
+  }else if(tab==='months')content=pick('#r68MonthsCard');
+  else if(tab==='health')content=pick('#r68HealthCard');
+  else content=pick('#r68StorageCard')+
+    '<section class="r71-tree-section"><div class="r71-tree-heading"><h3>实际文件树</h3>'+
+    r71Hint('展开文件夹查看已连接目录的真实文件')+'</div>'+
+    (host.querySelector('#r68ProjectTree .r68-filetree')?.outerHTML||
+    '<div class="r68-empty">目录扫描中…</div>')+'</section>';
+ }
+ const level=report?.level==='critical'?'严重问题':report?.level==='warning'?'需要检查':'正常';
+ node.innerHTML='<header class="r69-section-title r71-section-title"><h2>'+title+'</h2>'+
+  r71Hint(description)+(connected?'<span class="r71-project-status '+(report.level||'')+'">'+level+'</span>':'')+
+  '<div class="r71-project-actions">'+buttons+'</div></header>'+content;
  node.querySelector('#r68ScanAgain')?.addEventListener('click',r69RefreshInventory);
  node.querySelector('#r68ProjectBackup')?.addEventListener('click',()=>p109BackupProject());
  node.querySelector('#r68OpenProjectControl')?.addEventListener('click',()=>openProjectControl());
+ node.querySelector('#r71RestoreZip')?.addEventListener('click',()=>p109RestoreArchive());
  node.querySelector('#r68IndexRepair')?.addEventListener('click',async()=>{
   await p109RepairIndex(report);await r69RefreshInventory();
  });
  node.querySelectorAll('[data-r68-month]').forEach(b=>b.onclick=()=>{
-  const [y,m]=b.dataset.r68Month.split('-').map(Number);
-  if(monthExists(y,m)){
-   state.dataSection='records';switchMonth(y,m);render();
-  }else toast('磁盘存在此月份，但尚未载入内存；请重新连接项目目录',true);
+  const [year,month]=b.dataset.r68Month.split('-').map(Number);
+  if(monthExists(year,month)){state.dataSection='records';switchMonth(year,month);render()}
+  else toast('磁盘存在此月份，但尚未载入；请重新连接项目目录',true);
  });
 }
-
 function r68DataMarkup(){
  const section=state.dataSection||'records';
- if(r69IsProjectSection(section))return '<div class="r68-data-studio r69-project-data">'+
-  '<div class="r68-data-main" id="r69ProjectPane"><div class="r68-loading">正在核对本地项目状态…</div></div>'+
-  '<aside class="r68-data-rail" id="r68DataRail">'+r68RailPlaceholder()+'</aside></div>';
- return '<div class="r68-data-studio"><div class="r68-data-main"><div class="r68-studio-summary">'+
-  '<div><span>人员</span><strong>'+EMPLOYEES.length+'</strong></div>'+
-  '<div><span>打卡</span><strong>'+state.records.length.toLocaleString()+'</strong></div>'+
-  '<div><span>请假</span><strong>'+state.leaves.length+'</strong></div>'+
-  '<div><span>出差</span><strong>'+state.trips.length+'</strong></div>'+
-  '<div>'+r68Pill(state.projectDir?'已连接':'未连接',state.projectDir?'healthy':'warning')+'</div></div>'+
-  '<section class="r68-studio-card r68-data-content" id="r68DataContent">'+
+ if(r69IsProjectSection(section))return '<div class="r71-data-shell">'+
+  '<main id="r69ProjectPane" class="r71-data-main"><div class="r68-loading">正在读取项目…</div></main></div>';
+ return '<div class="r71-data-shell"><main class="r71-data-main">'+
+  '<section id="r68DataContent" class="r71-data-content">'+
   (section==='roster'?r68RosterHtml():section==='rules'?r68RulesHtml():
    section==='templates'?r68TemplatesHtml():section==='imports'?r68ImportsHtml():
-   section==='freezes'?r68FreezeHtml():r68RecordsHtml())+'</section></div>'+
-  '<aside class="r68-data-rail" id="r68DataRail">'+r68RailPlaceholder()+'</aside></div>';
+   section==='freezes'?r68FreezeHtml():r68RecordsHtml())+
+  '</section></main></div>';
 }
 function r68RailPlaceholder(){
  if(state.projectDir&&r68UI.latestRoot===state.projectDir&&r68UI.latestTree&&r68UI.latestReport){
@@ -249,6 +264,13 @@ function r68RenderData(){
  root.querySelector('#r68RailProject')?.addEventListener('click',()=>r69NavigateData('overview'));
  if((state.dataSection||'records')==='records')mountRawTable(state.selection.type==='date'?
   {type:'date',day:state.selection.day,items:[]}:{type:'overall',items:workAnalyses()});
+ root.querySelectorAll('.r68-note').forEach(note=>{
+  const btn=document.createElement('button');btn.type='button';
+  btn.className='r71-help r71-note-help';btn.textContent='ⓘ 说明';
+  btn.title=note.textContent.trim();
+  btn.setAttribute('aria-label','说明：'+note.textContent.trim());
+  note.replaceWith(btn);
+ });
  r68FillDataRail();
 }
 function r68RefreshDataContent(){
@@ -300,34 +322,26 @@ function r68StorageBars(tree){
  '<div class="r68-storage-row"><div><span>'+label+'</span><strong>'+r68HumanBytes(tree.buckets[id])+'</strong></div>'+
  '<div class="r68-storage-track"><i style="width:'+Math.max(1,100*tree.buckets[id]/tree.totalBytes).toFixed(2)+'%;background:'+colors[id]+'"></i></div></div>').join('');
 }
+/* R71: the only file-tree view is in Storage & Files, not every data subpage. */
 async function r68FillDataRail(){
- const el=document.getElementById('r68DataRail');if(!el)return;
- const id=++r68UI.treeSerial,sourceRoot=state.projectDir;
- if(sourceRoot&&r68UI.latestRoot===sourceRoot&&r68UI.latestTree&&r68UI.latestReport&&Date.now()-(r68UI.latestScanAt||0)<3000){
-   r69PaintProjectSection(r68UI.latestReport,r68UI.latestTree);return;
-  }
- if(!state.projectDir){el.innerHTML=r68RailPlaceholder();el.querySelector('#r68RailProject')?.addEventListener('click',()=>r69NavigateData('overview'));
-    if(r69IsProjectSection(state.dataSection))p109AuditProject().then(report=>r69PaintProjectSection(report,null)).catch(e=>r69ProjectError(e));return}
+ const tab=state.dataSection||'records',project=r69IsProjectSection(tab);
+ if(!project&&tab!=='freezes')return;
+ const root=state.projectDir,token=++r68UI.treeSerial;
+ if(r68UI.latestRoot===root&&r68UI.latestReport&&Date.now()-(r68UI.latestScanAt||0)<3000){
+  if(project)r69PaintProjectSection(r68UI.latestReport,r68UI.latestTree);
+  return;
+ }
  try{
-  const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
-  if(id!==r68UI.treeSerial||!el.isConnected||state.projectDir!==sourceRoot)return;
-  r68UI.latestRoot=sourceRoot;r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
-  el.innerHTML='<section class="r68-rail-card"><div class="r68-rail-heading"><h3>项目状态</h3>'+
-    r68Pill(report.level==='critical'?'严重问题':report.level==='warning'?'需检查':'健康',
-      report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
-   '<div class="r68-rail-metrics"><div>月份 <strong>'+report.months.length+'</strong></div>'+
-   '<div>冻结 <strong>'+report.snapshotCount+'</strong></div>'+
-   '<div>修订 <strong>'+report.months.reduce((x,m)=>x+m.branches.length,0)+'</strong></div>'+
-   '<div>原件 <strong>'+report.rawFileCount+'</strong></div></div>'+
-   '<p class="r68-muted">'+(state.saved?'当前月份已保存':'当前月份有未保存修改')+
-    ' · '+(report.issues?.length||0)+' 条检测提示</p>'+
-   '<button class="r68-btn" id="r68RailProject">查看月份与健康 →</button></section>'+
-   '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>文件树</h3><span>'+tree.files+' 文件 · '+r68HumanBytes(tree.totalBytes)+'</span></div>'+
-   '<div class="r68-filetree" aria-label="当前连接目录的实际文件树">'+r68TreeLine(state.projectDir.name||'项目','directory')+
-    '<div class="r68-tree-children">'+tree.html+'</div></div></section>';
-  el.querySelector('#r68RailProject').onclick=()=>r69NavigateData('overview');
-   r69PaintProjectSection(report,tree);
- }catch(e){if(id===r68UI.treeSerial){el.innerHTML='<div class="r68-note">文件扫描失败：'+r68Esc(e.message)+'</div>';r69ProjectError(e)}}
+  const [report,tree]=await Promise.all([p109AuditProject(root),
+   root&&project?r68PhysicalTree(root):Promise.resolve(null)]);
+  if(token!==r68UI.treeSerial||state.projectDir!==root||state.workspaceMode!=='data')return;
+  r68UI.latestRoot=root;r68UI.latestReport=report;
+  if(tree)r68UI.latestTree=tree;
+  if(!root)r68UI.latestTree=null;
+  r68UI.latestScanAt=Date.now();
+  if(project)r69PaintProjectSection(report,tree||r68UI.latestTree);
+  else if(tab==='freezes'&&state.dataSection==='freezes')r68RenderData();
+ }catch(e){if(token===r68UI.treeSerial&&project)r69ProjectError(e)}
 }
 function r68ProjectMarkup(report,tree){
  const months=report?.months||[],issues=report?.issues||[],connected=!!state.projectDir;

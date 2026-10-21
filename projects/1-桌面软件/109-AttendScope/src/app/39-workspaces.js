@@ -108,9 +108,9 @@ function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';
  if(mode==='all'||mode==='group')return '<div class="workspace-toolbar"><div><strong>'+(mode==='all'?'全员考勤':'分组考勤')+'</strong>'+
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
-  '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
+  '</div><section id="scopeSummary" class="scope-summary"></section>';
  if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
- if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 名册、规则与原始记录</span></div></div>';
+ if(mode==='data')return '<div class="workspace-toolbar r71-data-toolbar"><strong>数据管理</strong></div>';
 
  return '';
 }

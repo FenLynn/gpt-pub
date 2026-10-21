@@ -231,6 +231,37 @@ async function run(){
    })&&rank&&parseFloat(getComputedStyle(rank).fontSize)>=13;
   },'R70 group stats must use unboxed and legible rows');
  await page.screenshot({path:path.join(out,'r70-group-flat.png')});
+ // R71 viewport contracts: NO inspector scrollbar, clipping or repeated headcount.
+ for(const [width,height] of [[1366,768],[1600,900],[1920,1080]]){
+  await page.setViewportSize({width,height});
+  for(const view of ['all','group']){
+   await page.locator('[data-workspace="'+view+'"]').click();
+   await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
+   await check(page,()=>{
+    const panel=document.querySelector('#scopeInsights');
+    const chart=document.querySelector('#scopeDailyChart svg');
+    const rows=[...panel.querySelectorAll('.r68-scope-rank .r68-rank-row')];
+    const counter=panel.querySelector('.r71-headcount');
+    if(!counter||!chart||!rows.length)return false;
+    const panelRect=panel.getBoundingClientRect(),last=rows.at(-1).getBoundingClientRect();
+    const graph=chart.getBoundingClientRect();
+    return ['hidden','clip'].includes(getComputedStyle(panel).overflowY)&&
+     panel.scrollHeight<=panel.clientHeight+2&&
+     last.bottom<=panelRect.bottom+1&&graph.bottom<=panelRect.bottom+1&&
+     document.querySelectorAll('.r71-headcount').length===1&&
+     document.querySelectorAll('.workspace-hint').length===0&&
+     counter.textContent.trim()===(scopeVisibleEmployees().length+' 人')&&
+     !panel.querySelector('.r68-scope-note')&&
+     parseFloat(getComputedStyle(rows[0].querySelector('.r68-rank-name')).fontSize)>=13&&
+     document.documentElement.scrollWidth<=innerWidth+3;
+   },'R71 all/group inspector must fit the whole viewport with one headcount and no internal scroll');
+  }
+ }
+ await page.setViewportSize({width:1920,height:1080});
+ await page.locator('[data-workspace="group"]').click();
+ await page.waitForSelector('#scopeDailyChart svg',{timeout:15000});
+ await page.screenshot({path:path.join(out,'r71-group-no-scroll.png')});
+
  await page.screenshot({path:path.join(out,'r41-group.png')});
  await page.screenshot({path:path.join(out,'r37-group.png')});
  await check(page,()=>{
@@ -420,6 +451,28 @@ async function run(){
    })&&!document.querySelector('#r68DataRail .r68-rail-metrics');
   },'R70 project overview must not contain isolated numerical tiles');
  await page.screenshot({path:path.join(out,'r70-data-overview.png')});
+ // R71 data management uses one work area across all ten categories.
+ for(const tab of ['overview','months','health','storage','roster','rules','templates','records','imports','freezes']){
+  await page.locator('[data-data-section="'+tab+'"]').click();
+  if(['overview','months','health','storage'].includes(tab))
+   await page.waitForSelector('#r69ProjectPane .r71-section-title',{timeout:16000});
+  await check(page,expected=>{
+   const area=document.getElementById('analysisBody');
+   const toolbar=document.querySelector('.workspace-toolbar');
+   const tip=area.querySelector('.r71-help');
+   return state.dataSection===expected&&!!area.querySelector('.r71-data-shell')&&
+    !area.querySelector('#r68DataRail')&&!!tip&&tip.title.length>6&&
+    !area.querySelector('.r68-cardhead p')&&
+    !toolbar.textContent.includes('名册、规则与原始记录')&&
+    document.documentElement.scrollWidth<=innerWidth+3&&
+    (expected==='storage'||!area.querySelector('.r71-tree-section'));
+  },tab,'R71 data sections must be single-column, without persistent help text or duplicate tree');
+  if(tab==='overview')await page.screenshot({path:path.join(out,'r71-data-overview.png')});
+  if(tab==='storage')await page.screenshot({path:path.join(out,'r71-data-storage.png')});
+ }
+ await page.locator('[data-data-section="overview"]').click();
+ await page.waitForSelector('#r69ProjectPane .r71-section-title',{timeout:16000});
+
  await page.locator('[data-data-section="roster"]').click();
  await check(page,()=>document.querySelectorAll('.r68-roster-entry:not(.r68-roster-columns)').length===EMPLOYEES.length,
   'R37 data management missing real roster');
