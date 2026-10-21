@@ -3,7 +3,7 @@
   "projectId": "P109-AttendScope",
   "projectName": "考勤",
   "appVersion": "0.2.0-preview",
-  "analysisEngineVersion": "R67",
+  "analysisEngineVersion": "R68",
   "timezone": "Asia/Shanghai",
   "current": {
     "year": 2026,
