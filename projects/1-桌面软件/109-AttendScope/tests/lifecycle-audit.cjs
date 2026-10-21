@@ -207,12 +207,10 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   // R69: one data management route owns all project inventory and health categories.
   await page.evaluate(()=>{state.dataSection='overview';navigateWorkspace('data')});
   await page.waitForSelector('.r68-month-row:not(.heading)',{timeout:30000});
-  await page.waitForSelector('.r68-data-rail .r68-filetree',{timeout:30000});
   report.projectMonthInventory=await page.evaluate(()=>{
    const m=document.querySelector('.r68-month-table')?.textContent||'';
-   const tree=document.querySelector('.r68-data-rail .r68-filetree')?.textContent||'';
    return m.includes('2026-10')&&m.includes('已保存')&&
-    tree.includes('state.json')&&tree.includes('审核门禁.csv')&&
+    !document.querySelector('.r68-data-rail')&&!document.querySelector('.r68-filetree')&&
     !document.querySelector('[data-workspace="project"]')&&
     document.querySelectorAll('[data-workspace]').length===5&&
     ['overview','months','health','storage'].every(k=>!!document.querySelector('[data-data-section="'+k+'"]'));
@@ -220,8 +218,12 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.screenshot({path:path.join(out,'r69-data-project-overview.png')});
   await page.locator('[data-data-section="storage"]').click();
   await page.waitForSelector('.r68-storage-bars .r68-storage-row',{timeout:30000});
-  report.projectStorageCategory=await page.evaluate(()=>!!document.querySelector('#r68StorageCard')&&
-   !!document.querySelector('.r68-data-rail .r68-filetree'));
+  await page.waitForSelector('.r71-tree-section .r68-filetree',{timeout:30000});
+  report.projectStorageCategory=await page.evaluate(()=>{
+   const tree=document.querySelector('.r71-tree-section .r68-filetree')?.textContent||'';
+   return !!document.querySelector('#r68StorageCard')&&tree.includes('state.json')&&
+    tree.includes('审核门禁.csv')&&!document.querySelector('.r68-data-rail');
+  });
   await page.screenshot({path:path.join(out,'r69-data-storage.png')});
   await page.locator('[data-data-section="health"]').click();
   await page.waitForSelector('#r68HealthCard');
@@ -232,13 +234,12 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.projectMonthsCategory=await page.evaluate(()=>!!document.querySelector('#r68MonthsCard'));
   await page.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});
   await page.waitForSelector('.r68-roster-entry:not(.r68-roster-columns)');
-  await page.waitForSelector('.r68-data-rail .r68-filetree',{timeout:30000});
   report.rosterUi=await page.evaluate(()=>{
-   const card=document.querySelector('.r68-data-content');
+   const card=document.querySelector('.r71-data-content');
    return !!card&&!card.querySelector('.data-roster-head')&&
     !!document.querySelector('#r68SelectVisible')&&
     !!document.querySelector('#r68BulkGroup')&&
-    !!document.querySelector('.r68-data-rail .r68-filetree');
+    !document.querySelector('.r68-data-rail')&&!document.querySelector('.r68-filetree');
   });
   await page.locator('#r68SelectVisible').check();
   await page.locator('#r68BulkGroup').selectOption({index:1});
