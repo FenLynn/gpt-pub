@@ -40,12 +40,13 @@ function r68RosterHtml(){
   '<select id="r68RosterFilter" aria-label="人员筛选">'+
    [['all','所有人员'],['ungrouped','未分组'],['new','本月导入'],['fixed','固定人员'],['temporary','非固定人员']].map(([v,t])=>
     '<option value="'+v+'" '+(r68UI.rosterFilter===v?'selected':'')+'>'+t+'</option>').join('')+'</select>'+
-  '<span>'+rows.length+' 人 · 固定 '+fixed.size+' 人</span></div>'+
+  '<span>'+rows.length+' 人 · 固定 '+fixed.size+' 人</span>'+
   '<div class="r72-group-manager"><strong>组别</strong>'+
    '<select id="r72GroupToRemove" aria-label="管理已有组别"><option value="">选择组别…</option>'+
    catalog.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('')+'</select>'+
    '<button type="button" class="r68-btn" id="r72AddGroup">+ 新增组别</button>'+
-   '<button type="button" class="r68-btn" id="r72DeleteGroup">删除组别</button></div>'+
+   '<button type="button" class="r68-btn" id="r72RenameGroup">改名</button>'+
+   '<button type="button" class="r68-btn" id="r72DeleteGroup">删除</button></div></div>'+
   '<div class="r68-roster-bulk r72-roster-bulk"><label><input id="r68SelectVisible" type="checkbox" '+
    (rows.length&&rows.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'> 全选当前筛选</label>'+
    '<span>已选 '+chosen.length+' 人</span>'+
@@ -162,6 +163,22 @@ async function r72CreateGroup(){
  }
  state.groupCatalog=[...(state.groupCatalog||[]),group];
  r72MarkDirty('create-group',{group});await r72PersistRoster();
+}
+async function r72RenameGroup(group){
+ if(!group||!(state.groupCatalog||[]).includes(group))return;
+ const input=window.prompt('修改组别名称（旧月份内容保持不变）',group);
+ if(input===null)return;
+ const next=String(input).trim();
+ if(!next||next.length>24||next==='未分组'||
+  (next!==group&&(state.groupCatalog||[]).includes(next))){
+  toast('组别无效或已经存在',true);return;
+ }
+ if(next===group)return;
+ state.groupCatalog=state.groupCatalog.map(g=>g===group?next:g);
+ for(const e of EMPLOYEES)if(groupOf(e)===group)state.groups[e.id]=next;
+ if(state.selectedGroup===group)state.selectedGroup=next;
+ r72MarkDirty('rename-group',{from:group,to:next});
+ await r72PersistRoster();
 }
 async function r72DeleteGroup(group){
  if(!group||!(state.groupCatalog||[]).includes(group))return;
@@ -374,6 +391,8 @@ function r68RenderData(){
  root.querySelector('#r72AddGroup')?.addEventListener('click',()=>r72CreateGroup());
  root.querySelector('#r72DeleteGroup')?.addEventListener('click',()=>
   r72DeleteGroup(root.querySelector('#r72GroupToRemove')?.value));
+ root.querySelector('#r72RenameGroup')?.addEventListener('click',()=>
+  r72RenameGroup(root.querySelector('#r72GroupToRemove')?.value));
  root.querySelector('#r72FixSelected')?.addEventListener('click',()=>
   r72FixedPeople([...r68UI.chosen],true));
  root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>
