@@ -221,7 +221,7 @@ async function run(){
    const day=Array.from({length:monthDays()},(_,i)=>i+1).filter(isWorkday);
    const work=workAnalyses().filter(a=>day.includes(a.day));
    const n=work.filter(a=>attendanceJudgment(a)==='anomaly').length;
-   return +document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[2].textContent===n&&
+   return +document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[1].textContent===n&&
       !!document.querySelector('.r68-scope-rank .r68-rank-row');
  },'R40 all-staff scoped analytics failed');
  await page.locator('#workspaceScopeGroup').selectOption({index:1});
@@ -239,7 +239,7 @@ async function run(){
  await check(page,()=>{
    const work=workAnalyses().filter(a=>isWorkday(a.day)&&groupOf(a.employee)===state.selectedGroup);
    const x=work.filter(a=>attendanceJudgment(a)==='absent').length;
-   return Number(document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[3].textContent)===x;
+   return Number(document.querySelectorAll('#scopeInsights .r68-scope-kpis strong')[2].textContent)===x;
  },'R40 group charts must use group-only data');
  await check(page,()=>{
   const row=document.querySelector('.matrix .m-name[data-emp]');
