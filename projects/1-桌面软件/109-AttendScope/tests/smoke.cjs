@@ -20,6 +20,8 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
+ if(errors.length)throw Error('R62 initial script exception: '+errors.join(' | '));
+ if(!await page.locator('.m-name .name-letters').count())throw Error('R62 missing matrix: '+(await page.locator('#app').innerHTML()).slice(0,1900)+' | '+errors.join(' | '));
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
   'R38 retired chart renderers remain active');
