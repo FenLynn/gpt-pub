@@ -66,12 +66,11 @@ function r63Compose(kind,visual){
 
 function captureMatrixCanvas(){
  const people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
- const w=Math.max(1260,165+monthDays()*32),h=Math.max(400,140+people.length*25);
- const [canvas,g]=captureCanvas(w,h);captureLabel(g,r63Title()+' · 月度考勤矩阵',26,43,23,'#27456b');
- captureLabel(g,periodText()+'  /  '+people.length+' 人',26,72);
- for(let d=1;d<=monthDays();d++)captureLabel(g,pad(d),166+(d-1)*32,108,12);
+ const w=Math.max(1260,165+monthDays()*32),h=Math.max(315,55+people.length*25);
+ const [canvas,g]=captureCanvas(w,h);
+ for(let d=1;d<=monthDays();d++)captureLabel(g,pad(d),166+(d-1)*32,28,12);
  people.forEach((p,row)=>{
-  const y=122+row*25;captureLabel(g,p.name,20,y+15);
+  const y=40+row*25;captureLabel(g,p.name,20,y+15);
   for(let d=1;d<=monthDays();d++){
    const a=state.analysis.get(p.id+'|'+d);if(!a)continue;
    const kind=attendanceJudgment(a);
@@ -84,8 +83,6 @@ function captureMatrixCanvas(){
 function captureStatisticsCanvas(){
  const data=asStatRows(),rows=data.visible||[],w=Math.max(1230,rows.length*28+90),h=720;
  const [canvas,g]=captureCanvas(w,h),left=70,bottom=587,max=Math.max(1,...rows.map(x=>x.value||0));
- captureLabel(g,r63Title()+' · 统计分析',26,42,23,'#27456b');
- captureLabel(g,periodText()+'  ·  '+rows.length+' 项 / '+data.effectiveUnit,26,69);
  const palette=asStatPalette(asStatPrefs().family,asStatPrefs().metric);
  rows.forEach((r,i)=>{
   const slot=(w-left-20)/rows.length,x=left+(i+.5)*slot;
@@ -99,12 +96,10 @@ function captureStatisticsCanvas(){
 }
 function captureTimelineCanvas(){
  const e=EMPLOYEES.find(x=>x.id===state.selection?.employeeId)||EMPLOYEES[0],day=state.chartDay||state.selection?.day||1;
- const a=state.analysis.get(e.id+'|'+day),[canvas,g]=captureCanvas(1320,530);
- captureLabel(g,r63Title()+' · 个人考勤时间轴',26,42,23,'#27456b');
- captureLabel(g,e.name+'  ·  '+isoDate(day),26,72);
+ const a=state.analysis.get(e.id+'|'+day),[canvas,g]=captureCanvas(1320,440);
  const x=v=>105+1100*Math.max(0,Math.min(1440,v))/1440;
  const tracks=['进出','出差','请假','外出','加班'],loc={trip:1,leave:2,outing:3,overtime:4};
- tracks.forEach((n,i)=>{const y=143+i*66;captureLabel(g,n,26,y);g.strokeStyle='#e4ecf3';g.beginPath();g.moveTo(100,y);g.lineTo(1230,y);g.stroke()});
+ tracks.forEach((n,i)=>{const y=56+i*66;captureLabel(g,n,26,y);g.strokeStyle='#e4ecf3';g.beginPath();g.moveTo(100,y);g.lineTo(1230,y);g.stroke()});
  if(a){
   const chart=r14TrackData(a);
   for(const band of chart.bars||[]){
@@ -113,11 +108,11 @@ function captureTimelineCanvas(){
    g.fillStyle=band.track==='overtime'?(band.origin==='auto'?
     OVERTIME_VISUALS.auto.top:OVERTIME_VISUALS.registered.top):
     ({trip:'#7d95d9',leave:'#af94de',outing:'#6eb3d3'})[band.track];
-   g.fillRect(x(band.value[0]),130+row*66,Math.max(2,x(band.value[1])-x(band.value[0])),22);
+   g.fillRect(x(band.value[0]),43+row*66,Math.max(2,x(band.value[1])-x(band.value[0])),22);
    g.globalAlpha=1;
   }
   for(const event of chart.events||[]){const minute=Number(event.value[0]);
-   g.fillStyle='#527fba';g.fillRect(x(minute)-1,131,3,24)}
+   g.fillStyle='#527fba';g.fillRect(x(minute)-1,44,3,24)}
  }
  return canvas;
 }
