@@ -135,5 +135,5 @@
       {name:'xl/worksheets/sheet1.xml',data:sheet}
     ]; return zipStore(files);
   }
-  global.AttendScopeXLSX={readTable,readGrid,writeXlsx,parseCsvText,parseDelimited};
+  global.AttendScopeXLSX={readTable,readGrid,writeXlsx,parseCsvText,parseDelimited,writeArchive:zipStore};
 })(window);
