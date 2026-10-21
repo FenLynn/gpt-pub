@@ -125,6 +125,21 @@ function r68DataMarkup(){
   '<aside class="r68-data-rail" id="r68DataRail">'+r68RailPlaceholder()+'</aside></div>';
 }
 function r68RailPlaceholder(){
+ if(state.projectDir&&r68UI.latestTree&&r68UI.latestReport){
+  const report=r68UI.latestReport,tree=r68UI.latestTree;
+  return '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>项目状态</h3>'+
+   r68Pill(report.level==='critical'?'严重问题':report.level==='warning'?'需检查':'健康',
+   report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
+   '<div class="r68-rail-metrics"><div>月份 <strong>'+report.months.length+'</strong></div>'+
+   '<div>冻结 <strong>'+report.snapshotCount+'</strong></div>'+
+   '<div>修订 <strong>'+report.months.reduce((x,m)=>x+m.branches.length,0)+'</strong></div>'+
+   '<div>原件 <strong>'+report.rawFileCount+'</strong></div></div>'+
+   '<button class="r68-btn" id="r68RailProject">打开项目总览 →</button></section>'+
+   '<section class="r68-rail-card"><div class="r68-rail-heading"><h3>文件树</h3><span>'+tree.files+
+   ' 文件 · '+r68HumanBytes(tree.totalBytes)+'</span></div>'+
+   '<div class="r68-filetree">'+r68TreeLine(state.projectDir.name,'directory')+
+   '<div class="r68-tree-children">'+tree.html+'</div></div></section>';
+ }
  return '<section class="r68-rail-card"><h3>项目状态</h3><p>'+(state.projectDir?'正在读取本地文件…':'尚未连接项目目录')+'</p>'+
   '<button class="r68-btn" id="r68RailProject">打开项目总览</button></section>'+
   '<section class="r68-rail-card"><h3>文件树</h3><div id="r68RailTree" class="r68-tree-placeholder">'+(state.projectDir?'正在读取文件结构…':'连接目录后显示实际文件树')+'</div></section>';
@@ -225,11 +240,12 @@ function r68StorageBars(tree){
 async function r68FillDataRail(){
  const el=document.getElementById('r68DataRail');if(!el)return;
  const id=++r68UI.treeSerial;
+ if(state.projectDir&&r68UI.latestTree&&Date.now()-(r68UI.latestScanAt||0)<3000)return;
  if(!state.projectDir){el.innerHTML=r68RailPlaceholder();el.querySelector('#r68RailProject')?.addEventListener('click',()=>navigateWorkspace('project'));return}
  try{
   const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
   if(id!==r68UI.treeSerial||!el.isConnected)return;
-  r68UI.latestReport=report;r68UI.latestTree=tree;
+  r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
   el.innerHTML='<section class="r68-rail-card"><div class="r68-rail-heading"><h3>项目状态</h3>'+
     r68Pill(report.level==='critical'?'严重问题':report.level==='warning'?'需检查':'健康',
       report.level==='critical'?'critical':report.level==='warning'?'warning':'healthy')+'</div>'+
