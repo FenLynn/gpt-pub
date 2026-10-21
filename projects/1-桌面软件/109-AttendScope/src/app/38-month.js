@@ -6,7 +6,7 @@ function rememberMonth(){
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
     rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
-    calendarOverrides:{...state.calendarOverrides}
+    calendarOverrides:{...state.calendarOverrides},activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
   });
 }
 function monthExists(year,month){return state.monthStores.has(year+'-'+pad(month))}
@@ -20,7 +20,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
     const pinnedGroups=profile.pinRoster&&profile.groups?profile.groups:state.groups;
     const pinnedImport=profile.pinImport&&profile.importProfile?profile.importProfile:r62ImportProfile();
     state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
-     calendarOverrides:{...state.calendarOverrides}});
+     calendarOverrides:{...state.calendarOverrides},activeBranch:null});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
   YEAR=year;MONTH=month;
@@ -30,6 +30,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
   state.revisions=next.revisions;state.revisionSeq=next.revisionSeq;
   state.imports=next.imports;state.saved=next.saved;
+  state.activeBranch=next.activeBranch||null;
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   if(next.rules)Object.assign(RULES,next.rules);
   if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
