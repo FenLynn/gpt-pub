@@ -198,8 +198,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    fs.readFileSync(frozenPath).equals(frozenBytes)&&
    Object.keys(JSON.parse(fs.readFileSync(branchPath,'utf8')).manualStatuses||{}).length===1;
   await page.reload({waitUntil:'load'});await page.evaluate(()=>connectProjectDir());
-  report.branchReopened=await page.evaluate(()=>state.activeBranch?.id===JSON.parse(JSON.stringify(state.activeBranch))?.id&&
-    state.activeBranch?.parentSnapshotId===Object.keys({[state.activeBranch.parentSnapshotId]:true})[0]);
+  report.branchReopened=await page.evaluate(id=>state.activeBranch?.id===id&&!!state.activeBranch?.parentSnapshotId,branchId);
   await page.evaluate(()=>p109ReturnToMain());
   report.backToMain=await page.evaluate(()=>!state.activeBranch&&state.records.length===2&&
     Object.keys(state.manualStatuses).length===0);
@@ -219,11 +218,12 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    fs.existsSync(path.join(fresh,'project.index.previous.json'));
   await page.evaluate(async()=>{
    p109Audit=await p109AuditProject();
-   await p109PinDefaults('roster');await p109PinDefaults('import');
+   await p109PinDefaults('roster');await p109PinDefaults('import');await p109PinDefaults('rules');
    switchMonth(2026,11,true);
   });
   report.pinnedForNextMonth=await page.evaluate(()=>state.projectProfile?.pinRoster&&
-   state.projectProfile.pinImport&&EMPLOYEES.length===1&&!!state.importProfile.templates?.attendance);
+   state.projectProfile.pinImport&&state.projectProfile.pinRules&&
+   EMPLOYEES.length===1&&RULES.amEnd==='11:40'&&!!state.importProfile.templates?.attendance);
   if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
   await page.locator('#p109ProjectControl').click();
   await page.waitForSelector('#p109Backup');
@@ -258,7 +258,9 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.codeUpdateDataUntouched=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')).equals(beforeWorking)&&
    fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv')).equals(beforeOriginal);
   report.preUpdateBackup=fs.readdirSync(path.join(restoreDir,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
-  report.releaseZipNoData=cp.spawnSync('python3',['-m','zipfile','-t',releaseZip],{encoding:'utf8'}).status===0;
+  const releaseCheck=cp.spawnSync('python3',['-c',
+    "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;assert all(p in ('index.html','README.md','p109-release-manifest.json') or p.startswith('src/') for p in z.namelist())",releaseZip],{encoding:'utf8'});
+  report.releaseZipNoData=releaseCheck.status===0;
 
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',
