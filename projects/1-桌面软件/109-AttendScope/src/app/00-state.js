@@ -6,7 +6,7 @@ function monthKey(){return `${YEAR}-${pad(MONTH)}`}
 function monthDays(){return new Date(YEAR,MONTH,0).getDate()}
 function periodText(){return `${YEAR} 年 ${MONTH} 月`}
 function monthISO(){return monthKey()}
-function groupOf(e){return state.groups?.[e.id]||'未分组'}
+function groupOf(e){return e?(state.groups?.[e.id]||'未分组'):'未分组'}
 const DEMO_NAMES=["陈思远","林嘉禾","周亦宁","王若溪","李知夏","赵书言","沈清越","吴念安","郑予安","许慕白","苏晚晴","何景川","唐诗雨","陆明哲","韩子墨","顾一诺","宋雨桐","徐嘉宁","叶星辰","程安然","梁沐阳","杨可心","邓嘉祺","谢云舟","蒋书瑶","郭亦凡","夏知意","冯沐辰","傅清歌","曹锦程","姜乐言","董予希","段芷晴","钟书航","秦若楠","方之恒","黎星遥","彭思齐","余可欣","袁清禾","施景行","高雨薇","江知远","邵思涵","罗映雪","齐航","林安","欧阳晨曦","司马知远","白若曦"];
 let EMPLOYEES=Array.from({length:50},(_,i)=>({id:'E'+String(i+1).padStart(3,'0'),name:DEMO_NAMES[i],department:['综合','研发','生产','质检','保障'][i%5]}));
 // One visually related family for registered and inferred overtime; never use red anomaly tint.

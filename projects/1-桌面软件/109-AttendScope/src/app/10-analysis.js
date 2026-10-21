@@ -49,6 +49,8 @@ function importRosterPlan(names,kind){
 function applyImportRoster(plan,meta){
   if(!plan.resetDemo)r62MigrateActive();
   if(plan.resetDemo){
+    const before=new Map(EMPLOYEES.map(e=>[e.id,personIdentity(e.name)]));
+    state.fixedPeople=(state.fixedPeople||[]).map(id=>before.get(id)||id);
     state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
     state.manualStatuses={};state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
     state.imports=[meta];

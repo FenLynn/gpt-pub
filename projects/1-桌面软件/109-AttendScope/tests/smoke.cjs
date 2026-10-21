@@ -1771,6 +1771,41 @@ async function run(){
    return !!row&&row.业务标记.length>0;
  },'R35 export lost behavior tags');
 
+ // R72: roster identity editing, group creation/deletion, fixed staff only.
+ await page.evaluate(async()=>{
+  navigateWorkspace('data');state.dataSection='roster';render();
+  if(!document.querySelector('#r72AddGroup')||!document.querySelector('#r72FixSelected'))
+   throw Error('R72 roster actions not mounted');
+  const previous=window.prompt,person=EMPLOYEES[0],originalId=person.id;
+  try{
+   window.prompt=()=> 'R72自建分组';
+   await r72CreateGroup();
+   if(!state.groupCatalog.includes('R72自建分组'))throw Error('R72 group creation failed');
+   state.groups[originalId]='R72自建分组';
+   r72MarkDirty('assign-group',{employeeId:originalId,to:'R72自建分组'});
+   await r72FixedPeople([originalId],true);
+   if(!state.fixedPeople.includes(originalId))throw Error('R72 fixed entry missing');
+   const originalRows=state.records.filter(r=>r.employeeId===originalId).length;
+   window.prompt=()=> 'R72自定义姓名';
+   r72RenamePerson(originalId);
+   const id=personIdentity('R72自定义姓名');
+   if(!EMPLOYEES.some(e=>e.id===id)||state.fixedPeople.indexOf(id)<0||
+    state.records.filter(r=>r.employeeId===id).length!==originalRows)
+    throw Error('R72 canonical rename lost linked records');
+   if(originalRows&&!state.records.some(r=>r.employeeId===id&&r.sourceName))
+    throw Error('R72 original source name not retained');
+   await r72DeleteGroup('R72自建分组');
+   if(groupOf(EMPLOYEES.find(e=>e.id===id))!=='未分组'||state.groupCatalog.includes('R72自建分组'))
+    throw Error('R72 delete group must reassign without deleting person');
+   state.isDemo=false;rememberMonth();
+   switchMonth(2028,2,true);
+   if(EMPLOYEES.length!==1||EMPLOYEES[0].id!==id||state.records.length!==0)
+    throw Error('R72 new month should inherit ONLY fixed people, no prior raw');
+   await r72FixedPeople([id],false);
+   if(state.fixedPeople.includes(id)||!EMPLOYEES.some(e=>e.id===id))
+    throw Error('R72 unfix must preserve current month');
+  }finally{window.prompt=previous}
+ });
  await require('./lifecycle-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));

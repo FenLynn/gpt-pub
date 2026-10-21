@@ -278,12 +278,14 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    fs.existsSync(path.join(fresh,'project.index.previous.json'));
   await page.evaluate(async()=>{
    p109Audit=await p109AuditProject();
+   // R72: only explicitly selected staff are project defaults.
+   state.fixedPeople=[EMPLOYEES[0].id];rememberMonth();
    await p109PinDefaults('roster');await p109PinDefaults('import');await p109PinDefaults('rules');
    switchMonth(2026,11,true);
   });
   report.pinnedForNextMonth=await page.evaluate(()=>state.projectProfile?.pinRoster&&
    state.projectProfile.pinImport&&state.projectProfile.pinRules&&
-   EMPLOYEES.length===1&&RULES.amEnd==='11:40'&&!!state.importProfile.templates?.attendance);
+   EMPLOYEES.length===1&&(state.fixedPeople||[]).length===1&&RULES.amEnd==='11:40'&&!!state.importProfile.templates?.attendance);
   if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
   await page.locator('#p109ProjectControl').click();
   await page.waitForSelector('#p109Backup');

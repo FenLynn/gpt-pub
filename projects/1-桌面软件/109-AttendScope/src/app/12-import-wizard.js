@@ -85,6 +85,7 @@ function r62MigratePayload(data){
  }
  const groups={};for(const [id,value] of Object.entries(data.groups||{}))groups[change(id)]=value;
  data.groups=groups;
+ if(Array.isArray(data.fixedPeople))data.fixedPeople=[...new Set(data.fixedPeople.map(change).filter(id=>people.has(id)))];
  const statuses={};for(const [key,value] of Object.entries(data.manualStatuses||{})){
   const i=key.lastIndexOf('|');
   if(i>=0)statuses[change(key.slice(0,i))+'|'+key.slice(i+1)]=value;

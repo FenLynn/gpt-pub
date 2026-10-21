@@ -256,7 +256,7 @@ async function p109InitializeProject(root){
   state.projectDir=root; p109PendingDirectory=null;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
-  state.manualStatuses={};state.overtimeReview={};state.groups={};state.isDemo=false;
+  state.manualStatuses={};state.overtimeReview={};state.groups={};state.fixedPeople=[];state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
   state.monthStores=new Map();state.saved=false;
   state.importProfile={rules:R62_DEFAULT_DIRECTIONS.map(x=>({...x})),templates:{}};
   state.calendarOverrides={};state.selection={type:'overall'};
@@ -323,7 +323,7 @@ async function p109ReturnToMain(){
 
 async function p109PinDefaults(kind){
  if(!state.projectDir||!p109Audit?.initialized)return;
- const label=kind==='roster'?'员工名册和分组':kind==='rules'?'考勤时段与加班规则':'导入关键字及列映射模板';
+ const label=kind==='roster'?'已选固定人员和组别':kind==='rules'?'考勤时段与加班规则':'导入关键字及列映射模板';
  if(!window.confirm('将本月'+label+'固定为以后新建月份的默认配置？历史月份保持原样。'))return;
  try{
   const config=await dir(state.projectDir,'config');
