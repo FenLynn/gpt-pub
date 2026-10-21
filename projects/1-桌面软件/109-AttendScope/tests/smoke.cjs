@@ -117,7 +117,7 @@ async function run(){
  await page.locator('#r63PdfClose').click();
  // Save the actual exported PNGs for visual artifact review, including the
  // live ECharts renderer, header/legend and the right-hand factual summaries.
- const exported=await page.evaluate(async()=>{
+ const r63ImagesForReview=await page.evaluate(async()=>{
   const saved={workspaceMode:state.workspaceMode,selection:{...state.selection},
    chartDay:state.chartDay,chartTab:state.chartTab};
   const settle=()=>new Promise(ok=>requestAnimationFrame(()=>requestAnimationFrame(ok)));
@@ -135,7 +135,7 @@ async function run(){
   }
   return images;
  });
- for(const [type,data] of Object.entries(exported))
+ for(const [type,data] of Object.entries(r63ImagesForReview))
   fs.writeFileSync(path.join(out,'r63-export-'+type+'.png'),Buffer.from(data.split(',')[1],'base64'));
  await check(page,()=>typeof legacyMountAttendanceTimeline==='undefined'&&typeof analysisTimelineHtml==='undefined'&&
   typeof timelineMiniMapHtml==='undefined'&&typeof mountAttendanceTimeline==='function',
