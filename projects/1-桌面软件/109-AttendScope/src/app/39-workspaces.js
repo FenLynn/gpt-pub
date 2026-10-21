@@ -5,7 +5,8 @@ const WORKSPACE_ITEMS=[
  ['group','分组分析','layers'],
  ['person','个人分析','person'],
  ['stats','统计分析','chart'],
- ['data','数据管理','database']
+ ['data','数据管理','database'],
+ ['project','项目总览','folder-check']
 ];
 function workspaceGroups(){
  return [...new Set(EMPLOYEES.map(e=>groupOf(e)))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
@@ -106,7 +107,8 @@ function workspaceToolbarHtml(){
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
   '<span class="workspace-hint">'+scopeVisibleEmployees().length+' 位人员</span></div><section id="scopeSummary" class="scope-summary"></section>';
  if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
- if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 原始记录、员工与规则</span></div></div>';
+ if(mode==='data')return '<div class="workspace-toolbar"><div><strong>数据管理</strong><span>'+periodText()+' · 名册、规则与原始记录</span></div></div>';
+ if(mode==='project')return '<div class="workspace-toolbar"><div><strong>项目总览</strong><span>所有月份 · 存储库存 · 健康状态</span></div><button type="button" class="r68-quiet" id="r68RefreshProject">重新扫描</button></div>';
  return '';
 }
 function bindWorkspaceNavigation(){
@@ -160,7 +162,7 @@ function navigateWorkspace(mode){
   render();return;
  }
  if(state.statsConfig)state.statsConfig.compare=asStatDefaultCompare(mode);
- if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
+ if(mode==='all'||mode==='group'||mode==='data'||mode==='project'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
  if(mode==='person'){
   // An explicit visit to Personal starts on day 1 in timeline mode.
