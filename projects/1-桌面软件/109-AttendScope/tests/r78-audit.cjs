@@ -52,6 +52,7 @@ module.exports=async function({browser,out,root}){
  const connect=async key=>page.evaluate(async key=>{window.__r78Key=key;return connectProjectDir()},key);
  try{
   await open();
+  check(await page.locator('#resetDemo').count()===0,'business import menu cannot overwrite the workspace with demo records');
   const fixtures=await page.evaluate(()=>{
    const make=(name,month)=>{const id=personIdentity(name),date='2026-'+pad(month)+'-08';return {...workingPayload(),year:2026,month,
     employees:[{id,name,department:''}],groups:{[id]:'审计组'},fixedPeople:[],groupCatalog:['审计组'],

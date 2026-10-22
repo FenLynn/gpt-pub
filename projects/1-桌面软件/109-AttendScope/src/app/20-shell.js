@@ -111,8 +111,6 @@ function layoutHtml(){
           ${importMenuRow('出差','tripInput','sampleTrip')}
           ${importMenuRow('外出','outingInput','sampleOuting')}
           ${importMenuRow('登记加班','overtimeInput','sampleOvertime')}
-          <div class="import-divider"></div>
-          <button class="import-reset" id="resetDemo" ${state.projectDir?'disabled':''}>恢复演示数据</button>
         </div>
       </div>
       <div class="system-menu-anchor">
@@ -331,12 +329,6 @@ function bind(){
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
   for(const [id,kind] of [['sampleAttendance','attendance'],['sampleLeave','leave'],['sampleTrip','trip'],['sampleOuting','outing'],['sampleOvertime','overtime']])
     document.getElementById(id).onclick=()=>downloadBlankTemplate(kind);
-  document.getElementById('resetDemo').onclick=()=>{
-    if(state.projectDir||!window.confirm('恢复演示数据会替换当前内存工作空间。确定继续？'))return;
-    if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
-    Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='main'; state.chartTab='overview';
-    state.revisions=[];state.manualStatuses={};state.overtimeReview={};state.judgmentMode='initial'; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
-  };
 
   document.getElementById('connectDir').onclick=connectProjectDir;
   document.getElementById('initializeProject').onclick=()=>p109InitializeProject();
