@@ -1354,7 +1354,7 @@ async function run(){
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
     Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<3.4||layout.ratio>7.5||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
- await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===8&&!!document.getElementById('settingsBtn')&&
+ await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===9&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
     document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
  await check(page,()=>document.querySelector('.save-state.saved b')?.textContent==='✓'&&!document.querySelector('.save-state i'),'Save state should be semantic, not an unexplained dot');
