@@ -39,7 +39,7 @@ module.exports=async function runUiAudit({browser,out,root}){
   const views=[
    ['all','.scope-insights'],
    ['group','.scope-insights'],
-   ['person','.r74-unified-insight'],
+   ['person','.r77-anomaly-summary'],
    ['stats','#statisticsWorkspace'],
    ['data','[data-data-section]']
   ];
