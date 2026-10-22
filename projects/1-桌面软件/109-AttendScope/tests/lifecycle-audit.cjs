@@ -5,6 +5,9 @@
 const fs=require('fs'),path=require('path'),os=require('os'),cp=require('child_process');
 const {pathToFileURL}=require('url');
 module.exports=async function runLifecycleAudit({browser,out,root}){
+ const versionSource=fs.readFileSync(path.join(root,'src/app/00-state.js'),'utf8'),
+  currentVersion=/const P109_APP_VERSION='([^']+)'/.exec(versionSource)[1],
+  currentRevision=/const P109_APP_REVISION='([^']+)'/.exec(versionSource)[1];
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'p109-lifecycle-'));
  const staging=path.join(tmp,'staging','考勤'),unzipped=path.join(tmp,'fresh');
  fs.mkdirSync(staging,{recursive:true});fs.mkdirSync(unzipped,{recursive:true});
@@ -165,22 +168,30 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    JSON.parse(fs.readFileSync(path.join(diskRoot,'data','2027','03','working','state.json'),'utf8')).employees.length;
 
   // R65 actual clean-install and project health/recovery workflow.
-  const fresh=path.join(tmp,'fresh-install','考勤');fs.mkdirSync(fresh,{recursive:true});
+  const fresh=path.join(tmp,'fresh-data','考勤'),freshRuntime=path.join(tmp,'fresh-install','考勤');
+  fs.mkdirSync(fresh,{recursive:true});fs.mkdirSync(freshRuntime,{recursive:true});
   for(const name of ['index.html','src','README.md'])
-   fs.cpSync(path.join(root,name),path.join(fresh,name),{recursive:true});
+   fs.cpSync(path.join(root,name),path.join(freshRuntime,name),{recursive:true});
   const cleanZip=path.join(out,'P109-考勤-R65-首次初始化.zip');
-  const packed=cp.spawnSync('python3',['-c',zipScript,fresh,cleanZip],{encoding:'utf8'});
+  const packed=cp.spawnSync('python3',['-c',zipScript,freshRuntime,cleanZip],{encoding:'utf8'});
   if(packed.status!==0)throw Error('R65 packaging '+packed.stderr);
   diskRoot=fresh;
-  await open();
+  await page.goto(pathToFileURL(path.join(freshRuntime,'index.html')).href,{waitUntil:'load'});
+  await page.evaluate(()=>connectProjectDir());
   await page.waitForSelector('#p109CreateBlank');
   report.initializationPrompt=await page.evaluate(()=>!state.projectDir&&!!p109PendingDirectory);
   await page.locator('#p109CreateBlank').click();
   await page.waitForFunction(()=>state.saved&&!state.isDemo&&EMPLOYEES.length===0&&!!state.projectDir,{timeout:45000});
   report.blankProjectCreated=fs.existsSync(path.join(fresh,'project.json'))&&
    JSON.parse(fs.readFileSync(path.join(fresh,'config','employees.json'),'utf8')).employees.length===0;
+  report.newProjectDataSeparated=!fs.existsSync(path.join(fresh,'index.html'))&&!fs.existsSync(path.join(fresh,'src'))&&
+   !fs.existsSync(path.join(freshRuntime,'data'))&&!fs.existsSync(path.join(freshRuntime,'project.json'));
+  // Continue the historical co-located installation/backup/upgrade regression.
+  // This fixture copy is not the application's new-project initialization path.
+  for(const name of ['index.html','src','README.md'])fs.cpSync(path.join(root,name),path.join(fresh,name),{recursive:true});
   await page.locator('#attendanceInput').setInputFiles({name:'审核门禁.csv',mimeType:'text/csv',
    buffer:Buffer.from('姓名,日期,时间,进出\n测试甲,2026-10-08,08:20,进\n测试甲,2026-10-08,18:00,出')});
+  await page.locator('#r79Advanced>summary').click();
   await page.waitForSelector('#r65SaveTemplate');
   await page.locator('#r65SaveTemplate').check();
   await page.locator('#r62Validate').click();await page.locator('#r62Commit').click();
@@ -331,7 +342,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    EMPLOYEES.some(x=>x.name==='测试甲'));
 
   // R67 update only program assets; verify data remains byte-for-byte intact.
-  const releaseZip=path.join(out,'P109-考勤-R78-可更新离线版.zip'),
+  const releaseZip=path.join(out,'P109-考勤-'+currentRevision+'-可更新离线版.zip'),
    pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
@@ -388,10 +399,10 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.crossVersionUpgradePreservesData=fs.readFileSync(oldWorkingPath).equals(oldWorkingBytes)&&
    fs.readFileSync(oldRawPath).equals(oldRawBytes);
   report.crossVersionBackupCreated=fs.readdirSync(path.join(oldRoot,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
-  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.4-preview';");
+  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='"+currentVersion+"';");
   await open();
-  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.4-preview'&&
-   YEAR===2026&&MONTH===10&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲'));
+  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(version=>P109_APP_VERSION===version&&
+   YEAR===2026&&MONTH===10&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲'),currentVersion);
   report.crossVersionUpgradeVerified=report.oldVersionInstallBoot&&report.crossVersionUpgradePreservesData&&
    report.crossVersionBackupCreated&&report.crossVersionCodeUpdated&&report.crossVersionUpgradeRestoresDataAfterReload;
 
@@ -400,7 +411,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',
    'manualOverridePersisted','previousWorkingPreserved','snapshotUnchanged','reloadRestores',
    'relocatedRestores','sameVersionCodeOverlayKeepsData','bundledRulesHaveCurrentKeys',
-   'bundledRosterIsSeparateFromProjectState','initializationPrompt','blankProjectCreated',
+   'bundledRosterIsSeparateFromProjectState','initializationPrompt','blankProjectCreated','newProjectDataSeparated',
    'importTemplateStored','healthAfterImport','branchCreated','branchIsolated','branchReopened',
    'backToMain','projectMonthInventory','projectStorageCategory','projectHealthCategory',
    'projectMonthsCategory','rosterUi','batchGroupWorking','scopeUi','rawCorruptionDetected',

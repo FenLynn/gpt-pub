@@ -81,7 +81,7 @@ async function dir(root,n){return root.getDirectoryHandle(n,{create:true})}
 async function existingDir(root,n){return root.getDirectoryHandle(n,{create:false})}
 async function writeFile(handle,name,data){
   const f=await handle.getFileHandle(name,{create:true}),w=await f.createWritable();
-  await w.write(data);await w.close();
+  try{await w.write(data);await w.close()}catch(e){try{await w.abort?.()}catch(_){}throw e}
 }
 async function readJSON(handle,name){
   try{const fh=await handle.getFileHandle(name,{create:false});return JSON.parse(await (await fh.getFile()).text())}
@@ -202,12 +202,15 @@ async function p109ReadProject(handle,project){
   }
   return {months,current,profile,calendar,rules,recovered};
 }
-async function connectProjectDir(){
-  if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return false}
+async function connectProjectDir(savedHandle=null,options={}){
+  if(savedHandle?.kind!=='directory')savedHandle=null;
+  if(!savedHandle&&!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return false}
   if(p109ConnectionBusy||p109ProjectBusy||state.storageBusy||r63ReadingImport||r62ImportDraft){toast('请等待当前文件操作完成并关闭导入预览后再切换项目',true);return false}
   p109ConnectionBusy=true;
   try{
-    const handle=await showDirectoryPicker({mode:'readwrite'}),project=await readJSON(handle,'project.json');
+    const handle=savedHandle&&savedHandle.kind==='directory'?savedHandle:await showDirectoryPicker({mode:'readwrite'});
+    await p109RequireWriteAccess(handle,!options.automatic);
+    const project=await readJSON(handle,'project.json');
     if(!project){p109PendingDirectory=handle;await openProjectControl('initialize');return false}
     const loaded=await p109ReadProject(handle,project);
     if(!p109ConfirmProjectSwitch())return false;
@@ -226,14 +229,24 @@ async function connectProjectDir(){
       p109RestoreSession(before);throw e;
     }
     p109PendingDirectory=null;p109Audit=null;
+    if(typeof p109RememberProject==='function')await p109RememberProject(handle,project.projectName);
     Object.assign(asNavHistory,{back:[],forward:[],current:null,restoring:false});
     Object.assign(r68UI,{chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
     r68UI.projectSerial++;r68UI.treeSerial++;render();
-    toast(loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目');
+    const notice=typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'';
+    toast((loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目')+notice);
     return true;
   }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true);return false}
   finally{p109ConnectionBusy=false}
+}
+async function p109RequireWriteAccess(handle,request=true){
+ if(!handle||typeof handle.queryPermission!=='function')return true;
+ let permission=await handle.queryPermission({mode:'readwrite'});
+ if(permission!=='granted'&&request&&typeof handle.requestPermission==='function')
+  permission=await handle.requestPermission({mode:'readwrite'});
+ if(permission!=='granted')throw new DOMException('项目目录没有读写权限，请重新授权后重试','NotAllowedError');
+ return true;
 }
 async function persistImportedFile(file,type,count,importId){
   const bytes=await file.arrayBuffer();
@@ -248,9 +261,12 @@ async function persistImportedFile(file,type,count,importId){
     const exists=await existingDir(sub,importId).then(()=>true,e=>e.name==='NotFoundError'?false:Promise.reject(e));
     if(exists)throw new Error('导入目录已存在，拒绝覆盖原始文件');
     const folder=await dir(sub,importId);
-    await writeFile(folder,file.name,bytes);
+    try{await writeFile(folder,file.name,bytes)}catch(e){
+      try{if(typeof sub.removeEntry==='function')await sub.removeEntry(importId,{recursive:true})}catch(_){}
+      throw e;
+    }
   }
-  state.imports.push(meta);rememberMonth();return meta;
+  return meta;
 }
 function projectPayload(){
   rememberMonth();

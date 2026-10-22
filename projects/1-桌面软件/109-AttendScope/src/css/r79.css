@@ -1,0 +1,77 @@
+/* R79: readable import review and a compact project switcher. */
+.r62-dialog{width:min(940px,96vw);max-height:94dvh;font-size:14px;border-radius:18px}
+.r62-dialog>header{padding:22px 26px 18px;align-items:center}
+.r62-dialog>header strong{font-size:21px;font-weight:700;color:#20354c}
+.r62-dialog>header p.r79-import-file{font-size:14px;color:#687b8d;max-width:76vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:7px}
+.r62-dialog>header button{width:36px;height:36px;border-radius:9px}
+.r62-dialog>header button:hover{background:#eef4f8}
+.r62-body{padding:18px 26px 22px}
+.r79-import-context{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:16px 18px;background:#f3f7fb;border:1px solid #e2eaf1;border-radius:12px}
+.r79-import-context>label{display:flex;align-items:center;gap:12px;font-weight:650;color:#2c4864;font-size:14px}
+.r62-dialog .r79-import-context input{min-height:40px;background:#fff;font-size:15px;width:164px;padding:6px 10px}
+.r79-source-period{display:flex;flex-direction:column;gap:4px;color:#6c7e8e;font-size:13px;flex:1}
+.r79-source-period b{font-size:14px;font-weight:500;color:#38516a}
+#r79UseFileMonth{border:1px solid #b9d4e9;border-radius:8px;background:#fff;color:#236ca5;font-size:14px;padding:10px 13px;cursor:pointer}
+.r79-import-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px}
+.r79-import-section-head h3{font-size:15px;font-weight:650;color:#314960;margin:0}
+.r79-import-section-head>span,.r79-import-section-head>label{font-size:13px;color:#758695}
+.r79-import-section-head>label{display:flex;align-items:center;gap:10px}
+.r62-dialog .r79-import-section-head select{min-height:34px;font-size:13px;background:#fff}
+.r62-mapping{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.r62-field{font-size:13px;gap:8px;color:#546b80;font-weight:500}
+.r62-dialog .r62-field select{font-size:14px;min-height:42px;background:#fff;border-radius:9px;padding:8px 10px}
+.r79-import-advanced{margin-top:17px;border-bottom:1px solid #e7edf3;padding:0 0 15px}
+.r79-import-advanced>summary{font-size:14px;color:#55738f;cursor:pointer;width:fit-content}
+.r62-options{font-size:13px;border:0;gap:16px;padding:15px 0 8px}
+.r62-options input[type=number]{width:60px}
+.r62-options :is(input,select){font-size:13px!important}
+.r63-rules-details{margin-top:8px}
+.r63-rules-details summary{font-size:13px}
+.r62-rule{font-size:13px}
+.r62-grid-wrap{max-height:290px;border:1px solid #e3eaf0;border-radius:10px}
+.r62-grid-wrap table{font-size:13px}
+.r62-grid-wrap :is(th,td){padding:9px 14px;max-width:340px;border-right:0}
+.r62-grid-wrap thead th{font-size:12px;letter-spacing:.2px;font-weight:600}
+.r62-grid-wrap tbody th{font-size:12px;color:#8393a2;min-width:85px}
+.r62-grid-wrap tbody tr:not(.r62-header):hover td{background:#f8fbfe}
+.r62-dialog>footer{padding:17px 26px;align-items:center;gap:15px;flex-wrap:wrap;background:#fff}
+.r62-dialog>footer .r62-validation{margin:0;flex:1;font-size:14px;line-height:1.6;color:#3c6752;min-width:180px}
+.r62-dialog>footer .r62-validation.r62-has-errors{color:#a4472e}
+.r79-import-buttons{display:flex;gap:9px;align-items:center}
+.r62-dialog>footer button{min-height:40px;font-size:14px;padding:0 17px;border-radius:9px}
+.r62-dialog>footer #r62Validate{background:transparent;border-color:transparent;color:#708294}
+.r62-dialog>footer #r62Commit{background:#2c79b9;border-color:#2c79b9;min-width:122px;font-weight:650}
+.r79-row-errors{margin-top:14px;border:1px solid #f0d9c9;background:#fffaf5;border-radius:9px;padding:12px 15px;color:#9b5934;font-size:13px}
+.r79-row-errors summary{cursor:pointer;font-weight:600}
+.r79-row-errors ul{padding-left:20px;line-height:1.8;margin:9px 0 0;max-height:150px;overflow:auto}
+.r79-import-issue{font-size:14px;color:#a4472e;margin:16px 0 0;line-height:1.6}
+.p109-recent-overlay{position:fixed;inset:0;background:#21364c55;backdrop-filter:blur(5px);z-index:10030;display:grid;place-items:center;padding:20px}
+.p109-recent-panel{width:min(700px,96vw);max-height:90dvh;display:flex;flex-direction:column;background:#fff;border:1px solid #dde6ee;border-radius:16px;box-shadow:0 24px 80px #1b334733;color:#314b63;font-size:14px;overflow:hidden}
+.p109-recent-panel>header{display:flex;align-items:center;justify-content:space-between;padding:22px 25px;border-bottom:1px solid #e8eef3}
+.p109-recent-panel h2{margin:0;font-size:21px;color:#253e54}
+.p109-recent-panel header p{margin:6px 0 0;color:#788b9c;font-size:14px}
+.p109-recent-panel>header button{background:none;border:0;font-size:26px;color:#7e93a6;cursor:pointer}
+.p109-recent-body{padding:16px 25px 22px;overflow:auto}
+#p109RecentStatus{font-size:14px;line-height:1.7;color:#74889a;margin:0 0 16px}
+.p109-recent-row{display:flex;gap:15px;align-items:center;justify-content:space-between;border:1px solid #e3ebf2;border-radius:11px;padding:17px;margin-top:10px}
+.p109-recent-row>div:first-child{min-width:0}
+.p109-recent-row strong{font-size:16px;overflow-wrap:anywhere;font-weight:650}
+.p109-recent-row p{font-size:13px;color:#778d9f;margin:6px 0}
+.p109-recent-row time{font-size:12px;color:#96a4af}
+.p109-recent-actions{display:flex;gap:5px;flex-shrink:0}
+.p109-recent-panel button:not(#p109RecentClose){border:1px solid #dbe5ed;border-radius:8px;background:white;color:#46708f;padding:9px 12px;font-size:13px;cursor:pointer}
+.p109-recent-actions button:first-child{background:#eef6fc;border-color:#cfe2f1}
+.p109-recent-actions button:hover,.p109-recent-panel>footer button:hover{background:#eaf4fb!important}
+.p109-recent-panel>footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 25px;border-top:1px solid #e7edf3}
+.p109-recent-empty{padding:25px 0;color:#8598a9;text-align:center}
+@media(max-width:680px){
+ .r62-dialog{max-height:97dvh;width:98vw}
+ .r62-dialog>header{padding:17px 18px}.r62-body{padding:14px 18px}
+ .r79-import-context{gap:13px;padding:13px}.r79-source-period{min-width:160px}
+ .r62-mapping{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .r79-import-section-head{flex-wrap:wrap}.r62-dialog>footer .r62-validation{flex-basis:100%}
+ .r79-import-buttons{width:100%;justify-content:flex-end}
+ .r62-dialog>footer button{padding-inline:12px!important}
+ .p109-recent-row{align-items:flex-start;flex-direction:column}
+ .p109-recent-actions{align-self:flex-end}.p109-recent-panel>footer{flex-wrap:wrap}
+}

@@ -119,6 +119,7 @@ function layoutHtml(){
           <button id="connectDir" role="menuitem">连接 / 切换项目目录</button>
           <button id="initializeProject" role="menuitem">新建空白项目</button>
           <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
+          <div id="p109RecentList">${typeof p109RecentMenuHtml==='function'?p109RecentMenuHtml():''}</div>
           <div class="system-menu-divider"></div>
           <button id="restoreBtn" role="menuitem">恢复月度工作 / 冻结 JSON</button>
           <button id="restoreZipBtn" role="menuitem">恢复整个项目 ZIP</button>
@@ -333,6 +334,7 @@ function bind(){
   document.getElementById('connectDir').onclick=connectProjectDir;
   document.getElementById('initializeProject').onclick=()=>p109InitializeProject();
   document.getElementById('p109ProjectControl').onclick=()=>openProjectControl();
+  if(typeof p109BindRecentMenu==='function')p109BindRecentMenu();
   document.getElementById('restoreZipBtn').onclick=()=>p109RestoreArchive();
   document.getElementById('backupProjectBtn').onclick=()=>p109BackupProject();
   document.getElementById('upgradeProjectBtn').onclick=()=>p109UpgradePick();
@@ -391,6 +393,8 @@ function bindGlobalUiShortcuts(){
  window.__p109UiShortcutsBound=true;
  document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  const recent=document.getElementById('p109RecentOverlay');
+  if(recent){e.preventDefault();recent.querySelector('#p109RecentClose')?.click();return}
   const project=document.querySelector('.p109-project-overlay');
   if(project){e.preventDefault();project.querySelector('#p109ProjectClose')?.click();project.remove();return}
   const importer=document.querySelector('.r62-overlay');

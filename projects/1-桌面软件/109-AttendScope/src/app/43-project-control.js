@@ -246,7 +246,7 @@ async function p109InitializeProject(root){
  const entries=await p109Entries(root);
  const known=await p109Json(root,'project.json');
  if(known.exists){p109Status('这个文件夹已有 project.json，请使用「目录」连接，不能重复初始化',true);return}
- if(entries.some(e=>!['index.html','README.md','src','p109-release-manifest.json'].includes(e.name))){p109Status('请使用空目录或干净离线程序目录初始化，避免覆盖已有文件',true);return false}
+ if(entries.length){p109Status('新项目请使用独立的空数据文件夹，不要选择程序目录。已有项目请通过连接目录打开。',true);return false}
  if(!p109ConfirmProjectSwitch())return false;
  if(!window.confirm('建立全新的空白考勤项目？演示员工与考勤不会复制到新项目。'))return;
  previous=p109CaptureSession();
@@ -272,7 +272,9 @@ async function p109InitializeProject(root){
   if(!await saveWorking({initializing:true}))throw Error('初始工作状态未能保存');
   r68UI.latestRoot=null;r68UI.latestReport=null;r68UI.latestTree=null;r68UI.latestScanAt=0;
   r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
-  render();p109Status('空白项目已初始化并保存，可以开始导入');return true;
+  if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle());
+  render();p109Status('空白项目已初始化并保存，可以开始导入'+
+   (typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':''));return true;
  }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109Status('初始化失败，请检查目录权限：'+e.message,true);return false}
  finally{p109ProjectBusy=false}
 }

@@ -9,18 +9,27 @@ function p109CompareVersion(a,b){
  for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]-y[i];
  return 0;
 }
-function p109UpgradePick(){
+async function p109UpgradePick(){
  if(!state.projectDir||p109ProjectBusy){p109Status('请先连接并初始化本地项目目录',true);return}
+ let programRoot=state.projectDir;
+ try{
+  if(!await p109File(programRoot,'index.html')||!await p109Child(programRoot,'src')){
+   p109Status('请选择包含 index.html 的程序文件夹；项目数据目录独立保留');
+   programRoot=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});
+  }
+ }catch(e){if(e.name!=='AbortError')p109Status('程序目录选择失败：'+e.message,true);return}
  const chooser=document.createElement('input');chooser.type='file';chooser.accept='.zip,application/zip';
  chooser.onchange=async()=>{
-  const file=chooser.files?.[0];if(file)await p109ApplyCodeUpdate(file);
+  const file=chooser.files?.[0];if(file)await p109ApplyCodeUpdate(file,{programRoot});
  };
  chooser.click();
 }
-async function p109ApplyCodeUpdate(file){
+async function p109ApplyCodeUpdate(file,options={}){
  if(!state.projectDir||p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting||r62ImportDraft)return false;
  p109ProjectBusy=true;
  try{
+  const programRoot=options.programRoot||state.projectDir;
+  await p109RequireWriteAccess(state.projectDir,true);await p109RequireWriteAccess(programRoot,true);
   if(file.size>45*1024*1024)throw Error('更新 ZIP 超过 45 MB 上限');
   const items=await p109ZipRead(file);
   const manifestFile=items.find(x=>x.name==='p109-release-manifest.json');
@@ -35,8 +44,10 @@ async function p109ApplyCodeUpdate(file){
   if(meta.value?.projectId!=='P109-AttendScope')throw Error('目录不是已初始化的考勤项目');
   if(!manifest.supportedDataSchemas.includes(Number(meta.value.schemaVersion)))
    throw Error('更新版本不支持项目当前数据结构；必须先进行数据迁移');
-  const home=await p109File(root,'index.html'),src=await p109Child(root,'src');
-  if(!home||!src)throw Error('连接的目录只有工作数据，不包含程序文件。请在完整安装目录进行更新');
+  const home=await p109File(programRoot,'index.html'),src=await p109Child(programRoot,'src'),app=src&&await p109Child(src,'app'),versionFile=app&&await p109File(app,'00-state.js');
+  if(!home||!src||!versionFile||!await p109File(app,'43-project-control.js')||
+    !(await (await versionFile.getFile()).text()).includes('P109_APP_VERSION'))
+   throw Error('请选择已有的 P109 程序目录，不能选择数据目录或其他软件目录');
   const upgrades=items.filter(x=>x!==manifestFile);
   if(upgrades.length!==manifest.files.length||upgrades.length>120)
    throw Error('程序文件数量与清单不一致');
@@ -57,6 +68,17 @@ async function p109ApplyCodeUpdate(file){
   // Archive is written on disk BEFORE any application file is replaced.
   const files=[],limits={count:0,bytes:0};
   await p109ArchiveWalk(root,'',files,limits);
+  const sameDirectory=programRoot===root||!!(await programRoot.isSameEntry?.(root));
+  if(!sameDirectory){
+   for(const name of ['index.html','README.md','p109-release-manifest.json']){
+    const h=await p109File(programRoot,name);if(!h)continue;
+    const data=new Uint8Array(await (await h.getFile()).arrayBuffer());
+    limits.count++;limits.bytes+=data.byteLength;
+    if(limits.count>5000||limits.bytes>160*1024*1024)throw Error('升级前备份超过文件数量或大小上限');
+    files.push({name:'program/'+name,data});
+   }
+   await p109ArchiveWalk(src,'program/src/',files,limits);
+  }
   const {zip}=await p109ZipBuild(files);
   const archive=new Uint8Array(await zip.arrayBuffer()),backupHash=await p109Hash(archive),
    backupFolder=await dir(root,'backups'),
@@ -68,7 +90,7 @@ async function p109ApplyCodeUpdate(file){
    throw Error('升级前项目备份写盘校验失败，未更新任何程序文件');
   const prior=[],completed=[];
   for(const f of upgrades){
-   const parts=f.name.split('/'),name=parts.pop();let folder=root;
+   const parts=f.name.split('/'),name=parts.pop();let folder=programRoot;
    for(const dirName of parts)folder=await dir(folder,dirName);
    const existing=await p109File(folder,name);
    prior.push({folder,name,exists:!!existing,

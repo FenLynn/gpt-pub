@@ -28,28 +28,33 @@
     }
     return out;
   }
-  function parseXml(bytes){return new DOMParser().parseFromString(TD.decode(bytes),'application/xml')}
+  function xmlElements(parent,name){return [...parent.getElementsByTagNameNS('*',name)]}
+  function parseXml(bytes){
+    const doc=new DOMParser().parseFromString(TD.decode(bytes),'application/xml');
+    if(xmlElements(doc,'parsererror').length)throw new Error('XLSX XML 内容损坏，无法读取');
+    return doc;
+  }
   function colIndex(ref){let n=0; const m=String(ref||'').match(/^[A-Z]+/i); if(!m)return 0; for(const ch of m[0].toUpperCase())n=n*26+(ch.charCodeAt(0)-64); return n-1}
   async function readXlsx(file){
     const zip=await unzip(await file.arrayBuffer());
     const wb=zip['xl/workbook.xml']; if(!wb) throw new Error('缺少 workbook.xml。');
     let shared=[];
     if(zip['xl/sharedStrings.xml']){
-      const d=parseXml(zip['xl/sharedStrings.xml']); shared=[...d.getElementsByTagName('si')].map(si=>[...si.getElementsByTagName('t')].map(t=>t.textContent||'').join(''));
+      const d=parseXml(zip['xl/sharedStrings.xml']); shared=xmlElements(d,'si').map(si=>xmlElements(si,'t').map(t=>t.textContent||'').join(''));
     }
-    const wbDoc=parseXml(wb), first=wbDoc.getElementsByTagName('sheet')[0]; if(!first) return {sheet:'Sheet1',rows:[]};
+    const wbDoc=parseXml(wb), first=xmlElements(wbDoc,'sheet')[0]; if(!first) return {sheet:'Sheet1',rows:[]};
     const rid=first.getAttribute('r:id')||first.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
     const relDoc=parseXml(zip['xl/_rels/workbook.xml.rels']); let target='worksheets/sheet1.xml';
-    for(const rel of relDoc.getElementsByTagName('Relationship')) if(rel.getAttribute('Id')===rid) target=rel.getAttribute('Target')||target;
+    for(const rel of xmlElements(relDoc,'Relationship')) if(rel.getAttribute('Id')===rid) target=rel.getAttribute('Target')||target;
     while(target.startsWith('/')) target=target.slice(1); if(target.startsWith('xl/')) target=target.slice(3); if(target.startsWith('./')) target=target.slice(2); const sheetPath='xl/'+target;
     const sd=zip[sheetPath]; if(!sd) throw new Error('找不到工作表：'+sheetPath);
     const doc=parseXml(sd); const rows=[];
-    for(const r of doc.getElementsByTagName('row')){
+    for(const r of xmlElements(doc,'row')){
       const arr=[];
-      for(const c of r.getElementsByTagName('c')){
+      for(const c of xmlElements(r,'c')){
         const idx=colIndex(c.getAttribute('r')); const t=c.getAttribute('t'); let val='';
-        if(t==='inlineStr'){const ts=c.getElementsByTagName('t'); val=[...ts].map(x=>x.textContent||'').join('')}
-        else {const ve=c.getElementsByTagName('v')[0]; const raw=ve?ve.textContent:''; if(t==='s') val=shared[Number(raw)]??''; else if(t==='b') val=raw==='1'; else if(raw!==''&&!Number.isNaN(Number(raw))) val=Number(raw); else val=raw}
+        if(t==='inlineStr'){val=xmlElements(c,'t').map(x=>x.textContent||'').join('')}
+        else {const ve=xmlElements(c,'v')[0]; const raw=ve?ve.textContent:''; if(t==='s') val=shared[Number(raw)]??''; else if(t==='b') val=raw==='1'; else if(raw!==''&&!Number.isNaN(Number(raw))) val=Number(raw); else val=raw}
         arr[idx]=val;
       }
       arr.__rowNumber=Number(r.getAttribute('r'))||rows.length+1;
