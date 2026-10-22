@@ -2,13 +2,13 @@
 function r19PunchClusters(a,range,width,fixedLane=null){
   const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
   const mergeMinutes=Math.max(.45,span/Math.max(160,px-24)*11),maxGroupSpan=Math.max(.8,mergeMinutes*1.6),out=[];
-  for(const direction of ['进','出']){
-    const rows=a.punches.filter(p=>p.direction===direction&&Number.isFinite(minutes(p.time))&&minutes(p.time)>=range.start&&minutes(p.time)<=range.end).sort((x,y)=>minutes(x.time)-minutes(y.time));
+  for(const direction of ['进','出','未标注']){
+    const rows=a.punches.filter(p=>(direction==='未标注'?!['进','出'].includes(p.direction):p.direction===direction)&&Number.isFinite(minutes(p.time))&&minutes(p.time)>=range.start&&minutes(p.time)<=range.end).sort((x,y)=>minutes(x.time)-minutes(y.time));
     let group=[];
     const flush=()=>{
       if(!group.length)return;
       const values=group.map(p=>minutes(p.time));
-      const lane=Number.isFinite(fixedLane)?fixedLane:(direction==='进'?0:1);
+      const lane=Number.isFinite(fixedLane)?fixedLane:(direction==='进'?0:direction==='出'?1:.5);
       out.push({
         value:[values.reduce((n,x)=>n+x,0)/values.length,lane],
         p:group[0],records:[...group],count:group.length,direction,
@@ -102,6 +102,7 @@ function mountAttendanceTimeline(a){
     const x=api.coord([api.value(0),api.value(1)])[0];
     const yIn=api.coord([api.value(0),0])[1],yOut=api.coord([api.value(0),1])[1];
     const baseline=(yIn+yOut)/2,toward=state.prefs.arrowsTowardLine!==false;
+    if(!['进','出'].includes(d.direction))return {type:'circle',shape:{cx:x,cy:baseline,r:4.5},style:{fill:'#8595a4',stroke:'#fff',lineWidth:1.5}};
     const count=d.count||1,thickness=Math.min(8.5,2.35+Math.log2(Math.max(1,count))*1.9);
     const laneHeight=behaviorRowHeight(api);
     // Baseline is between the two punch rows. Each arrow should span its

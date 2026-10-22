@@ -98,7 +98,7 @@ function workspaceSidebarHtml(){
    '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
   '</div>':'';
  return '<div class="side-controls">'+groupControl+personControl+sub+'</div>'+
-   '<div class="side-bottom">'+(mode==='data'&&(state.dataSection||'records')!=='records'?'':'<section class="side-calendar calendar-section">'+
+   '<div class="side-bottom">'+(mode==='data'&&((state.dataSection||'records')!=='records'||r68UI.recordsView!=='rows')?'':'<section class="side-calendar calendar-section">'+
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">'+(mode==='person'?'返回全览':'清除选择')+'</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>')+

@@ -3,7 +3,7 @@
 'use strict';
 const R68_SECTIONS={records:'原始记录',roster:'名册与分组',rules:'工作规则',
  templates:'导入模板',imports:'导入历史',freezes:'冻结与修订'};
-const r68UI={chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
+const r68UI={chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',targetGroup:'未分组',recordsView:'files',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
 function r68Esc(s){return escapeNameChar(String(s??''))}
 function r68HumanBytes(bytes){return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB'}
 function r68Pill(text,kind='neutral'){return '<span class="r68-pill '+kind+'">'+r68Esc(text)+'</span>'}
@@ -121,11 +121,11 @@ function r73GroupEditorHtml(){
 }
 function r68RosterHtml(){
  const monthly=r68RosterRows(),fixed=r73FixedRoster(),fixedIds=new Set(state.fixedPeople||[]),
-  selected=[...r68UI.chosen].filter(id=>monthly.some(e=>e.id===id)),
+  selected=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),
   selectedFixed=[...r68UI.fixedChosen].filter(id=>fixedIds.has(id)),
   groups=workspaceGroups().filter(g=>g!=='未分组'),catalog=state.groupCatalog||[],
   fixedShown=fixed.filter(e=>!r68UI.fixedSearch||e.name.toLocaleLowerCase().includes(r68UI.fixedSearch.toLocaleLowerCase())),
-  choices='<option value="未分组">未分组</option>'+groups.map(g=>'<option value="'+r68Esc(g)+'">'+r68Esc(g)+'</option>').join('');
+  choices=['未分组',...groups].map(g=>'<option value="'+r68Esc(g)+'" '+(r68UI.targetGroup===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('');
  return '<div class="r74-roster-header">'+r68SidebarHeader('人员与分组','当月人员不因取消固定而删除；右侧固定名单会带入以后新建的月份。')+
   '<div class="r73-roster-top">'+
    '<div class="r73-roster-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
@@ -141,17 +141,14 @@ function r68RosterHtml(){
      '<label><input id="r68SelectVisible" type="checkbox" '+(monthly.length&&monthly.every(e=>r68UI.chosen.has(e.id))?'checked':'')+'>全选</label></header>'+
     '<div class="r73-assign-tools"><span>已选 '+selected.length+'</span>'+
      '<select id="r68BulkGroup" aria-label="为选中人员指定组别">'+choices+'</select>'+
-     '<button type="button" id="r68ApplyGroup" '+(!selected.length?'disabled':'')+'>设组别</button></div>'+
+     '<button type="button" id="r68ApplyGroup" '+(!selected.length?'disabled':'')+'>加入组别</button><button type="button" id="r80ClearPeople" '+(!selected.length?'disabled':'')+'>清空选择</button></div>'+
     '<div class="r73-roster-scroll" id="r73MonthList" role="table" aria-label="当月人员名单">'+
      (monthly.length?monthly.map(e=>{
       const currentGroup=groupOf(e);
       return '<div class="r73-person-row" role="row">'+
        '<input type="checkbox" data-r68-person="'+r68Esc(e.id)+'" aria-label="选择 '+r68Esc(e.name)+'" '+(r68UI.chosen.has(e.id)?'checked':'')+'>'+
        '<strong>'+r68Esc(e.name)+'</strong>'+
-       '<select data-r72-person-group="'+r68Esc(e.id)+'" aria-label="'+r68Esc(e.name)+'所属组别">'+
-         '<option value="未分组" '+(currentGroup==='未分组'?'selected':'')+'>未分组</option>'+
-         groups.map(g=>'<option value="'+r68Esc(g)+'" '+(currentGroup===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('')+
-       '</select>'+
+       '<span class="r73-group-tag">'+r68Esc(currentGroup)+'</span>'+
        (fixedIds.has(e.id)?'<span class="r73-pinned-mark" '+ 'data-r73-tip="已加入长期固定人员">✓</span>':'')+
        '<button class="r73-rename" type="button" data-r72-rename="'+r68Esc(e.id)+'" aria-label="修改 '+r68Esc(e.name)+'的姓名">改名</button></div>';
      }).join(''):'<div class="r73-list-empty">当前筛选没有人员</div>')+'</div>'+
@@ -183,7 +180,7 @@ function r68RosterHtml(){
 function r72MarkDirty(action,details={}){
  state.revisions.push({id:'R'+(++state.revisionSeq),key:'roster',action,...details,
   time:new Date().toISOString()});
- state.saved=false;rememberMonth();reanalyze();render();
+ const view=r80CaptureRosterView();state.saved=false;rememberMonth();reanalyze();render();r80RestoreRosterView(view);
 }
 /* Fixed staff are a project default, not a deletion or replacement of current
  * month observations. Never touch frozen snapshots or previously saved months. */
@@ -302,6 +299,8 @@ async function r72RenameGroup(group,value){
    .map(([id,g])=>[id,g===group?next:g]));
  }
  if(state.selectedGroup===group)state.selectedGroup=next;
+ if(r68UI.targetGroup===group)r68UI.targetGroup=next;
+ if(r68UI.groupFilter===group)r68UI.groupFilter=next;
  r72MarkDirty('rename-group',{from:group,to:next});
  await r72PersistRoster();
 }
@@ -316,6 +315,8 @@ async function r72DeleteGroup(group){
    .map(([id,g])=>[id,g===group?'未分组':g]));
  }
  if(state.selectedGroup===group)state.selectedGroup='未分组';
+ if(r68UI.targetGroup===group)r68UI.targetGroup='未分组';
+ if(r68UI.groupFilter===group)r68UI.groupFilter='未分组';
  r72MarkDirty('delete-group',{group,reassigned:n});await r72PersistRoster();
 }
 function r68RulesHtml(){
@@ -354,7 +355,7 @@ function r68ImportsHtml(){
  const imports=state.imports||[];
  return r68SidebarHeader('导入历史','本月文件与解析结果；原件按导入 ID 单独保留。')+
   (imports.length?'<div class="r68-history">'+imports.map(r=>
-   '<div class="r68-history-row"><span class="r68-history-icon">↧</span><div><strong>'+r68Esc(r.name||'未知文件')+'</strong>'+
+   '<div class="r68-history-row"><span class="r68-history-icon">↧</span><div><button type="button" class="r80-file-link" data-p109-source="'+r68Esc(r.id)+'">'+r68Esc(r.name||'未知文件')+'</button>'+
    '<small>'+r68Esc(r.type)+' · '+r68Esc(r.importedAt||'时间未知')+'</small></div><span>'+Number(r.count||0)+' 条</span>'+
    r68Pill(r.sha256?'已记录哈希':'无哈希',r.sha256?'healthy':'warning')+'</div>').join('')+'</div>':
    '<div class="r68-empty">本月尚未导入真实文件。模拟数据不会冒充已保存的原件。</div>');
@@ -372,7 +373,10 @@ function r68FreezeHtml(){
   branches.map(b=>'<div class="r68-snapshot-row"><strong>'+r68Esc(b.id)+'</strong>'+r68Pill(b.valid?'正常':'损坏',b.valid?'healthy':'critical')+'</div>').join('')+
   '<button class="r68-btn" id="r68OpenProject">查看所有月份与存储</button>';
 }
-function r68RecordsHtml(){return '<div class="r68-records-head">'+r68SidebarHeader('原始记录','查看实际导入后的各类型表格；不在这里更改原始文件。')+'</div>'+
+function r68RecordsHtml(){
+ const tabs='<div class="r80-record-views" role="group" aria-label="记录视图"><button type="button" data-r80-record-view="files" class="'+(r68UI.recordsView!=='rows'?'active':'')+'">导入原件</button><button type="button" data-r80-record-view="rows" class="'+(r68UI.recordsView==='rows'?'active':'')+'">合并数据</button></div>';
+ if(r68UI.recordsView!=='rows')return r68SidebarHeader('原始文件','浏览保存的原文件；合并数据在另一视图中展示。')+tabs+p109SourceListHtml();
+ return tabs+'<div class="r68-records-head">'+r68SidebarHeader('原始记录','查看实际导入后的各类型表格；不在这里更改原始文件。')+'</div>'+
   '<div class="r68-records-frame"><section class="inspector-bottom" id="rawPane"><div class="raw-toolbar"><strong>数据来源</strong><div class="raw-tabs">'+
   [['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,t])=>
    '<button data-raw-tab="'+id+'">'+t+'</button>').join('')+'</div><span id="rawRowCount"></span>'+
@@ -425,7 +429,7 @@ function r69PaintProjectSection(report,tree){
     ['冻结',report.snapshotCount||0],['修订',months.reduce((n,m)=>n+m.branches.length,0)],
     ['占用',r68HumanBytes(tree?.totalBytes||0)]];
    content='<div class="r70-project-facts r71-facts">'+facts.map(([n,v])=>
-    '<span><em>'+n+'</em><strong>'+v+'</strong></span>').join('')+'</div>'+
+    '<button type="button" '+p109PathAttr(n==='月份'||n==='原始文件'||n==='冻结'||n==='修订'?['data']:[])+'><em>'+n+'</em><strong>'+v+'</strong></button>').join('')+'</div>'+
     pick('#r68MonthsCard')+(issues.length?pick('#r68HealthCard'):'');
   }else if(tab==='months')content=pick('#r68MonthsCard');
   else if(tab==='health')content=pick('#r68HealthCard');
@@ -498,7 +502,7 @@ function renderDataWorkspace(){
   r68UI.fixedSearch=e.target.value;r68RefreshDataContent('r73FixedSearch',e.target.selectionStart)
  });
  root.querySelector('#r73GroupFilter')?.addEventListener('change',e=>{
-  r68UI.groupFilter=e.target.value;r68UI.chosen.clear();r68RefreshDataContent()
+  r68UI.groupFilter=e.target.value;r68RefreshDataContent()
  });
  root.querySelectorAll('[data-r68-person]').forEach(c=>c.onchange=()=>{
   if(c.checked)r68UI.chosen.add(c.dataset.r68Person);else r68UI.chosen.delete(c.dataset.r68Person);
@@ -519,19 +523,16 @@ function renderDataWorkspace(){
    e.target.checked?r68UI.fixedChosen.add(p.id):r68UI.fixedChosen.delete(p.id));
   r68RefreshDataContent()
  });
+ root.querySelector('#r68BulkGroup')?.addEventListener('change',e=>{r68UI.targetGroup=e.target.value});
+ root.querySelector('#r80ClearPeople')?.addEventListener('click',()=>{r68UI.chosen.clear();r68RefreshDataContent()});
  root.querySelector('#r68ApplyGroup')?.addEventListener('click',()=>{
   const ids=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),g=root.querySelector('#r68BulkGroup')?.value;
   if(!ids.length||!g)return;
   if(g!=='未分组'&&!(state.groupCatalog||[]).includes(g)){toast('请先在组别编辑里创建该组别',true);return}
   for(const id of ids)state.groups[id]=g;
+  r68UI.targetGroup=g;r68UI.chosen.clear();
   r72MarkDirty('bulk-group',{to:g,employees:ids});
   if(ids.some(id=>(state.fixedPeople||[]).includes(id)))r72PersistRoster();
- });
- root.querySelectorAll('[data-r72-person-group]').forEach(select=>select.onchange=()=>{
-  const group=select.value,id=select.dataset.r72PersonGroup;
-  if(group!=='未分组'&&!(state.groupCatalog||[]).includes(group))return;
-  state.groups[id]=group;r72MarkDirty('assign-group',{employeeId:id,to:group});
-  if((state.fixedPeople||[]).includes(id))r72PersistRoster();
  });
  root.querySelector('#r72AddPerson')?.addEventListener('click',r72AddPerson);
  root.querySelectorAll('[data-r72-rename]').forEach(b=>b.onclick=()=>r72RenamePerson(b.dataset.r72Rename));
@@ -559,7 +560,9 @@ function renderDataWorkspace(){
   const [month,id]=b.dataset.r68Fork.split('|');return p109ForkSnapshot(month,id)
  });
  root.querySelector('#r68RailProject')?.addEventListener('click',()=>r69NavigateData('overview'));
- if((state.dataSection||'records')==='records')mountRawTable(state.selection.type==='date'?
+ root.querySelectorAll('[data-r80-record-view]').forEach(b=>b.onclick=()=>{r68UI.recordsView=b.dataset.r80RecordView;
+  if(r68UI.recordsView!=='rows')state.selection={type:'overall'};render()});
+ if((state.dataSection||'records')==='records'&&r68UI.recordsView==='rows')mountRawTable(state.selection.type==='date'?
   {type:'date',day:state.selection.day,items:[]}:{type:'overall',items:workAnalyses()});
  root.querySelectorAll('.r68-note').forEach(note=>{
   const btn=document.createElement('button');btn.type='button';
@@ -570,16 +573,23 @@ function renderDataWorkspace(){
  });
  r68FillDataRail();r73WireTooltips();
 }
+function r80CaptureRosterView(){
+ const active=document.activeElement;
+ return {scroll:['#r73MonthList','#r73FixedList','#analysisBody','.r71-data-main'].map(selector=>({selector,top:document.querySelector(selector)?.scrollTop||0})),
+  x:scrollX,y:scrollY,id:active?.id,person:active?.dataset?.r68Person,fixed:active?.dataset?.r73FixedPerson,
+  caret:['r68RosterSearch','r73FixedSearch'].includes(active?.id)?active.selectionStart:null};
+}
+function r80RestoreRosterView(view){
+ if(!view)return;
+ const focus=view.id?document.getElementById(view.id):view.person?[...document.querySelectorAll('[data-r68-person]')].find(el=>el.dataset.r68Person===view.person):
+  view.fixed?[...document.querySelectorAll('[data-r73-fixed-person]')].find(el=>el.dataset.r73FixedPerson===view.fixed):null;
+ focus?.focus({preventScroll:true});if(view.caret!=null)focus?.setSelectionRange(view.caret,view.caret);
+ for(const {selector,top} of view.scroll){const el=document.querySelector(selector);if(el)el.scrollTop=top}
+ window.scrollTo(view.x,view.y);
+}
 function r68RefreshDataContent(focusId,position){
- const active=focusId||(['r68RosterSearch','r73FixedSearch'].includes(document.activeElement?.id)?
-   document.activeElement.id:null);
- const caret=position??(active?document.activeElement?.selectionStart:null);
- const a=document.getElementById('r73MonthList')?.scrollTop||0;
- const b=document.getElementById('r73FixedList')?.scrollTop||0;
- renderDataWorkspace();
- if(document.getElementById('r73MonthList'))document.getElementById('r73MonthList').scrollTop=a;
- if(document.getElementById('r73FixedList'))document.getElementById('r73FixedList').scrollTop=b;
- if(active){const next=document.getElementById(active);next?.focus();if(caret!=null)next?.setSelectionRange(caret,caret)}
+ const view=r80CaptureRosterView();if(focusId)view.id=focusId;if(position!=null)view.caret=position;
+ renderDataWorkspace();r80RestoreRosterView(view);
 }
 function r68TreeLine(name,kind,detail=''){
  return '<span class="r68-tree-icon '+kind+'">'+(kind==='directory'?'▣':'▤')+'</span>'+
@@ -602,12 +612,12 @@ async function r68PhysicalTree(root,limit=1600){
     /\/output\//.test(pathname)?'output':'other';
    if(item.kind==='directory'){
     const nested=await entries(item.handle,pathname,depth+1);
-    list.push('<details class="r68-tree-dir" '+(depth<1?'open':'')+'><summary>'+r68TreeLine(item.name,'directory')+'</summary>'+
+    list.push('<details class="r68-tree-dir" '+(depth<1?'open':'')+'><summary>'+r68TreeLine(item.name,'directory')+'<button type="button" class="r80-tree-open" '+p109PathAttr(pathname.split('/').filter(Boolean))+' aria-label="浏览文件夹 '+r68Esc(item.name)+'">浏览</button></summary>'+
      '<div class="r68-tree-children">'+nested+'</div></details>');
    }else{
     const file=await item.handle.getFile(),size=file.size;
     files++;totalBytes+=size;buckets[bucket]+=size;
-    list.push('<div class="r68-tree-file" title="'+r68Esc(pathname)+'">'+r68TreeLine(item.name,'file',r68HumanBytes(size))+'</div>');
+    list.push('<button type="button" class="r68-tree-file r80-tree-file" '+p109PathAttr(pathname.split('/').filter(Boolean))+' title="'+r68Esc(pathname)+'">'+r68TreeLine(item.name,'file',r68HumanBytes(size))+'</button>');
    }
   }
   return list.join('');
@@ -661,10 +671,10 @@ function r68ProjectMarkup(report,tree){
   '<div class="r68-month-table"><div class="r68-month-row heading"><span>月份</span><span>员工</span><span>原件</span><span>工作状态</span>'+
    '<span>上次保存</span><span>冻结</span><span>修订副本</span><span>操作</span></div>'+
    (months.length?months.map(m=>'<div class="r68-month-row"><strong>'+r68Esc(m.key)+'</strong>'+
-    '<span>'+m.employees+'</span><span>'+m.raw+'</span><span>'+
+    '<span>'+m.employees+'</span><span><button class="r80-file-link" '+p109PathAttr(['data',...m.key.split('-'),'raw'])+'>'+m.raw+'</button></span><span>'+
      r68Pill(!m.hasWorking?'缺失':m.key===monthKey()&&!state.saved?'待保存':'已保存',m.hasWorking&&(m.key!==monthKey()||state.saved)?'healthy':'warning')+'</span>'+
     '<span>'+r68Pill(m.hasPrevious?'有':'无',m.hasPrevious?'neutral':'warning')+'</span>'+
-    '<span>'+m.snapshots.length+'</span><span>'+m.branches.length+'</span>'+
+    '<span><button class="r80-file-link" '+p109PathAttr(['data',...m.key.split('-'),'snapshots'])+'>'+m.snapshots.length+'</button></span><span><button class="r80-file-link" '+p109PathAttr(['data',...m.key.split('-'),'branches'])+'>'+m.branches.length+'</button></span>'+
     '<button class="r68-inline" data-r68-month="'+m.key+'">查看月份</button></div>').join(''):
     '<div class="r68-empty">目录内暂无保存过的月份。新项目请先导入并保存。</div>')+'</div></section>'+
   '<section id="r68HealthCard" class="r68-studio-card">'+r68SidebarHeader('项目健康','只读检测 · 提醒缺失与冲突，绝不擅自覆盖原始打卡和冻结。')+
@@ -678,7 +688,7 @@ function r68ProjectMarkup(report,tree){
     '<div class="r68-storage-bars">'+r68StorageBars(tree)+'</div></section>'+
   '</div><aside class="r68-project-rail"><section id="r68ProjectTree" class="r68-studio-card">'+
    r68SidebarHeader('项目文件树','展开目录浏览实际文件，不修改任何内容。')+
-   '<div class="r68-filetree r68-overview-tree">'+(connected?r68TreeLine(state.projectDir.name,'directory')+
+   '<div class="r68-filetree r68-overview-tree">'+(connected?'<button type="button" class="r80-tree-root" '+p109PathAttr([])+'>'+r68TreeLine(state.projectDir.name,'directory')+'</button>'+
    '<div class="r68-tree-children">'+(tree?.html||'')+'</div>':
    '<div class="r68-empty">未连接本地目录。点击顶部「目录」选择已有项目或初始化。</div>')+
    '</div></section><section class="r68-studio-card">'+r68SidebarHeader('安全操作','离线存储 · 用户确认后执行。')+

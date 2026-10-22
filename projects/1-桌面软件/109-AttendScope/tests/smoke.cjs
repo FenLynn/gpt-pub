@@ -15,6 +15,8 @@ async function run(){
  browser=await chromium.launch({headless:true,...(process.env.CHROME_BIN?{executablePath:process.env.CHROME_BIN}:{channel:'chrome'})});
  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,acceptDownloads:true});
  const page=await context.newPage();
+ // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
+ await page.addInitScript(()=>{if(!localStorage.getItem('p109-session-mode'))localStorage.setItem('p109-session-mode','demo')});
  page.on('pageerror',e=>errors.push('page: '+(e.stack||e.message)));
  page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text())});
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
@@ -407,6 +409,7 @@ async function run(){
   getComputedStyle(document.querySelector('.chart-mode-tabs')).display==='none',
   'R42 duplicate personal analysis selector must be absent');
  await page.locator('[data-workspace="data"]').click();
+ await page.locator('[data-r80-record-view="rows"]').click();
  try{await page.waitForSelector('#rawDataTable .tabulator-row',{timeout:10000})}
  catch(e){
    const debug=await page.evaluate(()=>({
@@ -1796,6 +1799,7 @@ async function run(){
   const roster=await browser.newPage({viewport:{width:1600,height:900}});
   roster.on('dialog',dialog=>dialog.accept());
   try{
+   await roster.addInitScript(()=>localStorage.setItem('p109-session-mode','demo'));
    await roster.goto(url,{waitUntil:'load'});
    await roster.locator('[data-workspace="data"]').click();
    await roster.locator('[data-data-section="roster"]').click();
@@ -1912,6 +1916,7 @@ async function run(){
  {
   const flagPage=await browser.newPage({viewport:{width:1600,height:900}});
   try{
+   await flagPage.addInitScript(()=>localStorage.setItem('p109-session-mode','demo'));
    await flagPage.goto(page.url(),{waitUntil:'load'});
    await flagPage.evaluate(()=>{
     const e=EMPLOYEES[0],date='2026-10-08';
@@ -1945,11 +1950,12 @@ async function run(){
  }
  await require('./r78-audit.cjs')({browser,out,root});
  await require('./r79-audit.cjs')({browser,out,root});
+ await require('./r80-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R79',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R80',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

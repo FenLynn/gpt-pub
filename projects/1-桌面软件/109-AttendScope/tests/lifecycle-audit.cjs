@@ -27,6 +27,8 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   bundledRuleKeys:Object.keys(originalConfig),
   demoRosterCount:JSON.parse(fs.readFileSync(path.join(diskRoot,'config','employees.json'),'utf8')).employees.length};
  const page=await browser.newPage({viewport:{width:1600,height:900},acceptDownloads:true});
+ // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
+ await page.addInitScript(()=>{if(!localStorage.getItem('p109-session-mode'))localStorage.setItem('p109-session-mode','demo')});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  page.on('dialog',d=>d.accept());
  const leaf=(parts)=>{

@@ -175,7 +175,9 @@ function r62PreviewHtml(){
  const width=Math.max(0,...d.grid.rows.slice(0,80).map(r=>r.cells.length));
  const dataStart=d.skip+(d.header?1:0),cols=Array.from({length:width},(_,i)=>i),source=r79SourcePeriod();
  const label=i=>r62ColumnLabel(i)+' · '+r62Esc(d.header?d.grid.rows[d.skip]?.cells[i]??'':'列 '+(i+1));
- const select=(key,title)=>'<label class="r62-field">'+title+'<select data-map="'+key+'"><option value="-1">请选择</option>'+
+ const required=key=>['name','datetime','date','time','startDate'].includes(key)||(['start','end'].includes(key)&&['outing','overtime'].includes(d.kind));
+ const select=(key,title)=>'<label class="r62-field">'+title+(required(key)?' <b class="r80-required">必填</b>':'')+'<select data-map="'+key+'"><option value="-1" '+(d.mapping[key]<0?'selected':'')+'>'+
+  (required(key)?'请选择':d.kind==='leave'&&['start','end'].includes(key)?'无（使用班次'+(key==='start'?'开始':'结束')+'）':key==='endDate'?'无（同开始日期）':'无')+'</option>'+
   cols.map(i=>'<option value="'+i+'" '+(d.mapping[key]===i?'selected':'')+'>'+label(i)+'</option>').join('')+'</select></label>';
  const fields=d.kind==='attendance'?[['name','姓名'],...(d.dateMode==='split'?[['date','日期'],['time','时间']]:[['datetime','打卡时间']]),['direction','进出']]:R62_FIELDS[d.kind];
  const mapping=fields.map(([key,title])=>select(key,title)).join('');
@@ -192,12 +194,15 @@ function r62PreviewHtml(){
  const title={attendance:'考勤记录',leave:'请假',trip:'出差',outing:'外出',overtime:'登记加班'}[d.kind];
  return '<section class="r62-overlay" role="dialog" aria-modal="true" aria-labelledby="r62Title"><div class="r62-dialog">'+
   '<header><div><strong id="r62Title">导入'+title+'</strong><p class="r79-import-file" title="'+r62Esc(d.file.name)+'">'+r62Esc(d.file.name)+'</p></div><button id="r62Close" aria-label="关闭导入">×</button></header>'+
+  (r80ImportQueue?'<div class="r80-import-queue">文件 '+(r80ImportQueue.index+1)+' / '+r80ImportQueue.files.length+' · 逐个核对并合并<button id="r80SkipFile" type="button">跳过此文件</button></div>':'')+
   '<div class="r62-body"><div class="r79-import-context"><label>导入月份<input id="r79ImportMonth" aria-label="导入月份" type="month" min="2000-01" max="2099-12" value="'+d.targetMonth+'"></label>'+
   '<div class="r79-source-period">文件日期<b>'+r62Esc(source.first?(source.first===source.last?source.first:source.first+' 至 '+source.last):'待识别')+'</b></div>'+
   (source.main&&source.main!==d.targetMonth?'<button type="button" id="r79UseFileMonth" data-month="'+source.main+'">改为 '+source.main+'</button>':'')+'</div>'+
   '<div class="r79-import-section-head"><h3>字段对应</h3>'+(d.kind==='attendance'?'<label>时间格式<select id="r79DateMode" aria-label="时间格式"><option value="combined" '+(d.dateMode!=='split'?'selected':'')+'>日期时间在同一列</option><option value="split" '+(d.dateMode==='split'?'selected':'')+'>日期、时间分列</option></select></label>':'')+'</div>'+
   '<div class="r62-mapping">'+mapping+'</div>'+
+  (d.kind==='attendance'&&d.mapping.direction<0?'<p class="r80-mapping-hint">未提供进出方向的打卡将标为待核。</p>':'')+
   '<details id="r79Advanced" class="r79-import-advanced" '+(d.advanced?'open':'')+'><summary>更多选项</summary><div class="r62-options">'+
+  '<label>导入方式<select id="r80ImportMode"><option value="merge" '+(d.importMode!=='replace'?'selected':'')+'>合并到已有数据</option><option value="replace" '+(d.importMode==='replace'?'selected':'')+'>替换本月此类数据</option></select></label>'+
   '<label><input type="checkbox" id="r62Header" '+(d.header?'checked':'')+'> 首行为表头</label><label>跳过开头 <input id="r62Skip" type="number" min="0" max="100" value="'+d.skip+'"> 行</label>'+
   (d.file.name.toLowerCase().endsWith('.csv')?'<label>编码<select id="r62Encoding">'+[['auto','自动'],['utf-8','UTF-8'],['gb18030','GB18030/GBK']].map(([v,t])=>'<option value="'+v+'" '+(d.encoding===v?'selected':'')+'>'+t+'</option>').join('')+'</select></label>':'')+
   '<label><input type="checkbox" id="r65SaveTemplate" '+(d.saveTemplate?'checked':'')+'> 记住字段对应</label></div>'+
@@ -219,18 +224,21 @@ function r62BuildCanonical(){
   if(!name)reason='姓名为空';
   if(d.kind==='attendance'){
    const dt=r62DateTime(val(c,'datetime'),val(c,'date'),val(c,'time'));
-   const direction=r62MatchDirection(val(c,'direction'),d.rules);
+   const rawDirection=val(c,'direction'),direction=d.mapping.direction<0||!String(rawDirection??'').trim()||String(rawDirection).trim()==='未标注'?'未标注':r62MatchDirection(rawDirection,d.rules);
    if(!strictDateTime(dt))reason=reason||'日期时间格式错误';
-   if(!['进','出'].includes(direction))reason=reason||('进出无法明确识别：'+String(val(c,'direction')).slice(0,35));
+   if(!['进','出','未标注'].includes(direction))reason=reason||('进出无法明确识别：'+String(val(c,'direction')).slice(0,35));
    Object.assign(base,{打卡时间:dt,进出:direction});
   }else if(d.kind==='leave'||d.kind==='overtime'){
    const date=r62Date(val(c,'date'));
    if(!strictISODate(date))reason=reason||'日期格式错误';
+   for(const key of ['start','end'])if(String(val(c,key)??'').trim()&&!r62Time(val(c,key)))reason=reason||'起止时间格式错误';
    Object.assign(base,{日期:date,开始时间:r62Time(val(c,'start')),
     结束时间:r62Time(val(c,'end')),类型:String(val(c,'type')||''),备注:String(val(c,'note')||'')});
   }else{
    const start=r62Date(val(c,'startDate')),end=r62Date(val(c,'endDate'))||start;
    if(!strictISODate(start)||!strictISODate(end))reason=reason||'起止日期格式错误';
+   if(String(val(c,'endDate')??'').trim()&&!r62Date(val(c,'endDate')))reason=reason||'结束日期格式错误';
+   if(d.kind==='outing')for(const key of ['start','end'])if(String(val(c,key)??'').trim()&&!r62Time(val(c,key)))reason=reason||'起止时间格式错误';
    Object.assign(base,{开始日期:start,结束日期:end,开始时间:r62Time(val(c,'start')),
     结束时间:r62Time(val(c,'end')),类型:String(val(c,'type')||''),
     地点:String(val(c,'place')||''),备注:String(val(c,'note')||'')});
@@ -264,7 +272,10 @@ function r62WireImport(){
  const rerender=()=>{d.error='';r62ShowImport()};
  modal.querySelector('#r79Advanced')?.addEventListener('toggle',e=>{d.advanced=e.target.open});
  modal.querySelector('#r63DirectionDetails')?.addEventListener('toggle',e=>{d.rulesExpanded=e.target.open});
- const close=()=>{if(state.importCommitting)return;modal.remove();r62ImportDraft=null;document.getElementById('importBtn')?.focus()};
+ const close=(continueQueue=false)=>{if(state.importCommitting)return;modal.remove();r62ImportDraft=null;
+  if(continueQueue!==true)r80ImportQueue=null;document.getElementById('importBtn')?.focus({preventScroll:true})};
+ modal.querySelector('#r80ImportMode').onchange=e=>{d.importMode=e.target.value};
+ modal.querySelector('#r80SkipFile')?.addEventListener('click',async()=>{close(true);await r80NextImportFile()});
  modal.querySelector('#r62Close').onclick=close;modal.querySelector('#r62Cancel').onclick=close;
  modal.addEventListener('keydown',e=>p109TrapDialogFocus(e,modal));
  modal.querySelector('#r65SaveTemplate').onchange=e=>{d.saveTemplate=e.target.checked};
@@ -301,11 +312,11 @@ function r62WireImport(){
     if(!switchMonth(y,m,true,true,true))throw Error('无法打开所选导入月份');
    }
    const converter={attendance:importAttendance,leave:importLeaves,trip:importTrips,outing:importOutings,overtime:importOvertime}[d.kind];
-   const oldProfile=state.importProfile;await converter(d.file,{sheet:d.grid.sheet,rows:data.rows,headers:Object.keys(data.rows[0])});
+   const oldProfile=state.importProfile;await converter(d.file,{sheet:d.grid.sheet,rows:data.rows,headers:Object.keys(data.rows[0]),importMode:d.importMode});
    const nextProfile={...oldProfile,rules:d.rules.filter(r=>r.text.trim()).map(r=>({...r}))};
    if(d.saveTemplate)nextProfile.templates={...(nextProfile.templates||{}),[d.kind]:{header:d.header,skip:d.skip,
     labels:d.grid.rows[d.skip]?.cells.map(x=>String(x??'').trim())||[],mapping:{...d.mapping},encoding:d.encoding}};
-   state.importProfile=nextProfile;state.saved=false;rememberMonth();state.importCommitting=false;close();render();
+   state.importProfile=nextProfile;state.saved=false;rememberMonth();state.importCommitting=false;close(true);render();await r80NextImportFile();
   }catch(e){
    p109RestoreSession(before);reanalyze();render();
    d.error=e.name==='AbortError'?'已取消，原数据已保留。':e.name==='NotAllowedError'?'项目目录没有写入权限，请重新授权后重试。':('导入失败：'+e.message);
@@ -321,6 +332,17 @@ function r62ShowImport(){
  document.querySelector('#r79ImportMonth')?.focus();
 }
 let r63ReadingImport=false;
+let r80ImportQueue=null;
+async function r80OpenImportFiles(files,kind){
+ if(r62ImportDraft||r63ReadingImport){toast('请先完成或取消当前导入',true);return}
+ r80ImportQueue=files.length>1?{files:[...files],kind,index:0}:null;
+ try{await r62OpenImport(files[0],kind)}catch(e){r80ImportQueue=null;throw e}
+}
+async function r80NextImportFile(){
+ const queue=r80ImportQueue;if(!queue)return;
+ queue.index++;if(queue.index>=queue.files.length){r80ImportQueue=null;return}
+ try{await r62OpenImport(queue.files[queue.index],queue.kind)}catch(e){r80ImportQueue=null;toast('后续文件未导入：'+e.message+'。已完成的文件保留。',true)}
+}
 async function r62OpenImport(file,kind){
  if(r63ReadingImport){toast('正在处理上一个文件，请先完成导入',true);return}
  if(file.size>40*1024*1024)throw new Error('文件超过 40 MB；请按月份拆分后导入');
@@ -343,7 +365,7 @@ async function r62OpenImport(file,kind){
  r62ImportDraft={file,kind,grid,header,skip:0,encoding:'auto',
   mapping:matches?{...saved.mapping}:r62InferColumns({...grid,kind},header),
   rules:profile.rules.map(r=>({...r})),rulesExpanded:false,saveTemplate:false,validated:null,
-  targetMonth:monthKey(),advanced:false,error:''};
+  targetMonth:monthKey(),advanced:false,error:'',importMode:'merge'};
  r62ImportDraft.dateMode=r62ImportDraft.mapping.datetime>=0?'combined':'split';
  r62ShowImport();
  }finally{indicator.remove();r63ReadingImport=false}

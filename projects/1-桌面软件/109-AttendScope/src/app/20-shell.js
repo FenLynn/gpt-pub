@@ -82,8 +82,8 @@ function layoutHtml(){
   <header class="topbar">
     <div class="brand">
       <div class="logo" aria-hidden="true"><span></span></div>
-      <strong class="brand-title">${escapeNameChar(attendTitle())}</strong>
-      <span class="brand-mode">${state.projectDir?"离线考勤":state.isDemo?"演示 · 待初始化":"未连接目录"}</span>
+      <div class="r80-brand-label"><div><strong class="brand-title">${escapeNameChar(attendTitle())}</strong><button type="button" id="p109ModeSwitch" aria-label="切换 Demo / Work 模式">${state.isDemo?'Demo':'Work'}</button></div>
+      <button type="button" id="p109CurrentProject" title="${escapeNameChar(p109CurrentProjectName())} · 点击浏览项目">${escapeNameChar(p109CurrentProjectName())}<span aria-hidden="true"> ↗</span></button></div>
     </div>
     <nav class="workspace-navigation" aria-label="分析工作区">${workspaceNavHtml()}</nav>
     <div class="top-global-actions">
@@ -229,11 +229,11 @@ function layoutHtml(){
   </div>
 
   ${r14SettingsMarkup()}
-  <input class="hidden" id="attendanceInput" type="file" accept=".xlsx,.csv">
-  <input class="hidden" id="leaveInput" type="file" accept=".xlsx,.csv">
-  <input class="hidden" id="tripInput" type="file" accept=".xlsx,.csv">
-  <input class="hidden" id="outingInput" type="file" accept=".xlsx,.csv">
-  <input class="hidden" id="overtimeInput" type="file" accept=".xlsx,.csv">
+  <input class="hidden" id="attendanceInput" type="file" multiple accept=".xlsx,.csv">
+  <input class="hidden" id="leaveInput" type="file" multiple accept=".xlsx,.csv">
+  <input class="hidden" id="tripInput" type="file" multiple accept=".xlsx,.csv">
+  <input class="hidden" id="outingInput" type="file" multiple accept=".xlsx,.csv">
+  <input class="hidden" id="overtimeInput" type="file" multiple accept=".xlsx,.csv">
   `;
 }
 
@@ -242,11 +242,11 @@ function importMenuRow(title,input,sample){
 }
 
 function bind(){
-  document.getElementById('attendanceInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'attendance'));
-  document.getElementById('leaveInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'leave'));
-  document.getElementById('tripInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'trip'));
-  document.getElementById('outingInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'outing'));
-  document.getElementById('overtimeInput').onchange=e=>handleFile(e,file=>r62OpenImport(file,'overtime'));
+  document.getElementById('attendanceInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'attendance'));
+  document.getElementById('leaveInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'leave'));
+  document.getElementById('tripInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'trip'));
+  document.getElementById('outingInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'outing'));
+  document.getElementById('overtimeInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'overtime'));
 
   const filter=document.getElementById('statusFilter');
   const filterButton=document.getElementById('statusFilterButton');
@@ -393,6 +393,9 @@ function bindGlobalUiShortcuts(){
  window.__p109UiShortcutsBound=true;
  document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  if(document.getElementById('p109FilesOverlay')){e.preventDefault();p109CloseFileBrowser();return}
+  const mode=document.getElementById('p109ModeOverlay');
+  if(mode){e.preventDefault();mode.querySelector('#r80ModeClose')?.click();return}
   const recent=document.getElementById('p109RecentOverlay');
   if(recent){e.preventDefault();recent.querySelector('#p109RecentClose')?.click();return}
   const project=document.querySelector('.p109-project-overlay');
@@ -426,9 +429,9 @@ function bindGlobalUiShortcuts(){
 }
 
 async function handleFile(e,fn){
-  const file=e.target.files?.[0]; if(!file)return;
+  const files=[...(e.target.files||[])]; if(!files.length)return;
   if(p109ConnectionBusy||state.storageBusy||state.importCommitting||p109ProjectBusy){toast('请等待当前项目文件操作完成',true);e.target.value='';return}
-  try{await fn(file)}catch(err){toast(err.message,true)}finally{e.target.value=''}
+  try{await fn(files)}catch(err){toast(err.message,true)}finally{e.target.value=''}
 }
 
 function renderCalendar(){

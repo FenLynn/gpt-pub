@@ -336,7 +336,12 @@ function renderRawTable(ctx){
   const prefs=p.tableColumns?.[kind]||{};
   const col=(title,field,width,minWidth=43)=>{
     const opt=prefs[field]||{};
-    return {title,field,minWidth,formatter:'plaintext',headerSort:true,tooltip:true,
+    return {title,field,minWidth,formatter:field==='source'?cell=>{
+       const row=cell.getRow().getData(),refs=row.sources||[row];
+       if(!refs.some(x=>x.importId))return escapeNameText(cell.getValue()||'');
+       return '<button type="button" class="r80-file-link" data-p109-source="'+escapeNameText(refs.find(x=>x.importId).importId)+'">'+escapeNameText(cell.getValue()||'原件')+'</button>'+
+        (refs.length>1?'<button type="button" class="r80-cell-sources" data-p109-sources="'+encodeURIComponent(JSON.stringify([kind,rawEvidenceKey(kind,row)]))+'">'+refs.length+' 个来源</button>':'');
+      }:'plaintext',headerSort:true,tooltip:true,
       hozAlign:'center',headerHozAlign:'center',
       visible:field==='name'||opt.visible!==false,frozen:field==='name',width:opt.width&&opt.width>=48?Math.min(500,opt.width):undefined,
       widthGrow:Math.max(1,Math.round(width/65))};
@@ -372,6 +377,7 @@ function renderRawTable(ctx){
     });
   });
   rawTabulator.on('rowClick',(event,row)=>{
+    if(event.target.closest?.('[data-p109-source],[data-p109-sources]'))return;
     if(kind!=='attendance')return;
     const record=row.getData(),day=Number(record.datetime.slice(8,10));
     if(ctx.type==='cell'&&ctx.employee.id===record.employeeId&&ctx.day===day){
@@ -448,15 +454,15 @@ function r15PunchPreview(a){
   const bins=new Map();
   for(const p of (a.punches||[])){
     const minute=Math.floor(minutes(p.time)),bucket=Math.floor(minute/3)*3;
-    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,sum:0,in:0,out:0});
-    const bin=bins.get(bucket);bin[p.direction==='进'?'in':'out']++;bin.sum+=minutes(p.time);
+    if(!bins.has(bucket))bins.set(bucket,{minute:bucket,sum:0,in:0,out:0,unknown:0});
+    const bin=bins.get(bucket);bin[p.direction==='进'?'in':p.direction==='出'?'out':'unknown']++;bin.sum+=minutes(p.time);
   }
   const bars=[...bins.values()].map(g=>{
-    const total=g.in+g.out,center=g.sum/total,left=(center/1440*100).toFixed(5),width=Math.min(9,2+total*1.35);
+    const total=g.in+g.out+g.unknown,center=g.sum/total,left=(center/1440*100).toFixed(5),width=Math.min(9,2+total*1.35);
     const range=state.timelineRange,inside=range&&center>=range.start&&center<=range.end;
     return '<span class="r15-punch-stack '+(inside?'inside':'outside')+'" data-nav-minute="'+center+'" style="left:clamp('+(width/2)+'px,'+left+'%,calc(100% - '+(width/2)+'px));width:'+width+'px" title="进 '+g.in+' / 出 '+g.out+'">'+
       (g.in?'<i class="in"></i>':'')+
-      (g.out?'<i class="out"></i>':'')+
+      (g.out?'<i class="out"></i>':'')+(g.unknown?'<i class="unknown"></i>':'')+
     '</span>';
   }).join('');
   const ticks=['0:00','6:00','12:00','18:00','24:00'].map(t=>'<span>'+t+'</span>').join('');

@@ -58,6 +58,8 @@ function p109BindRecentMenu(){
  document.getElementById('p109RecentManage')?.addEventListener('click',()=>{p109CloseSystemMenus();p109ShowRecentProjects()});
 }
 function p109RefreshRecentMenu(){
+ const label=document.getElementById('p109CurrentProject');
+ if(label){label.textContent=p109CurrentProjectName()+' ↗';label.title=p109CurrentProjectName()+' · 点击浏览项目'}
  const menu=document.getElementById('p109RecentList');if(!menu)return;
  menu.innerHTML=p109RecentMenuHtml();p109BindRecentMenu();
 }
@@ -113,7 +115,11 @@ async function p109RestoreLastProject(){
   const data=await p109RecentRead();
   if(serial!==p109RecentState.serial)return;
   p109RecentState.items=data.items.filter(x=>x.handle?.kind==='directory'&&typeof x.handle.getDirectoryHandle==='function');p109RecentState.lastId=data.lastId;p109RefreshRecentMenu();
+  const mode=p109ReadMode();
+  if(!mode){p109ShowModeChooser(true);return}
+  if(mode==='demo')return;
   const item=p109RecentState.items.find(x=>x.id===data.lastId);
+  if(!item&&!state.projectDir&&!p109RecentState.interacted){p109ShowWorkHome();return}
   if(!item||state.projectDir||p109RecentState.interacted)return;
   const permission=await item.handle.queryPermission({mode:'readwrite'});
   if(state.projectDir||p109RecentState.interacted)return;
@@ -121,8 +127,13 @@ async function p109RestoreLastProject(){
    const ok=await connectProjectDir(item.handle,{automatic:true});
    if(!ok)p109ShowRecentProjects('上次项目未能载入，请重新授权或选择目录。');
   }else p109ShowRecentProjects('上次项目：'+p109RecentName(item)+'。点击“继续打开”重新授权，无需再次寻找目录。');
- }catch(e){p109RecentState.available=false;p109RecentState.error='无法读取项目历史：'+e.message;p109RefreshRecentMenu()}
+ }catch(e){p109RecentState.available=false;p109RecentState.error='无法读取项目历史：'+e.message;p109RefreshRecentMenu();
+  if(!state.projectDir&&!p109RecentState.interacted){if(!p109ReadMode())p109ShowModeChooser(true);else if(p109ReadMode()==='work')p109ShowWorkHome()}}
  finally{document.removeEventListener('pointerdown',mark,true);document.removeEventListener('keydown',mark,true)}
 }
 p109RefreshRecentMenu();
-const p109RecentReady=p109RestoreLastProject();
+const p109RecentReady=(async()=>{
+ p109DemoSession=structuredClone(p109CaptureSession());
+ if(p109ReadMode()==='work')p109BlankWork();
+ await p109RestoreLastProject();
+})();

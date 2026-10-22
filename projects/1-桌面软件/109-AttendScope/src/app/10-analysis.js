@@ -104,11 +104,11 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
   const datetime=importedDate(aliases(r,['打卡时间','时间','datetime','DateTime'])),
    direction=String(aliases(r,['进出','方向','状态','direction'])).trim();
   if(!strictDateTime(datetime))throw Error('日期时间格式错误');
-  if(!['进','出'].includes(direction))throw Error('进出方向无法识别');
+  if(direction&&!['进','出','未标注'].includes(direction))throw Error('进出方向无法识别');
   const stamp=attendanceUtcMinute(datetime.slice(0,10),datetime.slice(11));
   if(stamp<period.first-1440||stamp>=period.last+1440)
    throw Error('日期不属于 '+period.key+'（仅允许前后各一天的跨月配对记录）');
-  return {name,datetime,time:datetime.slice(11,19),direction,row};
+  return {name,datetime,time:datetime.slice(11,19),direction:direction||'未标注',row};
  }
  if(kind==='trip'||kind==='outing'){
   const startDate=r62Date(aliases(r,['开始日期','起始日期','日期','startDate','date'])),
@@ -140,15 +140,43 @@ function p109ParseImportTable(kind,table,period=p109ImportPeriod()){
   catch(e){failed.push({row:sourceRow(r,i),reason:e.message})}});
  return {rows,failed};
 }
+// Preserve multiplicity within a source file. Only overlaps with earlier files
+// are folded; all contributing source rows remain traceable in `sources`.
+function p109ImportSignature(kind,row){
+ const keys={attendance:['employeeId','datetime','direction'],leave:['employeeId','date','start','end','type','note'],
+  trip:['employeeId','startDate','endDate','type','place','note'],
+  outing:['employeeId','startDate','endDate','start','end','type','place','note'],
+  overtime:['employeeId','date','start','end','type','note']}[kind];
+ return JSON.stringify(keys.map(key=>{
+  const value=row[key]??'';
+  if(['start','end'].includes(key))return validClock(value)?minutes(value):value;
+  return key==='datetime'&&String(value).length===16?value+':00':value;
+ }));
+}
+function p109SourceReference(row){
+ return Object.fromEntries(['importId','source','sheet','row','recordId','id','sourceName'].filter(k=>row[k]!=null).map(k=>[k,row[k]]));
+}
+function p109MergeImportRows(kind,previous,incoming){
+ const rows=previous.map(r=>({...r})),slots=new Map();let added=0,merged=0;
+ rows.forEach((r,i)=>{const key=p109ImportSignature(kind,r);if(!slots.has(key))slots.set(key,[]);slots.get(key).push(i)});
+ for(const row of incoming){
+  const indices=slots.get(p109ImportSignature(kind,row));
+  if(indices?.length){
+   const index=indices.shift(),old=rows[index];
+   rows[index]={...old,sources:[...(old.sources||[p109SourceReference(old)]),p109SourceReference(row)]};merged++;
+  }else{rows.push(row);added++}
+ }
+ return {rows,added,merged};
+}
 async function p109ImportBusiness(kind,file,prepared=null){
  const table=prepared||await XLSX.readTable(file),result=p109ParseImportTable(kind,table);
  if(!result.rows.length)throw Error('没有可导入 '+monthKey()+' 的记录'+
   (result.failed[0]?'：'+result.failed[0].reason:''));
  const parsed=result.rows,plan=importRosterPlan(parsed.map(r=>r.name),kind),
   field={attendance:'records',leave:'leaves',trip:'trips',outing:'outings',overtime:'overtimeEntries'}[kind],
-  title={attendance:'考勤',leave:'请假',trip:'出差',outing:'外出',overtime:'登记加班'}[kind];
- if(!plan.resetDemo&&state[field].length&&!window.confirm('本月已有'+title+'记录，新文件将替换当前工作数据，历史原文件会保留。是否继续？'))
-  throw new DOMException('已取消导入','AbortError');
+  mode=prepared?.importMode==='replace'?'replace':'merge';
+ if(mode==='replace'&&!plan.resetDemo&&state[field].length&&!window.confirm('替换本月此类工作数据？其他类型与历史原件均保留。'))
+  throw new DOMException('已取消替换','AbortError');
  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
   prefix={leave:'LI',trip:'TI',outing:'OI',overtime:'OTI'}[kind];
  const out=parsed.map(r=>{
@@ -157,10 +185,15 @@ async function p109ImportBusiness(kind,file,prepared=null){
   return {...r,...identity,importId,employeeId:employee.id,name:employee.name,
    sourceName:r.name,source:file.name,sheet:table.sheet};
  });
- // No roster or live dataset changes until the original has been persisted.
- const meta=await persistImportedFile(file,kind,out.length,importId);
- applyImportRoster(plan,meta);acceptImportedRows(kind,out,plan,result.failed.length);
- return {count:out.length,skipped:result.failed.length};
+ const translation=new Map(EMPLOYEES.map(e=>[e.id,personIdentity(e.name)])),
+  previous=state[field].map(r=>({...r,employeeId:translation.get(r.employeeId)||r.employeeId}));
+ const combined=mode==='merge'&&!plan.resetDemo?p109MergeImportRows(kind,previous,out):{rows:out,added:out.length,merged:0};
+ // Persist an immutable copy before changing the roster or live dataset.
+ const meta={...await persistImportedFile(file,kind,out.length,importId),mode,addedCount:combined.added,mergedCount:combined.merged};
+ applyImportRoster(plan,meta);if(!state.isDemo)p109WriteMode('work');acceptImportedRows(kind,combined.rows,plan,result.failed.length);
+ if(typeof p109SourceCache!=='undefined'&&!state.projectDir)p109SourceCache.set(importId,file);
+ toast('已'+(mode==='replace'?'替换':'合并')+'：新增 '+combined.added+' 条'+(combined.merged?'，重合 '+combined.merged+' 条（保留来源）':''));
+ return {count:out.length,added:combined.added,merged:combined.merged,skipped:result.failed.length};
 }
 async function importAttendance(file,prepared=null){return p109ImportBusiness('attendance',file,prepared)}
 async function importLeaves(file,prepared=null){return p109ImportBusiness('leave',file,prepared)}
@@ -270,12 +303,14 @@ function attendanceAdjacentRows(field='records'){
 function attendanceVisitEvents(employeeId){
  if(r63AnalysisIndex?.visits.has(employeeId))return r63AnalysisIndex.visits.get(employeeId);
  const rows=attendanceAdjacentRows('records').filter(x=>x.employeeId===employeeId&&
-   x.datetime&&['进','出'].includes(x.direction))
+   x.datetime)
   .sort((a,b)=>a.datetime.localeCompare(b.datetime)||
     (a.direction==='进'?-1:1));
  const visits=[];let pending=null;
  for(const row of rows){
   const stamp=attendanceUtcMinute(row.datetime.slice(0,10),row.time||row.datetime.slice(11));
+  // An unknown event can be an exit or entry. Do not bridge a visit across it.
+  if(!['进','出'].includes(row.direction)){pending=null;continue}
   if(row.direction==='进'){
    if(!pending||(row.datetime.slice(0,10)!==pending.row.datetime.slice(0,10)&&
       (stamp-pending.stamp)*60>RULES.dupSeconds))pending={row,stamp};
@@ -464,6 +499,7 @@ function analyzeDay(emp,d){
  const wholeVisits=attendanceVisitEvents(emp.id);
  for(let i=0;i<punches.length;i++){
   const p=punches[i],prev=punches[i-1];
+  if(!['进','出'].includes(p.direction)){suspect('未提供进出方向（待核）');pairingUncertain=true;continue}
   if(prev&&prev.direction===p.direction){
    const diff=Math.abs(minutes(p.time)-minutes(prev.time));
    suspect(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:

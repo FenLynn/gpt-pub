@@ -272,6 +272,7 @@ async function p109InitializeProject(root){
   if(!await saveWorking({initializing:true}))throw Error('初始工作状态未能保存');
   r68UI.latestRoot=null;r68UI.latestReport=null;r68UI.latestTree=null;r68UI.latestScanAt=0;
   r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
+  p109ActivateWorkSession();
   if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle());
   render();p109Status('空白项目已初始化并保存，可以开始导入'+
    (typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':''));return true;

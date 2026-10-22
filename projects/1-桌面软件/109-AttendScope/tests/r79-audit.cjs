@@ -6,6 +6,8 @@ module.exports=async({browser,out,root})=>{
  root=path.resolve(root);
  const currentVersion=/const P109_APP_VERSION='([^']+)'/.exec(fs.readFileSync(path.join(root,'src/app/00-state.js'),'utf8'))[1];
  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
+ // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
+ await page.addInitScript(()=>{if(!localStorage.getItem('p109-session-mode'))localStorage.setItem('p109-session-mode','demo')});
  const report={revision:'R79',nativeOpfsVerified:true,nativePickerVerified:false,historyHarness:'local HTTP (OPFS disallowed on file origins); file runtime separately covered by full smoke',checks:[]},errors=[];
  const server=http.createServer((req,res)=>{
   const target=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
@@ -102,14 +104,14 @@ module.exports=async({browser,out,root})=>{
     requestPermission:async()=>window.__r79Permission,getDirectoryHandle:root.getDirectoryHandle.bind(root),
     getFileHandle:root.getFileHandle.bind(root),entries:root.entries.bind(root)};
   });
-  await upload();await page.locator('#r62Commit').click();
+  await upload(attendance.replace('17:15:00','17:20:00'));await page.locator('#r62Commit').click();
   await page.waitForFunction(()=>!state.importCommitting&&!!r62ImportDraft.error);
   check(await page.evaluate(()=>state.records.length===4&&state.imports.length===1&&
    document.querySelector('#r62Validation').textContent.includes('写入权限')&&!document.querySelector('#r62Commit').disabled),
    'permission failure leaves inline error and unchanged data; retry stays available');
   await page.evaluate(()=>{window.__r79Permission='granted';state.projectDir=window.__r79Root});
   await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
-  check(await page.evaluate(()=>state.records.length===4&&state.imports.length===2),'retry after permission restoration commits once');
+  check(await page.evaluate(()=>state.records.length===5&&state.imports.length===2),'retry after permission restoration merges exactly once');
   const parser=await page.evaluate(()=>{
    const dt=(Date.UTC(2026,9,27,19)-Date.UTC(1899,11,30))/86400000;
    const grid={kind:'attendance',rows:[{rowNumber:1,cells:['姓名','日期','时间','进出']},

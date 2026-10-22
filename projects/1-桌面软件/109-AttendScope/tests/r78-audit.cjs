@@ -11,6 +11,8 @@ module.exports=async function({browser,out,root}){
  const check=(ok,label)=>{if(!ok)throw Error('R78: '+label);report.checks.push(label)};
  const put=(key,relative,body)=>{const f=path.join(roots[key],relative);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,typeof body==='string'?body:JSON.stringify(body,null,2))};
  const page=await browser.newPage({viewport:{width:1600,height:900},acceptDownloads:true});
+ // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
+ await page.addInitScript(()=>{if(!localStorage.getItem('p109-session-mode'))localStorage.setItem('p109-session-mode','demo')});
  page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.accept());
  await page.exposeFunction('__r78fs',async({key,parts,op,create,data})=>{
@@ -153,7 +155,12 @@ module.exports=async function({browser,out,root}){
   await page.locator('[data-workspace="data"]').click();
   for(const section of ['overview','months','health','storage','roster','rules','templates','records','imports','freezes']){
    await page.locator('[data-data-section="'+section+'"]').click();
-   check(await page.locator('#calendar').count()===(section==='records'?1:0),'date calendar only where effective: '+section);
+   check(await page.locator('#calendar').count()===0,'date calendar absent from file inventory and configuration: '+section);
+   if(section==='records'){
+    await page.locator('[data-r80-record-view="rows"]').click();
+    check(await page.locator('#calendar').count()===1,'combined rows keep an effective date filter');
+    await page.locator('[data-r80-record-view="files"]').click();
+   }
   }
   check(await page.locator('#r68FreezeNow').count()===0,'freeze has one global primary action');
   await page.locator('#exportMenuButton').click();await page.screenshot({path:path.join(out,'r78-export-menu.png')});

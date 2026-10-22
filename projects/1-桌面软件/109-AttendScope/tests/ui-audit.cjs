@@ -5,6 +5,8 @@ const {pathToFileURL}=require('url');
 
 module.exports=async function runUiAudit({browser,out,root}){
  const page=await browser.newPage({viewport:{width:1600,height:900},acceptDownloads:true});
+ // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
+ await page.addInitScript(()=>{if(!localStorage.getItem('p109-session-mode'))localStorage.setItem('p109-session-mode','demo')});
  const errors=[];
  page.on('pageerror',e=>errors.push(e.stack||e.message));
  page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
