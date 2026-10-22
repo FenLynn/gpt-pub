@@ -329,6 +329,38 @@ function bind(){
    finally{e.target.value=''}
   };
   document.getElementById('freezeBtn').onclick=freezeSnapshot;
+  bindGlobalUiShortcuts();
+}
+
+function bindGlobalUiShortcuts(){
+ if(window.__p109UiShortcutsBound)return;
+ window.__p109UiShortcutsBound=true;
+ document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape')return;
+  const project=document.querySelector('.p109-project-overlay');
+  if(project){e.preventDefault();project.querySelector('#p109ProjectClose')?.click();project.remove();return}
+  const importer=document.querySelector('.r62-overlay');
+  if(importer){e.preventDefault();importer.querySelector('#r62Close')?.click();return}
+  const pdf=document.getElementById('r63PdfPicker');
+  if(pdf&&!pdf.hidden){e.preventDefault();pdf.hidden=true;document.getElementById('printReport')?.setAttribute('aria-expanded','false');return}
+  const settings=document.querySelector('.settings-overlay:not(.hidden)');
+  if(settings){e.preventDefault();document.getElementById('settingsClose')?.click();document.getElementById('settingsBtn')?.focus();return}
+  const raw=document.querySelector('.raw-dialog-overlay');
+  if(raw&&typeof closeRawPopout==='function'){e.preventDefault();closeRawPopout();return}
+  const custom=document.querySelector('.r73-modal-backdrop');
+  if(custom){
+   const close=custom.querySelector('[data-modal-close],[aria-label*="关闭"],[aria-label*="取消"]');
+   if(close){e.preventDefault();close.click();return}
+  }
+  const importMenu=document.getElementById('importPopover');
+  const monthMenu=document.getElementById('monthPopover');
+  const statusMenu=document.getElementById('statusFilterMenu');
+  if(importMenu?.classList.contains('open')||monthMenu?.classList.contains('open')||statusMenu?.classList.contains('open')){
+   e.preventDefault();importMenu?.classList.remove('open');monthMenu?.classList.remove('open');statusMenu?.classList.remove('open');
+   document.getElementById('monthMenuButton')?.setAttribute('aria-expanded','false');
+   document.getElementById('statusFilterButton')?.setAttribute('aria-expanded','false');
+  }
+ });
 }
 
 async function handleFile(e,fn){

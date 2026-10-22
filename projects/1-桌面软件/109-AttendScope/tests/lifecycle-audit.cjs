@@ -108,12 +108,14 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.savedRecords=w.records.length;report.savedGroup=w.groups[w.employees.find(e=>e.name==='审计甲').id];
   const rawPath=path.join(diskRoot,'data','2027','03','raw','attendance');
   report.rawImportDirectories=fs.readdirSync(rawPath).length;
+  report.singleRawImportCopy=report.rawImportDirectories===1;
   await page.evaluate(()=>freezeSnapshot());
   const snRoot=path.join(diskRoot,'data','2027','03','snapshots');
   const folders=fs.readdirSync(snRoot);
   if(folders.length!==1)throw Error('R64 snapshot was not written');
   const frozen=JSON.parse(fs.readFileSync(path.join(snRoot,folders[0],'snapshot.json'),'utf8'));
   report.snapshotBeforeEdit=frozen.working.manualStatuses;
+  report.snapshotStartsWithoutManualOverride=Object.keys(report.snapshotBeforeEdit||{}).length===0;
   await page.evaluate(()=>{
    const e=EMPLOYEES.find(e=>e.name==='审计甲');
    state.workspaceMode='person';state.selection={type:'cell',employeeId:e.id,day:10};
@@ -122,7 +124,9 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.evaluate(()=>saveWorking());
   const amended=JSON.parse(fs.readFileSync(wpath,'utf8'));
   report.manualAfterEdit=amended.manualStatuses;
+  report.manualOverridePersisted=Object.entries(report.manualAfterEdit||{}).some(([key,value])=>key.endsWith('|10')&&value==='absent');
   report.previousSaved=fs.existsSync(path.join(diskRoot,'data','2027','03','working','state.previous.json'));
+  report.previousWorkingPreserved=report.previousSaved;
   report.snapshotUnchanged=fs.readFileSync(path.join(snRoot,folders[0],'snapshot.json'),'utf8')===JSON.stringify(frozen,null,2);
   await page.reload({waitUntil:'load'});
   await page.evaluate(()=>connectProjectDir());
@@ -142,8 +146,8 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   fs.copyFileSync(path.join(root,'index.html'),path.join(diskRoot,'index.html'));
   await open();
   report.sameVersionCodeOverlayKeepsData=await page.evaluate(()=>YEAR===2027&&MONTH===3&&state.records.length===4);
-  report.oldBundledRulesDoNotMatchRuntime=!(Object.hasOwn(originalConfig,'amStart')&&Object.hasOwn(originalConfig,'pmStart'));
-  report.oldBundledRosterStillSample=JSON.parse(fs.readFileSync(path.join(diskRoot,'config','employees.json'),'utf8')).employees.length!==
+  report.bundledRulesHaveCurrentKeys=['amStart','amEnd','pmStart','pmEnd','overtimeMinMinutes'].every(k=>Object.hasOwn(originalConfig,k));
+  report.bundledRosterIsSeparateFromProjectState=JSON.parse(fs.readFileSync(path.join(diskRoot,'config','employees.json'),'utf8')).employees.length!==
    JSON.parse(fs.readFileSync(path.join(diskRoot,'data','2027','03','working','state.json'),'utf8')).employees.length;
 
   // R65 actual clean-install and project health/recovery workflow.
@@ -326,6 +330,59 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const releaseCheck=cp.spawnSync('python3',['-c',
     "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;assert all(p in ('index.html','README.md','p109-release-manifest.json') or p.startswith('src/') for p in z.namelist())",releaseZip],{encoding:'utf8'});
   report.releaseZipNoData=releaseCheck.status===0;
+
+  // R75: version-gated upgrade from a synthetic prior-version installation.
+  // The application assets are the current tree with only the version marker lowered;
+  // this tests the actual 0.2.0 -> 0.2.1 package gate and preservation path, not a historical binary.
+  const oldRoot=path.join(tmp,'old-version-install','考勤');
+  fs.cpSync(restoreDir,oldRoot,{recursive:true});
+  const oldControl=path.join(oldRoot,'src','app','43-project-control.js');
+  let oldControlText=fs.readFileSync(oldControl,'utf8');
+  if(!oldControlText.includes("const P109_APP_VERSION='0.2.1-preview';"))
+   throw Error('R75 expected new version marker before generating old-version fixture');
+  fs.writeFileSync(oldControl,oldControlText.replace("const P109_APP_VERSION='0.2.1-preview';","const P109_APP_VERSION='0.2.0-preview';"));
+  const oldMetaPath=path.join(oldRoot,'project.json');
+  const oldMeta=JSON.parse(fs.readFileSync(oldMetaPath,'utf8'));
+  oldMeta.appVersion='0.2.0-preview';fs.writeFileSync(oldMetaPath,JSON.stringify(oldMeta,null,2));
+  diskRoot=oldRoot;
+  await open();
+  report.oldVersionInstallBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.0-preview'&&
+   YEAR===2026&&MONTH===10&&state.records.length===2&&!!state.projectDir);
+  const oldWorkingPath=path.join(oldRoot,'data','2026','10','working','state.json');
+  const oldRawPath=path.join(oldRoot,'data','2026','10','raw','attendance',impName,'审核门禁.csv');
+  const oldWorkingBytes=fs.readFileSync(oldWorkingPath),oldRawBytes=fs.readFileSync(oldRawPath);
+  await page.locator('#p109ProjectControl').click();
+  await page.waitForSelector('#p109UpgradeCode',{timeout:30000});
+  const oldUpgradeChoice=page.waitForEvent('filechooser',{timeout:30000});
+  await page.locator('#p109UpgradeCode').click();
+  await (await oldUpgradeChoice).setFiles({name:'P109-update-0.2.1.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
+  report.crossVersionUpgradePreservesData=fs.readFileSync(oldWorkingPath).equals(oldWorkingBytes)&&
+   fs.readFileSync(oldRawPath).equals(oldRawBytes);
+  report.crossVersionBackupCreated=fs.readdirSync(path.join(oldRoot,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
+  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.1-preview';");
+  await open();
+  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.1-preview'&&
+   YEAR===2026&&MONTH===10&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲'));
+  report.crossVersionUpgradeVerified=report.oldVersionInstallBoot&&report.crossVersionUpgradePreservesData&&
+   report.crossVersionBackupCreated&&report.crossVersionCodeUpdated&&report.crossVersionUpgradeRestoresDataAfterReload;
+
+  const requiredTrue=[
+   'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',
+   'manualOverridePersisted','previousWorkingPreserved','snapshotUnchanged','reloadRestores',
+   'relocatedRestores','sameVersionCodeOverlayKeepsData','bundledRulesHaveCurrentKeys',
+   'bundledRosterIsSeparateFromProjectState','initializationPrompt','blankProjectCreated',
+   'importTemplateStored','healthAfterImport','branchCreated','branchIsolated','branchReopened',
+   'backToMain','projectMonthInventory','projectStorageCategory','projectHealthCategory',
+   'projectMonthsCategory','rosterUi','batchGroupWorking','scopeUi','rawCorruptionDetected',
+   'missingIndexDetected','safeIndexFixed','pinnedForNextMonth','backupZipValid','zipRestoreRaw',
+   'zipRestoreWorking','codeUpdateDataUntouched','preUpdateBackup','releaseZipNoData',
+   'oldVersionInstallBoot','crossVersionUpgradePreservesData','crossVersionBackupCreated',
+   'crossVersionCodeUpdated','crossVersionUpgradeRestoresDataAfterReload','crossVersionUpgradeVerified'
+  ];
+  const missing=requiredTrue.filter(k=>report[k]!==true);
+  if(missing.length||report.importedRows!==4||report.savedRecords!==4||report.savedGroup!=='测试研发组')
+   throw Error('R75 full lifecycle audit failed '+JSON.stringify({missing,report}));
 
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',

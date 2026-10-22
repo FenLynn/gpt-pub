@@ -1,0 +1,268 @@
+/* R75 · Cohesive interaction and accessibility polish.
+   Presentation-only layer: preserves attendance rules, storage and data schema. */
+:root{
+ --r75-ink:#263e53;
+ --r75-muted:#71879a;
+ --r75-line:#e2eaf1;
+ --r75-line-strong:#d4e0e9;
+ --r75-accent:#347fbd;
+ --r75-accent-soft:#eaf4fc;
+ --r75-focus:rgba(67,133,201,.48);
+ --r75-radius:8px;
+}
+html{scroll-padding-top:calc(var(--topbar,46px) + 12px)}
+body{color:var(--r75-ink)}
+/* A clear, quiet hierarchy for the five primary workspaces. */
+.topbar{
+ background:rgba(255,255,255,.98);
+ border-bottom-color:#dfe8ef;
+ box-shadow:0 1px 0 rgba(34,65,91,.015);
+}
+.workspace-navigation{gap:3px!important}
+.workspace-navigation button{
+ position:relative;display:inline-flex;align-items:center;justify-content:center;
+ min-height:31px;padding:6px 10px;border-radius:7px;
+ font-size:12.5px;font-weight:630;letter-spacing:0;
+ transition:background-color .14s ease,color .14s ease;
+}
+.workspace-navigation button.active{
+ background:#eaf3fb;color:#215f91;font-weight:740;
+}
+.workspace-navigation button.active:after{
+ content:"";position:absolute;left:11px;right:11px;bottom:1px;height:2px;
+ border-radius:2px;background:#5a9bd1;opacity:.85;
+}
+.workspace-navigation button[aria-current="page"]{color:#245f8b}
+.top-global-actions{gap:7px!important}
+.month-actions,.top-actions{gap:3px}
+.month-actions .text-btn,.top-actions .text-btn{
+ min-height:30px;padding:0 8px;border-radius:7px;
+ font-size:12px;font-weight:630;transition:background .14s ease,color .14s ease;
+}
+.top-actions .text-btn:hover,.month-actions .text-btn:hover{
+ background:#edf4f9;color:#2e6389;
+}
+.primary-btn{
+ min-height:31px;border-radius:8px;font-size:12px;font-weight:700;
+ box-shadow:0 1px 1px rgba(35,83,125,.035);
+}
+.settings-toggle{
+ width:32px;height:31px;border-radius:8px;
+ transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.save-state{font-size:10.5px;white-space:nowrap}
+.save-state.saved{color:#598b74}
+.save-state.dirty{color:#a47a36}
+.save-state i{flex:none}
+/* Predictable keyboard focus; never rely on color alone for focus. */
+:where(button,a,input,select,textarea,[role="button"],[tabindex]):focus-visible{
+ outline:2px solid var(--r75-focus)!important;outline-offset:2px!important;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,textarea){
+ transition:border-color .14s ease,box-shadow .14s ease;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,textarea):focus-visible{
+ border-color:#8bb5d7!important;box-shadow:0 0 0 3px rgba(80,145,202,.12);
+}
+:where(input[type="checkbox"],input[type="radio"]){accent-color:#4a8ac0}
+button:disabled{cursor:not-allowed}
+button:not(:disabled){-webkit-tap-highlight-color:transparent}
+/* Standardized controls across side filters, roster, rules, import and settings. */
+.side-select,.side-search,.r68-roster-tools input,.r68-roster-tools select,
+.r68-roster-bulk select,.r73-roster-search input,.r73-fixed-filter input,
+.r73-filter-group select,.r73-person-row select,.settings-row input,
+.settings-row select,.r14-setting-row input,.r14-setting-row select{
+ border-color:#d9e4ec;border-radius:7px;color:#35536b;
+}
+.side-select:hover,.side-search:hover,.r68-roster-tools input:hover,
+.r68-roster-tools select:hover,.r73-filter-group select:hover,
+.r73-person-row select:hover{border-color:#c1d4e3}
+.side-inline label,.side-view-row label{color:#4e687d;font-weight:650}
+.side-subnav{gap:3px}
+.side-subnav button{
+ position:relative;min-height:34px;border-radius:7px;padding:8px 10px;
+ font-size:12.5px;transition:background .14s ease,color .14s ease;
+}
+.side-subnav button.active{
+ background:#eaf3fb;color:#245f8b;font-weight:730;
+}
+.side-subnav button.active:before{
+ content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;
+ border-radius:0 3px 3px 0;background:#5b9fd3;
+}
+.side-subnav button:hover:not(.active){background:#f0f5f8;color:#385a73}
+.side-label{letter-spacing:0}
+.side-calendar{border-top-color:#e1e9ef!important}
+.side-calendar .cal-day{transition:background .12s ease,color .12s ease,box-shadow .12s ease}
+.side-calendar .cal-day:focus-visible{position:relative;z-index:2}
+.side-calendar .cal-day.selected{font-weight:750}
+/* Shared title, section and chart rhythm. */
+.workspace-toolbar{gap:12px}
+.workspace-toolbar strong{letter-spacing:-.2px}
+.analysis-panel{border-color:#e0e8ef}
+.analysis-head{border-bottom-color:#e3ebf1}
+.analysis-head h2{color:#2c465b}
+.chart-mode-tabs{gap:20px}
+.chart-mode-tabs button,.raw-tabs button{
+ transition:color .14s ease,background .14s ease;
+}
+.chart-mode-tabs button:focus-visible,.raw-tabs button:focus-visible{z-index:1}
+.raw-toolbar{background:#fff;border-bottom-color:#e2eaf1}
+.raw-tabs button{border-radius:6px;font-weight:600}
+.raw-tabs button.active{background:#eaf4fc;color:#246a9b;font-weight:720}
+.raw-tabs button:hover:not(.active){background:#f4f7fa}
+.raw-count{color:#748a9b;font-variant-numeric:tabular-nums}
+.raw-float-btn,.raw-page-controls button{
+ border-radius:7px;transition:background .14s ease,border-color .14s ease;
+}
+.raw-float-btn:hover,.raw-page-controls button:hover:not(:disabled){
+ background:#eaf3fa;border-color:#bfd5e5;
+}
+.raw-table .tabulator-header{background:#f5f8fb}
+.raw-table .tabulator-row{transition:background .1s ease}
+.raw-table .tabulator-row.tabulator-selected{background:#edf6fd!important}
+.raw-table .tabulator-cell:focus-visible{outline:2px solid var(--r75-focus);outline-offset:-2px}
+.scope-insights{color:var(--r75-ink)}
+.scope-insight-chart-title{letter-spacing:0}
+.scope-member-list button{transition:background .12s ease}
+.scope-member-list button:focus-visible{outline-offset:-2px}
+/* Data management: calm dividers, legible controls and deliberate empty states. */
+.layout.workspace-mode-data .r71-content-head h3,
+.layout.workspace-mode-data .r69-section-title h2{letter-spacing:-.2px}
+.layout.workspace-mode-data .r68-btn,.layout.workspace-mode-data .r73-main-btn,
+.layout.workspace-mode-data .r73-text-btn,.layout.workspace-mode-data .r71-setup-actions button{
+ min-height:33px;border-radius:7px;font-size:12.5px;font-weight:650;
+ transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.layout.workspace-mode-data .r68-btn.primary{
+ background:#3e83c1;border-color:#3e83c1;
+}
+.layout.workspace-mode-data .r68-btn.primary:hover:not(:disabled){
+ background:#326fa8;border-color:#326fa8;
+}
+.layout.workspace-mode-data .r68-studio-card,
+.layout.workspace-mode-data .r68-rail-card{border-color:#e4ebf1;box-shadow:0 2px 10px rgba(31,61,88,.025)}
+.layout.workspace-mode-data .r68-studio-card{border-radius:11px}
+.layout.workspace-mode-data .r68-cardhead{margin-bottom:15px}
+.layout.workspace-mode-data .r68-cardhead h3{font-size:15.5px;letter-spacing:-.1px}
+.layout.workspace-mode-data .r68-note{line-height:1.75}
+.layout.workspace-mode-data .r68-empty{color:#758a9b;line-height:1.75}
+.layout.workspace-mode-data .r68-month-row.heading,
+.layout.workspace-mode-data .r68-roster-columns{color:#6e8395}
+.layout.workspace-mode-data .r68-month-row:not(.heading):focus-within,
+.layout.workspace-mode-data .r68-roster-entry:focus-within{background:#f1f7fc}
+.layout.workspace-mode-data .r73-person-row{transition:background .12s ease}
+.layout.workspace-mode-data .r73-person-row:focus-within{background:#f2f8fc}
+.layout.workspace-mode-data .r73-transfer-controls button{
+ border-radius:8px;transition:background .14s ease,border-color .14s ease,opacity .14s ease;
+}
+.layout.workspace-mode-data .r74-roster-header .r73-roster-search input{
+ min-height:35px;font-size:13px;
+}
+.layout.workspace-mode-data .r74-roster-header .r73-filter-group select{height:35px}
+.layout.workspace-mode-data .r73-person-row>strong{color:#2e4d65}
+.layout.workspace-mode-data .r73-person-row select{font-size:12.5px}
+.layout.workspace-mode-data .r73-rename{font-size:12px}
+/* Forms, dialogs and popovers share the same surface and motion language. */
+.settings-overlay,.r62-overlay,.r73-modal-backdrop,.p109-project-overlay,.raw-dialog-overlay{
+ -webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px);
+}
+.r14-settings.settings-modal,.r62-dialog,.r73-modal,.p109-project-panel,.raw-dialog{
+ border:1px solid #dfe8ef;border-radius:12px;
+ box-shadow:0 18px 56px rgba(28,55,79,.18);
+}
+.r14-settings-top,.r62-dialog>header,.r62-dialog>footer{border-color:#e5edf3}
+.r14-settings-nav button,.r14-settings-foot button,.r14-settings-top button,
+.r62-dialog>header button,.r73-modal button,.p109-project-panel button{
+ transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.r14-settings-nav button{border-radius:7px}
+.r14-settings-nav button.active{background:#eaf4fc;color:#256b9f}
+.r14-settings-foot #settingsApply{background:#347fbd;border-color:#347fbd}
+.r14-settings-foot #settingsApply:hover{background:#2b6fa9}
+.r14-settings-content{scrollbar-width:thin;scrollbar-color:#cad8e2 transparent}
+.r62-dialog{overflow:hidden}
+.r62-dialog>header strong{font-weight:700}
+.r62-dialog>footer #r62Commit{background:#347fbd;border-color:#347fbd}
+.r73-modal-backdrop{padding:18px}
+.r73-modal{max-height:min(90dvh,780px);overflow:auto}
+.p109-project-panel{max-height:min(94dvh,900px);overflow:hidden}
+.p109-project-body{min-height:0;overflow:auto}
+.r63-pdf-picker{
+ border-color:#dfe8ef;border-radius:12px;
+ box-shadow:0 16px 44px rgba(28,55,79,.17);
+}
+.r63-pdf-picker header,.r63-pdf-picker footer{border-color:#e5edf3}
+.toast{
+ max-width:min(480px,calc(100vw - 28px));padding:12px 15px;border-radius:10px;
+ font-size:12.5px;line-height:1.55;box-shadow:0 10px 32px rgba(20,40,60,.16);
+}
+.r73-floating-tip{line-height:1.6;box-shadow:0 10px 28px rgba(30,55,76,.14)}
+/* Keep dense workbench useful at common laptop sizes; no global page overflow. */
+@media(max-width:1450px){
+ .workspace-navigation{gap:1px!important}
+ .workspace-navigation button{padding-inline:8px;font-size:12px}
+ .top-global-actions{gap:5px!important}
+ .month-actions .text-btn,.top-actions .text-btn{padding-inline:5px;font-size:11.5px}
+ .save-state{margin-right:3px;font-size:10px}
+}
+@media(max-width:1240px){
+ .topbar{gap:6px;padding-inline:8px}
+ .brand{gap:6px;margin-right:0}
+ .brand-title{font-size:14px}
+ .workspace-navigation{padding-inline:3px}
+ .workspace-navigation button{padding-inline:6px;font-size:11px}
+ .top-global-actions{gap:4px!important}
+ .top-month{flex-basis:128px}
+ .top-month .month-button{min-width:0;padding-inline:7px}
+ .month-actions .text-btn,.top-actions .text-btn{padding-inline:4px;font-size:10.5px}
+ .month-actions{gap:0}
+ .action-divider{margin-inline:2px}
+}
+@media(max-width:1050px){
+ .topbar{overflow-x:auto;overflow-y:hidden;justify-content:flex-start}
+ .brand,.workspace-navigation,.top-global-actions{flex-shrink:0}
+ .top-global-actions{margin-left:auto;flex:0 0 auto}
+ .workspace-navigation{overflow:visible}
+}
+@media(max-height:760px){
+ .layout.workspace-mode-data>.workspace{padding-top:9px!important;padding-bottom:9px!important}
+ .layout.workspace-mode-data .r74-roster-header{min-height:40px;margin-bottom:8px}
+ .layout.workspace-mode-data .r73-transfer-shell{height:max(330px,calc(100dvh - 120px))}
+ .layout.workspace-mode-person .inspector-insight{padding-top:8px!important}
+ .layout.workspace-mode-person .r74-insight-section{padding-top:7px}
+}
+@media(prefers-reduced-motion:reduce){
+ *,*:before,*:after{scroll-behavior:auto!important;animation-duration:.001ms!important;
+  animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+
+@media(max-width:700px){
+ .raw-dialog{min-width:min(470px,96vw)!important;max-width:96vw!important;max-height:92dvh!important;resize:none}
+ .raw-dialog-title{cursor:default}
+ .r14-settings.settings-modal{width:calc(100vw - 16px)!important;max-height:94dvh!important}
+ .r14-settings-body{grid-template-columns:132px minmax(0,1fr)!important}
+ .r14-settings-nav{padding:12px 7px!important}
+ .r14-settings-nav button{padding:10px 8px!important}
+ .r14-settings-content{padding:15px!important}
+ .r14-settings-foot{flex-wrap:wrap;padding:10px 12px!important}
+ .r14-settings-foot span{flex-basis:100%;margin:0}
+ .r62-dialog{width:calc(100vw - 12px)!important;max-height:96dvh!important}
+ .r62-dialog>header{padding:13px 15px!important}
+ .r62-dialog>footer{gap:7px;padding:10px 12px!important}
+ .r62-dialog>footer button{padding-inline:10px!important}
+ .p109-project-overlay{padding:8px!important}
+ .p109-project-panel{width:calc(100vw - 16px)!important;max-height:96dvh!important}
+ .p109-project-panel>header,.p109-project-panel>footer{padding:12px 14px!important}
+ .p109-project-body{padding:13px!important}
+ .r73-modal-backdrop{padding:8px!important}
+}
+@media(max-width:460px){
+ .r14-settings-body{grid-template-columns:108px minmax(0,1fr)!important}
+ .r14-settings-nav button{font-size:11.5px!important}
+ .r14-settings-content{padding:11px!important}
+ .r14-setting-row{gap:9px!important}
+ .r14-setting-row>span{font-size:12px!important}
+}

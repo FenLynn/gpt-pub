@@ -1939,6 +1939,7 @@ async function run(){
   }finally{await flagPage.close()}
  }
  await require('./lifecycle-audit.cjs')({browser,out,root});
+ await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
  console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R68',remote:remote.length,errors:errors.length,layout}));
