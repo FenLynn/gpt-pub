@@ -29,9 +29,10 @@ function p109ShowModeChooser(first=false){
  node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80ModeTitle">开始使用考勤</h2><p>连接工作项目后，下次自动继续；未设置时每次选择</p></div>'+
   (!first?'<button id="r80ModeClose" aria-label="关闭模式选择">×</button>':'')+'</header><div class="r80-mode-choices">'+
   '<button id="r80Demo"><span class="r80-mode-symbol">◈</span><strong>Demo · 体验</strong><span>用演示数据了解分析、统计和分组</span></button>'+
-  '<button id="r80Work"><span class="r80-mode-symbol">▣</span><strong>Work · 工作</strong><span>新建空白项目，或连接已有项目</span></button></div></div>';
+  '<button id="r80Work"><span class="r80-mode-symbol">▣</span><strong>Work · 工作</strong><span>新建空白项目，或连接已有项目</span></button></div><footer><button id="r82EntryHelp">先看入门教程</button></footer></div>';
  document.body.appendChild(node);node.addEventListener('keydown',e=>p109TrapDialogFocus(e,node));
  node.querySelector('#r80ModeClose')?.addEventListener('click',()=>node.remove());
+ node.querySelector('#r82EntryHelp').onclick=()=>p109ShowHelp('start','overview');
  node.querySelector('#r80Demo').onclick=()=>{
   if(!first&&!p109ConfirmProjectSwitch())return;
   p109ClearTransientFiles();p109RestoreSession(structuredClone(p109DemoSession));p109WriteMode('demo');

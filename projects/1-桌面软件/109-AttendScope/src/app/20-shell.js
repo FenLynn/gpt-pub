@@ -153,7 +153,6 @@ function layoutHtml(){
     </div>
     </div>
   </header>
-  ${p109ProjectLocationHtml()}
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
     <aside class="sidebar">
@@ -230,7 +229,6 @@ function layoutHtml(){
     </main>
   </div>
 
-  ${p109ProgramFooter()}
   ${r14SettingsMarkup()}
   <input class="hidden" id="attendanceInput" type="file" multiple accept=".xlsx,.csv">
   <input class="hidden" id="leaveInput" type="file" multiple accept=".xlsx,.csv">

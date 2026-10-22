@@ -1,10 +1,9 @@
-.r81-program-footer{display:flex;align-items:center;gap:10px;min-height:32px;padding:5px 18px;background:#f6f9fc;border-top:1px solid #dce6ef;color:#536e85;font-size:12px;position:fixed;bottom:0;left:0;right:0;z-index:65}
+.r81-program-location{display:flex;align-items:center;gap:10px;min-height:42px;padding:8px 0;color:#536e85;font-size:13px}
 .r81-location-label{font-weight:700;white-space:nowrap}
 #p109ProgramPath{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .r81-data-separate{margin-left:auto;white-space:nowrap;color:#74899b}
-.r81-program-footer button{border:0;border-radius:5px;padding:3px 9px;background:#fff1d8;color:#8b5b0f;white-space:nowrap}
-.r81-program-footer #r81CopyProgram{background:#e7eff7;color:#346488}
-.r81-project-location{display:flex;align-items:center;gap:10px;height:36px;box-sizing:border-box;padding:5px 18px;background:#f1f7fc;border-bottom:1px solid #dce7f0;font-size:13px;color:#416b8c;position:sticky;top:var(--topbar);z-index:58}
+.r81-program-location button{border:0;border-radius:5px;padding:5px 11px;background:#e7eff7;color:#346488;white-space:nowrap;margin-left:auto}
+.r81-project-location{display:flex;align-items:center;gap:10px;min-height:42px;box-sizing:border-box;padding:8px 0;border-bottom:1px solid #e4edf4;font-size:13px;color:#416b8c}
 .r81-project-location strong{white-space:nowrap;font-weight:650}
 .r81-project-location button{border:0;background:transparent;color:#2c6c9e;font-size:13px;white-space:nowrap;padding:3px 6px;border-radius:5px}
 #r81ProjectBrowse{overflow:hidden;text-overflow:ellipsis;text-align:left;min-width:0}
@@ -22,11 +21,6 @@
 #r81PathError{color:#b65343;min-height:20px}
 .r81-path-panel footer{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
 .r81-path-panel footer button{border:1px solid #c8dbe9;background:#f4f9fd;border-radius:7px;padding:9px 17px;color:#32678e;font-size:14px}
-#app{padding-bottom:32px}
-.layout{min-height:calc(100vh - var(--topbar) - 68px)}
-.layout>.sidebar{top:calc(var(--topbar) + 36px);height:calc(100vh - var(--topbar) - 68px)}
-.layout:not(.workspace-mode-data):not(.workspace-mode-stats) .workbench{height:calc(100vh - var(--topbar) - 96px)}
-.r68-data-rail{top:calc(var(--topbar) + 48px);max-height:calc(100vh - var(--topbar) - 86px)}
 .r81-help-overlay{z-index:240}
 .r81-help-panel{width:min(940px,calc(100vw - 40px));height:min(760px,calc(100vh - 48px));background:#fff;border-radius:16px;box-shadow:0 24px 85px #18344c40;display:flex;flex-direction:column;overflow:hidden}
 .r81-help-panel>header{display:flex;align-items:center;justify-content:space-between;padding:22px 28px 16px;border-bottom:1px solid #e1eaf2}

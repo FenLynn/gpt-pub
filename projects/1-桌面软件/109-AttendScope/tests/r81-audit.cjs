@@ -11,6 +11,7 @@ module.exports=async({browser,out,root})=>{
   try{res.setHeader('Content-Type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.svg':'image/svg+xml'})[path.extname(target)]||'application/octet-stream');res.end(fs.readFileSync(target))}catch(_){res.writeHead(404);res.end()}
  });await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage();
+ const storage=async(target=page)=>{await target.evaluate(()=>r69NavigateData('storage'));await target.waitForSelector('.r82-storage-locations')};
  page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await context.addInitScript(()=>{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__r81Copied=text}}})});
  try{
@@ -27,6 +28,8 @@ module.exports=async({browser,out,root})=>{
    window.showDirectoryPicker=async()=>__r81Root;
   });await page.locator('#r80NewProject').click();await page.waitForFunction(()=>state.projectDir&&state.saved&&!p109ProjectBusy);
   const name=await page.evaluate(()=>state.projectDir.name),note='Q:\\测试数据\\'+name;
+  check(await page.locator('.r81-project-location,#p109ProgramPath').count()===0,'paths do not occupy the main project overview');
+  await storage();
   check((await page.locator('.r81-project-location').textContent()).includes('浏览器仅提供目录名'),'unknown absolute paths are labelled honestly');
   check((await page.locator('#p109ProgramPath').textContent()).includes('浏览器未提供本机程序路径'),'hosted preview does not invent a local program path');
   await page.locator('#r81CopyProject').click();await page.locator('#r81PathInput').fill(note+'\\project.json');await page.locator('#r81PathOverlay [type=submit]').click();
@@ -41,6 +44,7 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(note=>state.projectDir&&p109ProjectDirectoryNote()===note&&!document.querySelector('#p109ModeOverlay'),note),'default Work and the local directory note survive reload');
   await page.locator('#p109ModeSwitch').click();await page.locator('#r80Demo').click();await page.reload();await page.evaluate(()=>p109RecentReady);
   check(await page.evaluate(()=>state.projectDir&&!state.isDemo),'a default Work project is resumed even after a previous Demo session');
+  await storage();
   await page.locator('#p109Help').click();
   check(await page.locator('.r81-help-steps li').count()===5,'quick start provides the actual five-step working flow');
   await page.screenshot({path:path.join(out,'r81-help-start.png')});
@@ -62,6 +66,7 @@ module.exports=async({browser,out,root})=>{
   await page.locator('#r81SaveReminder').click();await page.waitForFunction(()=>state.saved&&!state.storageBusy);
   await page.reload();await page.evaluate(()=>p109RecentReady);
   check(blocked===1&&await page.evaluate(()=>state.saved),'saved work reloads without a false unsaved warning');
+  await storage();
   await page.evaluate(()=>{switchMonth(2026,11,true);switchMonth(2026,10);render()});
   check(await page.evaluate(()=>state.saved&&p109UnsavedMonths().includes('2026-11')),'a dirty background month is detected even when the current month is saved');
   await page.reload({timeout:5000}).catch(e=>{if(!/ERR_ABORTED|interrupted|Timeout/.test(e.message))throw e});
@@ -81,6 +86,7 @@ module.exports=async({browser,out,root})=>{
   const filePage=await context.newPage();filePage.on('pageerror',e=>errors.push(e.message));
   try{
    await filePage.goto(pathToFileURL(path.join(root,'index.html')).href);await filePage.evaluate(()=>p109RecentReady);await filePage.locator('#r80Demo').click();
+   await storage(filePage);
    const expected=await filePage.evaluate(()=>p109ProgramLocation());await filePage.locator('#r81CopyProgram').click();
    check(await filePage.evaluate(expected=>__r81Copied===expected&&!/index\.html/i.test(__r81Copied),expected),'file HTML copies the decoded program folder, without the entry filename');
    check(expected.includes(path.basename(root)),'program directory is derived from the actual local HTML location');

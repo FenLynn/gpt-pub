@@ -459,6 +459,7 @@ function r68DataMarkup(){
  if(r69IsProjectSection(section))return '<div class="r71-data-shell r78-project-shell">'+
   '<div class="r78-project-tools"><span>'+r68Esc(state.projectDir?.name||'尚未连接项目')+'</span>'+
   '<button type="button" class="r68-btn" id="r68ScanAgain">重新扫描</button></div>'+
+  (section==='storage'?p109StorageLocationsHtml():'')+
   '<main id="r69ProjectPane" class="r71-data-main"><div class="r68-loading">正在读取项目…</div></main></div>';
  return '<div class="r71-data-shell"><main class="r71-data-main">'+
   '<section id="r68DataContent" class="r71-data-content">'+
