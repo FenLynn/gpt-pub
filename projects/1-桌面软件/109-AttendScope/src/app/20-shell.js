@@ -170,6 +170,7 @@ function layoutHtml(){
             <option value="normal">正常</option>
             <option value="anomaly">异常</option>
             <option value="absent">缺勤</option>
+            <option value="lateEarly">迟到早退</option>
             <option value="overtime">加班</option>
             <option value="leave">请假</option>
             <option value="trip">出差</option>
@@ -383,6 +384,7 @@ function renderCalendar(){
 function matrixVisible(a){
  const judgment=attendanceJudgment(a);
  return state.filter==='main'?['normal','anomaly','absent'].includes(judgment):
+   state.filter==='lateEarly'?attendanceHasLateEarly(a):
    ['trip','leave','outing','overtime'].includes(state.filter)?
    attendanceBehaviors(a).includes(state.filter):judgment===state.filter;
 }
@@ -579,7 +581,7 @@ function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;
 
 const STATUS_FILTER_ITEMS=[
  ['main','常规','multi'],['normal','正常','normal'],['anomaly','异常','anomaly'],['absent','缺勤','absent'],
- ['trip','出差','trip'],['leave','请假','leave'],['outing','外出','outing'],['overtime','加班','overtime']
+ ['lateEarly','迟到早退','late-early'],['trip','出差','trip'],['leave','请假','leave'],['outing','外出','outing'],['overtime','加班','overtime']
 ];
 function statusFilterSwatch(kind){
  if(kind==='multi')return '<span class="status-filter-dots"><i class="normal"></i><i class="anomaly"></i><i class="absent"></i></span>';

@@ -313,7 +313,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    EMPLOYEES.some(x=>x.name==='测试甲'));
 
   // R67 update only program assets; verify data remains byte-for-byte intact.
-  const releaseZip=path.join(out,'P109-考勤-R75-可更新离线版.zip'),
+  const releaseZip=path.join(out,'P109-考勤-R76-可更新离线版.zip'),
    pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
@@ -331,23 +331,23 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
     "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;assert all(p in ('index.html','README.md','p109-release-manifest.json') or p.startswith('src/') for p in z.namelist())",releaseZip],{encoding:'utf8'});
   report.releaseZipNoData=releaseCheck.status===0;
 
-  // R75: version-gated upgrade from a synthetic prior-version installation.
+  // R76: version-gated upgrade from a synthetic prior-version installation.
   // The application assets are the current tree with only the version marker lowered;
-  // this tests the actual 0.2.0 -> 0.2.1 package gate and preservation path, not a historical binary.
+  // this tests the actual 0.2.1 -> 0.2.2 package gate and preservation path, not a historical binary.
   const oldRoot=path.join(tmp,'old-version-install','考勤');
   fs.mkdirSync(path.dirname(oldRoot),{recursive:true});
   fs.cpSync(restoreDir,oldRoot,{recursive:true});
   const oldControl=path.join(oldRoot,'src','app','43-project-control.js');
   let oldControlText=fs.readFileSync(oldControl,'utf8');
-  if(!oldControlText.includes("const P109_APP_VERSION='0.2.1-preview';"))
-   throw Error('R75 expected new version marker before generating old-version fixture');
-  fs.writeFileSync(oldControl,oldControlText.replace("const P109_APP_VERSION='0.2.1-preview';","const P109_APP_VERSION='0.2.0-preview';"));
+  if(!oldControlText.includes("const P109_APP_VERSION='0.2.2-preview';"))
+   throw Error('R76 expected new version marker before generating old-version fixture');
+  fs.writeFileSync(oldControl,oldControlText.replace("const P109_APP_VERSION='0.2.2-preview';","const P109_APP_VERSION='0.2.1-preview';"));
   const oldMetaPath=path.join(oldRoot,'project.json');
   const oldMeta=JSON.parse(fs.readFileSync(oldMetaPath,'utf8'));
-  oldMeta.appVersion='0.2.0-preview';fs.writeFileSync(oldMetaPath,JSON.stringify(oldMeta,null,2));
+  oldMeta.appVersion='0.2.1-preview';fs.writeFileSync(oldMetaPath,JSON.stringify(oldMeta,null,2));
   diskRoot=oldRoot;
   await open();
-  report.oldVersionInstallBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.0-preview'&&
+  report.oldVersionInstallBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.1-preview'&&
    YEAR===2026&&MONTH===10&&state.records.length===2&&!!state.projectDir);
   const oldWorkingPath=path.join(oldRoot,'data','2026','10','working','state.json');
   const oldRawPath=path.join(oldRoot,'data','2026','10','raw','attendance',impName,'审核门禁.csv');
@@ -356,14 +356,14 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.waitForSelector('#p109UpgradeCode',{timeout:30000});
   const oldUpgradeChoice=page.waitForEvent('filechooser',{timeout:30000});
   await page.locator('#p109UpgradeCode').click();
-  await (await oldUpgradeChoice).setFiles({name:'P109-update-0.2.1.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await (await oldUpgradeChoice).setFiles({name:'P109-update-0.2.2.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
   await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
   report.crossVersionUpgradePreservesData=fs.readFileSync(oldWorkingPath).equals(oldWorkingBytes)&&
    fs.readFileSync(oldRawPath).equals(oldRawBytes);
   report.crossVersionBackupCreated=fs.readdirSync(path.join(oldRoot,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
-  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.1-preview';");
+  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.2-preview';");
   await open();
-  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.1-preview'&&
+  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.2-preview'&&
    YEAR===2026&&MONTH===10&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲'));
   report.crossVersionUpgradeVerified=report.oldVersionInstallBoot&&report.crossVersionUpgradePreservesData&&
    report.crossVersionBackupCreated&&report.crossVersionCodeUpdated&&report.crossVersionUpgradeRestoresDataAfterReload;
@@ -383,7 +383,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   ];
   const missing=requiredTrue.filter(k=>report[k]!==true);
   if(missing.length||report.importedRows!==4||report.savedRecords!==4||report.savedGroup!=='测试研发组')
-   throw Error('R75 full lifecycle audit failed '+JSON.stringify({missing,report}));
+   throw Error('R76 full lifecycle audit failed '+JSON.stringify({missing,report}));
 
   if(Object.entries(report).some(([k,v])=>[
    'initializationPrompt','blankProjectCreated','importTemplateStored','healthAfterImport',

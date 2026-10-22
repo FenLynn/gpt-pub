@@ -1,0 +1,28 @@
+/* R76 · Late/early indicators and a clear personal-overview return path. */
+:root{--r76-late-early:#d98945}
+.status-filter-dot.late-early{background:var(--r76-late-early)!important}
+.m-cell button.s-lateEarly{background:var(--r76-late-early)!important}
+.person-day.has-late-early{position:relative}
+.person-day.has-late-early::before{
+ content:"";position:absolute;left:2px;top:3px;width:5px;height:5px;
+ border-radius:50%;background:var(--r76-late-early);
+ box-shadow:0 0 0 1.5px rgba(255,255,255,.92);
+ pointer-events:none;z-index:2
+}
+.person-day.has-late-early.has-auto-overtime::before{left:9px}
+.workspace-mode-person .person-overview-button{
+ display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;
+ min-width:max-content;height:30px;padding:0 10px;
+ border:1px solid #d8e5ef;border-radius:7px;background:#fff;color:#2d6f9f;
+ font-size:13px;font-weight:700;line-height:1.2;cursor:pointer;
+ transition:background .14s ease,border-color .14s ease,color .14s ease;
+}
+.workspace-mode-person .person-overview-button:hover{
+ background:#edf6fc;border-color:#b7d2e6;color:#215d8b
+}
+.workspace-mode-person .person-overview-button:focus-visible{
+ outline:2px solid rgba(67,133,201,.48);outline-offset:2px
+}
+@media(prefers-reduced-motion:reduce){
+ .workspace-mode-person .person-overview-button{transition:none}
+}

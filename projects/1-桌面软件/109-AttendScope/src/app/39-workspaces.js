@@ -25,7 +25,7 @@ function scopeVisibleEmployees(){
  return people;
 }
 function sidebarFilterHtml(){
- const options=[['main','常规'],['normal','正常'],['anomaly','异常'],['absent','缺勤'],['overtime','加班'],['leave','请假'],['trip','出差'],['outing','外出']];
+ const options=[['main','常规'],['normal','正常'],['anomaly','异常'],['absent','缺勤'],['lateEarly','迟到早退'],['overtime','加班'],['leave','请假'],['trip','出差'],['outing','外出']];
  return '<section class="side-filter state-select-wrap"><label class="side-label" for="statusFilter">状态筛选</label>'+
   '<div class="status-filter-control"><button type="button" id="statusFilterButton" class="status-filter-button" aria-expanded="false">'+statusFilterLabel(state.filter)+'</button>'+
   '<div id="statusFilterMenu" class="status-filter-menu" role="listbox">'+statusFilterMenuHtml()+'</div>'+
@@ -41,27 +41,29 @@ function sidebarFilterHtml(){
 function personMonthStripHtml(){
  const id=state.selection.employeeId||EMPLOYEES[0]?.id;
  if(!id)return '';
- const selected=state.chartDay||state.selection.day||1;
+ const inDayDetail=state.selection.type==='cell';
+ const selected=inDayDetail?(state.chartDay||state.selection.day||1):null;
  const days=Array.from({length:monthDays()},(_,i)=>{
   const day=i+1,info=state.analysis.get(id+'|'+day),type=dayType(day);
   const rawManual=info?manualStatusFor(info):null;
   const final=rawManual||attendanceJudgmentSystem(info);
   const tone=final==='normal'?'normal':final==='anomaly'?'anomaly':final==='absent'?'absent':'rest';
   const hasAuto=(info?.autoOvertime?.segments?.length||0)>0;
+  const hasLateEarly=attendanceHasLateEarly(info);
   const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+
-   (hasAuto?' · 有自动加班候选':'')+(rawManual?' · 人工修正':'');
+   (hasAuto?' · 有自动加班候选':'')+(hasLateEarly?' · 迟到/早退':'')+(rawManual?' · 人工修正':'');
   return '<button type="button" class="person-day '+type+' '+(selected===day?'selected':'')+
-    (hasAuto?' has-auto-overtime':'')+
+    (hasAuto?' has-auto-overtime':'')+(hasLateEarly?' has-late-early':'')+
     '" data-person-day="'+day+'" title="'+escapeNameChar(title)+'" aria-current="'+(selected===day?'date':'false')+'">'+
     '<span class="person-day-number">'+pad(day)+'</span>'+
     (rawManual?'<span class="person-day-check" aria-label="人工修正">✓</span>':'')+
     '<span class="person-day-status '+tone+'"></span></button>';
  }).join('');
- const switcher='<div class="person-day-nav" aria-label="日期切换">'+
+ const switcher=inDayDetail?('<div class="person-day-nav" aria-label="日期切换">'+
   '<button id="personalDayPrev" type="button" aria-label="上一天" '+(selected<=1?'disabled':'')+'>‹</button>'+
   '<select id="timelineDayPicker" aria-label="时间轴日期">'+
    Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(selected===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
-  '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>';
+  '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>') : '';
  return '<div class="person-strip" aria-label="个人整月考勤">'+
   '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div>'+switcher+'</div>';
 }
@@ -109,7 +111,9 @@ function workspaceToolbarHtml(){
  if(mode==='all'||mode==='group')return '<div class="workspace-toolbar"><div><strong>'+(mode==='all'?'全员考勤':'分组考勤')+'</strong>'+
   '<span>'+periodText()+' · '+(mode==='group'?escapeNameChar(state.selectedGroup||'未分组'):'全部员工')+'</span></div>'+
   '</div><section id="scopeSummary" class="scope-summary"></section>';
- if(mode==='person')return '<div class="workspace-toolbar person-toolbar"><strong>个人分析</strong>'+personMonthStripHtml()+'</div>';
+ if(mode==='person')return '<div class="workspace-toolbar person-toolbar">'+
+  (state.selection.type==='cell'?'<button type="button" id="personOverviewButton" class="person-overview-button" title="返回该人员的月度全览" aria-label="返回个人全览">‹ 个人全览</button>':'<strong>个人分析</strong>')+
+  personMonthStripHtml()+'</div>';
  if(mode==='data')return '';
 
  return '';
@@ -123,6 +127,8 @@ function bindWorkspaceNavigation(){
    render();
  });
  document.querySelectorAll('[data-person-day]').forEach(b=>b.onclick=()=>changePersonalDay(b.dataset.personDay));
+ const overviewButton=document.getElementById('personOverviewButton');
+ if(overviewButton)overviewButton.onclick=returnPersonalOverview;
  const scope=document.getElementById('workspaceScopeGroup');
  if(scope)scope.onchange=()=>{if(scope.value){state.workspaceMode='group';state.selectedGroup=scope.value;state.scopeSearch='';state.attentionOnly=false;render()}};
  const g=document.getElementById('workspaceGroup');
@@ -154,6 +160,14 @@ function bindWorkspaceNavigation(){
   document.querySelectorAll('.side-controls [data-data-section]').forEach(x=>x.classList.toggle('active',x.dataset.dataSection===state.dataSection));
   renderDataWorkspace();
  });
+}
+function returnPersonalOverview(){
+ if(state.workspaceMode!=='person')return;
+ const employeeId=state.selection.employeeId||EMPLOYEES[0]?.id;
+ if(!employeeId)return;
+ state.selection={type:'person',employeeId};
+ state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.rawPage=1;state.analyticsPage='main';
+ render();
 }
 function navigateWorkspace(mode){
  if(!WORKSPACE_ITEMS.some(x=>x[0]===mode))return;

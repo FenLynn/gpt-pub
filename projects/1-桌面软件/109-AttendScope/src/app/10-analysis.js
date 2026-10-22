@@ -217,7 +217,7 @@ function tripFor(empId,date){return state.trips.filter(x=>x.employeeId===empId&&
 function intervalOverlap(a1,a2,b1,b2){return Math.max(0,Math.min(a2,b2)-Math.max(a1,b1))}
 /* R15: judgments and behaviors are independent dimensions. Purple is selection only. */
 const ATTEND_STATUS_COLORS=Object.freeze({normal:'#78caa0',anomaly:'#e6c36f',absent:'#e58f90',rest:'#eef2f6'});
-const ATTEND_BEHAVIOR_COLORS=Object.freeze({trip:'#6b7fd7',leave:'#8a6fd1',outing:'#3c9dc4',overtime:'#c876a0'});
+const ATTEND_BEHAVIOR_COLORS=Object.freeze({trip:'#6b7fd7',leave:'#8a6fd1',outing:'#3c9dc4',overtime:'#c876a0',lateEarly:'#d98945'});
 const ATTEND_EVENT_COLORS=Object.freeze({in:'#1f5a9f',out:'#8a5b3d'});
 function manualStatusKey(aOrId,day){
   return typeof aOrId==='string'?aOrId+'|'+day:aOrId.employee.id+'|'+aOrId.day;
@@ -249,8 +249,10 @@ function attendanceBehaviors(a){
    results.push('overtime');
   return results;
 }
+function attendanceHasLateEarly(a){return !!a&&(a.attendanceFlags||[]).some(flag=>flag.kind==='late'||flag.kind==='early')}
 function attendanceCategory(a){return attendanceJudgment(a)}
 function matrixCategory(a,filter=state.filter){
+  if(filter==='lateEarly'&&attendanceHasLateEarly(a))return 'lateEarly';
   return ['trip','leave','outing','overtime'].includes(filter)&&attendanceBehaviors(a).includes(filter)?filter:
    attendanceJudgment(a,state.judgmentMode==='initial'?'initial':'final');
 }
