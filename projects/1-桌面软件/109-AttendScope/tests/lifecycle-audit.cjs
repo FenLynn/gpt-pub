@@ -188,7 +188,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    mainPath=path.join(fresh,'data','2026','10','working','state.json'),
    mainBytes=fs.readFileSync(mainPath);
   await page.evaluate(id=>p109ForkSnapshot('2026-10',id),freezeId);
-  report.branchCreated=await page.evaluate(()=>!!state.activeBranch?.id&&state.activeBranch.parentSnapshotId);
+  report.branchCreated=await page.evaluate(()=>!!state.activeBranch?.id&&!!state.activeBranch.parentSnapshotId);
   await page.evaluate(()=>{
     const id=EMPLOYEES.find(x=>x.name==='测试甲').id;
     state.selection={type:'cell',employeeId:id,day:8};
