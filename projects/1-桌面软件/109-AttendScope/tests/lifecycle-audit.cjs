@@ -335,6 +335,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   // The application assets are the current tree with only the version marker lowered;
   // this tests the actual 0.2.0 -> 0.2.1 package gate and preservation path, not a historical binary.
   const oldRoot=path.join(tmp,'old-version-install','考勤');
+  fs.mkdirSync(path.dirname(oldRoot),{recursive:true});
   fs.cpSync(restoreDir,oldRoot,{recursive:true});
   const oldControl=path.join(oldRoot,'src','app','43-project-control.js');
   let oldControlText=fs.readFileSync(oldControl,'utf8');
