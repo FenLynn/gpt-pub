@@ -14,6 +14,7 @@ module.exports=async function runUiAudit({browser,out,root}){
  const check=(ok,label,details='')=>{if(!ok)throw Error('R77 UI audit: '+label+(details?' · '+JSON.stringify(details):''))};
  try{
   await page.goto(url,{waitUntil:'load',timeout:60000});
+  await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();
   await page.waitForSelector('.topbar .workspace-navigation [data-workspace="all"]',{timeout:20000});
   check(await page.locator('.m-name .name-letters').count()>0,'initial demo matrix is not rendered');
 

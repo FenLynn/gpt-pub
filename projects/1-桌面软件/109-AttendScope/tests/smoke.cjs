@@ -22,6 +22,7 @@ async function run(){
  page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});
  page.on('dialog',d=>d.type()==='prompt'?d.accept('科研创新组'):d.accept());
  await page.goto(url,{waitUntil:'load',timeout:60000});
+ await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();
  if(errors.length)throw Error('R62 initial script exception: '+errors.join(' | '));
  if(!await page.locator('.m-name .name-letters').count())throw Error('R62 missing matrix: '+(await page.locator('#app').innerHTML()).slice(0,1900)+' | '+errors.join(' | '));
  // R62 core acceptance: visible first row without importing it, hand-picked
@@ -1801,6 +1802,7 @@ async function run(){
   try{
    await roster.addInitScript(()=>localStorage.setItem('p109-session-mode','demo'));
    await roster.goto(url,{waitUntil:'load'});
+   await roster.evaluate(()=>p109RecentReady);await roster.locator('#r80Demo').click();
    await roster.locator('[data-workspace="data"]').click();
    await roster.locator('[data-data-section="roster"]').click();
    await roster.waitForSelector('#r73MonthList .r73-person-row');
@@ -1918,6 +1920,7 @@ async function run(){
   try{
    await flagPage.addInitScript(()=>localStorage.setItem('p109-session-mode','demo'));
    await flagPage.goto(page.url(),{waitUntil:'load'});
+   await flagPage.evaluate(()=>p109RecentReady);await flagPage.locator('#r80Demo').click();
    await flagPage.evaluate(()=>{
     const e=EMPLOYEES[0],date='2026-10-08';
     state.records=[['08:36','进'],['11:30','出'],['13:25','进'],['17:10','出']].map(([time,direction],i)=>
@@ -1951,11 +1954,12 @@ async function run(){
  await require('./r78-audit.cjs')({browser,out,root});
  await require('./r79-audit.cjs')({browser,out,root});
  await require('./r80-audit.cjs')({browser,out,root});
+ await require('./r81-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R80',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R81',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

@@ -26,7 +26,7 @@ function p109ShowModeChooser(first=false){
  document.getElementById('p109ModeOverlay')?.remove();
  const node=document.createElement('section');node.id='p109ModeOverlay';node.className='p109-recent-overlay r80-mode-overlay';
  node.setAttribute('role','dialog');node.setAttribute('aria-modal','true');node.setAttribute('aria-labelledby','r80ModeTitle');
- node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80ModeTitle">开始使用考勤</h2><p>选择工作方式，下次自动记住</p></div>'+
+ node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80ModeTitle">开始使用考勤</h2><p>连接工作项目后，下次自动继续；未设置时每次选择</p></div>'+
   (!first?'<button id="r80ModeClose" aria-label="关闭模式选择">×</button>':'')+'</header><div class="r80-mode-choices">'+
   '<button id="r80Demo"><span class="r80-mode-symbol">◈</span><strong>Demo · 体验</strong><span>用演示数据了解分析、统计和分组</span></button>'+
   '<button id="r80Work"><span class="r80-mode-symbol">▣</span><strong>Work · 工作</strong><span>新建空白项目，或连接已有项目</span></button></div></div>';
@@ -42,7 +42,7 @@ function p109ShowModeChooser(first=false){
   if(!first&&!state.isDemo){p109WriteMode('work');node.remove();p109ShowWorkHome();return}
   if(!first&&!p109ConfirmProjectSwitch())return;
   p109WriteMode('work');p109BlankWork();node.remove();p109RecentState.interacted=false;
-  await p109RestoreLastProject();
+  await p109RestoreLastProject({startup:false});
  };
  node.querySelector('#r80Work').focus();
 }

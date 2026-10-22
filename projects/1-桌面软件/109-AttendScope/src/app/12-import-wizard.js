@@ -152,7 +152,7 @@ function r62InferColumns(grid,headerRow,skip=0){
 function r62Esc(s){return escapeNameChar(String(s??''))}
 function p109TrapDialogFocus(event,root){
  if(event.key!=='Tab')return;
- const nodes=[...root.querySelectorAll('button,input,select,summary,[tabindex="0"]')]
+ const nodes=[...root.querySelectorAll('button,input,textarea,select,summary,[tabindex="0"]')]
   .filter(el=>!el.disabled&&!el.hidden&&el.getClientRects().length),first=nodes[0],last=nodes.at(-1);
  if(!first)return;
  if(event.shiftKey&&(document.activeElement===first||!root.contains(document.activeElement))){event.preventDefault();last.focus()}

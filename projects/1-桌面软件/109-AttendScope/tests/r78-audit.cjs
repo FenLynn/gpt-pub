@@ -50,7 +50,7 @@ module.exports=async function({browser,out,root}){
    if(window.__r78Abort)throw new DOMException('Cancelled','AbortError');return new DirHandle(window.__r78Key);
   }});
  });
- const open=async()=>{await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.waitForSelector('.m-name')};
+ const open=async()=>{await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();await page.waitForSelector('.m-name')};
  const connect=async key=>page.evaluate(async key=>{window.__r78Key=key;return connectProjectDir()},key);
  try{
   await open();

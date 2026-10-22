@@ -87,6 +87,9 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
  });
  const open=async()=>{
   await page.goto(pathToFileURL(path.join(diskRoot,'index.html')).href,{waitUntil:'load',timeout:60000});
+  // This helper also boots the exact historical R77 source, before mode entry existed.
+  await page.evaluate(async()=>{if(typeof p109RecentReady!=='undefined')await p109RecentReady});
+  if(await page.locator('#r80Demo').isVisible())await page.locator('#r80Demo').click();
   await page.waitForFunction(()=>!!document.querySelector('.topbar'),null,{timeout:15000});
   await page.evaluate(()=>connectProjectDir());
  };
@@ -179,6 +182,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   if(packed.status!==0)throw Error('R65 packaging '+packed.stderr);
   diskRoot=fresh;
   await page.goto(pathToFileURL(path.join(freshRuntime,'index.html')).href,{waitUntil:'load'});
+  await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();
   await page.evaluate(()=>connectProjectDir());
   await page.waitForSelector('#p109CreateBlank');
   report.initializationPrompt=await page.evaluate(()=>!state.projectDir&&!!p109PendingDirectory);

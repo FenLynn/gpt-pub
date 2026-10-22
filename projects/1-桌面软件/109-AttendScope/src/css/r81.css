@@ -1,0 +1,53 @@
+.r81-program-footer{display:flex;align-items:center;gap:10px;min-height:32px;padding:5px 18px;background:#f6f9fc;border-top:1px solid #dce6ef;color:#536e85;font-size:12px;position:fixed;bottom:0;left:0;right:0;z-index:65}
+.r81-location-label{font-weight:700;white-space:nowrap}
+#p109ProgramPath{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r81-data-separate{margin-left:auto;white-space:nowrap;color:#74899b}
+.r81-program-footer button{border:0;border-radius:5px;padding:3px 9px;background:#fff1d8;color:#8b5b0f;white-space:nowrap}
+.r81-program-footer #r81CopyProgram{background:#e7eff7;color:#346488}
+.r81-project-location{display:flex;align-items:center;gap:10px;height:36px;box-sizing:border-box;padding:5px 18px;background:#f1f7fc;border-bottom:1px solid #dce7f0;font-size:13px;color:#416b8c;position:sticky;top:var(--topbar);z-index:58}
+.r81-project-location strong{white-space:nowrap;font-weight:650}
+.r81-project-location button{border:0;background:transparent;color:#2c6c9e;font-size:13px;white-space:nowrap;padding:3px 6px;border-radius:5px}
+#r81ProjectBrowse{overflow:hidden;text-overflow:ellipsis;text-align:left;min-width:0}
+.r81-project-location button:hover{background:#e2edf7}
+.r81-project-location .r81-copy{margin-left:auto;background:#e4eef8;padding:4px 11px}
+.r81-path-origin{font-size:12px;color:#6c8193;white-space:nowrap}
+.r81-path-overlay{z-index:260}
+.r81-path-panel{background:#fff;border-radius:14px;width:min(580px,calc(100vw - 40px));padding:25px;color:#415d74;box-shadow:0 20px 80px #18344c40}
+.r81-path-panel h2{margin:0 0 14px;font-size:20px;color:#214763}
+.r81-path-panel p{font-size:14px;line-height:1.8}
+.r81-path-panel label{font-weight:650;font-size:14px}
+.r81-path-panel input,.r81-path-panel textarea{box-sizing:border-box;width:100%;padding:11px;border:1px solid #c8dbe9;border-radius:7px;margin-top:9px;font-size:14px}
+.r81-path-panel textarea{min-height:85px;resize:vertical}
+.r81-path-panel .r81-path-note{font-size:13px;color:#73889a}
+#r81PathError{color:#b65343;min-height:20px}
+.r81-path-panel footer{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
+.r81-path-panel footer button{border:1px solid #c8dbe9;background:#f4f9fd;border-radius:7px;padding:9px 17px;color:#32678e;font-size:14px}
+#app{padding-bottom:32px}
+.layout{min-height:calc(100vh - var(--topbar) - 68px)}
+.layout>.sidebar{top:calc(var(--topbar) + 36px);height:calc(100vh - var(--topbar) - 68px)}
+.layout:not(.workspace-mode-data):not(.workspace-mode-stats) .workbench{height:calc(100vh - var(--topbar) - 96px)}
+.r68-data-rail{top:calc(var(--topbar) + 48px);max-height:calc(100vh - var(--topbar) - 86px)}
+.r81-help-overlay{z-index:240}
+.r81-help-panel{width:min(940px,calc(100vw - 40px));height:min(760px,calc(100vh - 48px));background:#fff;border-radius:16px;box-shadow:0 24px 85px #18344c40;display:flex;flex-direction:column;overflow:hidden}
+.r81-help-panel>header{display:flex;align-items:center;justify-content:space-between;padding:22px 28px 16px;border-bottom:1px solid #e1eaf2}
+.r81-help-panel h2{margin:0;font-size:21px;color:#183c59}
+.r81-help-panel header p{margin:7px 0 0;color:#71879a;font-size:14px}
+#r81HelpClose{border:0;background:transparent;font-size:25px;color:#728ca3;padding:5px 10px}
+.r81-help-tabs{display:flex;gap:8px;padding:14px 28px;border-bottom:1px solid #e6edf3}
+.r81-help-tabs button{border:0;border-radius:8px;background:#f1f5f9;padding:9px 20px;font-size:15px;color:#526f88}
+.r81-help-tabs [aria-pressed=true]{background:#e2effb;color:#1d649c;font-weight:700}
+.r81-help-layout{display:flex;min-height:0;flex:1}
+.r81-help-topics{flex:0 0 156px;display:flex;flex-direction:column;gap:5px;padding:20px 12px;border-right:1px solid #e3ebf2;overflow:auto}
+.r81-help-topics button{border:0;background:transparent;border-radius:7px;padding:11px 12px;text-align:left;font-size:14px;color:#526d84}
+.r81-help-topics [aria-current=page]{color:#1f649a;background:#eaf3fb;font-weight:700}
+#r81HelpArticle{padding:24px 32px;overflow:auto;flex:1;min-width:0;font-size:15px;line-height:1.85;color:#3f5c73}
+#r81HelpArticle h3{font-size:23px;line-height:1.5;margin:0 0 18px;color:#173d5c}
+#r81HelpArticle p{margin:0 0 15px}
+#r81HelpArticle .r81-help-eyebrow{color:#5b87ad;font-size:13px;letter-spacing:.04em;margin:0 0 5px}
+.r81-help-steps{padding-left:24px;margin:0}
+.r81-help-steps li{padding:0 0 10px 8px}
+.r81-help-steps strong{color:#214b6b;font-size:16px}
+.r81-help-steps p{margin-top:5px!important}
+.r81-help-action{border:1px solid #c6dbee;background:#f0f7fd;color:#2b6896;border-radius:8px;padding:10px 15px;font-size:14px}
+#r81HelpArticle pre{font-size:13px;line-height:1.8;overflow:auto;background:#f3f7fb;border:1px solid #e0e9f1;border-radius:9px;padding:16px}
+@media(max-width:900px){.r81-data-separate{display:none}.r81-help-topics{flex-basis:120px}#r81HelpArticle{padding:20px}.r81-help-panel>header,.r81-help-tabs{padding-left:20px;padding-right:20px}}

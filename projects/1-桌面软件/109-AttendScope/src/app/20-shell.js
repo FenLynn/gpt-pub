@@ -148,10 +148,12 @@ function layoutHtml(){
         <div id="r63PdfPicker" class="r63-pdf-picker" role="dialog" aria-label="截图 PDF" hidden></div>
       </div>
       <span class="action-divider"></span>
+      <button class="text-btn" id="p109Help" aria-haspopup="dialog">帮助</button>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
     </div>
   </header>
+  ${p109ProjectLocationHtml()}
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
     <aside class="sidebar">
@@ -228,6 +230,7 @@ function layoutHtml(){
     </main>
   </div>
 
+  ${p109ProgramFooter()}
   ${r14SettingsMarkup()}
   <input class="hidden" id="attendanceInput" type="file" multiple accept=".xlsx,.csv">
   <input class="hidden" id="leaveInput" type="file" multiple accept=".xlsx,.csv">
@@ -393,6 +396,8 @@ function bindGlobalUiShortcuts(){
  window.__p109UiShortcutsBound=true;
  document.addEventListener('keydown',e=>{
   if(e.key!=='Escape')return;
+  const pathOverlay=document.querySelector('#r81PathOverlay,#r81CopyOverlay');if(pathOverlay){e.preventDefault();pathOverlay.remove();return}
+  if(document.getElementById('p109HelpOverlay')){e.preventDefault();p109CloseHelp();return}
   if(document.getElementById('p109FilesOverlay')){e.preventDefault();p109CloseFileBrowser();return}
   const mode=document.getElementById('p109ModeOverlay');
   if(mode){e.preventDefault();mode.querySelector('#r80ModeClose')?.click();return}

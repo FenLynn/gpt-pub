@@ -22,8 +22,8 @@ module.exports=async({browser,out,root})=>{
   await page.screenshot({path:path.join(out,'r80-mode-entry.png')});await page.locator('#r80Demo').click();
   check(await page.evaluate(()=>state.isDemo&&EMPLOYEES.length===50&&p109ReadMode()==='demo'),'Demo loads explicit sample data');
   await page.reload();await page.evaluate(()=>p109RecentReady);
-  check(await page.evaluate(()=>!document.querySelector('#p109ModeOverlay')&&state.isDemo),'remembered Demo opens without another mode prompt');
-  await page.locator('#p109ModeSwitch').click();await page.locator('#r80Work').click();await page.waitForSelector('#r80NewProject');
+  check(await page.locator('#r80Demo').isVisible(),'without a default Work project, remembered Demo still offers the mode choice on reload');
+  await page.locator('#r80Work').click();await page.waitForSelector('#r80NewProject');
   check(await page.evaluate(()=>EMPLOYEES.length===0&&!state.isDemo&&state.records.length===0),'Work starts empty without carrying sample staff or data');
   await page.evaluate(async()=>{
    const home=await navigator.storage.getDirectory();window.__r80Root=await home.getDirectoryHandle('R80 空白项目 '+crypto.randomUUID(),{create:true});

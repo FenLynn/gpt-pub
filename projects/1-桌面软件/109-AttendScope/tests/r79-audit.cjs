@@ -25,6 +25,7 @@ module.exports=async({browser,out,root})=>{
  };
  try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/index.html');await page.evaluate(()=>p109RecentReady);
+  await page.locator('#r80Demo').click();
   check(await page.evaluate(async()=>{
    const root=await navigator.storage.getDirectory(),parent=await root.getDirectoryHandle('r79-'+crypto.randomUUID(),{create:true});
    const a=await parent.getDirectoryHandle('A',{create:true}),b=await parent.getDirectoryHandle('B',{create:true});
