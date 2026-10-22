@@ -7,13 +7,18 @@ This builder is for development/CI only. Extracted runtime needs no Python.
 import hashlib
 import json
 import pathlib
+import re
 import sys
 import zipfile
 
-APP_VERSION = "0.2.3-preview"
 PROJECT = "P109-AttendScope"
 
 def build(root: pathlib.Path, destination: pathlib.Path):
+    version_source = (root / "src/app/00-state.js").read_text(encoding="utf-8")
+    match = re.search(r"const P109_APP_VERSION='([^']+)';", version_source)
+    if not match:
+        raise ValueError("Missing application version")
+    app_version = match.group(1)
     sources = [root / "index.html", root / "README.md"] + sorted(
         f for f in (root / "src").rglob("*") if f.is_file()
     )
@@ -26,7 +31,7 @@ def build(root: pathlib.Path, destination: pathlib.Path):
     manifest = {
         "schemaVersion": 1,
         "projectId": PROJECT,
-        "appVersion": APP_VERSION,
+        "appVersion": app_version,
         "supportedDataSchemas": [2],
         "files": [
             {"path": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
@@ -41,7 +46,7 @@ def build(root: pathlib.Path, destination: pathlib.Path):
     with zipfile.ZipFile(destination, "r") as verification:
         if verification.testzip():
             raise RuntimeError("ZIP CRC verification failed")
-    print(json.dumps({"output": str(destination), "files": len(allowed), "version": APP_VERSION}))
+    print(json.dumps({"output": str(destination), "files": len(allowed), "version": app_version}))
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

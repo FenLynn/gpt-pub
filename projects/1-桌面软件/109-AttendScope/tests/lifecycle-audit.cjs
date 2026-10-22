@@ -308,17 +308,21 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.projectProfile.pinImport&&state.projectProfile.pinRules&&
    EMPLOYEES.length===1&&(state.fixedPeople||[]).length===1&&RULES.amEnd==='11:40'&&!!state.importProfile.templates?.attendance);
   if(await page.locator('#p109ProjectClose').count())await page.locator('#p109ProjectClose').click();
+  await page.locator('#projectMenuButton').click();
   await page.locator('#p109ProjectControl').click();
-  await page.waitForSelector('#p109Backup');
+  await page.waitForSelector('#p109ProjectClose');
   await page.screenshot({path:path.join(out,'r67-project-health.png')});
+  await page.locator('#p109ProjectClose').click();
+  await page.locator('#projectMenuButton').click();
   const download=page.waitForEvent('download',{timeout:60000});
-  await page.locator('#p109Backup').click();
+  await page.locator('#backupProjectBtn').click();
   const outZip=path.join(tmp,'working-backup.zip');await (await download).saveAs(outZip);
   report.backupZipValid=cp.spawnSync('python3',['-m','zipfile','-t',outZip],{encoding:'utf8'}).status===0;
   const restoreDir=path.join(tmp,'restored','考勤');fs.mkdirSync(restoreDir,{recursive:true});
   diskRoot=restoreDir;
   const choose=page.waitForEvent('filechooser',{timeout:30000});
-  await page.locator('#p109RestoreZip').click();
+  await page.locator('#projectMenuButton').click();
+  await page.locator('#restoreZipBtn').click();
   await (await choose).setFiles({name:'restore.zip',mimeType:'application/zip',buffer:fs.readFileSync(outZip)});
   await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('恢复完成'),null,{timeout:60000});
   report.zipRestoreRaw=fs.existsSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
@@ -327,15 +331,14 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    EMPLOYEES.some(x=>x.name==='测试甲'));
 
   // R67 update only program assets; verify data remains byte-for-byte intact.
-  const releaseZip=path.join(out,'P109-考勤-R77-可更新离线版.zip'),
+  const releaseZip=path.join(out,'P109-考勤-R78-可更新离线版.zip'),
    pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
    beforeOriginal=fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
-  await page.locator('#p109ProjectControl').click();
-  await page.waitForSelector('#p109UpgradeCode');
+  await page.locator('#projectMenuButton').click();
   const updateChoice=page.waitForEvent('filechooser',{timeout:30000});
-  await page.locator('#p109UpgradeCode').click();
+  await page.locator('#upgradeProjectBtn').click();
   await (await updateChoice).setFiles({name:'P109-update.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
   await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
   report.codeUpdateDataUntouched=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')).equals(beforeWorking)&&
@@ -345,27 +348,37 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
     "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;assert all(p in ('index.html','README.md','p109-release-manifest.json') or p.startswith('src/') for p in z.namelist())",releaseZip],{encoding:'utf8'});
   report.releaseZipNoData=releaseCheck.status===0;
 
-  // R77: version-gated upgrade from a synthetic prior-version installation.
-  // The application assets are the current tree with only the version marker lowered;
-  // this tests the actual 0.2.2 -> 0.2.3 package gate and preservation path, not a historical binary.
+  // R78: use the exact previous application commit, not changed version markers.
   const oldRoot=path.join(tmp,'old-version-install','考勤');
   fs.mkdirSync(path.dirname(oldRoot),{recursive:true});
   fs.cpSync(restoreDir,oldRoot,{recursive:true});
-  const oldControl=path.join(oldRoot,'src','app','43-project-control.js');
-  let oldControlText=fs.readFileSync(oldControl,'utf8');
-  if(!oldControlText.includes("const P109_APP_VERSION='0.2.3-preview';"))
-   throw Error('R77 expected new version marker before generating old-version fixture');
-  fs.writeFileSync(oldControl,oldControlText.replace("const P109_APP_VERSION='0.2.3-preview';","const P109_APP_VERSION='0.2.2-preview';"));
-  const oldMetaPath=path.join(oldRoot,'project.json');
-  const oldMeta=JSON.parse(fs.readFileSync(oldMetaPath,'utf8'));
-  oldMeta.appVersion='0.2.2-preview';fs.writeFileSync(oldMetaPath,JSON.stringify(oldMeta,null,2));
+  const historicalCommit='71caeaa99b7eb41b71ee457d1334a8bcff2de561';
+  const projectPath='projects/1-桌面软件/109-AttendScope/';
+  const listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',historicalCommit,'--',projectPath],{encoding:'utf8'});
+  if(listing.status!==0)throw Error('Historical source listing unavailable: '+listing.stderr);
+  const historicalFiles=listing.stdout.trim().split(/\r?\n/).filter(file=>{
+    const relative=file.slice(projectPath.length);
+    return relative==='index.html'||relative==='README.md'||relative.startsWith('src/');
+  });
+  if(historicalFiles.length<20)throw Error('Historical application fixture incomplete');
+  for(const file of historicalFiles){
+    const relative=file.slice(projectPath.length),destination=path.join(oldRoot,relative);
+    const original=cp.spawnSync('git',['-C',root,'show',historicalCommit+':'+file],{maxBuffer:16*1024*1024});
+    if(original.status!==0)throw Error('Cannot read historical source '+relative);
+    fs.mkdirSync(path.dirname(destination),{recursive:true});fs.writeFileSync(destination,original.stdout);
+  }
+  report.historicalSourceCommit=historicalCommit;
+  report.historicalApplicationFiles=historicalFiles.length;
+  const oldControl=path.join(oldRoot,'src','app','00-state.js');
   diskRoot=oldRoot;
   await open();
-  report.oldVersionInstallBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.2-preview'&&
+  report.oldVersionInstallBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.3-preview'&&
    YEAR===2026&&MONTH===10&&state.records.length===2&&!!state.projectDir);
+  await page.evaluate(()=>saveWorking());
   const oldWorkingPath=path.join(oldRoot,'data','2026','10','working','state.json');
   const oldRawPath=path.join(oldRoot,'data','2026','10','raw','attendance',impName,'审核门禁.csv');
   const oldWorkingBytes=fs.readFileSync(oldWorkingPath),oldRawBytes=fs.readFileSync(oldRawPath);
+  // The historical R77 program still exposes project management directly.
   await page.locator('#p109ProjectControl').click();
   await page.waitForSelector('#p109UpgradeCode',{timeout:30000});
   const oldUpgradeChoice=page.waitForEvent('filechooser',{timeout:30000});
@@ -375,9 +388,9 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.crossVersionUpgradePreservesData=fs.readFileSync(oldWorkingPath).equals(oldWorkingBytes)&&
    fs.readFileSync(oldRawPath).equals(oldRawBytes);
   report.crossVersionBackupCreated=fs.readdirSync(path.join(oldRoot,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
-  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.3-preview';");
+  report.crossVersionCodeUpdated=fs.readFileSync(oldControl,'utf8').includes("const P109_APP_VERSION='0.2.4-preview';");
   await open();
-  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.3-preview'&&
+  report.crossVersionUpgradeRestoresDataAfterReload=await page.evaluate(()=>P109_APP_VERSION==='0.2.4-preview'&&
    YEAR===2026&&MONTH===10&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲'));
   report.crossVersionUpgradeVerified=report.oldVersionInstallBoot&&report.crossVersionUpgradePreservesData&&
    report.crossVersionBackupCreated&&report.crossVersionCodeUpdated&&report.crossVersionUpgradeRestoresDataAfterReload;

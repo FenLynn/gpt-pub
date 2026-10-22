@@ -1,8 +1,6 @@
 /* P109 R65: offline-first project control. Audit is read-only; repairs are opt-in.
  * All data and native folder operations occur on the user's device. */
 'use strict';
-const P109_DATA_SCHEMA=2;
-const P109_APP_VERSION='0.2.3-preview';
 let p109Audit=null,p109PendingDirectory=null,p109ProjectBusy=false;
 function p109Escape(x){return escapeNameChar(String(x??''))}
 function p109Status(msg,error=false){toast(msg,error)}
@@ -194,7 +192,7 @@ function p109ProjectView(report){
     '<p class="p109-empty">未发现已检查项目结构的问题。原文件哈希与 Windows 权限须单独验证。</p>')+'</div>'+
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>下月默认配置</b><span>可选固定，不强制</span></div>'+
    '<div class="p109-project-actions"><button id="p109PinRoster" type="button" '+(!report.initialized?'disabled':'')+'>'+
-    (report.configuration.pinnedRoster?'✓ 名册已固定 · 更新':'固定当前名册')+'</button>'+
+    (report.configuration.pinnedRoster?'更新下月默认名册':'保存下月默认名册')+'</button>'+
     '<button id="p109PinImport" type="button" '+(!report.initialized?'disabled':'')+'>'+
     (report.configuration.pinnedImport?'✓ 导入规则已固定 · 更新':'固定当前导入规则')+'</button>'+ 
     '<button id="p109PinRules" type="button" '+(!report.initialized?'disabled':'')+'>'+ 
@@ -204,13 +202,10 @@ function p109ProjectView(report){
    p109Escape(report.activeBranch.id)+' · 不覆盖原月份 working <button type="button" id="p109ReturnMain">返回主工作状态</button></div>':'')+
   '<div class="p109-project-section"><div class="p109-project-rowtitle"><b>安全管理</b><span>不会自动改写原始记录或冻结</span></div>'+
    '<div class="p109-project-actions"><button id="p109Rescan" type="button">重新检测</button>'+
-    '<button id="p109Backup" type="button" '+(!report.initialized?'disabled':'')+'>备份整个项目 ZIP</button>'+
-    '<button id="p109RestoreZip" type="button">从 ZIP 恢复</button>'+ 
-    '<button id="p109UpgradeCode" type="button" '+(!report.initialized?'disabled':'')+'>安全更新程序</button>'+
     '<button id="p109RepairIndex" type="button" '+(!report.safeIndexRepair.length?'disabled':'')+'>补全月份索引（'+report.safeIndexRepair.length+'）</button></div>'+
     '<p class="p109-project-desc">自动整理仅补充确认存在的有效月份索引；缺失原件、数据冲突、损坏快照均只报告，不擅自合并。</p></div>'+
   '</div><footer><span>运行版本 '+P109_APP_VERSION+' · 数据结构 v'+P109_DATA_SCHEMA+'</span>'+
-   '<button type="button" id="p109ProjectDone">完成</button></footer></div></section>';
+   '</footer></div></section>';
 }
 async function openProjectControl(mode='scan'){
  if(p109ProjectBusy)return;
@@ -222,20 +217,16 @@ async function openProjectControl(mode='scan'){
   p109Audit=report;
   parent.outerHTML=p109ProjectView(report);
   const root=document.querySelector('.p109-project-overlay');
-  const close=()=>root?.remove();
+  const close=()=>{root?.remove();p109PendingDirectory=null;document.getElementById('projectMenuButton')?.focus()};
   root.querySelector('#p109ProjectClose').onclick=close;
-  root.querySelector('#p109ProjectDone').onclick=close;
   root.querySelector('#p109Rescan').onclick=()=>openProjectControl();
   root.querySelector('#p109PickExisting')?.addEventListener('click',async()=>{close();await connectProjectDir()});
   root.querySelector('#p109CreateBlank')?.addEventListener('click',async()=>{
-   close();await p109InitializeProject(p109PendingDirectory||state.projectDir)
+   const target=p109PendingDirectory||state.projectDir;close();await p109InitializeProject(target)
   });
-  root.querySelector('#p109Backup').onclick=()=>p109BackupProject();
   root.querySelector('#p109PinRoster').onclick=()=>p109PinDefaults('roster');
   root.querySelector('#p109PinImport').onclick=()=>p109PinDefaults('import');
   root.querySelector('#p109PinRules').onclick=()=>p109PinDefaults('rules');
-  root.querySelector('#p109RestoreZip').onclick=()=>p109RestoreArchive();
-  root.querySelector('#p109UpgradeCode').onclick=()=>p109UpgradePick();
   root.querySelector('#p109RepairIndex').onclick=()=>p109RepairIndex(report);
   root.querySelectorAll('[data-p109-fork]').forEach(btn=>btn.onclick=async()=>{
     const [month,id]=btn.dataset.p109Fork.split('|');await p109ForkSnapshot(month,id)
@@ -245,19 +236,31 @@ async function openProjectControl(mode='scan'){
  }catch(e){document.querySelector('.p109-project-overlay')?.remove();p109Status('项目扫描失败：'+e.message,true)}
 }
 async function p109InitializeProject(root){
- if(!root){p109Status('请先选择用于存放项目的文件夹',true);return}
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||r63ReadingImport||r62ImportDraft)return false;
+ let previous=null;
+ try{
+ if(!root){
+   if(!window.showDirectoryPicker){p109Status('请使用支持目录读写的 Chrome/Edge',true);return false}
+   root=await showDirectoryPicker({mode:'readwrite'});
+ }
  const entries=await p109Entries(root);
  const known=await p109Json(root,'project.json');
  if(known.exists){p109Status('这个文件夹已有 project.json，请使用「目录」连接，不能重复初始化',true);return}
- if(entries.length&&!window.confirm('目标文件夹不为空，且缺少项目标识。只新增项目所需文件，绝不覆盖现有文件。确定继续初始化？'))return;
+ if(entries.some(e=>!['index.html','README.md','src','p109-release-manifest.json'].includes(e.name))){p109Status('请使用空目录或干净离线程序目录初始化，避免覆盖已有文件',true);return false}
+ if(!p109ConfirmProjectSwitch())return false;
  if(!window.confirm('建立全新的空白考勤项目？演示员工与考勤不会复制到新项目。'))return;
+ previous=p109CaptureSession();
  p109ProjectBusy=true;
- try{
   state.projectDir=root; p109PendingDirectory=null;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
   state.manualStatuses={};state.overtimeReview={};state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
-  state.monthStores=new Map();state.saved=false;
+  state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.captureItems=[];
+  state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.filter='main';
+  state.selectedGroup=null;state.statsConfig=null;state.statsPersonId='';state.statsGroup='';
+  state.workspaceMode='all';state.analyticsPage='main';state.prefs={fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'};
+  Object.assign(RULES,P109_DEFAULT_RULES);
+  Object.assign(asNavHistory,{back:[],forward:[],current:null,restoring:false});
   state.importProfile={rules:R62_DEFAULT_DIRECTIONS.map(x=>({...x})),templates:{}};
   state.calendarOverrides={};state.selection={type:'overall'};
   rememberMonth();reanalyze();
@@ -266,17 +269,21 @@ async function p109InitializeProject(root){
   await writeFile(cfg,'employees.json',JSON.stringify({schemaVersion:2,employees:[]},null,2));
   await writeFile(cfg,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
   await writeFile(cfg,'project-profile.json',JSON.stringify({schemaVersion:1,pinRoster:false,pinImport:false},null,2));
-  await saveWorking();
-  render();p109Status('空白项目已初始化并保存，可以开始导入'); 
- }catch(e){p109Status('初始化失败，请检查目录权限：'+e.message,true)}
+  if(!await saveWorking({initializing:true}))throw Error('初始工作状态未能保存');
+  r68UI.latestRoot=null;r68UI.latestReport=null;r68UI.latestTree=null;r68UI.latestScanAt=0;
+  r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
+  render();p109Status('空白项目已初始化并保存，可以开始导入');return true;
+ }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109Status('初始化失败，请检查目录权限：'+e.message,true);return false}
  finally{p109ProjectBusy=false}
 }
 
 
 async function p109ForkSnapshot(month,snapshotId){
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
  if(!state.projectDir||!p109KnownMonth(month)||!/^F[a-z0-9-]+$/i.test(snapshotId))return;
  if(!state.saved&&!window.confirm('当前存在未保存工作，请先保存；放弃这些修改并从冻结版本建立独立副本？'))return;
  if(!window.confirm('根据 '+month+' 的冻结 '+snapshotId+' 创建独立修订工作区？主 working 和原快照将保持不变。'))return;
+ p109ProjectBusy=true;
  try{
   const [yr,mo]=month.split('-'),m=await monthDirectory(Number(yr),Number(mo)),
    snaps=await existingDir(m,'snapshots'),folder=await existingDir(snaps,snapshotId),
@@ -295,17 +302,19 @@ async function p109ForkSnapshot(month,snapshotId){
   await writeFile(work,'state.json',JSON.stringify({...snap.working,context:'branch',branch:ref},null,2));
   rememberMonth();
   state.monthStores.set(month,{...normalized,activeBranch:ref,saved:true});
-  switchMonth(Number(yr),Number(mo),false,false);
+  switchMonth(Number(yr),Number(mo),false,false,true);
   state.activeBranch=ref;
   await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
   document.querySelector('.p109-project-overlay')?.remove();
   p109Status('已创建独立修订 '+id+'，后续保存不会修改原工作状态');
- }catch(e){p109Status('派生快照失败：'+e.message,true)}
+ }catch(e){p109Status('派生快照失败：'+e.message,true)}finally{p109ProjectBusy=false}
 }
 async function p109ReturnToMain(){
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
  const ref=state.activeBranch;
  if(!ref||!state.projectDir)return;
  if(!state.saved&&!window.confirm('独立副本有未保存修改；放弃并返回主工作状态？'))return;
+ p109ProjectBusy=true;
  try{
   const [y,m]=ref.month.split('-'),folder=await monthDirectory(Number(y),Number(m)),
    working=await existingDir(folder,'working'),source=await readJSON(working,'state.json'),
@@ -313,18 +322,20 @@ async function p109ReturnToMain(){
   if(!main)throw Error('主 working 不完整，拒绝切换');
   rememberMonth();
   state.monthStores.set(ref.month,{...main,activeBranch:null,saved:true});
-  switchMonth(Number(y),Number(m),false,false);
+  switchMonth(Number(y),Number(m),false,false,true);
   state.activeBranch=null;
   await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
   document.querySelector('.p109-project-overlay')?.remove();
   p109Status('已返回主工作状态，独立修订副本仍保存在磁盘');
- }catch(e){p109Status('返回主状态失败：'+e.message,true)}
+ }catch(e){p109Status('返回主状态失败：'+e.message,true)}finally{p109ProjectBusy=false}
 }
 
 async function p109PinDefaults(kind){
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
  if(!state.projectDir||!p109Audit?.initialized)return;
  const label=kind==='roster'?'已选固定人员和组别':kind==='rules'?'考勤时段与加班规则':'导入关键字及列映射模板';
  if(!window.confirm('将本月'+label+'固定为以后新建月份的默认配置？历史月份保持原样。'))return;
+ p109ProjectBusy=true;
  try{
   const config=await dir(state.projectDir,'config');
   const profile=(await p109Json(config,'project-profile.json')).value||{schemaVersion:1};
@@ -343,14 +354,17 @@ async function p109PinDefaults(kind){
   await writeFile(config,'project-profile.json',JSON.stringify(profile,null,2));
   state.projectProfile=profile;
   p109Status('已固定当前'+label+'，可在后续月份复用');
+  p109ProjectBusy=false;
   await openProjectControl();
- }catch(e){p109Status('固定配置失败：'+e.message,true)}
+ }catch(e){p109Status('固定配置失败：'+e.message,true)}finally{p109ProjectBusy=false}
 }
 
 async function p109RepairIndex(report=p109Audit){
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
  if(!report?.initialized||!report.safeIndexRepair?.length||!state.projectDir)return;
  const targets=report.safeIndexRepair.slice();
  if(!window.confirm('即将把磁盘上已存在的 '+targets.length+' 个有效月份补入 project.json 索引。不会删除其他月份或修改任何 working/raw/snapshot。是否继续？'))return;
+ p109ProjectBusy=true;
  try{
   const root=state.projectDir,meta=await p109Json(root,'project.json');
   if(!meta.value||meta.value.projectId!=='P109-AttendScope')throw Error('项目身份验证失败');
@@ -361,8 +375,9 @@ async function p109RepairIndex(report=p109Audit){
   await writeFile(root,'project.index.previous.json',JSON.stringify(meta.value,null,2));
   await writeFile(root,'project.json',JSON.stringify({...meta.value,months:[...current].sort(),updatedAt:new Date().toISOString()},null,2));
   p109Status('已补全 '+targets.length+' 个月份索引，原始数据未修改');
+  p109ProjectBusy=false;
   await openProjectControl();
- }catch(e){p109Status('整理失败：'+e.message,true)}
+ }catch(e){p109Status('整理失败：'+e.message,true)}finally{p109ProjectBusy=false}
 }
 async function p109ArchiveWalk(folder,prefix,files,limits){
  for(const item of await p109Entries(folder)){
@@ -377,7 +392,7 @@ async function p109ArchiveWalk(folder,prefix,files,limits){
  }
 }
 async function p109BackupProject(){
- if(!state.projectDir||p109ProjectBusy)return;
+ if(!state.projectDir||p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting||r62ImportDraft)return;
  p109ProjectBusy=true;
  try{
   const audit=await p109AuditProject();
@@ -394,6 +409,7 @@ async function p109BackupProject(){
  finally{p109ProjectBusy=false}
 }
 async function p109RestoreArchive(){
+ if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
  if(!window.showDirectoryPicker){p109Status('该浏览器不支持写入本地目录',true);return}
  let target;
  try{target=await showDirectoryPicker({mode:'readwrite'});
@@ -402,6 +418,7 @@ async function p109RestoreArchive(){
  const chooser=document.createElement('input');chooser.type='file';chooser.accept='.zip,application/zip';
  chooser.onchange=async()=>{
   const file=chooser.files?.[0];if(!file)return;
+  if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting){p109Status('请等待当前项目文件操作完成',true);return}
   p109ProjectBusy=true;
   try{
    if(file.size>180*1024*1024)throw Error('备份包过大，请先通过系统文件管理器处理');

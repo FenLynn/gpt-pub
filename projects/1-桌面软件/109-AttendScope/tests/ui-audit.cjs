@@ -211,10 +211,12 @@ module.exports=async function runUiAudit({browser,out,root}){
   await page.keyboard.press('Escape');
   check(await page.locator('#statusFilterMenu.open').count()===0,'Escape did not close status filter');
 
+  await page.locator('#exportMenuButton').click();
   await page.locator('#printReport').click();
   await page.waitForSelector('#r63PdfClose',{timeout:15000});
   await page.keyboard.press('Escape');
   await page.waitForFunction(()=>document.getElementById('r63PdfPicker')?.hidden===true);
+  await page.locator('#projectMenuButton').click();
   await page.locator('#p109ProjectControl').click();
   await page.waitForSelector('.p109-project-overlay',{timeout:15000});
   await page.waitForSelector('#p109ProjectClose',{timeout:15000});
@@ -235,18 +237,18 @@ module.exports=async function runUiAudit({browser,out,root}){
 
   // Verify the visible primary actions have names and the main viewport is not clipped.
   const controls=await page.evaluate(()=>{
-   const ids=['asNavBack','asNavForward','monthMenuButton','importBtn','connectDir','p109ProjectControl',
-    'saveBtn','restoreBtn','freezeBtn','exportTable','exportCsv','captureView','printReport','settingsBtn'];
+   const ids=['asNavBack','asNavForward','monthMenuButton','importBtn','projectMenuButton',
+    'saveBtn','freezeBtn','exportMenuButton','settingsBtn'];
    return ids.map(id=>{const e=document.getElementById(id);return {id,exists:!!e,
     name:e?([e.getAttribute('aria-label'),e.getAttribute('title'),e.innerText].filter(Boolean).join(' ').trim()):''}});
   });
   check(controls.every(x=>x.exists&&x.name.length>0),'topbar action lacks accessible name',controls.filter(x=>!x.exists||!x.name));
   check(!errors.length,'browser emitted runtime errors',errors);
   fs.writeFileSync(path.join(out,'p109-r77-ui-audit.json'),JSON.stringify({
-   version:'R77',viewportGeometry:geometry,workspaces:views.map(x=>x[0]),dataSections:sections,
+   version:'R78',viewportGeometry:geometry,workspaces:views.map(x=>x[0]),dataSections:sections,
    settingsSections:settingSections,escapeDismissal:true,cancelledImportNonDestructive:true,
    primaryControlsNamed:true,runtimeErrors:errors
   },null,2));
-  console.log('P109_R77_UI_AUDIT_PASS '+JSON.stringify({viewports:geometry.map(x=>x.viewport),workspaces:views.map(x=>x[0]),dataSections:sections.length,settingsSections:settingSections.length,errors:errors.length}));
+  console.log('P109_R78_UI_AUDIT_PASS '+JSON.stringify({viewports:geometry.map(x=>x.viewport),workspaces:views.map(x=>x[0]),dataSections:sections.length,settingsSections:settingSections.length,errors:errors.length}));
  }finally{await page.close()}
 };

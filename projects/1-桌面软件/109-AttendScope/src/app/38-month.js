@@ -6,11 +6,14 @@ function rememberMonth(){
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
     rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
-    calendarOverrides:{...state.calendarOverrides},activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
+    calendarOverrides:{...state.calendarOverrides},snapshotContext:!!state.snapshotContext,activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
   });
 }
 function monthExists(year,month){return state.monthStores.has(year+'-'+pad(month))}
-function switchMonth(year,month,create=false,preserveCurrent=true){
+function switchMonth(year,month,create=false,preserveCurrent=true,internal=false){
+  if(!internal&&(state.storageBusy||state.importCommitting||p109ConnectionBusy||p109ProjectBusy)){
+    toast('正在处理项目文件，请完成后再切换月份',true);return false;
+  }
   if(!Number.isInteger(year)||year<2000||year>2100||!Number.isInteger(month)||month<1||month>12)return;
   const key=year+'-'+pad(month);
   if(!state.monthStores.has(key)){
@@ -32,27 +35,29 @@ function switchMonth(year,month,create=false,preserveCurrent=true){
   const next=state.monthStores.get(key);
   if(Array.isArray(next.employees))EMPLOYEES=next.employees.map(e=>({...e}));
   state.groups=next.groups?{...next.groups}:{...state.groups};
-  const globalFixed=state.projectProfile?.pinRoster?
+  const historical=!!(next.snapshotContext||next.activeBranch);
+  const globalFixed=!historical&&state.projectProfile?.pinRoster?
     (state.projectProfile.fixedPeople||state.projectProfile.employees?.map(e=>e.id)||[]):null;
   state.fixedPeople=[...(globalFixed??next.fixedPeople??[])];
-  state.nameAliases={...(next.nameAliases||{}),...(state.projectProfile?.nameAliases||{})};
-  state.groupCatalog=[...(state.projectProfile?.groupCatalog||next.groupCatalog||
+  state.nameAliases=historical?{...(next.nameAliases||{})}:{...(next.nameAliases||{}),...(state.projectProfile?.nameAliases||{})};
+  state.groupCatalog=[...((historical?next.groupCatalog:state.projectProfile?.groupCatalog)||next.groupCatalog||
     [...new Set(Object.values(state.groups).filter(g=>g&&g!=='未分组'))])];
   state.isDemo=!!next.isDemo;
   state.records=next.records;state.leaves=next.leaves;state.trips=next.trips;
   state.revisions=next.revisions;state.revisionSeq=next.revisionSeq;
   state.imports=next.imports;state.saved=next.saved;
   state.activeBranch=next.activeBranch||null;
+  state.snapshotContext=!!next.snapshotContext;
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
-  if(next.rules)Object.assign(RULES,next.rules);
+  Object.assign(RULES,P109_DEFAULT_RULES,next.rules||{});
   RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);
   if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.gracePmStart==null)RULES.gracePmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.graceAmEnd==null)RULES.graceAmEnd=0;
   if(next.rules&&next.rules.gracePmEnd==null)RULES.gracePmEnd=0;
-  if(next.prefs)state.prefs={...state.prefs,...next.prefs};
-  if(next.importProfile)state.importProfile=structuredClone(next.importProfile);
-  if(next.calendarOverrides)state.calendarOverrides={...state.calendarOverrides,...next.calendarOverrides};
+  state.prefs=next.prefs?structuredClone(next.prefs):{fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'};
+  state.importProfile=structuredClone(next.importProfile||{rules:R62_DEFAULT_DIRECTIONS.map(r=>({...r})),templates:{}});
+  state.calendarOverrides={...(next.calendarOverrides||{})};
   state.selection={type:'overall'};state.filter='main';state.chartTab='overview';
   state.chartDay=null;state.rawPage=1;state.timelineRange=null;
   reanalyze();render();

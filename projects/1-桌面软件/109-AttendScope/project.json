@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "projectId": "P109-AttendScope",
   "projectName": "考勤",
-  "appVersion": "0.2.0-preview",
+  "appVersion": "0.2.4-preview",
   "analysisEngineVersion": "R68",
   "timezone": "Asia/Shanghai",
   "current": {

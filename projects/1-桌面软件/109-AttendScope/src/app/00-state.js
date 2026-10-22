@@ -1,4 +1,8 @@
 'use strict';
+const P109_DATA_SCHEMA=2;
+const P109_APP_VERSION='0.2.4-preview';
+const P109_APP_REVISION='R78';
+const P109_ENGINE_VERSION='R68';
 const XLSX=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}
@@ -18,6 +22,7 @@ const OVERTIME_VISUALS=Object.freeze({
 const RULES={amStart:'08:30',amEnd:'11:40',pmStart:'13:30',pmEnd:'17:10',
  grace:5,graceAmStart:5,graceAmEnd:0,gracePmStart:5,gracePmEnd:0,
  dupSeconds:120,overtimeMinMinutes:20};
+const P109_DEFAULT_RULES=Object.freeze({...RULES});
 const state={calendarOverrides:{},isDemo:true,records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'main',judgmentMode:'initial',manualStatuses:{},overtimeReview:{},zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),nameAliases:{},fixedPeople:[],groupCatalog:['综合组','研发组','生产组','质检组','保障组'],workspaceMode:'all',selectedGroup:null,scopeSearch:'',attentionOnly:false,chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false,outings:[],overtimeEntries:[],prefs:{fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'}};
 const scenarioNames={normal:'正常',late:'迟到',early:'早退',absent:'缺勤',multiin:'多进一出',multiout:'一进多出',missingout:'缺少出',missingin:'缺少进',longout:'长时间外出',duplicate:'疑似重复打卡',overtime:'非工作日出勤'};
 function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${YEAR}-${pad(MONTH)}-${pad(d)}`}

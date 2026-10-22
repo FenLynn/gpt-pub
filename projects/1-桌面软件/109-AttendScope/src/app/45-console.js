@@ -175,7 +175,7 @@ function r68RosterHtml(){
         '<input type="checkbox" data-r73-fixed-person="'+r68Esc(e.id)+'" aria-label="选择固定人员 '+r68Esc(e.name)+'" '+(r68UI.fixedChosen.has(e.id)?'checked':'')+'>'+
         '<strong>'+r68Esc(e.name)+'</strong><span class="r73-group-tag">'+r68Esc(group)+'</span>'+
         (!exists?'<span class="r73-other-month" data-r73-tip="该人员不在当前月份，但仍属于长期固定名单">跨月</span>':'')+
-        '<button type="button" data-r73-remove-one="'+r68Esc(e.id)+'" class="r73-row-remove" aria-label="从固定名单移除 '+r68Esc(e.name)+'">×</button></div>';
+        '</div>';
      }).join(''):'<div class="r73-list-empty">'+(fixed.length?'未找到匹配人员':'选择左侧人员，点击“添加 →”')+'</div>')+
     '</div>'+
    '</section></div>'+r73GroupEditorHtml();
@@ -362,8 +362,7 @@ function r68ImportsHtml(){
 function r68FreezeHtml(){
  const month=monthKey(),detail=(r68UI.latestRoot===state.projectDir?r68UI.latestReport:null)?.months?.find(x=>x.key===month);
  const list=detail?.snapshots||[],branches=detail?.branches||[];
- return r68SidebarHeader('冻结与修订','不可变冻结作为基准，派生副本后修改不会覆盖主 working。',
-  '<button class="r68-btn" id="r68FreezeNow">冻结当前月</button>')+
+ return r68SidebarHeader('冻结与修订','顶部「冻结」创建不可变基准；派生修订不会覆盖主 working。')+
   '<div class="r68-snapshot-list">'+(list.length?list.map(s=>
   '<div class="r68-snapshot-row"><div><strong>'+r68Esc(s.id)+'</strong><small>'+r68Esc(s.createdAt||'时间未知')+'</small></div>'+
    r68Pill(s.valid?'已冻结':'已损坏',s.valid?'healthy':'critical')+
@@ -400,7 +399,7 @@ function r69ProjectError(err){
 async function r69RefreshInventory(){
  r68UI.latestScanAt=0;r68UI.latestReport=null;r68UI.latestTree=null;
  r68UI.treeSerial++;
- if(state.workspaceMode==='data')r68RenderData();
+ if(state.workspaceMode==='data')renderDataWorkspace();
 }
 function r69PaintProjectSection(report,tree){
  const node=document.getElementById('r69ProjectPane');
@@ -411,9 +410,6 @@ function r69PaintProjectSection(report,tree){
   health:['健康检测','只读检测，不自动覆盖用户的原始记录或冻结'],
   storage:['存储与文件','实际磁盘大小与文件目录，不修改原文件']};
  const [title,description]=captions[tab];
- const buttons=connected?'<button class="r68-btn" type="button" id="r68ScanAgain">重新扫描</button>'+
-  '<button class="r68-btn" type="button" id="r68ProjectBackup">备份 ZIP</button>'+
-  '<button class="r68-btn" type="button" id="r68OpenProjectControl">管理项目</button>':'';
  let content='';
  if(!connected){
   content='<div class="r70-project-intro r71-setup" role="region" aria-label="项目连接">'+
@@ -442,9 +438,7 @@ function r69PaintProjectSection(report,tree){
  const level=report?.level==='critical'?'严重问题':report?.level==='warning'?'需要检查':'正常';
  node.innerHTML='<header class="r69-section-title r71-section-title"><h2>'+title+'</h2>'+
   r71Hint(description)+(connected?'<span class="r71-project-status '+(report.level||'')+'">'+level+'</span>':'')+
-  '<div class="r71-project-actions">'+buttons+'</div></header>'+content;
- node.querySelector('#r68ScanAgain')?.addEventListener('click',r69RefreshInventory);
- node.querySelector('#r68ProjectBackup')?.addEventListener('click',()=>p109BackupProject());
+  '</header>'+content;
  node.querySelector('#r68OpenProjectControl')?.addEventListener('click',()=>openProjectControl());
  node.querySelector('#r71RestoreZip')?.addEventListener('click',()=>p109RestoreArchive());
  node.querySelector('#r68IndexRepair')?.addEventListener('click',async()=>{
@@ -458,7 +452,9 @@ function r69PaintProjectSection(report,tree){
 }
 function r68DataMarkup(){
  const section=state.dataSection||'records';
- if(r69IsProjectSection(section))return '<div class="r71-data-shell">'+
+ if(r69IsProjectSection(section))return '<div class="r71-data-shell r78-project-shell">'+
+  '<div class="r78-project-tools"><span>'+r68Esc(state.projectDir?.name||'尚未连接项目')+'</span>'+
+  '<button type="button" class="r68-btn" id="r68ScanAgain">重新扫描</button></div>'+
   '<main id="r69ProjectPane" class="r71-data-main"><div class="r68-loading">正在读取项目…</div></main></div>';
  return '<div class="r71-data-shell"><main class="r71-data-main">'+
   '<section id="r68DataContent" class="r71-data-content">'+
@@ -487,13 +483,14 @@ function r68RailPlaceholder(){
   '<button class="r68-btn" id="r68RailProject">查看项目状态</button></section>'+
   '<section class="r68-rail-card"><h3>文件树</h3><div id="r68RailTree" class="r68-tree-placeholder">'+(state.projectDir?'正在读取文件结构…':'连接目录后显示实际文件树')+'</div></section>';
 }
-function r68RenderData(){
+function renderDataWorkspace(){
  const body=document.getElementById('analysisBody');if(!body)return;
  const head=document.getElementById('analysisTitle');if(head)head.textContent='数据管理 · '+monthKey();
  const tools=document.getElementById('analysisHeadTools');if(tools)tools.textContent='';
  if(typeof disposeRawTable==='function')disposeRawTable();
  body.innerHTML=r68DataMarkup();
  const root=body;
+ root.querySelector('#r68ScanAgain')?.addEventListener('click',r69RefreshInventory);
  root.querySelector('#r68RosterSearch')?.addEventListener('input',e=>{
   r68UI.search=e.target.value;r68RefreshDataContent('r68RosterSearch',e.target.selectionStart)
  });
@@ -540,7 +537,6 @@ function r68RenderData(){
  root.querySelectorAll('[data-r72-rename]').forEach(b=>b.onclick=()=>r72RenamePerson(b.dataset.r72Rename));
  root.querySelector('#r72FixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.chosen],true));
  root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.fixedChosen],false));
- root.querySelectorAll('[data-r73-remove-one]').forEach(b=>b.onclick=()=>r72FixedPeople([b.dataset.r73RemoveOne],false));
  root.querySelector('#r73EditGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(true));
  root.querySelector('#r73CloseGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(false));
  root.querySelector('#r73GroupBackdrop')?.addEventListener('click',e=>{
@@ -558,7 +554,6 @@ function r68RenderData(){
  for(const [id,kind] of [['r68PinRoster','roster'],['r68PinImport','import'],['r68PinRules','rules']]){
   root.querySelector('#'+id)?.addEventListener('click',async()=>{p109Audit=await p109AuditProject();await p109PinDefaults(kind)});
  }
- root.querySelector('#r68FreezeNow')?.addEventListener('click',()=>freezeSnapshot());
  root.querySelector('#r68OpenProject')?.addEventListener('click',()=>r69NavigateData('months'));
  root.querySelectorAll('[data-r68-fork]').forEach(b=>b.onclick=()=>{
   const [month,id]=b.dataset.r68Fork.split('|');return p109ForkSnapshot(month,id)
@@ -581,7 +576,7 @@ function r68RefreshDataContent(focusId,position){
  const caret=position??(active?document.activeElement?.selectionStart:null);
  const a=document.getElementById('r73MonthList')?.scrollTop||0;
  const b=document.getElementById('r73FixedList')?.scrollTop||0;
- r68RenderData();
+ renderDataWorkspace();
  if(document.getElementById('r73MonthList'))document.getElementById('r73MonthList').scrollTop=a;
  if(document.getElementById('r73FixedList'))document.getElementById('r73FixedList').scrollTop=b;
  if(active){const next=document.getElementById(active);next?.focus();if(caret!=null)next?.setSelectionRange(caret,caret)}
@@ -648,7 +643,7 @@ async function r68FillDataRail(){
   if(!root)r68UI.latestTree=null;
   r68UI.latestScanAt=Date.now();
   if(project)r69PaintProjectSection(report,tree||r68UI.latestTree);
-  else if(tab==='freezes'&&state.dataSection==='freezes')r68RenderData();
+  else if(tab==='freezes'&&state.dataSection==='freezes')renderDataWorkspace();
  }catch(e){if(token===r68UI.treeSerial&&project)r69ProjectError(e)}
 }
 function r68ProjectMarkup(report,tree){
@@ -722,4 +717,3 @@ async function r68RenderProject(){
  document.getElementById('r68RefreshProject')?.addEventListener('click',r68RenderProject);
  document.querySelectorAll('[data-project-scroll]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.projectScroll)?.scrollIntoView({behavior:'smooth',block:'start'}));
 }
-renderDataWorkspace=r68RenderData;

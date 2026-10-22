@@ -1,0 +1,32 @@
+/* R78 system actions and shared project tools. */
+.system-menu-anchor{position:relative;display:flex;align-items:center}
+.system-menu[hidden],.r63-pdf-picker[hidden]{display:none!important}
+.system-menu{
+ position:absolute;right:0;top:calc(100% + 9px);z-index:1300;min-width:238px;
+ max-height:calc(100vh - 80px);overflow-y:auto;padding:7px;
+ border:1px solid #dce6ee;border-radius:10px;background:#fff;
+ box-shadow:0 12px 36px #24435f24;display:flex;flex-direction:column;gap:2px;
+}
+.system-menu button{
+ text-align:left;display:block;width:100%;padding:9px 12px!important;
+ border:0;background:transparent;border-radius:6px;white-space:nowrap;
+ color:#365a76;font-size:12px;line-height:1.4;cursor:pointer;
+}
+.system-menu button:hover,.system-menu button:focus-visible{background:#edf5fb}
+.system-menu button:disabled{opacity:.4;cursor:default}
+.system-menu-divider{border-top:1px solid #e7edf3;margin:5px 3px}
+.system-menu-caption{padding:5px 12px;color:#8a9eaf;font-size:11px}
+.top-global-actions .import-anchor{position:relative}
+.top-global-actions .import-popover{z-index:1300;min-width:270px}
+.system-menu-anchor>.r63-pdf-picker{top:calc(100% + 9px);right:0;z-index:1400}
+.person-day-nav .person-current-day{min-width:38px;text-align:center;font-size:12px;color:#3c5d78}
+.r78-project-shell{display:flex!important;flex-direction:column!important;min-height:0}
+.r78-project-tools{display:flex;align-items:center;justify-content:space-between;gap:14px;
+ border-bottom:1px solid #e2ebf2;padding:7px 0 12px;margin-bottom:13px;color:#8498aa;font-size:12px}
+.r78-project-tools .r68-btn{padding:5px 11px}
+.workspace-mode-stats .stats-side-controls{height:auto;justify-content:flex-start}
+.r73-fixed-row{grid-template-columns:20px minmax(60px,1fr) auto auto!important}
+@media(max-width:1366px){
+ .top-global-actions{gap:5px!important}
+ .topbar .workspace-navigation button{padding:6px 8px}
+}

@@ -373,9 +373,7 @@ function statisticsSidebarControlsHtml(){
   '<label class="stats-side-field">范围<select id="asStatsScope">'+
   asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+
   '</select></label>'+groupControl+personControl+
-  asStatSidebarFiltersHtml()+
-  '<button id="asStatsExport" type="button" class="as-stats-export stats-side-export r69-export-btn" '+
-  'title="将当前统计指标及范围导出为 CSV"><span aria-hidden="true">↓</span> 导出 CSV</button>';
+  asStatSidebarFiltersHtml();
 }
 function statisticsWorkspaceHtml(){
  const c=asStatPrefs(),met=asStatMetric(),mode=asStatScopeMode();
@@ -474,16 +472,17 @@ function asStatDrill(key){
  }
 }
 function asStatCSVCell(value){
- let str=String(value);
- if(/^[\s]*[=+\-@]/.test(str))str="'"+str;
- return '"'+str.replace(/"/g,'""')+'"';
+ return r62CsvCell(value);
+}
+function asStatExportRows(){
+ const data=asStatRows(),c=asStatPrefs(),metric=asStatMetric();
+ const scope=asStatScopeMode()==='all'?'全员':asStatScopeMode()==='group'?asStatScopeGroup():data.people[0]?.name||'个人';
+ return data.rows.map(r=>({月份:monthKey(),统计范围:scope,对象:r.label,业务:asStatFamily(c.family)[1],
+  指标:metric[1],统计方式:{total:'总量',perPerson:'人均',per100:'每百应出勤人日'}[c.aggregate]||c.aggregate,
+  数值:r.value,单位:data.effectiveUnit,员工数:r.peopleCount,应出勤人日:r.scheduled}));
 }
 function asStatExport(){
- const data=asStatRows(),c=asStatPrefs(),metric=asStatMetric(),header=['对象','指标','统计方式','数值','单位','员工数','应出勤人日'];
- const csv=[header,...data.rows.map(r=>[r.label,metric[1],c.aggregate,r.value,data.effectiveUnit,r.peopleCount,r.scheduled])].
-  map(row=>row.map(asStatCSVCell).join(',')).join('\r\n');
- downloadBlob(new Blob(['\ufeff',csv],{type:'text/csv;charset=utf-8'}),monthKey()+'_统计_'+c.family+'_'+c.metric+'.csv');
- toast('已导出当前指标统计明细');
+ const c=asStatPrefs();return p109ExportRows(asStatExportRows(),monthKey()+'_统计_'+c.family+'_'+c.metric+'.csv');
 }
 function renderStatisticsWorkspace(){
  const node=document.getElementById('statisticsWorkspace');

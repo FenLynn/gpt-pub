@@ -18,7 +18,7 @@ function p109UpgradePick(){
  chooser.click();
 }
 async function p109ApplyCodeUpdate(file){
- if(!state.projectDir||p109ProjectBusy)return false;
+ if(!state.projectDir||p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting||r62ImportDraft)return false;
  p109ProjectBusy=true;
  try{
   if(file.size>45*1024*1024)throw Error('更新 ZIP 超过 45 MB 上限');

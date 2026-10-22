@@ -97,11 +97,13 @@ async function run(){
  await check(page,()=>YEAR===2027&&MONTH===1&&EMPLOYEES.some(e=>e.name==='新员工乙')&&state.records.every(r=>r.name==='新员工乙'),'R63 real January XLSX import');
  await page.evaluate(()=>switchMonth(2026,10));
  await check(page,()=>EMPLOYEES.length===50&&state.records.length>3500,'R63 restored October baseline');
+ await page.locator('#exportMenuButton').click();
  await page.locator('#printReport').click();
  await page.waitForSelector('#r63PdfClose');
  await check(page,()=>document.querySelector('#r63PdfExport').disabled,'R63 no synthetic PDF pages');
  await page.locator('#r63PdfClose').click();
  await page.evaluate(async()=>{state.captureItems=[await captureCurrentImage('matrix'),await captureCurrentImage('timeline')]});
+ await page.locator('#exportMenuButton').click();
  await page.locator('#printReport').click();
  await page.waitForSelector('#r63PdfPicker input');
  await check(page,()=>document.querySelectorAll('#r63PdfPicker input:checked').length===2,'R63 cached thumbnails default checked');
@@ -322,10 +324,10 @@ async function run(){
  await check(page,()=>state.chartDay===11&&state.selection.day===11&&
    document.querySelector('.person-day[data-person-day="11"]').classList.contains('selected'),
  'R40 left calendar must update personal month strip');
- await page.locator('#timelineDayPicker').selectOption('12');
+ await page.locator('[data-person-day="12"]').click();
  await check(page,()=>state.chartDay===12&&state.selection.day===12&&
   document.querySelector('.cal-day[data-day="12"]').classList.contains('selected'),
- 'R40 date dropdown must share date navigator');
+ 'R78 date strip must share date navigator');
  // Simulated manual correction: narrow strip inherits the final status color,
  // with the violet check inside the date tile, independent of the active view.
  await page.evaluate(()=>{
@@ -951,7 +953,7 @@ async function run(){
    document.querySelector('[data-workspace="stats"].active')!==null&&
    !!document.getElementById('asStatsScope')&&
    getComputedStyle(layout.querySelector('.sidebar')).display==='flex'&&
-   document.getElementById('calendar')?.children.length>0&&
+   !document.getElementById('calendar')&&
    chart.width>400&&rank.width>=250&&rank.width<=324&&rank.left>chart.left&&
    !!echarts.getInstanceByDom(document.getElementById('asStatChart'))&&h.textContent.includes('考勤统计');
  },'R52 top-level statistics route, width, or chart missing');
@@ -1125,7 +1127,8 @@ async function run(){
  await check(page,()=>asStatRows().rows.length===workspaceGroups().length,
   'R52 whole-workforce group comparison broken');
  const exported=page.waitForEvent('download');
- await page.locator('#asStatsExport').click();
+ await page.locator('#exportMenuButton').click();
+ await page.locator('#exportCsv').click();
  const csv=await exported;
  if(!csv.suggestedFilename().includes('punch'))throw Error('R52 statistics CSV filename incorrect');
  await page.setViewportSize({width:1366,height:768});
@@ -1145,12 +1148,12 @@ async function run(){
    selects.every(x=>x.getBoundingClientRect().right<=box.right+2)&&
    Math.abs(title.top-total.top)<24&&
    side.contains(document.getElementById('asStatsScope'))&&
-   side.contains(document.getElementById('asStatsExport'))&&
-   document.getElementById('asStatsExport').tagName==='BUTTON'&&
-   document.getElementById('asStatsExport').textContent.includes('导出')&&
+   !document.getElementById('asStatsExport')&&!document.getElementById('calendar')&&
+   document.getElementById('exportMenuButton').tagName==='BUTTON'&&
+   document.getElementById('exportCsv').textContent.includes('当前统计')&&
    !document.querySelector('.as-stats-heading .as-stats-filters')&&
    document.documentElement.scrollWidth<=innerWidth+3;
- },'R69 statistics five selectors vertically aligned and export as sidebar button at 1366px');
+ },'R78 five statistics selectors, one global export and no ineffective calendar at 1366px');
  await page.screenshot({path:path.join(out,'r52-top-groups-1366.png')});
  await page.setViewportSize({width:1600,height:900});
  await page.screenshot({path:path.join(out,'r52-top-groups-1600.png')});
@@ -1940,11 +1943,12 @@ async function run(){
    await flagPage.screenshot({path:path.join(out,'r72-timeline-late-early.png')});
   }finally{await flagPage.close()}
  }
+ await require('./r78-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R77',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R78',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

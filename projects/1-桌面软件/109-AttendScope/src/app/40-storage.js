@@ -3,17 +3,40 @@ function downloadBlob(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),500);
 }
-function r62CsvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
-function downloadCurrentCSV(){
- const rows=state.workspaceMode==='stats'?
-  asStatRows().visible.map(r=>({统计对象:r.label,业务:asStatFamily(asStatPrefs().family)[1],
-   指标:asStatMetric()[1],数值:r.value,单位:asStatRows().effectiveUnit})):traditionalRows();
- if(!rows.length){toast('当前没有可导出数据',true);return}
+function r62CsvCell(v){
+ let s=String(v??'');
+ if(typeof v==='string'&&/^[\s\u0000-\u001f]*[=+\-@]/.test(s))s="'"+s;
+ return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+}
+function p109ExportRows(rows,name){
+ if(!rows.length){toast('当前没有可导出数据',true);return false}
  const keys=Object.keys(rows[0]),lines=[keys.map(r62CsvCell).join(','),
   ...rows.map(r=>keys.map(k=>r62CsvCell(r[k])).join(','))];
- downloadBlob(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),
-  r63FileStem()+'_'+monthKey()+'_'+(state.workspaceMode==='stats'?'统计':'明细')+'.csv');
- toast('已导出 UTF-8 CSV');
+ downloadBlob(new Blob(['\uFEFF'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}),name);
+ toast('已导出 UTF-8 CSV');return true;
+}
+function downloadCurrentCSV(){
+ if(state.workspaceMode==='stats')return asStatExport();
+ return p109ExportRows(traditionalRows(),r63FileStem()+'_'+monthKey()+'_每日考勤明细.csv');
+}
+const P109_IMPORT_TEMPLATES={
+ attendance:['考勤记录',['姓名','打卡时间','进出']],
+ leave:['请假',['姓名','日期','开始时间','结束时间','类型','备注']],
+ trip:['出差',['姓名','开始日期','结束日期','类型','地点','备注']],
+ outing:['外出',['姓名','开始日期','结束日期','开始时间','结束时间','类型','地点','备注']],
+ overtime:['登记加班',['姓名','日期','开始时间','结束时间','类型','备注']]
+};
+function downloadBlankTemplate(kind){
+ const template=P109_IMPORT_TEMPLATES[kind];if(!template)return;
+ const [title,columns]=template;
+ downloadBlob(XLSX.writeXlsx([Object.fromEntries(columns.map(k=>[k,'']))],title),title+'_空白模板.xlsx');
+}
+function exportCurrentTable(){
+ if(state.workspaceMode!=='stats')return exportTraditionalTable();
+ const rows=asStatExportRows();
+ if(!rows.length){toast('当前没有可导出统计',true);return}
+ downloadBlob(XLSX.writeXlsx(rows,'当前统计'),monthKey()+'_统计_'+asStatPrefs().family+'_'+asStatPrefs().metric+'.xlsx');
+ toast('已导出当前统计 XLSX');
 }
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
 function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
@@ -83,93 +106,134 @@ async function ensureProjectSkeleton(){
   }
 }
 function normalizeSavedMonth(payload){
-  if(!payload||!Array.isArray(payload.records)||Number(payload.schemaVersion)>2)return null;
+  const schema=payload?.schemaVersion==null?1:Number(payload.schemaVersion);
+  if(!payload||!Array.isArray(payload.records)||!Number.isInteger(schema)||schema<1||schema>P109_DATA_SCHEMA)return null;
+  for(const key of ['employees','leaves','trips','outings','overtimeEntries','imports','revisions'])
+    if(payload[key]!=null&&!Array.isArray(payload[key]))return null;
   payload=r62MigratePayload(structuredClone(payload));
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     employees:payload.employees||null,groups:payload.groups||null,
-    fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
+    fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
     revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
+let p109ConnectionBusy=false;
+function p109CaptureSession(){
+ return {values:{...state},employees:EMPLOYEES,year:YEAR,month:MONTH,rules:{...RULES},
+  navigation:{...asNavHistory,back:[...asNavHistory.back],forward:[...asNavHistory.forward]}};
+}
+function p109RestoreSession(saved){
+ for(const key of Object.keys(state))if(!(key in saved.values))delete state[key];
+ Object.assign(state,saved.values);EMPLOYEES=saved.employees;YEAR=saved.year;MONTH=saved.month;
+ Object.assign(RULES,saved.rules);Object.assign(asNavHistory,saved.navigation);render();
+}
+function p109ConfirmProjectSwitch(){
+  rememberMonth();
+  const dirty=[...state.monthStores].filter(([,m])=>!m.saved&&!m.isDemo).map(([key])=>key);
+  return !dirty.length||window.confirm('以下月份有未保存内容：'+dirty.join('、')+'。切换项目会放弃这些内存修改；建议取消并先保存。仍要切换？');
+}
+async function p109OptionalDirectory(root,name){
+  try{return await existingDir(root,name)}catch(e){if(e.name==='NotFoundError')return null;throw e}
+}
+async function p109ReadWorking(folder,key){
+  let payload,error;
+  try{payload=await readJSON(folder,'state.json')}catch(e){error=e}
+  if(Number(payload?.schemaVersion)>P109_DATA_SCHEMA)throw Error(key+' 来自更高数据版本，请先升级软件');
+  let normalized=normalizeSavedMonth(payload);
+  if(normalized)return {normalized,recovered:false};
+  const previous=await readJSON(folder,'state.previous.json');
+  normalized=normalizeSavedMonth(previous);
+  if(!normalized)throw Error(key+' 的工作状态及备用版本无效'+(error?'：'+error.message:''));
+  return {normalized:{...normalized,saved:false},recovered:true};
+}
+async function p109ReadProject(handle,project){
+  if(project.projectId!=='P109-AttendScope')throw Error('所选目录不是有效的考勤项目');
+  if(Number(project.schemaVersion)>P109_DATA_SCHEMA)throw Error('这个项目来自更新的数据版本，请先升级软件');
+  const active=project.current||{year:YEAR,month:MONTH};
+  if(!Number.isInteger(active.year)||active.year<2000||active.year>2100||
+    !Number.isInteger(active.month)||active.month<1||active.month>12)throw Error('项目当前年月无效');
+  const conf=await p109OptionalDirectory(handle,'config');
+  const rules={...((conf?await readJSON(conf,'work_rules.json'):null)||P109_DEFAULT_RULES)};
+  const people=(conf?await readJSON(conf,'employees.json'):null)?.employees||[];
+  if(!Array.isArray(people))throw Error('项目人员配置无效');
+  const profile=conf?await readJSON(conf,'project-profile.json'):null;
+  if(profile&&profile.schemaVersion!==1)throw Error('项目默认配置版本不兼容');
+  const calendar={},months=new Map(),keys=new Set(project.months||[]),recovered=[];
+  const data=await p109OptionalDirectory(handle,'data');
+  if(data)for(const year of await p109Entries(data)){
+    if(year.kind!=='directory'||!/^20\d{2}$/.test(year.name))continue;
+    const y=await existingDir(data,year.name);
+    for(const m of await p109Entries(y))if(m.kind==='directory'&&/^(0[1-9]|1[0-2])$/.test(m.name))keys.add(year.name+'-'+m.name);
+  }
+  const caldir=conf?await p109OptionalDirectory(conf,'calendar'):null;
+  for(const year of new Set([active.year,...[...keys].map(k=>Number(String(k).slice(0,4)))])){
+    const cal=caldir?await readJSON(caldir,String(year)+'.json'):null;
+    if(cal?.overrides)Object.assign(calendar,cal.overrides);
+  }
+  for(const key of keys){
+    if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(key))throw Error('项目月份索引无效：'+key);
+    if(!data)continue;
+    const [y,m]=key.split('-'),year=await p109OptionalDirectory(data,y);
+    const month=year?await p109OptionalDirectory(year,m):null;
+    const folder=month?await p109OptionalDirectory(month,'working'):null;
+    if(!folder)continue;
+    const result=await p109ReadWorking(folder,key),stored=result.normalized;
+    const raw=await readJSON(folder,result.recovered?'state.previous.json':'state.json');
+    if(raw.year!=null&&(Number(raw.year)!==Number(y)||Number(raw.month)!==Number(m)))throw Error(key+' 工作状态年月与目录不一致');
+    if(!stored.employees)stored.employees=structuredClone(people);
+    if(!stored.rules)stored.rules={...rules};
+    if(stored.calendarOverrides==null)stored.calendarOverrides={...calendar};
+    months.set(key,stored);if(result.recovered)recovered.push(key);
+  }
+  let current=active.year+'-'+pad(active.month);
+  if(!months.has(current)){
+    const seed={schemaVersion:P109_DATA_SCHEMA,year:active.year,month:active.month,
+      employees:people,records:[],leaves:[],trips:[],groups:Object.fromEntries(people.map(e=>[e.id,e.group||'未分组'])),
+      calendarOverrides:calendar,rules,isDemo:!!project.notes?.includes('演示')};
+    months.set(current,{...normalizeSavedMonth(seed),saved:false});
+  }
+  const branch=project.activeBranch;
+  if(branch){
+    if(!/^[A-Za-z0-9-]+$/.test(branch.id)||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(branch.month))throw Error('独立修订引用无效');
+    const [y,m]=branch.month.split('-'),year=await existingDir(data,y),month=await existingDir(year,m),
+      branches=await existingDir(month,'branches'),b=await existingDir(branches,branch.id),folder=await existingDir(b,'working');
+    const result=await p109ReadWorking(folder,branch.month+' 修订');
+    months.set(branch.month,{...result.normalized,activeBranch:branch});current=branch.month;
+    if(result.recovered)recovered.push(branch.month+' 修订');
+  }
+  return {months,current,profile,calendar,rules,recovered};
+}
 async function connectProjectDir(){
-  if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return}
+  if(!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return false}
+  if(p109ConnectionBusy||p109ProjectBusy||state.storageBusy||r63ReadingImport||r62ImportDraft){toast('请等待当前文件操作完成并关闭导入预览后再切换项目',true);return false}
+  p109ConnectionBusy=true;
   try{
-    const handle=await showDirectoryPicker({mode:'readwrite'});
-    const project=await readJSON(handle,'project.json');
-    if(project&&project.projectId!=='P109-AttendScope')throw new Error('所选目录不是有效的考勤项目，请更换目录，避免覆盖其他数据');
-    if(!project){
-      p109PendingDirectory=handle;
-      await openProjectControl('initialize');
-      return;
+    const handle=await showDirectoryPicker({mode:'readwrite'}),project=await readJSON(handle,'project.json');
+    if(!project){p109PendingDirectory=handle;await openProjectControl('initialize');return false}
+    const loaded=await p109ReadProject(handle,project);
+    if(!p109ConfirmProjectSwitch())return false;
+    if(r62ImportDraft||r63ReadingImport)throw Error('请先完成或取消当前导入');
+    const before=p109CaptureSession();
+    try{
+      Object.assign(state,{projectDir:handle,monthStores:loaded.months,projectProfile:loaded.profile,
+        calendarOverrides:{},groups:{},fixedPeople:[],nameAliases:{},groupCatalog:[],activeBranch:null,
+        prefs:{fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'},captureItems:[],
+        selectedGroup:null,statsGroup:'',statsPersonId:'',statsConfig:null,statsExpandedKey:'',
+        scopeSearch:'',attentionOnly:false,rawPopout:false,importProfile:null});
+      EMPLOYEES=[];Object.assign(RULES,P109_DEFAULT_RULES);
+      const [y,m]=loaded.current.split('-').map(Number);
+      if(!switchMonth(y,m,false,false,true))throw Error('无法载入当前月份');
+    }catch(e){
+      p109RestoreSession(before);throw e;
     }
-    if(Number(project.schemaVersion)>2)throw new Error('这个项目来自更新的数据版本，请先升级软件');
-    state.projectDir=handle;p109PendingDirectory=null;
-    if(project?.projectId==='P109-AttendScope'){
-      const conf=await existingDir(handle,'config').catch(()=>null);
-      if(conf){
-        const savedRules=await readJSON(conf,'work_rules.json');
-        if(savedRules)for(const k of ['amStart','amEnd','pmStart','pmEnd','grace','graceAmStart','graceAmEnd','gracePmStart','gracePmEnd','dupSeconds','overtimeMinMinutes'])if(savedRules[k]!=null)RULES[k]=savedRules[k];
-        if(savedRules&&savedRules.graceAmStart==null)RULES.graceAmStart=Number(savedRules.grace??5);
-        if(savedRules&&savedRules.gracePmStart==null)RULES.gracePmStart=Number(savedRules.grace??5);
-        const caldir=await existingDir(conf,'calendar').catch(()=>null);
-        const years=new Set([YEAR,...(project.months||[]).map(k=>Number(String(k).slice(0,4))).filter(Number.isInteger)]);
-        for(const yr of years){
-          const cal=caldir?await readJSON(caldir,String(yr)+'.json'):null;
-          if(cal?.overrides)Object.assign(state.calendarOverrides,cal.overrides);
-        }
-      }
-      if(conf){
-        const pinned=await readJSON(conf,'project-profile.json');
-        if(pinned?.schemaVersion===1){
-         state.projectProfile=pinned;
-         state.fixedPeople=[...(pinned.fixedPeople||(pinned.pinRoster?pinned.employees?.map(e=>e.id):[])||[])];
-         state.groupCatalog=[...(pinned.groupCatalog||[])];state.nameAliases={...(pinned.nameAliases||{})};
-        }
-        const people=await readJSON(conf,'employees.json');
-        if(people?.employees?.length){
-          EMPLOYEES=people.employees.map(e=>({id:e.id,name:e.name,department:e.department||'未分类'}));
-          for(const e of people.employees)if(e.id&&e.group)state.groups[e.id]=e.group;
-        }
-      }
-      const monthKeys=new Set([...(project.months||[]),monthKey()]);
-      for(const key of monthKeys){
-        if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(key))continue;
-        const [yr,mo]=key.split('-');
-        try{
-          const data=await existingDir(handle,'data');
-          const year=await existingDir(data,yr),month=await existingDir(year,mo);
-          const work=await existingDir(month,'working');
-          let payload;
-          try{payload=await readJSON(work,'state.json')}catch(e){
-           payload=await readJSON(work,'state.previous.json');
-           if(payload)toast('检测到损坏的工作文件，已使用上一有效版本：'+key,true);
-           else throw e;
-          }
-          const stored=normalizeSavedMonth(payload);
-          if(stored)state.monthStores.set(key,stored);
-        }catch(e){if(e.name!=='NotFoundError')throw e}
-      }
-      const active=project.current||{year:YEAR,month:MONTH};
-      const key=active.year+'-'+pad(active.month);
-      if(state.monthStores.has(key))switchMonth(active.year,active.month,false,false);
-      const branchRef=project.activeBranch;
-      if(branchRef?.id&&/^[A-Za-z0-9-]+$/.test(branchRef.id)&&
-        /^\d{4}-(0[1-9]|1[0-2])$/.test(branchRef.month)){
-       const [by,bm]=branchRef.month.split('-'),data=await existingDir(handle,'data'),
-        y=await existingDir(data,by),m=await existingDir(y,bm),
-        branches=await existingDir(m,'branches'),branch=await existingDir(branches,branchRef.id),
-        branchWork=await existingDir(branch,'working');
-       const branchPayload=normalizeSavedMonth(await readJSON(branchWork,'state.json'));
-       if(!branchPayload)throw new Error('当前独立修订工作区损坏，已拒绝载入以防覆盖主状态');
-       state.monthStores.set(branchRef.month,{...branchPayload,activeBranch:branchRef,saved:true});
-       switchMonth(Number(by),Number(bm),false,false);
-      }
-    }
-    await ensureProjectSkeleton();render();toast('已连接并载入月度工作空间');
-    try{p109Audit=await p109AuditProject(handle);
-      if(p109Audit.issues.some(x=>x.level==='critical'))toast('发现严重数据问题，点击「项目」查看健康检查',true);
-    }catch(error){console.warn('健康检查尚未完成',error?.message||error)}
-
-  }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true)}
+    p109PendingDirectory=null;p109Audit=null;
+    Object.assign(asNavHistory,{back:[],forward:[],current:null,restoring:false});
+    Object.assign(r68UI,{chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',
+      latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
+    r68UI.projectSerial++;r68UI.treeSerial++;render();
+    toast(loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目');
+    return true;
+  }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true);return false}
+  finally{p109ConnectionBusy=false}
 }
 async function persistImportedFile(file,type,count,importId){
   const bytes=await file.arrayBuffer();
@@ -190,8 +254,8 @@ async function persistImportedFile(file,type,count,importId){
 }
 function projectPayload(){
   rememberMonth();
-  return {schemaVersion:2,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:'0.2.0-preview',
-    analysisEngineVersion:'R68',current:{year:YEAR,month:MONTH},
+  return {schemaVersion:P109_DATA_SCHEMA,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:P109_APP_VERSION,
+    analysisEngineVersion:P109_ENGINE_VERSION,current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),activeBranch:state.activeBranch||null,updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
@@ -202,9 +266,12 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
-    analysisEngineVersion:'R68',branch:state.activeBranch||null};
+    appVersion:P109_APP_VERSION,analysisEngineVersion:P109_ENGINE_VERSION,snapshotContext:!!state.snapshotContext,branch:state.activeBranch||null};
 }
-async function saveWorking(){
+async function saveWorking(options={}){
+  if(state.storageBusy||state.importCommitting||p109ConnectionBusy||(p109ProjectBusy&&!options.initializing)){toast('正在处理项目文件，请稍后保存',true);return false}
+  state.storageBusy=true;
+  try{
   const payload=JSON.stringify(workingPayload(),null,2);
   if(state.projectDir){
     try{
@@ -216,22 +283,28 @@ async function saveWorking(){
        w=await dir(branch,'working');
       }else w=await dir(m,'working');
       // Keep a verified last-good copy before replacing the working state.
-      const old=await readJSON(w,'state.json');
-      if(old?.records)await writeFile(w,'state.previous.json',JSON.stringify(old,null,2));
+      let old;try{old=await readJSON(w,'state.json')}catch(e){if(e.name!=='SyntaxError')throw e}
+      if(normalizeSavedMonth(old))await writeFile(w,'state.previous.json',JSON.stringify(old,null,2));
       await writeFile(w,'state.json',payload);
       const verified=await readJSON(w,'state.json');
       if(!verified||JSON.stringify(verified)!==JSON.stringify(JSON.parse(payload)))
        throw new Error('写入校验失败，保留上一有效版本');
       // Working is authoritative; config files are optional legacy defaults.
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
-      state.saved=true;rememberMonth();
-      render();toast('已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'));return;
-    }catch(e){toast('目录保存失败：'+e.message,true);return}
+      const current=workingPayload(),written=JSON.parse(payload);delete current.savedAt;delete written.savedAt;
+      state.saved=JSON.stringify(current)===JSON.stringify(written);rememberMonth();
+      render();toast(state.saved?'已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'):'已保存，操作期间的新修改仍需再次保存');return true;
+    }catch(e){toast('目录保存失败：'+e.message,true);return false}
   }
   downloadBlob(new Blob([payload],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_working.json');
   state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
+  return true;
+  }finally{state.storageBusy=false}
 }
 async function restoreWorkingFile(file){
+ if(state.storageBusy||state.importCommitting||p109ConnectionBusy||p109ProjectBusy)throw Error('请等待当前项目文件操作完成');
+ state.storageBusy=true;
+ try{
  let source;try{source=JSON.parse(await file.text())}catch(e){throw new Error('无法解析 JSON，文件可能不完整')}
  const working=source?.working||source;
  const yr=Number(working?.year),mo=Number(working?.month);
@@ -239,19 +312,44 @@ async function restoreWorkingFile(file){
   throw new Error('工作文件缺少有效年月');
  const normalized=normalizeSavedMonth(working);
  if(!normalized)throw new Error('文件不是有效的考勤工作状态或冻结快照');
- if(!window.confirm('将导入 '+yr+' 年 '+mo+' 月工作状态（包括人工修订）。同月未保存的内容将被替换。是否继续？'))return;
+ const frozen=!!source?.working;
+ if(frozen&&(Number(source.manifest?.year)!==yr||Number(source.manifest?.month)!==mo||
+   Number(source.manifest?.schemaVersion)>P109_DATA_SCHEMA))throw Error('冻结元数据与工作状态不一致或版本不兼容');
+ if(frozen){normalized.snapshotContext=true;
+   if(normalized.calendarOverrides==null)normalized.calendarOverrides={...(source.config?.calendarOverrides||{})};
+   if(!normalized.rules)normalized.rules={...(source.config?.rules||P109_DEFAULT_RULES)};
+ }
+ const isolated=!!state.projectDir&&(frozen||!!working.branch);
+ if(!window.confirm('将导入 '+yr+' 年 '+mo+' 月'+(isolated?'到独立修订副本，保留主 working 和已有冻结。':'工作状态（包括人工修订），同月未保存内容将被替换。')+'是否继续？'))return false;
  rememberMonth();
  const key=yr+'-'+pad(mo),before=state.monthStores.get(key);
- state.monthStores.set(key,{...normalized,saved:false});
+ let branch=null;
+ if(isolated){
+   const id='B'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+   branch={id,month:key,parentSnapshotId:source.manifest?.snapshotId||working.branch?.parentSnapshotId||null};
+   const month=await monthDirectory(yr,mo),branches=await dir(month,'branches');
+   if(await p109Child(branches,id))throw Error('修订标识重复，请重试');
+   const folder=await dir(branches,id),work=await dir(folder,'working');
+   await writeFile(folder,'branch.json',JSON.stringify({schemaVersion:1,...branch,createdAt:new Date().toISOString(),appVersion:P109_APP_VERSION},null,2));
+   await writeFile(work,'state.json',JSON.stringify({...working,snapshotContext:frozen,context:'branch',branch},null,2));
+ }
+ const current={values:{...state},employees:EMPLOYEES,year:YEAR,month:MONTH,rules:{...RULES}};
+ state.monthStores.set(key,{...normalized,activeBranch:branch,saved:false});
  try{
-  if(!switchMonth(yr,mo,false,false))throw new Error('无法打开导入月份');
+  if(!switchMonth(yr,mo,false,false,true))throw new Error('无法打开导入月份');
   state.saved=false;rememberMonth();render();toast('工作状态已恢复，建议检查后保存');
- }catch(e){if(before)state.monthStores.set(key,before);else state.monthStores.delete(key);throw e}
+  return true;
+ }catch(e){Object.assign(state,current.values);EMPLOYEES=current.employees;YEAR=current.year;MONTH=current.month;Object.assign(RULES,current.rules);
+  if(before)state.monthStores.set(key,before);else state.monthStores.delete(key);render();throw e}
+ }finally{state.storageBusy=false}
 }
 async function freezeSnapshot(){
+  if(state.storageBusy||state.importCommitting||p109ConnectionBusy||p109ProjectBusy){toast('正在处理项目文件，请稍后冻结',true);return false}
+  state.storageBusy=true;
+  try{
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
-    appVersion:'0.2.0-preview',sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
-  const snapshot={manifest:{...manifest,analysisEngineVersion:'R68',workingSchema:2},config:{
+    appVersion:P109_APP_VERSION,sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
+  const snapshot={manifest:{...manifest,analysisEngineVersion:P109_ENGINE_VERSION,workingSchema:P109_DATA_SCHEMA},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
  },working:workingPayload()};
   const txt=JSON.stringify(snapshot,null,2);
@@ -262,11 +360,15 @@ async function freezeSnapshot(){
       const already=await existingDir(snapshots,id).then(()=>true,e=>e.name==='NotFoundError'?false:Promise.reject(e));
       if(already)throw new Error('快照编号已存在，拒绝覆盖');
       const folder=await dir(snapshots,id);
-      await writeFile(folder,'snapshot.json',txt);toast('已冻结 '+monthKey()+' · '+id);return;
-    }catch(e){toast('冻结失败：'+e.message,true);return}
+      await writeFile(folder,'snapshot.json',txt);
+      if(JSON.stringify(await readJSON(folder,'snapshot.json'))!==JSON.stringify(snapshot))throw Error('冻结写入校验失败');
+      toast('已冻结 '+monthKey()+' · '+id);return true;
+    }catch(e){toast('冻结失败：'+e.message,true);return false}
   }
   downloadBlob(new Blob([txt],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_'+id+'.json');
   toast('已下载不可变冻结快照 '+id);
+  return true;
+  }finally{state.storageBusy=false}
 }
 function toast(msg,error=false){
   document.querySelector('.toast')?.remove();const el=document.createElement('div');

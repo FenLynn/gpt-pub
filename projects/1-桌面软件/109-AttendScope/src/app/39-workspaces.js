@@ -66,9 +66,8 @@ function personMonthStripHtml(){
  }).join('');
  const switcher=inDayDetail?('<div class="person-day-nav" aria-label="日期切换">'+
   '<button id="personalDayPrev" type="button" aria-label="上一天" '+(selected<=1?'disabled':'')+'>‹</button>'+
-  '<select id="timelineDayPicker" aria-label="时间轴日期">'+
-   Array.from({length:monthDays()},(_,i)=>'<option value="'+(i+1)+'" '+(selected===i+1?'selected':'')+'>'+pad(i+1)+' 日</option>').join('')+
-  '</select><button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>') : '';
+  '<span class="person-current-day" aria-live="polite">'+pad(selected)+' 日</span>'+
+  '<button id="personalDayNext" type="button" aria-label="下一天" '+(selected>=monthDays()?'disabled':'')+'>›</button></div>') : '';
  return '<div class="person-strip" aria-label="个人整月考勤">'+
   '<div class="person-days" style="--r40-days:'+monthDays()+'">'+days+'</div>'+switcher+'</div>';
 }
@@ -76,12 +75,7 @@ function workspaceSidebarHtml(){
  const mode=state.workspaceMode||'all',groups=workspaceGroups();
  if(mode==='stats')return '<div class="side-controls stats-side-controls" id="statsSidebarControls">'+
   statisticsSidebarControlsHtml()+
-  '</div><div class="side-bottom"><section class="side-calendar calendar-section">'+
-  '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
-  '<div id="calendar" class="calendar-grid"></div>'+
-  '<div class="calendar-key"><span><i class="work"></i>工作日</span>'+
-  '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
-  '<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div></div>';
+  '</div><div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>';
  const group=mode==='group'?state.selectedGroup:mode==='person'?groupOf(EMPLOYEES.find(e=>e.id===state.selection.employeeId)||EMPLOYEES[0]):'';
  const candidates=mode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):
    mode==='person'?EMPLOYEES.filter(e=>groupOf(e)===group):EMPLOYEES;
@@ -104,10 +98,10 @@ function workspaceSidebarHtml(){
    '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
   '</div>':'';
  return '<div class="side-controls">'+groupControl+personControl+sub+'</div>'+
-   '<div class="side-bottom"><section class="side-calendar calendar-section">'+
-  '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>'+
+   '<div class="side-bottom">'+(mode==='data'&&(state.dataSection||'records')!=='records'?'':'<section class="side-calendar calendar-section">'+
+  '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">'+(mode==='person'?'返回全览':'清除选择')+'</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
-  '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>'+
+  '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>')+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
    '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
 }
@@ -163,7 +157,8 @@ function bindWorkspaceNavigation(){
   state.dataSection=b.dataset.dataSection;
   asNavTrack();asNavUpdateButtons();
   document.querySelectorAll('.side-controls [data-data-section]').forEach(x=>x.classList.toggle('active',x.dataset.dataSection===state.dataSection));
-  renderDataWorkspace();
+  if(state.dataSection!=='records')state.selection={type:'overall'};
+  render();
  });
 }
 function returnPersonalOverview(){
@@ -282,59 +277,4 @@ function mountScopeAnalytics(people,work){
      itemStyle:{color:asSoftBarGradient(true),opacity:.9,borderRadius:[0,6,6,0]},
      showBackground:true,backgroundStyle:{color:'rgba(107,149,130,.06)'}}]});
  }
-}
-function dataPanelHtml(section){
- if(section==='roster'){
-  return '<div class="data-note">以姓名作为唯一身份；不同闸机记录按姓名归并，组别仍可编辑。</div>'+
-  '<div class="data-roster-table"><div class="data-roster-head"><span>姓名</span><span>部门</span><span>组别</span><span>操作</span></div>'+
-  EMPLOYEES.map(e=>'<div class="data-roster-row"><strong>'+escapeNameChar(e.name)+'</strong>'+
-   '<span>'+escapeNameChar(e.department)+'</span><span>'+escapeNameChar(groupOf(e))+'</span>'+
-   '<button data-edit-roster-group="'+escapeNameChar(e.id)+'">修改组别</button></div>').join('')+'</div>';
- }
- if(section==='rules'){
-  return '<div class="data-note">以下为当前月份使用的规则；修改时将重新计算系统判定，不修改原始打卡。</div>'+
-    '<div class="data-rules-grid">'+[
-      ['上午时段',RULES.amStart+'–'+RULES.amEnd],
-      ['下午时段',RULES.pmStart+'–'+RULES.pmEnd],
-      ['上午上班冗余',RULES.graceAmStart+' 分钟'],
-      ['上午下班冗余',RULES.graceAmEnd+' 分钟'],
-      ['下午上班冗余',RULES.gracePmStart+' 分钟'],
-      ['下午下班冗余',RULES.gracePmEnd+' 分钟'],
-      ['重复打卡',RULES.dupSeconds+' 秒'],
-      ['日历调整',Object.keys(state.calendarOverrides||{}).filter(k=>k.startsWith(monthKey()+'-')).length+' 天'],
-      ['人工判定',Object.keys(state.manualStatuses||{}).length+' 个']
-    ].map(([label,value])=>'<div><span>'+label+'</span><strong>'+escapeNameChar(value)+'</strong></div>').join('')+
-    '</div><button class="data-rule-edit" id="dataEditRules">在设置中修改班次与规则</button>';
- }
- if(section==='imports'){
-  const imports=state.imports||[];
-  return '<div class="data-note">原始导入文件与本月工作状态分开保存。冻结快照用于保留当时的完整工作副本。</div>'+
-   '<div class="data-import-history"><div class="scope-subheading">本月导入记录 <small>'+imports.length+' 份</small></div>'+
-   (imports.length?imports.map(x=>'<div class="data-import-item"><strong>'+escapeNameChar(x.name||'未命名')+'</strong>'+
-    '<span>'+escapeNameChar(x.type||'')+' · '+Number(x.count||0)+' 条</span><small>'+escapeNameChar(x.importedAt||'')+'</small></div>').join('')
-    :'<p>当前月份尚无真实文件导入。演示数据不作为真实导入记录。</p>')+'</div>';
- }
- return '<section class="inspector-bottom" id="rawPane"><div class="raw-toolbar"><strong>原始记录</strong><div class="raw-tabs">'+
-   [['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,name])=>'<button data-raw-tab="'+id+'">'+name+'</button>').join('')+
-  '</div><span class="raw-count" id="rawRowCount"></span><button class="raw-float-btn" id="rawFloat" title="弹出原始表格">⛶</button></div>'+
-  '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section>';
-}
-function dataWorkspaceHtml(){
- const section=state.dataSection||'records';
- return '<div class="data-management"><div class="data-stat-inline">'+
-  '<span>人员 <strong>'+EMPLOYEES.length+'</strong></span><span>打卡 <strong>'+state.records.length.toLocaleString()+'</strong></span>'+
-  '<span>请假 <strong>'+state.leaves.length+'</strong></span><span>出差 <strong>'+state.trips.length+'</strong></span>'+
-  '<span class="data-dir-state">'+(state.selection.type==='date'?'仅显示 '+isoDate(state.selection.day)+' · ':'')+(state.projectDir?'已连接本地目录':'本地目录未连接')+'</span></div>'+
-  '<div class="data-section-panel">'+dataPanelHtml(section)+'</div></div>';
-}
-function renderDataWorkspace(){
- const body=document.getElementById('analysisBody');if(!body)return;
- const heading=document.getElementById('analysisTitle');if(heading)heading.textContent='数据管理 · '+monthKey();
- const tools=document.getElementById('analysisHeadTools');if(tools)tools.textContent='';
- if(typeof disposeRawTable==='function')disposeRawTable();
- body.innerHTML=dataWorkspaceHtml();
- body.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
- body.querySelectorAll('[data-edit-roster-group]').forEach(b=>b.onclick=()=>setPersonGroup(b.dataset.editRosterGroup));
- const edit=body.querySelector('#dataEditRules');if(edit)edit.onclick=()=>document.getElementById('settingsBtn').click();
- if((state.dataSection||'records')==='records')mountRawTable(state.selection.type==='date'?{type:'date',day:state.selection.day,items:[]}: {type:'overall',items:workAnalyses()});
 }

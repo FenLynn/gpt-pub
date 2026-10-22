@@ -282,7 +282,7 @@ async function r63TogglePdfPicker(event){
     '<img src="'+x.thumb+'" alt=""><span title="'+escapeNameChar(x.filename)+'">'+escapeNameChar(x.filename)+'</span></label>').join('')+'</div>':
    '<p class="r63-pdf-status">暂无截图。先点击旁边的「截图」保存需要的视图。</p>')+
   '<footer><span id="r63PdfCount">'+captures.length+' 张已选</span><button type="button" id="r63PdfExport" '+(captures.length?'':'disabled')+'>导出 PDF</button></footer>';
- picker.querySelector('#r63PdfClose').onclick=()=>{picker.hidden=true;button.setAttribute('aria-expanded','false')};
+ picker.querySelector('#r63PdfClose').onclick=()=>{picker.hidden=true;button.setAttribute('aria-expanded','false');document.getElementById('exportMenuButton')?.focus()};
  const sync=()=>{const n=picker.querySelectorAll('input[data-capture-index]:checked').length;
   picker.querySelector('#r63PdfCount').textContent=n+' 张已选';
   picker.querySelector('#r63PdfExport').disabled=!n};

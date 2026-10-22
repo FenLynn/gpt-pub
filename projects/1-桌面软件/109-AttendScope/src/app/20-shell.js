@@ -102,9 +102,9 @@ function layoutHtml(){
         </div>
       </div>
     <div class="month-actions">
-      <span class="save-state ${state.saved?'saved':'dirty'}"><b aria-hidden="true">${state.saved?'✓':'!'}</b>${state.saved?'已保存':'未保存'}</span>
+      <span class="save-state ${state.saved?'saved':'dirty'}" title="${state.projectDir?'项目目录中的工作状态':'未连接项目目录；请初始化项目或下载 JSON 保存'}"><b aria-hidden="true">${state.saved?'✓':'!'}</b>${state.projectDir?(state.saved?'已保存':'未保存'):state.isDemo?'演示数据':'仅内存'}</span>
       <div class="import-anchor">
-        <button class="text-btn" id="importBtn">导入</button>
+        <button class="text-btn" id="importBtn" aria-expanded="false" aria-controls="importPopover">导入</button>
         <div class="import-popover" id="importPopover">
           ${importMenuRow('考勤记录','attendanceInput','sampleAttendance')}
           ${importMenuRow('请假','leaveInput','sampleLeave')}
@@ -112,20 +112,42 @@ function layoutHtml(){
           ${importMenuRow('外出','outingInput','sampleOuting')}
           ${importMenuRow('登记加班','overtimeInput','sampleOvertime')}
           <div class="import-divider"></div>
-          <button class="import-reset" id="resetDemo">恢复模拟数据</button>
+          <button class="import-reset" id="resetDemo" ${state.projectDir?'disabled':''}>恢复演示数据</button>
         </div>
       </div>
-      <button class="text-btn" id="connectDir">目录</button>
-      <button class="text-btn" id="p109ProjectControl">${state.projectDir?"项目":"初始化"}</button>
+      <div class="system-menu-anchor">
+        <button class="text-btn" id="projectMenuButton" data-system-menu="projectMenu" aria-expanded="false" aria-controls="projectMenu" aria-haspopup="menu">项目</button>
+        <div class="system-menu" id="projectMenu" role="menu" aria-label="项目操作" hidden>
+          <button id="connectDir" role="menuitem">连接 / 切换项目目录</button>
+          <button id="initializeProject" role="menuitem">新建空白项目</button>
+          <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
+          <div class="system-menu-divider"></div>
+          <button id="restoreBtn" role="menuitem">恢复月度工作 / 冻结 JSON</button>
+          <button id="restoreZipBtn" role="menuitem">恢复整个项目 ZIP</button>
+          <button id="backupProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>完整项目备份 ZIP</button>
+          <button id="upgradeProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>安全更新程序 ZIP</button>
+        </div>
+      </div>
       <button class="text-btn" id="saveBtn">保存</button>
-      <button class="text-btn" id="restoreBtn">恢复</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
       <button class="primary-btn" id="freezeBtn">冻结</button>
     </div>
     <div class="top-actions">
-      <button class="text-btn" id="exportTable">导出表格</button><button class="text-btn" id="exportCsv">CSV</button>
-      <button class="text-btn" id="captureView">截图</button>
-      <div class="r63-pdf-anchor"><button class="text-btn" id="printReport" aria-expanded="false" aria-controls="r63PdfPicker">PDF ▾</button><div id="r63PdfPicker" class="r63-pdf-picker" hidden></div></div>
+      <div class="system-menu-anchor">
+        <button class="text-btn" id="exportMenuButton" data-system-menu="exportMenu" aria-expanded="false" aria-controls="exportMenu" aria-haspopup="menu">导出</button>
+        <div class="system-menu" id="exportMenu" role="menu" aria-label="导出操作" hidden>
+          <button id="exportTable" role="menuitem">${state.workspaceMode==='stats'?'当前统计 XLSX':'全月考勤明细 XLSX'}</button>
+          <button id="exportCsv" role="menuitem">${state.workspaceMode==='stats'?'当前统计 CSV':'全月考勤明细 CSV'}</button>
+          ${state.workspaceMode==='stats'?'<button id="exportMonthlyTable" role="menuitem">全月考勤明细 XLSX</button>':''}
+          <div class="system-menu-divider"></div>
+          <button id="captureView" role="menuitem">当前视图截图 PNG</button>
+          <button id="printReport" role="menuitem" aria-expanded="false" aria-controls="r63PdfPicker">选择截图合成 PDF…</button>
+          <div class="system-menu-divider"></div>
+          <span class="system-menu-caption">导出当前原始数据</span>
+          ${[['attendance','考勤'],['leave','请假'],['trip','出差'],['outing','外出'],['overtime','登记加班']].map(([kind,label])=>'<button role="menuitem" data-export-source="'+kind+'">'+label+' XLSX</button>').join('')}
+        </div>
+        <div id="r63PdfPicker" class="r63-pdf-picker" role="dialog" aria-label="截图 PDF" hidden></div>
+      </div>
       <span class="action-divider"></span>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
@@ -217,7 +239,7 @@ function layoutHtml(){
 }
 
 function importMenuRow(title,input,sample){
-  return `<div class="import-menu-row"><span>${title}</span><div><button data-open="${input}">导入</button><button id="${sample}">样例</button></div></div>`;
+  return `<div class="import-menu-row"><span>${title}</span><div><button type="button" data-open="${input}">导入</button><button type="button" id="${sample}">空白模板</button></div></div>`;
 }
 
 function bind(){
@@ -263,19 +285,17 @@ function bind(){
   document.getElementById('asNavBack').onclick=()=>asNavGo('back');
   document.getElementById('asNavForward').onclick=()=>asNavGo('forward');
 
-  document.getElementById('clearSelection').onclick=()=>{
-    if(state.workspaceMode==='person'){
-      const employeeId=state.selection.employeeId||EMPLOYEES[0]?.id;
-      state.selection=employeeId?{type:'person',employeeId}:{type:'overall'};
-    }else state.selection={type:'overall'};
-    if(state.workspaceMode==='classic')state.chartTab='overview';
+  document.getElementById('clearSelection')?.addEventListener('click',()=>{
+    if(state.workspaceMode==='person'){returnPersonalOverview();return}
+    state.selection={type:'overall'};state.chartDay=null;state.chartTab='overview';state.timelineRange=null;
     render();
-  };
+  });
   const importBtn=document.getElementById('importBtn'),popover=document.getElementById('importPopover');
   const monthButton=document.getElementById('monthMenuButton'),monthPopover=document.getElementById('monthPopover');
-  importBtn.onclick=e=>{e.stopPropagation();monthPopover.classList.remove('open');popover.classList.toggle('open')};
+  importBtn.onclick=e=>{e.stopPropagation();p109CloseSystemMenus();monthPopover.classList.remove('open');popover.classList.toggle('open');importBtn.setAttribute('aria-expanded',String(popover.classList.contains('open')))};
   monthButton.onclick=e=>{
     e.stopPropagation();
+    p109CloseSystemMenus();
     popover.classList.remove('open');
     monthPopover.classList.toggle('open');
     monthButton.setAttribute('aria-expanded',String(monthPopover.classList.contains('open')));
@@ -296,6 +316,7 @@ function bind(){
   document.getElementById('yearNext').onclick=()=>{browseYear++;bindMonthChoices()};
   bindMonthChoices();
   document.getElementById('app').onclick=e=>{
+    if(!e.target.closest('.system-menu-anchor'))p109CloseSystemMenus();
     if(!e.target.closest('.import-anchor'))popover.classList.remove('open');
     if(!e.target.closest('.month-anchor')){
       monthPopover.classList.remove('open');
@@ -308,23 +329,28 @@ function bind(){
   };
 
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>document.getElementById(b.dataset.open).click());
-  document.getElementById('sampleAttendance').onclick=downloadAttendance;
-  document.getElementById('sampleLeave').onclick=downloadLeaves;
-  document.getElementById('sampleTrip').onclick=downloadTrips;
-  document.getElementById('sampleOuting').onclick=downloadOutings;
-  document.getElementById('sampleOvertime').onclick=downloadOvertimeEntries;
+  for(const [id,kind] of [['sampleAttendance','attendance'],['sampleLeave','leave'],['sampleTrip','trip'],['sampleOuting','outing'],['sampleOvertime','overtime']])
+    document.getElementById(id).onclick=()=>downloadBlankTemplate(kind);
   document.getElementById('resetDemo').onclick=()=>{
+    if(state.projectDir||!window.confirm('恢复演示数据会替换当前内存工作空间。确定继续？'))return;
     if(YEAR!==2026||MONTH!==10){toast('演示数据仅用于 2026 年 10 月',true);return}
     Object.assign(state,generateMock()); state.selection={type:'overall'}; state.filter='main'; state.chartTab='overview';
     state.revisions=[];state.manualStatuses={};state.overtimeReview={};state.judgmentMode='initial'; state.saved=false; reanalyze(); render(); toast('已恢复模拟数据');
   };
 
   document.getElementById('connectDir').onclick=connectProjectDir;
+  document.getElementById('initializeProject').onclick=()=>p109InitializeProject();
   document.getElementById('p109ProjectControl').onclick=()=>openProjectControl();
-  document.getElementById('exportTable').onclick=exportTraditionalTable;
+  document.getElementById('restoreZipBtn').onclick=()=>p109RestoreArchive();
+  document.getElementById('backupProjectBtn').onclick=()=>p109BackupProject();
+  document.getElementById('upgradeProjectBtn').onclick=()=>p109UpgradePick();
+  document.getElementById('exportTable').onclick=exportCurrentTable;
+  document.getElementById('exportMonthlyTable')?.addEventListener('click',exportTraditionalTable);
+  const sources={attendance:downloadAttendance,leave:downloadLeaves,trip:downloadTrips,outing:downloadOutings,overtime:downloadOvertimeEntries};
+  document.querySelectorAll('[data-export-source]').forEach(b=>b.onclick=()=>sources[b.dataset.exportSource]());
   document.getElementById('exportCsv').onclick=downloadCurrentCSV;
   document.getElementById('captureView').onclick=captureCurrentView;
-  document.getElementById('printReport').onclick=r63TogglePdfPicker;
+  document.getElementById('printReport').onclick=e=>{p109CloseSystemMenus();r63TogglePdfPicker(e)};
   document.getElementById('saveBtn').onclick=saveWorking;
   document.getElementById('restoreBtn').onclick=()=>document.getElementById('restoreInput').click();
   document.getElementById('restoreInput').onchange=async e=>{
@@ -333,7 +359,39 @@ function bind(){
    finally{e.target.value=''}
   };
   document.getElementById('freezeBtn').onclick=freezeSnapshot;
+  bindSystemMenus();
   bindGlobalUiShortcuts();
+}
+
+function p109CloseSystemMenus(restoreFocus=false){
+ document.querySelectorAll('[data-system-menu]').forEach(button=>{
+  const menu=document.getElementById(button.dataset.systemMenu);
+  if(menu&&!menu.hidden){menu.hidden=true;if(restoreFocus)button.focus()}
+  button.setAttribute('aria-expanded','false');
+ });
+}
+function bindSystemMenus(){
+ for(const button of document.querySelectorAll('[data-system-menu]')){
+  const menu=document.getElementById(button.dataset.systemMenu);
+  const items=()=>[...menu.querySelectorAll('button:not(:disabled)')];
+  button.onclick=e=>{
+   e.stopPropagation();const open=menu.hidden;p109CloseSystemMenus();
+   document.getElementById('importPopover')?.classList.remove('open');
+   document.getElementById('monthPopover')?.classList.remove('open');
+   menu.hidden=!open;button.setAttribute('aria-expanded',String(open));
+  };
+  button.onkeydown=e=>{if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();if(menu.hidden)button.click();(e.key==='ArrowUp'?items().at(-1):items()[0])?.focus()}};
+  menu.onkeydown=e=>{
+   const buttons=items(),index=buttons.indexOf(document.activeElement);
+   if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){
+    e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:
+     (index+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length;
+    buttons[next]?.focus();
+   }
+   if(e.key==='Tab')setTimeout(()=>{if(!menu.contains(document.activeElement))p109CloseSystemMenus()},0);
+  };
+  menu.addEventListener('click',e=>{if(e.target.closest('button'))p109CloseSystemMenus()});
+ }
 }
 
 function bindGlobalUiShortcuts(){
@@ -346,7 +404,8 @@ function bindGlobalUiShortcuts(){
   const importer=document.querySelector('.r62-overlay');
   if(importer){e.preventDefault();importer.querySelector('#r62Close')?.click();return}
   const pdf=document.getElementById('r63PdfPicker');
-  if(pdf&&!pdf.hidden){e.preventDefault();pdf.hidden=true;document.getElementById('printReport')?.setAttribute('aria-expanded','false');return}
+  if(pdf&&!pdf.hidden){e.preventDefault();pdf.hidden=true;document.getElementById('printReport')?.setAttribute('aria-expanded','false');document.getElementById('exportMenuButton')?.focus();return}
+  if(document.querySelector('.system-menu:not([hidden])')){e.preventDefault();p109CloseSystemMenus(true);return}
   const settings=document.querySelector('.settings-overlay:not(.hidden)');
   if(settings){e.preventDefault();document.getElementById('settingsClose')?.click();document.getElementById('settingsBtn')?.focus();return}
   const raw=document.querySelector('.raw-dialog-overlay');
@@ -360,20 +419,25 @@ function bindGlobalUiShortcuts(){
   const monthMenu=document.getElementById('monthPopover');
   const statusMenu=document.getElementById('statusFilterMenu');
   if(importMenu?.classList.contains('open')||monthMenu?.classList.contains('open')||statusMenu?.classList.contains('open')){
+   const trigger=importMenu?.classList.contains('open')?'importBtn':monthMenu?.classList.contains('open')?'monthMenuButton':'statusFilterButton';
    e.preventDefault();importMenu?.classList.remove('open');monthMenu?.classList.remove('open');statusMenu?.classList.remove('open');
    document.getElementById('monthMenuButton')?.setAttribute('aria-expanded','false');
    document.getElementById('statusFilterButton')?.setAttribute('aria-expanded','false');
+   document.getElementById('importBtn')?.setAttribute('aria-expanded','false');
+   document.getElementById(trigger)?.focus();
   }
  });
 }
 
 async function handleFile(e,fn){
   const file=e.target.files?.[0]; if(!file)return;
+  if(p109ConnectionBusy||state.storageBusy||state.importCommitting||p109ProjectBusy){toast('请等待当前项目文件操作完成',true);e.target.value='';return}
   try{await fn(file)}catch(err){toast(err.message,true)}finally{e.target.value=''}
 }
 
 function renderCalendar(){
   const el=document.getElementById('calendar'),heads=['一','二','三','四','五','六','日'];
+  if(!el)return;
   el.innerHTML=heads.map(x=>`<div class="cal-head">${x}</div>`).join('');
   const first=(new Date(YEAR,MONTH-1,1).getDay()+6)%7;
   for(let i=0;i<first;i++)el.insertAdjacentHTML('beforeend','<div></div>');

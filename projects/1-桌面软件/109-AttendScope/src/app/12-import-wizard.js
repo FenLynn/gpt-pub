@@ -229,7 +229,7 @@ function r62WireImport(){
  const d=r62ImportDraft,modal=document.querySelector('.r62-overlay');if(!modal)return;
  const rerender=()=>r62ShowImport();
  modal.querySelector('#r63DirectionDetails')?.addEventListener('toggle',e=>{d.rulesExpanded=e.target.open});
- const close=()=>{modal.remove();r62ImportDraft=null};
+ const close=()=>{if(state.importCommitting)return;modal.remove();r62ImportDraft=null};
  modal.querySelector('#r62Close').onclick=close;
  modal.querySelector('#r62Cancel').onclick=close;
  modal.querySelector('#r65SaveTemplate').onchange=e=>{d.saveTemplate=e.target.checked};
@@ -262,9 +262,11 @@ function r62WireImport(){
   modal.querySelector('#r62Commit').disabled=result.rows.length===0;
  };
  modal.querySelector('#r62Commit').onclick=async()=>{
+  if(state.importCommitting||state.storageBusy||p109ConnectionBusy||p109ProjectBusy)return;
   const data=d.validated;if(!data?.rows.length)return;
   if(data.failed.length&&!window.confirm('有 '+data.failed.length+' 行无法识别，将跳过这些行。是否继续？'))return;
   const button=modal.querySelector('#r62Commit');button.disabled=true;
+  state.importCommitting=true;
   button.textContent='正在导入…';
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   try{
@@ -280,8 +282,9 @@ function r62WireImport(){
        mapping:{...d.mapping},encoding:d.encoding}};
    }
    state.importProfile=nextProfile;
-   state.saved=false;rememberMonth();close();render();
+   state.saved=false;rememberMonth();state.importCommitting=false;close();render();
   }catch(e){button.disabled=false;button.textContent='确认导入';toast('导入失败：'+e.message,true)}
+  finally{state.importCommitting=false}
  };
 }
 function r62ShowImport(){
