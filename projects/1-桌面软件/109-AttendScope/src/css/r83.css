@@ -1,0 +1,12 @@
+/* R83: save is the persistent primary action; freeze belongs to Project. */
+#saveBtn.r83-save-primary{
+ min-width:66px;min-height:32px;padding:0 16px!important;
+ border:1px solid #1977b7!important;background:#197fc3!important;color:#fff!important;
+ font-size:12.5px;font-weight:760;letter-spacing:.02em;
+ box-shadow:0 2px 7px rgba(25,112,172,.22);transition:background .14s ease,box-shadow .14s ease,transform .14s ease
+}
+#saveBtn.r83-save-primary:hover{background:#116da9!important;box-shadow:0 3px 10px rgba(25,112,172,.28)}
+#saveBtn.r83-save-primary:active{transform:translateY(1px);box-shadow:0 1px 4px rgba(25,112,172,.2)}
+#saveBtn.r83-save-primary.is-saved{background:#3f83ae!important;border-color:#3f83ae!important;box-shadow:0 1px 4px rgba(43,102,140,.14)}
+#projectMenu #freezeBtn{font-weight:680;color:#236b9f}
+@media(max-width:1280px){#saveBtn.r83-save-primary{min-width:58px;padding-inline:12px!important}}

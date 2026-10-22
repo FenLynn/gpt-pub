@@ -241,7 +241,7 @@ module.exports=async function runUiAudit({browser,out,root}){
   // Verify the visible primary actions have names and the main viewport is not clipped.
   const controls=await page.evaluate(()=>{
    const ids=['asNavBack','asNavForward','monthMenuButton','importBtn','projectMenuButton',
-    'saveBtn','freezeBtn','exportMenuButton','settingsBtn'];
+    'saveBtn','exportMenuButton','settingsBtn'];
    return ids.map(id=>{const e=document.getElementById(id);return {id,exists:!!e,
     name:e?([e.getAttribute('aria-label'),e.getAttribute('title'),e.innerText].filter(Boolean).join(' ').trim()):''}});
   });

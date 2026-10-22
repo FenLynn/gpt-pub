@@ -363,7 +363,7 @@ function r68ImportsHtml(){
 function r68FreezeHtml(){
  const month=monthKey(),detail=(r68UI.latestRoot===state.projectDir?r68UI.latestReport:null)?.months?.find(x=>x.key===month);
  const list=detail?.snapshots||[],branches=detail?.branches||[];
- return r68SidebarHeader('冻结与修订','顶部「冻结」创建不可变基准；派生修订不会覆盖主 working。')+
+ return r68SidebarHeader('冻结与修订','「项目 → 冻结当前月」创建不可变基准；派生修订不会覆盖主 working。')+
   '<div class="r68-snapshot-list">'+(list.length?list.map(s=>
   '<div class="r68-snapshot-row"><div><strong>'+r68Esc(s.id)+'</strong><small>'+r68Esc(s.createdAt||'时间未知')+'</small></div>'+
    r68Pill(s.valid?'已冻结':'已损坏',s.valid?'healthy':'critical')+

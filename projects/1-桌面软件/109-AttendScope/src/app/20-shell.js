@@ -121,15 +121,15 @@ function layoutHtml(){
           <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
           <div id="p109RecentList">${typeof p109RecentMenuHtml==='function'?p109RecentMenuHtml():''}</div>
           <div class="system-menu-divider"></div>
+          <button id="freezeBtn" role="menuitem">冻结当前月</button>
           <button id="restoreBtn" role="menuitem">恢复月度工作 / 冻结 JSON</button>
           <button id="restoreZipBtn" role="menuitem">恢复整个项目 ZIP</button>
           <button id="backupProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>完整项目备份 ZIP</button>
           <button id="upgradeProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>安全更新程序 ZIP</button>
         </div>
       </div>
-      <button class="text-btn" id="saveBtn">保存</button>
+      <button class="primary-btn r83-save-primary ${state.saved?'is-saved':'is-dirty'}" id="saveBtn" title="保存当前月">保存</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
-      <button class="primary-btn" id="freezeBtn">冻结</button>
     </div>
     <div class="top-actions">
       <div class="system-menu-anchor">
