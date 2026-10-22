@@ -75,11 +75,17 @@ jobs:
           grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
       - name: Install CJK fonts for accurate visual screenshots
+        timeout-minutes: 5
         shell: bash
         run: |
-          sudo apt-get update -qq
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fonts-noto-cjk
-          fc-list :lang=zh family | head -n 3
+          if test -z "$(fc-list :lang=zh family)"; then
+            if ! timeout 90s sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y -qq fonts-noto-cjk; then
+              timeout 90s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -qq
+              timeout 90s sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y -qq fonts-noto-cjk
+            fi
+          fi
+          test -n "$(fc-list :lang=zh family)"
+          fc-list :lang=zh family | sed -n '1,3p'
       - name: Set up real Chromium browser test
         shell: bash
         run: |
