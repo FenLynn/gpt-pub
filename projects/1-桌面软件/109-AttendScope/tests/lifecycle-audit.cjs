@@ -313,7 +313,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    EMPLOYEES.some(x=>x.name==='测试甲'));
 
   // R67 update only program assets; verify data remains byte-for-byte intact.
-  const releaseZip=path.join(out,'P109-考勤-R68-可更新离线版.zip'),
+  const releaseZip=path.join(out,'P109-考勤-R75-可更新离线版.zip'),
    pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
