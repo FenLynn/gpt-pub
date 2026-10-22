@@ -1,0 +1,31 @@
+/* R77: low-chrome monthly anomaly evidence, no metric cards. */
+:root{--r77-accent:#d98945}
+.workspace-mode-person .r77-anomaly-summary{
+  margin-top:17px;padding:12px 0 0;border-top:1px solid #e0eaf2;
+}
+.workspace-mode-person .r77-anomaly-summary header{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  font-size:13.5px;color:#38576d;font-weight:720;white-space:nowrap
+}
+.workspace-mode-person .r77-anomaly-summary header small{
+  font-size:11.5px;font-weight:480;color:#8b9dac;white-space:normal;text-align:right
+}
+.workspace-mode-person .r77-anomaly-totals{
+  display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:#71899a;padding:12px 0 9px;
+}
+.workspace-mode-person .r77-anomaly-totals b{color:#ba763b;font-weight:750;font-size:13.5px}
+.workspace-mode-person .r77-anomaly-days{display:flex;flex-wrap:wrap;gap:5px;
+ align-items:center;padding-top:3px}
+.workspace-mode-person .r77-anomaly-days button{
+ border:1px solid #ead8c3;border-radius:6px;background:#fdf8f1;
+ color:#966331;padding:4px 7px;font-size:12px;cursor:pointer;
+ transition:background .14s,border-color .14s;
+}
+.workspace-mode-person .r77-anomaly-days button:hover{
+ background:#f9ecd9;border-color:#dcb98d}
+.workspace-mode-person .r77-anomaly-days span{
+ font-size:12.5px;color:#96a7b3;line-height:1.7;
+}
+.workspace-mode-person .r77-anomaly-days button:focus-visible{
+ outline:2px solid rgba(217,137,69,.5);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.workspace-mode-person .r77-anomaly-days button{transition:none}}

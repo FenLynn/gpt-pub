@@ -159,25 +159,27 @@ async function run(){
     buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'&&b.scrollHeight<=b.clientHeight+1);
  },'R44 two-column status picker must fit without scrollbars');
  await page.locator('#statusFilterButton').click();
- // Explicit Personal tab starts on day one; matrix cell drilldowns retain the clicked day.
+ // R77: primary Personal visit and person switches are month overviews, not empty day-one timelines.
  await page.locator('[data-workspace="person"]').click();
+ await page.waitForSelector('#overviewTrendChart',{timeout:15000});
+ await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='overview'&&
+   state.chartDay===null&&state.selection.type==='person'&&
+   !!document.querySelector('.r77-anomaly-summary')&&
+   !document.querySelector('.person-day.selected')&&!document.querySelector('#personOverviewButton'),
+ 'R77 personal navigation must open genuine monthly overview');
+ await page.screenshot({path:path.join(out,'r77-person-month-overview.png')});
+ await page.locator('[data-person-day="1"]').click();
  await page.waitForSelector('#attendanceTimelineChart svg',{timeout:15000});
- await check(page,()=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&
-   state.chartDay===1&&state.selection.day===1&&state.selection.type==='cell'&&
-   !!document.querySelector('.cal-day[data-day="1"].selected')&&
-   !!document.querySelector('.person-day[data-person-day="1"].selected')&&
-   !document.querySelector('.person-strip-label')&&!document.querySelector('.plot-heading')&&
-   !document.querySelector('.workspace-mode-person .inspector-plot')?.textContent.includes('常规每日分布'),
- 'R43 personal navigation must open first-day timeline without redundant titles');
- await page.screenshot({path:path.join(out,'r43-person-first-day.png')});
+ await check(page,()=>state.selection.type==='cell'&&state.chartTab==='timeline'&&state.selection.day===1&&
+  !!document.querySelector('#personOverviewButton'),'R77 month-to-day drilldown failed');
  const r63Timeline=await page.evaluate(async()=>(await captureCurrentImage('timeline')).data);
  fs.writeFileSync(path.join(out,'r63-export-timeline.png'),Buffer.from(r63Timeline.split(',')[1],'base64'));
  const secondPerson=await page.locator('#workspacePerson option').nth(1).getAttribute('value');
  await page.locator('#workspacePerson').selectOption(secondPerson);
- await check(page,(personId)=>state.workspaceMode==='person'&&state.chartTab==='timeline'&&
-    state.chartDay===1&&state.selection.type==='cell'&&state.selection.day===1&&
-    state.selection.employeeId===personId&&!!document.querySelector('#attendanceTimelineChart svg'),
-    secondPerson,'R43 choosing a new person must begin on first-day timeline');
+ await check(page,(personId)=>state.workspaceMode==='person'&&state.chartTab==='overview'&&
+    state.chartDay===null&&state.selection.type==='person'&&
+    state.selection.employeeId===personId&&!!document.querySelector('#overviewTrendChart'),
+    secondPerson,'R77 choosing a new person must open monthly overview');
  await page.locator('[data-workspace="all"]').click();
  await check(page,()=>{
   const wrap=document.querySelector('.matrix-wrap'),grid=document.querySelector('.matrix'),
@@ -1942,7 +1944,7 @@ async function run(){
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R76',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R77',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

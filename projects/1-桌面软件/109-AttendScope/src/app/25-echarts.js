@@ -422,7 +422,7 @@ function mountFilteredOverview(ctx){
     const list=person?[state.analysis.get(person.id+'|'+day)]:EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+day));
     const value=list.filter(a=>state.filter==='main'?true:analysisViewItems({items:[a]}).length>0).length;
     return {day,value};
-  }).filter(x=>isWorkday(x.day)||behaviorFilterActive());
+  }).filter(x=>isWorkday(x.day)||behaviorFilterActive()||state.filter==='lateEarly');
   chart.setOption({
     grid:{left:30,right:12,top:12,bottom:26},
     tooltip:{trigger:'axis',confine:true,formatter:p=>{const d=rows[p[0]?.dataIndex];return d?pad(d.day)+' 日 · '+currentFilterLabel()+' '+d.value+(person?'':' 人'):''}},

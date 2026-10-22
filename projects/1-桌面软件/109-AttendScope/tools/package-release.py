@@ -10,7 +10,7 @@ import pathlib
 import sys
 import zipfile
 
-APP_VERSION = "0.2.2-preview"
+APP_VERSION = "0.2.3-preview"
 PROJECT = "P109-AttendScope"
 
 def build(root: pathlib.Path, destination: pathlib.Path):

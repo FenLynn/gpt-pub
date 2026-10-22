@@ -1,4 +1,4 @@
-/* R76 cross-workspace UI audit. Uses the actual offline app, not DOM mocks. */
+/* R77 cross-workspace UI audit. Uses the actual offline app, not DOM mocks. */
 'use strict';
 const fs=require('fs'),path=require('path');
 const {pathToFileURL}=require('url');
@@ -9,7 +9,7 @@ module.exports=async function runUiAudit({browser,out,root}){
  page.on('pageerror',e=>errors.push(e.stack||e.message));
  page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
  const url=pathToFileURL(path.join(root,'index.html')).href;
- const check=(ok,label,details='')=>{if(!ok)throw Error('R76 UI audit: '+label+(details?' · '+JSON.stringify(details):''))};
+ const check=(ok,label,details='')=>{if(!ok)throw Error('R77 UI audit: '+label+(details?' · '+JSON.stringify(details):''))};
  try{
   await page.goto(url,{waitUntil:'load',timeout:60000});
   await page.waitForSelector('.topbar .workspace-navigation [data-workspace="all"]',{timeout:20000});
@@ -33,7 +33,7 @@ module.exports=async function runUiAudit({browser,out,root}){
    check(g.duplicateIds.length===0,'duplicate DOM IDs on initial workspace',g.duplicateIds);
   }
   await page.setViewportSize({width:1600,height:900});
-  await page.screenshot({path:path.join(out,'r76-ui-overview.png')});
+  await page.screenshot({path:path.join(out,'r77-ui-overview.png')});
 
   // Navigate using the real five primary navigation buttons.
   const views=[
@@ -55,7 +55,7 @@ module.exports=async function runUiAudit({browser,out,root}){
    const duplicates=await page.evaluate(()=>[...document.querySelectorAll('[id]')].map(x=>x.id)
     .filter((id,i,a)=>a.indexOf(id)!==i).filter((v,i,a)=>a.indexOf(v)===i));
    check(!duplicates.length,'duplicate IDs in '+mode,duplicates);
-   await page.screenshot({path:path.join(out,'r76-ui-'+mode+'.png')});
+   await page.screenshot({path:path.join(out,'r77-ui-'+mode+'.png')});
   }
 
   // Every data-management section must render a real page and keep one active section.
@@ -74,9 +74,9 @@ module.exports=async function runUiAudit({browser,out,root}){
    },section);
    check(data.active.length===1&&data.active[0]===section,'data section active state mismatch',data);
    check(data.pane||data.content>10,'data section is blank: '+section,data);
-   if(section==='roster')await page.screenshot({path:path.join(out,'r76-ui-data-roster.png')});
-   if(section==='rules')await page.screenshot({path:path.join(out,'r76-ui-data-rules.png')});
-   if(section==='overview')await page.screenshot({path:path.join(out,'r76-ui-data-overview.png')});
+   if(section==='roster')await page.screenshot({path:path.join(out,'r77-ui-data-roster.png')});
+   if(section==='rules')await page.screenshot({path:path.join(out,'r77-ui-data-rules.png')});
+   if(section==='overview')await page.screenshot({path:path.join(out,'r77-ui-data-overview.png')});
   }
 
   // Settings: every tab renders, cancel is non-destructive, Escape closes and restores focus.
@@ -92,7 +92,7 @@ module.exports=async function runUiAudit({browser,out,root}){
     inputs:document.querySelectorAll('#settingsContent input,#settingsContent select').length
    }));
    check(stateView.text.length>10,'settings tab content missing: '+section,stateView);
-   if(section==='advanced'||section==='appearance')await page.screenshot({path:path.join(out,'r76-ui-settings-'+section+'.png')});
+   if(section==='advanced'||section==='appearance')await page.screenshot({path:path.join(out,'r77-ui-settings-'+section+'.png')});
   }
   const beforePrefs=await page.evaluate(()=>JSON.stringify(state.prefs));
   await page.keyboard.press('Escape');
@@ -104,7 +104,7 @@ module.exports=async function runUiAudit({browser,out,root}){
   await page.locator('[data-workspace="all"]').click();
   await page.waitForFunction(()=>document.querySelector('.layout')?.classList.contains('workspace-mode-all'));
 
-  // R76: the combined late/early filter must use the same canonical attendance flags
+  // R77: the combined late/early filter must use the same canonical attendance flags
   // as the personal month strip, and must have its own non-overtime color.
   const lateEarlyCount=await page.evaluate(()=>[...state.analysis.values()].filter(attendanceHasLateEarly).length);
   check(lateEarlyCount>0,'demo analysis has no late/early cases for regression');
@@ -172,7 +172,34 @@ module.exports=async function runUiAudit({browser,out,root}){
    afterReturn.month===beforeReturn.month&&afterReturn.filter===beforeReturn.filter&&
    afterReturn.workspace==='person'&&!afterReturn.dayNav,
    'return-to-person-overview changed context or remained in day detail',{beforeReturn,afterReturn});
-  await page.screenshot({path:path.join(out,'r76-ui-person-overview.png')});
+  await page.screenshot({path:path.join(out,'r77-ui-person-overview.png')});
+  // R77: a filter applied inside day detail must return to a consistent month view.
+  await dayMarker.click();
+  await page.waitForFunction(()=>state.selection.type==='cell'&&state.chartTab==='timeline');
+  await page.locator('#statusFilterButton').click();
+  await page.locator('[data-filter-value="lateEarly"]').click();
+  await page.waitForFunction(()=>state.workspaceMode==='person'&&state.selection.type==='person'&&
+    state.chartDay===null&&state.chartTab==='overview'&&state.filter==='lateEarly');
+  const monthly=await page.evaluate(()=>{
+    const e=state.selection.employeeId,dayButtons=[...document.querySelectorAll('.r77-anomaly-days button')];
+    const summary=document.querySelector('.r77-anomaly-summary');
+    const all=Array.from({length:monthDays()},(_,i)=>state.analysis.get(e+'|'+(i+1)));
+    const work=all.filter(a=>isWorkday(a.day)&&attendanceJudgment(a)!=='rest');
+    const flags=work.filter(attendanceHasLateEarly).length;
+    const view=analysisViewItems({items:all}).filter(a=>isWorkday(a.day)&&attendanceJudgment(a)!=='rest').length;
+    const label=[...document.querySelectorAll('.insight-row')].find(r=>r.querySelector('span')?.textContent==='占工作日');
+    return {summary:!!summary,days:dayButtons.length,flags,work:work.length,view,percent:label?.querySelector('strong')?.textContent,
+      selected:document.querySelectorAll('.person-day.selected').length};
+  });
+  check(monthly.summary&&monthly.days===monthly.flags&&monthly.selected===0&&
+    monthly.percent===(monthly.work?Math.round(monthly.view/monthly.work*100):0)+'%',
+   'R77 monthly filter denominator or anomaly drilldown inconsistent',monthly);
+  if(monthly.days){
+    await page.locator('.r77-anomaly-days button').first().click();
+    await page.waitForFunction(()=>state.selection.type==='cell'&&state.chartTab==='timeline');
+    const tip=await page.locator('.person-day.has-late-early').first().getAttribute('title');
+    check(/系统检测：/.test(tip)&&/\d{2}:\d{2}/.test(tip),'R77 date tooltip lacks precise flagged time',tip);
+  }
   await page.locator('[data-workspace="all"]').click();
   await page.waitForFunction(()=>document.querySelector('.layout')?.classList.contains('workspace-mode-all'));
 
@@ -195,12 +222,12 @@ module.exports=async function runUiAudit({browser,out,root}){
   await page.waitForFunction(()=>!document.querySelector('.p109-project-overlay'));
   const beforeImport=await page.evaluate(()=>JSON.stringify({records:state.records.length,people:EMPLOYEES.length,imports:state.imports.length}));
   await page.locator('#attendanceInput').setInputFiles({
-   name:'R76-取消导入.csv',mimeType:'text/csv',
+   name:'R77-取消导入.csv',mimeType:'text/csv',
    buffer:Buffer.from('姓名,日期,时间,进出\nUI审计甲,2026-10-22,08:30,进\nUI审计甲,2026-10-22,17:30,出\n','utf8')
   });
   await page.waitForSelector('.r62-overlay',{timeout:20000});
   check(await page.locator('.r62-overlay[role="dialog"][aria-modal="true"]').count()===1,'import preview is not an accessible modal');
-  await page.screenshot({path:path.join(out,'r76-ui-import-preview.png')});
+  await page.screenshot({path:path.join(out,'r77-ui-import-preview.png')});
   await page.keyboard.press('Escape');
   check(await page.locator('.r62-overlay').count()===0,'Escape did not cancel import preview');
   check(await page.evaluate(()=>JSON.stringify({records:state.records.length,people:EMPLOYEES.length,imports:state.imports.length}))===beforeImport,
@@ -215,11 +242,11 @@ module.exports=async function runUiAudit({browser,out,root}){
   });
   check(controls.every(x=>x.exists&&x.name.length>0),'topbar action lacks accessible name',controls.filter(x=>!x.exists||!x.name));
   check(!errors.length,'browser emitted runtime errors',errors);
-  fs.writeFileSync(path.join(out,'p109-r76-ui-audit.json'),JSON.stringify({
-   version:'R76',viewportGeometry:geometry,workspaces:views.map(x=>x[0]),dataSections:sections,
+  fs.writeFileSync(path.join(out,'p109-r77-ui-audit.json'),JSON.stringify({
+   version:'R77',viewportGeometry:geometry,workspaces:views.map(x=>x[0]),dataSections:sections,
    settingsSections:settingSections,escapeDismissal:true,cancelledImportNonDestructive:true,
    primaryControlsNamed:true,runtimeErrors:errors
   },null,2));
-  console.log('P109_R76_UI_AUDIT_PASS '+JSON.stringify({viewports:geometry.map(x=>x.viewport),workspaces:views.map(x=>x[0]),dataSections:sections.length,settingsSections:settingSections.length,errors:errors.length}));
+  console.log('P109_R77_UI_AUDIT_PASS '+JSON.stringify({viewports:geometry.map(x=>x.viewport),workspaces:views.map(x=>x[0]),dataSections:sections.length,settingsSections:settingSections.length,errors:errors.length}));
  }finally{await page.close()}
 };

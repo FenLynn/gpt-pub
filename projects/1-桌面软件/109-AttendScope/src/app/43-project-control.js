@@ -2,7 +2,7 @@
  * All data and native folder operations occur on the user's device. */
 'use strict';
 const P109_DATA_SCHEMA=2;
-const P109_APP_VERSION='0.2.2-preview';
+const P109_APP_VERSION='0.2.3-preview';
 let p109Audit=null,p109PendingDirectory=null,p109ProjectBusy=false;
 function p109Escape(x){return escapeNameChar(String(x??''))}
 function p109Status(msg,error=false){toast(msg,error)}

@@ -237,8 +237,11 @@ function bind(){
     if(['trip','leave','outing','overtime'].includes(state.filter))state.rawDataTab=state.filter;
     else state.rawDataTab='attendance';
     state.chartTab='overview';
-    updateMatrixFilter();syncFilterButton();
     filterMenu.classList.remove('open');filterButton.setAttribute('aria-expanded','false');
+    if(state.workspaceMode==='person'&&state.selection.type==='cell'){
+      returnPersonalOverview();syncFilterButton();asNavRefreshCurrent();return;
+    }
+    updateMatrixFilter();syncFilterButton();
     if(state.analyticsPage==='stats')renderStatisticsWorkspace();
     else renderAnalysisPanel();
     asNavRefreshCurrent();
@@ -534,9 +537,9 @@ function selectMatrixRow(id){
 function selectPerson(id){
  const scoped=state.workspaceMode!=='classic';
  if(scoped)state.workspaceMode='person';
- state.selection=scoped?{type:'cell',employeeId:id,day:1}:{type:'person',employeeId:id};
- state.chartTab=scoped?'timeline':'overview';
- state.chartDay=scoped?1:nearestRecordedDay(id);
+ state.selection={type:'person',employeeId:id};
+ state.chartTab='overview';
+ state.chartDay=scoped?null:nearestRecordedDay(id);
  state.timelineRange=null;state.rawPage=1;render();
 }
 function changePersonalDay(day){

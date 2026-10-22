@@ -158,12 +158,27 @@ function timelineFullInsightHtml(item){
   (extra?'<div class="r74-insight-evidence">'+extra+'</div>':'')+
  '</div>';
 }
+function personalLateEarlySummaryHtml(employeeId){
+ const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1))).filter(Boolean);
+ const flagged=days.filter(attendanceHasLateEarly);
+ const late=days.reduce((n,a)=>n+a.attendanceFlags.filter(f=>f.kind==='late').length,0);
+ const early=days.reduce((n,a)=>n+a.attendanceFlags.filter(f=>f.kind==='early').length,0);
+ return '<section class="r77-anomaly-summary" aria-label="系统识别的迟到早退">'+
+  '<header><strong>迟到早退</strong><small>系统识别 · 人工判定独立</small></header>'+
+  '<div class="r77-anomaly-totals"><span>迟到 <b>'+late+' 次</b></span><span>早退 <b>'+early+
+  ' 次</b></span><span>涉及 <b>'+flagged.length+' 天</b></span></div>'+
+  '<div class="r77-anomaly-days">'+(flagged.length?flagged.map(a=>
+   '<button type="button" data-person-anomaly-day="'+a.day+'" title="'+safeTableText(a.attendanceFlags.map(f=>f.label+' '+f.time).join('、'))+
+   (manualStatusFor(a)?' · 人工已调整判定':'')+'" aria-label="'+pad(a.day)+'日异常，查看时间轴">'+pad(a.day)+'日</button>'
+  ).join(''):'<span>本月无明确迟到早退记录</span>')+'</div></section>';
+}
 function attendInsightHtml(ctx){
   const tab=state.chartTab||'overview',item=plotAnalysis(ctx);
   // Personal statistics and issues summarize this employee's month, not the selected day.
   const monthly=state.workspaceMode==='person'&&ctx.employee&&tab!=='timeline';
   const monthlyItems=monthly?Array.from({length:monthDays()},(_,i)=>state.analysis.get(ctx.employee.id+'|'+(i+1))):null;
-  const view=monthly?(state.filter==='lateEarly'?monthlyItems.filter(attendanceHasLateEarly):monthlyItems):analysisViewItems(ctx);
+  const view=monthly?analysisViewItems({items:monthlyItems}):analysisViewItems(ctx);
+  const eligible=(monthly?monthlyItems:ctx.items||[]).filter(a=>isWorkday(a.day)&&attendanceJudgment(a)!=='rest');
   const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
   if(tab==='timeline'&&item){
     return timelineFullInsightHtml(item)+'<div id="timelineEvidence" class="insight-evidence"></div>';
@@ -177,10 +192,11 @@ function attendInsightHtml(ctx){
       out+=insightMetric('记录日',view.length+' 日')+insightMetric('人员',people+' 人')+
         insightMetric('日期',days+' 天')+insightMetric('区间',fmtMinutes(mins));
     }else{
+      const numerator=view.filter(a=>isWorkday(a.day)&&attendanceJudgment(a)!=='rest').length;
       out+=insightMetric('记录日',view.length+' 日')+insightMetric('人员',people+' 人')+
-        insightMetric('占比',ctx.items.length?Math.round(view.length/ctx.items.length*100)+'%':'0%');
+        insightMetric('占工作日',eligible.length?Math.round(numerator/eligible.length*100)+'%':'0%');
     }
-    if(tab==='overview')return out;
+    if(tab==='overview')return out+(state.workspaceMode==='person'&&ctx.employee?personalLateEarlySummaryHtml(ctx.employee.id):'');
   }
   if(tab==='issues'){
     const anomalies=view.filter(a=>attendanceJudgment(a)==='anomaly').length;
@@ -206,7 +222,7 @@ function attendInsightHtml(ctx){
       insightMetric('正常',items.filter(a=>attendanceJudgment(a)==='normal').length,'tone-ok')+
       insightMetric('异常',items.filter(a=>attendanceJudgment(a)==='anomaly').length,'tone-warn')+
       insightMetric('缺勤',items.filter(a=>attendanceJudgment(a)==='absent').length,'tone-problem');
-    return out;
+    return out+(state.workspaceMode==='person'?personalLateEarlySummaryHtml(ctx.employee.id):'');
   }
   return out+insightMetric('人员',new Set(view.map(a=>a.employee.id)).size+' 人')+
     insightMetric('正常',view.filter(a=>attendanceJudgment(a)==='normal').length,'tone-ok')+
@@ -237,6 +253,7 @@ function attendWorkbenchHtml(ctx){
     '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section>';
 }
 function mountPlotTabs(ctx){
+  document.querySelectorAll('[data-person-anomaly-day]').forEach(b=>b.onclick=()=>changePersonalDay(b.dataset.personAnomalyDay));
   document.querySelectorAll('[data-chart-tab]').forEach(button=>button.onclick=()=>{
     state.chartTab=button.dataset.chartTab;state.rawPage=1;
     if(state.chartTab==='timeline'&&ctx.employee&&!state.chartDay)state.chartDay=nearestRecordedDay(ctx.employee.id);

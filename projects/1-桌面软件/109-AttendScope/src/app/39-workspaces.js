@@ -48,10 +48,15 @@ function personMonthStripHtml(){
   const rawManual=info?manualStatusFor(info):null;
   const final=rawManual||attendanceJudgmentSystem(info);
   const tone=final==='normal'?'normal':final==='anomaly'?'anomaly':final==='absent'?'absent':'rest';
-  const hasAuto=(info?.autoOvertime?.segments?.length||0)>0;
-  const hasLateEarly=attendanceHasLateEarly(info);
+  const autoSegments=info?.autoOvertime?.segments||[];
+  const included=autoSegments.filter(seg=>seg.accepted!==false).length;
+  const hasAuto=autoSegments.length>0||(info?.overtime?.length||0)>0,hasLateEarly=attendanceHasLateEarly(info);
+  const flagText=hasLateEarly?info.attendanceFlags.map(f=>f.label+' '+f.time).join('、'):'';
+  const adjusted=rawManual&&rawManual!==attendanceJudgmentSystem(info);
   const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+
-   (hasAuto?' · 有自动加班候选':'')+(hasLateEarly?' · 迟到/早退':'')+(rawManual?' · 人工修正':'');
+   (flagText?' · 系统检测：'+flagText:'')+(adjusted?' · 人工已调整判定（系统检测证据保留）':'')+
+   (autoSegments.length?' · 自动加班候选 '+autoSegments.length+' 段（纳入 '+included+' 段、排除 '+(autoSegments.length-included)+' 段）':'')+
+   (info?.overtime?.length?' · 登记加班 '+info.overtime.length+' 项':'');
   return '<button type="button" class="person-day '+type+' '+(selected===day?'selected':'')+
     (hasAuto?' has-auto-overtime':'')+(hasLateEarly?' has-late-early':'')+
     '" data-person-day="'+day+'" title="'+escapeNameChar(title)+'" aria-current="'+(selected===day?'date':'false')+'">'+
@@ -182,11 +187,10 @@ function navigateWorkspace(mode){
  if(mode==='all'||mode==='group'||mode==='data'){state.selection={type:'overall'};state.chartTab='overview'}
  if(mode==='group'&&!workspaceGroups().includes(state.selectedGroup))state.selectedGroup=workspaceGroups()[0]||'未分组';
  if(mode==='person'){
-  // An explicit visit to Personal starts on day 1 in timeline mode.
-  // Matrix-cell drilldowns use selectCell() and retain their clicked date.
+  // Primary navigation opens the whole month's overview; date/cell clicks drill down.
   const id=EMPLOYEES.find(e=>e.id===state.selection.employeeId)?.id||EMPLOYEES[0]?.id;
-  state.selection=id?{type:'cell',employeeId:id,day:1}:{type:'overall'};
-  state.chartDay=1;state.chartTab='timeline';state.timelineRange=null;state.rawPage=1;
+  state.selection=id?{type:'person',employeeId:id}:{type:'overall'};
+  state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.rawPage=1;
  }
  render();
 }
