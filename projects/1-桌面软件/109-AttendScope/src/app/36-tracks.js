@@ -280,7 +280,8 @@ function mountAttendanceTimeline(a){
   };
   syncNavSelection();
   const placeReview=(box,left,right,center,bandTop,bandBottom)=>{
-    const edge=chart.getWidth()-SIDE,w=box.offsetWidth,h=box.offsetHeight,gap=6;
+    // Leave the two-character track labels clear, including edge fallbacks.
+    const edge=chart.getWidth()-SIDE-52,w=box.offsetWidth,h=box.offsetHeight,gap=6;
     const beside=right+gap+w<=edge;
     box.dataset.placement=beside?'right':'above';
     box.dataset.bandLeft=String(left);box.dataset.bandRight=String(right);box.dataset.bandTop=String(bandTop);box.dataset.bandBottom=String(bandBottom);
