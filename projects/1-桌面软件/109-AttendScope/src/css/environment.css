@@ -12,5 +12,6 @@
 #p109PortableDownload{display:inline-block;background:#197fc3;color:#fff;border-radius:7px;padding:9px 18px;text-decoration:none;cursor:pointer}
 #p109TransferState{border-left:3px solid #87b0d0;background:#f0f6fb;padding:12px 16px;color:#496d88}
 #p109ConfirmDownload{background:#eaf4fc;color:#236a9a}
+.p109-update-web-note{background:#eff6fb;border-left:3px solid #82abcb;padding:12px 16px;color:#3e6380}
 .p109-environment button:focus-visible,#p109TransferOverlay button:focus-visible,#p109PortableDownload:focus-visible{outline:3px solid #8fc8ee;outline-offset:2px}
 @media(max-width:620px){.p109-environment th{width:105px}.p109-environment th,.p109-environment td{padding:8px}}

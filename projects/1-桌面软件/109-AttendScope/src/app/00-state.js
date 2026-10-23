@@ -1,8 +1,8 @@
 'use strict';
 const P109_DATA_SCHEMA=2;
-const P109_APP_VERSION='0.2.11-preview';
-const P109_APP_REVISION='R85';
-const P109_ENGINE_VERSION='R85';
+const P109_APP_VERSION='0.2.12-preview';
+const P109_APP_REVISION='R86';
+const P109_ENGINE_VERSION='R86';
 const XLSX=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}

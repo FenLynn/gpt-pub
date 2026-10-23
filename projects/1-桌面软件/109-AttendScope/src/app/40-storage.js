@@ -152,13 +152,22 @@ async function p109ReadProject(handle,project){
   const active=project.current||{year:YEAR,month:MONTH};
   if(!Number.isInteger(active.year)||active.year<2000||active.year>2100||
     !Number.isInteger(active.month)||active.month<1||active.month>12)throw Error('项目当前年月无效');
+  if(project.monthBranches!=null&&(typeof project.monthBranches!=='object'||Array.isArray(project.monthBranches)))throw Error('月份修订索引无效');
+  const monthBranches=new Map(Object.entries(project.monthBranches||{}));
+  if(project.activeBranch){
+    const branch=project.activeBranch,other=monthBranches.get(branch.month);
+    if(other&&other.id!==branch.id)throw Error('当前修订与月份修订索引不一致');
+    monthBranches.set(branch.month,branch);
+  }
+  for(const [key,branch] of monthBranches)if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(key)||
+    !branch||branch.month!==key||!/^[A-Za-z0-9-]+$/.test(branch.id))throw Error('独立修订引用无效');
   const conf=await p109OptionalDirectory(handle,'config');
   const rules={...((conf?await readJSON(conf,'work_rules.json'):null)||P109_DEFAULT_RULES)};
   const people=(conf?await readJSON(conf,'employees.json'):null)?.employees||[];
   if(!Array.isArray(people))throw Error('项目人员配置无效');
   const profile=conf?await readJSON(conf,'project-profile.json'):null;
   if(profile&&profile.schemaVersion!==1)throw Error('项目默认配置版本不兼容');
-  const calendar={},months=new Map(),keys=new Set(project.months||[]),recovered=[];
+  const calendar={},months=new Map(),keys=new Set([...(project.months||[]),...monthBranches.keys()]),recovered=[];
   const data=await p109OptionalDirectory(handle,'data');
   if(data)for(const year of await p109Entries(data)){
     if(year.kind!=='directory'||!/^20\d{2}$/.test(year.name))continue;
@@ -192,15 +201,18 @@ async function p109ReadProject(handle,project){
       calendarOverrides:calendar,rules,isDemo:!!project.notes?.includes('演示')};
     months.set(current,{...normalizeSavedMonth(seed),saved:false});
   }
-  const branch=project.activeBranch;
-  if(branch){
-    if(!/^[A-Za-z0-9-]+$/.test(branch.id)||!/^20\d{2}-(0[1-9]|1[0-2])$/.test(branch.month))throw Error('独立修订引用无效');
+  for(const branch of monthBranches.values()){
     const [y,m]=branch.month.split('-'),year=await existingDir(data,y),month=await existingDir(year,m),
       branches=await existingDir(month,'branches'),b=await existingDir(branches,branch.id),folder=await existingDir(b,'working');
     const result=await p109ReadWorking(folder,branch.month+' 修订');
-    months.set(branch.month,{...result.normalized,activeBranch:branch});current=branch.month;
+    const payload=await readJSON(folder,result.recovered?'state.previous.json':'state.json');
+    const [yearNumber,monthNumber]=branch.month.split('-').map(Number);
+    if((payload.year!=null&&(Number(payload.year)!==yearNumber||Number(payload.month)!==monthNumber))||
+      (payload.branch&&(payload.branch.id!==branch.id||payload.branch.month!==branch.month)))throw Error('修订文件与月份引用不一致');
+    months.set(branch.month,{...result.normalized,activeBranch:branch});
     if(result.recovered)recovered.push(branch.month+' 修订');
   }
+  if(project.activeBranch)current=project.activeBranch.month;
   return {months,current,profile,calendar,rules,recovered};
 }
 async function connectProjectDir(savedHandle=null,options={}){
@@ -273,7 +285,9 @@ function projectPayload(){
   rememberMonth();
   return {schemaVersion:P109_DATA_SCHEMA,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:P109_APP_VERSION,
     analysisEngineVersion:P109_ENGINE_VERSION,current:{year:YEAR,month:MONTH},
-    months:[...state.monthStores.keys()].sort(),activeBranch:state.activeBranch||null,updatedAt:new Date().toISOString()};
+    months:[...state.monthStores.keys()].sort(),activeBranch:state.activeBranch||null,
+    monthBranches:Object.fromEntries([...state.monthStores].filter(([,m])=>m.activeBranch).map(([key,m])=>[key,m.activeBranch])),
+    updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
   return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),

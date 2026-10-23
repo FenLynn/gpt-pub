@@ -152,9 +152,13 @@ async function p109OpenRescueFile(file){
   const base='data/'+year+'/'+pad(month),folder=m.activeBranch?base+'/branches/'+m.activeBranch.id+'/working':base+'/working';
   await p109PortablePut(root,folder+'/state.json',JSON.stringify(payload));
  }
- await p109PortablePut(root,'project.json',JSON.stringify(data.project));
+ // Older rescue files had only the current branch in project.json. Their month
+ // stores still carry background branches; preserve those on restoration too.
+ const project={...data.project,monthBranches:{...(data.project?.monthBranches||{})}};
+ for(const [key,m] of data.months)if(m.activeBranch)project.monthBranches[key]=m.activeBranch;
+ await p109PortablePut(root,'project.json',JSON.stringify(project));
  if(data.profile)await p109PortablePut(root,'config/project-profile.json',JSON.stringify(data.profile));
- await p109ReadProject(root,data.project);p109ProjectBusy=false;
+ await p109ReadProject(root,project);p109ProjectBusy=false;
  const ok=await connectProjectDir(root);if(ok){root.rescue=true;root.pending=false;render();p109CloseTransfer();toast('已恢复工作状态；救援 JSON 不包含原件和未加载的冻结，请保留原项目目录',true)}return ok;
 }
 async function p109UsePortable(){
@@ -165,7 +169,7 @@ async function p109UsePortable(){
 }
 async function p109NewPortable(){
  if(p109ProjectBusy||state.storageBusy||state.importCommitting||p109ConnectionBusy||r62ImportDraft)return;
- await p109InitializeProject(p109MemoryRoot());document.getElementById('p109ModeOverlay')?.remove();
+ const ok=await p109InitializeProject(p109MemoryRoot());if(ok)document.getElementById('p109ModeOverlay')?.remove();return ok;
 }
 function p109EnvironmentHtml(){
  const e=p109Environment(),rows=[['目录直接保存',e.directory?'支持；实际写入仍需授权':'不可用：使用便携项目 ZIP'],['文件下载',e.download?'支持检测；下载后须检查实际文件':'不可用：保留页面并恢复下载/目录权限'],['安全项目包校验',e.hash?'支持 SHA-256':'不可用：保留原件并用救援 JSON'],['压缩 XLSX',e.compressedXlsx?'支持':'请将源表另存 CSV 后导入'],['项目历史',e.history?'支持检测；写入失败时改为手动打开':'请每次手动打开项目包/目录'],['路径复制',e.clipboard?'支持检测；失败后提供手动复制':'使用选中文本手动复制']];

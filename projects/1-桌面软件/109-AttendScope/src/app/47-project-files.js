@@ -66,7 +66,7 @@ function p109ShowWorkHome(){
  node.querySelector('#r80NewProject').onclick=()=>open(()=>p109InitializeProject());
  node.querySelector('#r80ConnectProject').onclick=()=>open(()=>connectProjectDir());
  node.querySelector('#r80ChooseAgain').onclick=()=>p109ShowModeChooser();
- node.querySelector('#r80MemoryWork').onclick=()=>{node.remove();toast('当前为临时工作区；关闭页面前请保存工作 JSON，原件请自行保留。')};
+ node.querySelector('#r80MemoryWork').onclick=()=>{node.remove();toast('当前为临时工作区；关闭前点保存，下载并确认完整项目 ZIP。')};
  node.querySelector('#r80NewProject').focus();
 }
 function p109CurrentProjectName(){

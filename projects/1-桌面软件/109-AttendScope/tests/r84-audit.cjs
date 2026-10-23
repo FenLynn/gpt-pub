@@ -93,8 +93,10 @@ module.exports=async({browser,out,root})=>{
   await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
   check((await page.locator('#p109UpdateStatus').textContent()).includes('更新成功'),'one install action automatically backs up, writes and verifies all files');
   await page.screenshot({path:path.join(out,'r84-upgrade-complete.png')});
-  await Promise.all([page.waitForNavigation(),page.locator('#p109UpdateInstall').click()]);await page.evaluate(()=>p109RecentReady);
-  check(await page.evaluate(()=>!!state.projectDir&&state.saved),'completion reloads the application and restores the saved project');
+  const beforeUrl=page.url();await page.locator('#p109UpdateInstall').click();
+  check(await page.locator('#p109UpdateOverlay').count()===0&&page.url()===beforeUrl,'web completion closes the local upgrade wizard without claiming to update the hosted site');
+  await page.reload();await page.evaluate(()=>p109RecentReady);
+  check(await page.evaluate(()=>!!state.projectDir&&state.saved),'an explicit hosted-page reload restores the saved project independently of local code updates');
   await page.locator('#importBtn').click();const again=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();await (await again).setFiles(zip);
   await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall')?.disabled);
   check((await page.locator('#p109UpdateDirectory').textContent()).includes('程序 中文 (1)'),'authorized native program handle is remembered in IndexedDB');

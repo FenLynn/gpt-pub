@@ -185,8 +185,13 @@ async function p109ShowUpdate(file){
  const panel=document.createElement('section');panel.id='p109UpdateOverlay';panel.className='p109-recent-overlay';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','p109UpdateTitle');
  panel.innerHTML='<div class="p109-update-panel"><header><h2 id="p109UpdateTitle">程序升级</h2><button id="p109UpdateClose" aria-label="关闭升级">×</button></header><div class="p109-update-body"><p id="p109UpdateVersion"></p><p id="p109UpdateStatus" role="status" aria-live="polite">正在校验升级包…</p><ol><li>校验版本、完整文件与兼容性</li><li>自动备份、更新并逐项核验</li><li>完成后重新载入程序</li></ol><p id="p109UpdateDirectory">首次升级需授权包含 index.html 的程序文件夹。</p><button id="p109UpdateChoose">选择程序文件夹</button><p>项目数据保持原位。请使用可信来源的 P109 升级包。</p></div><footer><button id="p109UpdateCancel">取消</button><button class="primary-btn" id="p109UpdateInstall" disabled>校验中…</button></footer></div>';
  document.body.appendChild(panel);let running=false,programRoot=null,bundle=null;
+ if(location.protocol!=='file:'){
+  const note=document.createElement('p');note.className='p109-update-web-note';
+  note.textContent='当前从网站运行。此向导只更新你授权的本地离线程序目录，不会更新网站。网站版本由部署者在 Cloudflare Pages 等托管平台重新部署；本地更新完成后请打开本地 index.html。';
+  panel.querySelector('.p109-update-body').prepend(note);
+ }
  const status=panel.querySelector('#p109UpdateStatus'),install=panel.querySelector('#p109UpdateInstall'),choose=panel.querySelector('#p109UpdateChoose');
- const close=()=>{if(running)return;if(install.dataset.reload){location.reload();return}panel.remove();document.getElementById('importBtn')?.focus()};
+ const close=()=>{if(running)return;if(install.dataset.reload&&location.protocol==='file:'){location.reload();return}panel.remove();document.getElementById('importBtn')?.focus()};
  panel.querySelector('#p109UpdateClose').onclick=close;panel.querySelector('#p109UpdateCancel').onclick=close;
  panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}else p109TrapDialogFocus(e,panel)});
  const refresh=()=>{const dirty=p109UnsavedMonths();install.disabled=!bundle||!programRoot||!!dirty.length;
@@ -205,11 +210,12 @@ async function p109ShowUpdate(file){
  };
  choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError')status.textContent=e.message+'。无法授权时，先下载确认项目包，再把新版完整解压到新文件夹继续。'}};
  install.onclick=async()=>{
-  if(install.dataset.reload){location.reload();return}if(running)return;running=true;panel.querySelectorAll('button').forEach(b=>b.disabled=true);
+  if(install.dataset.reload){close();return}if(running)return;running=true;panel.querySelectorAll('button').forEach(b=>b.disabled=true);
   const ok=await p109ApplyCodeUpdate(file,{programRoot,confirmed:true,onProgress:t=>status.textContent=t,onError:t=>status.textContent=t});
   running=false;panel.querySelector('#p109UpdateClose').disabled=false;panel.querySelector('#p109UpdateCancel').disabled=false;
   if(ok){install.disabled=false;install.textContent='完成并重新载入';install.dataset.reload='1';status.textContent='更新成功，所有文件已核验。升级前备份位于程序目录的 backups 文件夹。'+(state.projectDir?.__p109Portable?'重新载入后，请手动打开已确认下载的最新项目 ZIP。':state.projectDir?'独立项目目录也保留备份。':'');choose.disabled=true;
-   panel.querySelector('#p109UpdateCancel').hidden=true;panel.querySelector('#p109UpdateClose').setAttribute('aria-label','完成并重新载入');
+   if(location.protocol!=='file:'){install.textContent='完成 · 请打开本地程序';status.textContent+='本地程序已更新，当前网站版本保持不变。请打开本地程序文件夹中的 index.html；本按钮仅关闭向导。'}
+   panel.querySelector('#p109UpdateCancel').hidden=true;panel.querySelector('#p109UpdateClose').setAttribute('aria-label',location.protocol==='file:'?'完成并重新载入':'完成并关闭向导');
   }
   else{choose.disabled=false;refresh()}
  };
