@@ -81,6 +81,8 @@ module.exports=async({browser,out,root})=>{
   check(await p.evaluate(async()=>{window.__disk=await (await navigator.storage.getDirectory()).getDirectoryHandle('r85-disk-'+crypto.randomUUID(),{create:true});return p109InitializeProject(__disk)}),'initialize native project for permission-failure test');
   await p.locator('#attendanceInput').setInputFiles({name:'disk.csv',mimeType:'text/csv',buffer:Buffer.from(csv('10'))});await p.locator('#r62Commit').click();await p.waitForFunction(()=>!r62ImportDraft);await p.evaluate(()=>saveWorking());
   const before=await p.evaluate(async()=>{const h=await (await (await (await __disk.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('working');return (await (await h.getFileHandle('state.json')).getFile()).text()});
+  await p.addInitScript(()=>Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('blocked','SecurityError')}}));
+  await p.evaluate(()=>Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('blocked','SecurityError')}}));
   await p.evaluate(()=>{state.groups[EMPLOYEES[0].id]='保留的修改';state.saved=false;const original=writeFile;window.__normalWrite=original;writeFile=async(h,n,d)=>{if(!h.__p109Portable)throw new DOMException('disk denied','NotAllowedError');return original(h,n,d)}});
   check(await p.evaluate(()=>saveWorking())===false,'native write failure preserves dirty work');
   const downloaded=p.waitForEvent('download');await p.locator('#p109FallbackPortable').click();await (await downloaded).saveAs(path.join(out,'r85-recovered-portable.zip'));
@@ -102,6 +104,9 @@ module.exports=async({browser,out,root})=>{
    const backups=await p109Entries(await existingDir(runtime,'backups'));
    return ok&&state.projectDir===originalRoot&&!originalRoot.pending&&originalRoot.revision===revision&&backups.some(x=>x.name.startsWith('pre-upgrade-'));
   },[...fs.readFileSync(update)]),'a saved portable project can upgrade a native program folder with durable backups and no fake-handle call');
+  check(await p.evaluate(async()=>{const history=await p109RecentRead();return history.items.length===1&&history.lastId===null}),'portable mode retains recent directories but clears their default even when localStorage is blocked');
+  await p.reload();await p.evaluate(()=>p109RecentReady);
+  check(await p.locator('#r80Demo').isVisible()&&await p.locator('#r80Work').isVisible()&&await p.evaluate(()=>!state.projectDir),'without a default Work project startup offers Demo and Work instead of reopening an unrelated old directory');
   check(!errors.length,'all compatibility paths have no script errors');
   fs.writeFileSync(path.join(out,'r85-audit.json'),JSON.stringify(report,null,2));console.log('P109_R85_AUDIT_PASS '+JSON.stringify(report));
  }finally{await native.close();await new Promise(r=>server.close(r))}
