@@ -85,6 +85,10 @@ module.exports=async({browser,out,root})=>{
   await p.evaluate(()=>Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('blocked','SecurityError')}}));
   await p.evaluate(()=>{state.groups[EMPLOYEES[0].id]='保留的修改';state.saved=false;const original=writeFile;window.__normalWrite=original;writeFile=async(h,n,d)=>{if(!h.__p109Portable)throw new DOMException('disk denied','NotAllowedError');return original(h,n,d)}});
   check(await p.evaluate(()=>saveWorking())===false,'native write failure preserves dirty work');
+  const pngDownload=p.waitForEvent('download');await p.evaluate(()=>captureCurrentView());const pngPath=path.join(out,'r85-output-fallback.png');await (await pngDownload).saveAs(pngPath);
+  check(fs.readFileSync(pngPath).subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))&&await p.evaluate(()=>!state.saved),'a screenshot falls back to a real PNG download when the project directory cannot write');
+  const pdfDownload=p.waitForEvent('download');check(await p.evaluate(()=>captureAllPdf())===true,'PDF export continues after directory write failure');const pdfPath=path.join(out,'r85-output-fallback.pdf');await (await pdfDownload).saveAs(pdfPath);
+  check(fs.readFileSync(pdfPath).subarray(0,8).toString().startsWith('%PDF-1.4'),'PDF fallback downloads the generated report bytes');
   const downloaded=p.waitForEvent('download');await p.locator('#p109FallbackPortable').click();await (await downloaded).saveAs(path.join(out,'r85-recovered-portable.zip'));
   check(await p.evaluate(()=>state.projectDir.__p109Portable&&state.groups[EMPLOYEES[0].id]==='保留的修改'),'permission failure can switch to portable while retaining live edits');
   await p.locator('#p109ConfirmDownload').click();await p.locator('#p109TransferClose').click();

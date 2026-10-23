@@ -8,6 +8,23 @@ function p109Environment(){
   download:supports(()=>typeof URL.createObjectURL==='function'&&'download' in document.createElement('a')),
   compressedXlsx,clipboard:supports(()=>navigator.clipboard?.writeText),history:supports(()=>globalThis.indexedDB)};
 }
+async function p109PersistOutput(blob,name,parts){
+ const root=state.projectDir;
+ if(root){try{
+  let folder=root;for(const part of ['data',String(YEAR),pad(MONTH),'output',...parts])folder=await dir(folder,part);
+  await writeFile(folder,name,await blob.arrayBuffer());if(root.__p109Portable)render();
+  return {mode:root.__p109Portable?'portable':'directory'};
+ }catch(e){
+  if(!p109Environment().download)throw Error('目录写入失败，且浏览器无法下载：'+e.message+'。文件仍需另行保存');
+  downloadBlob(blob,name);return {mode:'download',reason:e.message};
+ }}
+ if(!p109Environment().download)throw Error('浏览器无法下载文件，请恢复下载能力');
+ downloadBlob(blob,name);return {mode:'download'};
+}
+function p109OutputNotice(result,label){
+ return result.mode==='portable'?label+'已加入便携项目；请下载新的完整项目包':result.mode==='directory'?label+'已写入项目目录':
+  (result.reason?'目录写入失败，已改为下载'+label:'已发起'+label+'下载')+'；请检查下载文件';
+}
 function p109MemoryRoot(name='便携项目'){
  const root={name,kind:'directory',__p109Portable:true,pending:true,revision:0,missing:[]};
  const changed=()=>{root.pending=true;root.revision++};

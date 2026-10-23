@@ -198,14 +198,11 @@ async function captureSave(item){
  item.thumb=await r63Thumbnail(item.data);
  state.captureItems.push(item);if(state.captureItems.length>16)state.captureItems.splice(0,state.captureItems.length-16);
  const bytes=captureBytes(item.data);
- if(state.projectDir){
-  const month=await monthDirectory(),out=await dir(month,'output'),folder=await dir(out,'captures');
-  await writeFile(folder,item.filename,bytes);
- }else downloadBlob(new Blob([bytes],{type:'image/png'}),item.filename);
+ return p109PersistOutput(new Blob([bytes],{type:'image/png'}),item.filename,['captures']);
 }
 async function captureCurrentView(){
  const kind=state.workspaceMode==='stats'?'stats':state.workspaceMode==='person'||state.chartTab==='timeline'?'timeline':'matrix';
- try{await captureSave(await captureCurrentImage(kind));toast('已保存截图：'+kind)}
+ try{const result=await captureSave(await captureCurrentImage(kind));toast(p109OutputNotice(result,'截图'))}
  catch(e){toast('截图失败：'+e.message,true)}
 }
 async function captureStoredFiles(){
@@ -253,9 +250,8 @@ async function captureAllPdf(selected){
   const items=Array.isArray(selected)?selected:(state.captureItems||[]).filter(x=>x.month===monthKey());
   if(!items.length){toast('请先截图，再从 PDF 菜单选择图片',true);return}
   const pdf=await capturePdf(items),name=r63FileStem()+'_Report_'+monthKey()+'_'+captureStamp()+'.pdf';
-  if(state.projectDir){const output=await dir(await monthDirectory(),'output');await writeFile(output,name,await pdf.arrayBuffer())}
-  else downloadBlob(pdf,name);
-  toast('已导出 '+items.length+' 页横向 A4 PDF');return true;
+  const result=await p109PersistOutput(pdf,name,[]);
+  toast(p109OutputNotice(result,items.length+' 页横向 A4 PDF'));return true;
  }catch(e){toast('生成 PDF 失败：'+e.message,true);return false}
 
 }
@@ -268,7 +264,7 @@ async function r63TogglePdfPicker(event){
  if(!picker.hidden){picker.hidden=true;button.setAttribute('aria-expanded','false');return}
  picker.hidden=false;button.setAttribute('aria-expanded','true');
  picker.innerHTML='<p class="r63-pdf-status">正在读取最近截图…</p>';
- let previous=[];try{previous=await captureStoredFiles()}catch(e){picker.innerHTML='<p class="r63-pdf-status">读取缓存失败：'+escapeNameChar(e.message)+'</p>';return}
+ let previous=[],warning='';try{previous=await captureStoredFiles()}catch(e){warning='目录截图暂时不可读，仍可使用本次页面截图：'+e.message}
  if(picker.hidden)return;
  const memory=(state.captureItems||[]).filter(x=>x.month===monthKey()).slice().reverse();
  const names=new Set(memory.map(x=>x.filename));
@@ -276,7 +272,7 @@ async function r63TogglePdfPicker(event){
  await Promise.all(captures.map(async x=>{if(!x.thumb)x.thumb=await r63Thumbnail(x.data)}));
  if(picker.hidden)return;
  picker._captures=captures;
- picker.innerHTML='<div class="r63-pdf-header"><strong>最近截图</strong><button type="button" id="r63PdfClose" aria-label="关闭">×</button></div>'+
+ picker.innerHTML='<div class="r63-pdf-header"><strong>最近截图</strong><button type="button" id="r63PdfClose" aria-label="关闭">×</button></div>'+(warning?'<p class="r63-pdf-status">'+escapeNameChar(warning)+'</p>':'')+
   (captures.length?'<div class="r63-pdf-list">'+captures.map((x,i)=>
     '<label class="r63-pdf-row"><input type="checkbox" data-capture-index="'+i+'" checked>'+
     '<img src="'+x.thumb+'" alt=""><span title="'+escapeNameChar(x.filename)+'">'+escapeNameChar(x.filename)+'</span></label>').join('')+'</div>':

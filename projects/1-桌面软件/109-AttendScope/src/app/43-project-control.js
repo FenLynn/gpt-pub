@@ -418,7 +418,7 @@ async function p109RestoreArchive(){
  let target;
  try{target=await showDirectoryPicker({mode:'readwrite'});
   if((await p109Entries(target)).length)throw Error('恢复仅允许选择空目录，防止覆盖已有项目');
- }catch(e){if(e.name!=='AbortError')p109Status('选择恢复目录失败：'+e.message,true);return}
+ }catch(e){if(e.name!=='AbortError')p109ShowStorageFallback('选择恢复目录失败：'+e.message+'。可直接打开完整项目 ZIP，在便携模式继续');return}
  const chooser=document.createElement('input');chooser.type='file';chooser.accept='.zip,application/zip';
  chooser.onchange=async()=>{
   const file=chooser.files?.[0];if(!file)return;
