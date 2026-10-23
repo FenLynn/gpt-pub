@@ -79,10 +79,13 @@ jobs:
         shell: bash
         run: |
           if test -z "$(fc-list :lang=zh family)"; then
-            if ! timeout 90s sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y -qq fonts-noto-cjk; then
-              timeout 90s sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -qq
-              timeout 90s sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install --no-install-recommends -y -qq fonts-noto-cjk
-            fi
+            font="$RUNNER_TEMP/NotoSansCJKsc-Regular.otf"
+            curl --fail --location --silent --show-error --connect-timeout 15 --max-time 90 --retry 1 --retry-delay 2 --retry-max-time 190 \
+              'https://raw.githubusercontent.com/notofonts/noto-cjk/165c01b46ea533872e002e0785ff17e44f6d97d8/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf' -o "$font"
+            test "$(git hash-object "$font")" = 'dc15562470b4f842321894787a0d066879ccff8b'
+            mkdir -p "$HOME/.local/share/fonts"
+            install -m 644 "$font" "$HOME/.local/share/fonts/NotoSansCJKsc-Regular.otf"
+            fc-cache -f "$HOME/.local/share/fonts"
           fi
           test -n "$(fc-list :lang=zh family)"
           fc-list :lang=zh family | sed -n '1,3p'
