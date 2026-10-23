@@ -356,7 +356,10 @@ function mountAttendanceTimeline(a){
       button.onclick=()=>p109OpenIntervalEditor(kind,a.employee.id,a.date);overlay.appendChild(button);
     }
   };
-  const syncAll=()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags();syncTemporaryControls()};
+  const syncAll=()=>{
+    if(!el.isConnected||chart.isDisposed()||echarts.getInstanceByDom(el)!==chart)return;
+    syncNavigator();syncOvertimeControls();syncAttendanceFlags();syncTemporaryControls();
+  };
   chart.on('finished',syncAll);
   requestAnimationFrame(syncAll);
   chart.on('mouseover',p=>{

@@ -94,6 +94,15 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(()=>dayType(8)==='rest'&&dayType(10)==='work'&&!state.saved&&state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings.length===0),'applying the month calendar changes eligibility and marks work unsaved');
   check(await page.evaluate(()=>{switchMonth(2026,11,true);const answer=dayType(1)==='rest'&&dayType(2)==='work'&&!attendanceDateIsWork('2026-10-08');switchMonth(2026,10);return answer&&dayType(8)==='rest'&&dayType(10)==='work'}),'new month defaults to weekdays and adjacent overtime reads the owning month calendar');
   await page.locator('[data-calendar-editor]').click();await page.screenshot({path:path.join(out,'r89-calendar.png')});await page.keyboard.press('Escape');
+  check(await page.evaluate(()=>{
+   Object.assign(state,{workspaceMode:'person',selection:{type:'cell',employeeId:EMPLOYEES[0].id,day:8},chartDay:8,chartTab:'timeline'});render();const frames=[],original=window.requestAnimationFrame;
+   try{
+    window.requestAnimationFrame=callback=>{frames.push(callback);return 0};
+    disposeAttendCharts();mountAttendanceTimeline(state.analysis.get(EMPLOYEES[0].id+'|8'));disposeAttendCharts();
+    for(const callback of frames)callback(performance.now());return frames.length>0;
+   }catch(error){window.__r89StaleFrameError=error.message;return false}
+   finally{window.requestAnimationFrame=original;render()}
+  }),'disposed timeline ignores a pending frame without touching its old chart');
   check(!errors.length&&!remote.length,'no script exceptions or remote requests');
   fs.writeFileSync(path.join(out,'r89-audit.json'),JSON.stringify(report,null,2));console.log('P109_R89_AUDIT_PASS '+JSON.stringify({checks:report.checks.length,geometry:report.geometry.length}));
  }catch(error){fs.writeFileSync(path.join(out,'r89-failure.json'),JSON.stringify({error:error.stack,report,errors},null,2));await page.screenshot({path:path.join(out,'r89-failure.png')});throw error}finally{await context.close()}
