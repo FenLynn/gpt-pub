@@ -105,8 +105,8 @@
 .r71-insights-heading{display:flex;align-items:baseline;justify-content:space-between;flex:none;gap:12px}
 .r71-insights-heading h3{font-size:17px;color:#29465c;font-weight:740;margin:0;line-height:1.35}
 .r71-headcount{font-size:14px;color:#5f788c;font-weight:660;white-space:nowrap}
-.r71-scope-metrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));
- align-items:center;gap:0 15px!important;flex:0 0 auto;margin:1px 0 0!important;
+.r71-scope-metrics{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr)) minmax(76px,1.4fr);
+ align-items:center;gap:0 8px!important;flex:0 0 auto;margin:1px 0 0!important;
  border-top:1px solid #e4ebf0;border-bottom:1px solid #e4ebf0;padding:3px 0!important}
 .r71-scope-metrics .r68-kpi{display:flex!important;align-items:center;justify-content:center;
  flex-direction:column!important;gap:3px;min-width:0;padding:7px 0!important;min-height:58px;text-align:center;

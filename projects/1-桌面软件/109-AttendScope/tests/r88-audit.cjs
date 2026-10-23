@@ -17,9 +17,17 @@ module.exports=async({browser,out,root})=>{
      overflow:document.documentElement.scrollWidth>innerWidth+1};
    });
    report.geometry.push(geometry);
-   check(geometry.columns===4&&geometry.metrics.length===4&&Math.max(...geometry.metrics.map(n=>n.y))-Math.min(...geometry.metrics.map(n=>n.y))<1.5&&geometry.metrics.every(n=>n.width<=n.container+1)&&!geometry.overflow,'four overview totals share one row without overflow: '+width);
+   check(geometry.columns===4&&geometry.metrics.length===4&&Math.max(...geometry.metrics.map(n=>n.y))-Math.min(...geometry.metrics.map(n=>n.y))<1.5&&geometry.metrics.every(n=>n.width<=n.container+1)&&!geometry.overflow,'four overview totals share one row without overflow: '+JSON.stringify(geometry));
    check(geometry.trend.size>=8&&geometry.trend.fill==='#fff'&&geometry.trend.border>=2&&geometry.trend.gradient.length===2&&geometry.trend.gradient[1].color.endsWith(',0)')&&geometry.bars.every(h=>h>=10),'larger hollow trend markers, vertical shading and thicker ranking bars: '+width);
    check(!geometry.sidebarCard,'no bottom-left temporary card: '+width);
+  }
+  await page.setViewportSize({width:1280,height:900});
+  for(const font of ['Arial Black','Microsoft YaHei','monospace']){
+   const style=await page.addStyleTag({content:'.r71-scope-metrics{font-family:"'+font+'"!important}'});
+   await page.locator('.r71-scope-metrics strong').last().evaluate(n=>n.textContent='100.0%');
+   const metrics=await page.evaluate(()=>[...document.querySelectorAll('.r71-scope-metrics strong')].map(n=>{const r=n.getBoundingClientRect();return {y:r.top+r.height/2,width:r.width,container:n.parentElement.clientWidth}}));
+   check(metrics.every(n=>n.width<=n.container+1)&&Math.max(...metrics.map(n=>n.y))-Math.min(...metrics.map(n=>n.y))<1.5,'widest percentage fits with fallback font: '+font+' '+JSON.stringify(metrics));
+   await style.evaluate(n=>n.remove());
   }
   await page.setViewportSize({width:1600,height:900});await page.evaluate(()=>render());await page.screenshot({path:path.join(out,'r88-overview.png')});
   const logic=await page.evaluate(()=>{
@@ -100,5 +108,8 @@ module.exports=async({browser,out,root})=>{
   }),'deleting a next-month slice removes the owning month manual session and marks it dirty');
   check(!errors.length&&!remote.length,'no runtime exceptions or remote requests');
   fs.writeFileSync(path.join(out,'r88-audit.json'),JSON.stringify(report,null,2));console.log('P109_R88_AUDIT_PASS '+JSON.stringify({checks:report.checks.length,geometry:report.geometry.length}));
+ }catch(e){
+  fs.writeFileSync(path.join(out,'r88-failure.json'),JSON.stringify({error:e.message,report},null,2));
+  await page.screenshot({path:path.join(out,'r88-failure.png')});throw e;
  }finally{await context.close()}
 };
