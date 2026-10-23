@@ -133,10 +133,10 @@ async function run(){
   return nav.parentElement===bar&&document.querySelectorAll('.workspace-navigation').length===1&&
     !!side.querySelector('#statusFilter')&&!!side.querySelector('#workspaceScopeGroup')&&!!side.querySelector('#workspacePerson')&&
     !document.querySelector('.scope-group-links')&&!document.querySelector('.scope-stat-row')&&
-    cal.getBoundingClientRect().bottom<=innerHeight+2&&cal.getBoundingClientRect().top>side.getBoundingClientRect().top+100&&
+    cal.getBoundingClientRect().bottom<=innerHeight+2&&cal.getBoundingClientRect().top<side.getBoundingClientRect().top+35&&
     name.textContent===EMPLOYEES[0].name&&!name.querySelector('span')&&
     document.querySelector('.matrix-wrap').getBoundingClientRect().top<210;
- },'R39 system header, left filters, fixed calendar or compact matrix failed');
+ },'R90 system header, left filters, top calendar or compact matrix failed');
  await check(page,()=>{
   const controls=document.querySelector('.top-global-actions').getBoundingClientRect();
   const nav=document.querySelector('.workspace-navigation').getBoundingClientRect();
@@ -969,7 +969,7 @@ async function run(){
   const label=document.querySelector('.as-stats-filters label');
   const line=document.querySelector('[data-as-chart="line"]');
   return selected?.value==='all'&&!!label?.querySelector('select')&&
-   getComputedStyle(label).display==='flex'&&
+   getComputedStyle(label).display==='grid'&&
    asStatPrefs().compare==='people'&&!!line?.disabled;
  },'R55 categorical chart must disable chronological line mode');
  // R58: each statistical family gets its own accessible gradient and hover shade.
@@ -1963,11 +1963,12 @@ async function run(){
  await require('./r87-audit.cjs')({browser,out,root});
  await require('./r88-audit.cjs')({browser,out,root});
  await require('./r89-audit.cjs')({browser,out,root});
+ await require('./r90-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R89',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R90',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

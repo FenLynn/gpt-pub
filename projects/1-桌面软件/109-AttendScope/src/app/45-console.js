@@ -1,7 +1,7 @@
 /* P109 R68 · data studio and on-disk inventory. Always read file handles, never
  * invent stored files from current analysis. Scanner is read-only; mutations are explicit. */
 'use strict';
-const R68_SECTIONS={records:'原始记录',roster:'名册与分组',rules:'工作规则',
+const R68_SECTIONS={records:'原始记录',calendar:'工作日管理',roster:'名册与分组',rules:'工作规则',
  templates:'导入模板',imports:'导入历史',freezes:'冻结与修订'};
 const r68UI={chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',targetGroup:'未分组',recordsView:'files',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
 function r68Esc(s){return escapeNameChar(String(s??''))}
@@ -339,7 +339,7 @@ function r68RulesHtml(){
    '<div><span>'+r68Esc(title)+'</span><strong>'+r68Esc(value)+'</strong></div>').join('')+'</div>'+
   '<div class="r68-note">自动加班：12:00 / 17:30（含）前离开不计；超过门槛后，从 11:40 / 17:10 起完整计时，不扣除 20 分钟。连续跨午休的工作不能当作午间加班。</div>'+
   '<button class="r68-btn" id="r68PinRules">固定本月规则为项目默认</button> '+
-  '<button class="r68-btn" type="button" data-calendar-editor>编辑本月工作 / 休息日</button>';
+  '<button class="r68-btn" type="button" data-calendar-editor>打开工作日管理</button>';
 }
 function r68TemplatesHtml(){
  const profile=r62ImportProfile(),templates=profile.templates||{};
@@ -467,7 +467,7 @@ function r68DataMarkup(){
   '<main id="r69ProjectPane" class="r71-data-main"><div class="r68-loading">正在读取项目…</div></main></div>';
  return '<div class="r71-data-shell"><main class="r71-data-main">'+
   '<section id="r68DataContent" class="r71-data-content">'+
-  (section==='roster'?r68RosterHtml():section==='rules'?r68RulesHtml():
+  (section==='calendar'?p109CalendarPageHtml():section==='roster'?r68RosterHtml():section==='rules'?r68RulesHtml():
    section==='templates'?r68TemplatesHtml():section==='imports'?r68ImportsHtml():
    section==='freezes'?r68FreezeHtml():r68RecordsHtml())+
   '</section></main></div>';
@@ -556,6 +556,7 @@ function renderDataWorkspace(){
   await r72RenameGroup(group,b.closest('.r73-editor-row')?.querySelector('input')?.value);
  });
  root.querySelectorAll('[data-r73-delete-group]').forEach(b=>b.onclick=()=>r72DeleteGroup(b.dataset.r73DeleteGroup));
+ if((state.dataSection||'records')==='calendar')p109WireCalendarPage(root);
  root.querySelector('#r68EditRules')?.addEventListener('click',()=>document.getElementById('settingsBtn').click());
  for(const [id,kind] of [['r68PinRoster','roster'],['r68PinImport','import'],['r68PinRules','rules']]){
   root.querySelector('#'+id)?.addEventListener('click',async()=>{p109Audit=await p109AuditProject();await p109PinDefaults(kind)});

@@ -62,7 +62,7 @@ module.exports=async function runUiAudit({browser,out,root}){
   }
 
   // Every data-management section must render a real page and keep one active section.
-  const sections=['overview','months','health','storage','roster','rules','templates','records','imports','freezes'];
+  const sections=['overview','months','health','storage','calendar','roster','rules','templates','records','imports','freezes'];
   for(const section of sections){
    await page.locator('[data-data-section="'+section+'"]').click();
    await page.waitForFunction(s=>state.dataSection===s,section,{timeout:15000});

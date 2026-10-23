@@ -1,0 +1,32 @@
+.p109-sidebar-content{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;scrollbar-width:thin}
+.p109-sidebar-content>.side-controls{flex:0 0 auto;overflow:visible}
+.p109-sidebar-footer{flex:none;border-top:1px solid #e3e9ee;padding:8px 2px 0;margin-top:8px}
+.p109-sidebar-footer button{display:flex;align-items:center;gap:9px;width:100%;height:33px;padding:0 9px;border:1px solid transparent;border-radius:4px;background:transparent;color:#607889;font:600 13px 'Segoe UI','Microsoft YaHei',sans-serif;cursor:pointer}
+.p109-sidebar-footer button:hover{background:#eef3f6}.p109-sidebar-footer button:focus-visible{outline:2px solid #73a9cd;outline-offset:-2px}
+.p109-analysis-sidebar{flex:none;padding-top:16px}
+.p109-analysis-sidebar .side-bottom,.p109-analysis-sidebar .side-calendar{margin-top:0;border-top:0;padding-top:0}
+.p109-analysis-sidebar .side-controls{flex:none;overflow:visible;padding:12px 3px 0;margin-top:12px;border-top:1px solid #e3e9ee}
+.p109-analysis-sidebar .side-refinements{margin-top:12px!important}
+.layout.workspace-mode-stats .stats-side-field,.layout.workspace-mode-stats .r69-side-stat-filters label:nth-child(n){display:grid!important;grid-template-columns:38px minmax(0,1fr)!important;align-items:center!important;gap:7px!important}
+.layout.workspace-mode-stats .stats-side-field select,.layout.workspace-mode-stats .r69-side-stat-filters select{min-width:0!important;width:100%!important;height:33px!important}
+.layout.workspace-mode-data .r69-data-nav .r69-nav-category{font-size:14px;font-weight:750;color:#36536a;margin:16px 8px 7px;padding-top:16px}
+.layout.workspace-mode-data .r69-data-nav .r69-nav-category:first-child{margin-top:0;padding-top:0}
+.layout.workspace-mode-data .r69-data-nav button{border:1px solid transparent!important;border-radius:4px!important;padding:7px 9px!important}
+.layout.workspace-mode-data .r69-data-nav button.active{border:1px solid #bfd5e5!important;background:#edf5fa;color:#23618e;padding:7px 9px!important;box-shadow:none}
+.layout.workspace-mode-data .r69-data-nav button::before,.layout.workspace-mode-data .r69-data-nav button::after{display:none!important}
+.workspace-mode-person .r74-attendance-tag{gap:0;padding:3px 6px;max-width:none;overflow:visible}
+.r74-attendance-tag button{position:absolute;left:100%;top:50%;transform:translateY(-50%);width:24px;height:24px;margin:0;border:1px solid #d8e2e9;background:#fff;box-shadow:0 1px 4px #233d5018;visibility:hidden}
+.r74-attendance-tag.control-left button{left:auto;right:100%;margin:0}
+.r74-attendance-tag:is(:hover,:focus-within) button{visibility:visible;opacity:1}
+.r74-attendance-tag:focus-within{z-index:2}.r74-attendance-tag button:focus-visible{visibility:visible;opacity:1}
+.music-track-panel .p109-interval-add,.music-track-panel:hover .p109-interval-add{opacity:0;pointer-events:none}
+.music-track-panel .p109-interval-add.is-row-hovered,.music-track-panel .p109-interval-add:focus{opacity:1;pointer-events:auto}
+.p109-calendar-page{width:100%;padding:3px 2px 20px;color:#35536a}
+.p109-calendar-page header,.p109-calendar-page footer,.p109-calendar-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.p109-calendar-page header{justify-content:space-between}.p109-calendar-page h2{font-size:18px;margin:0}.p109-calendar-page header label{display:flex;align-items:center;gap:10px;font-size:13px}
+.p109-calendar-page p{font-size:13px;color:#74899b;margin:14px 0}.p109-calendar-page input{height:34px;padding:4px 8px;border:1px solid #cddce7;border-radius:4px;color:#35536a;background:#fff;font:inherit}
+.p109-calendar-page button{cursor:pointer}.p109-calendar-tools{margin:18px 0}.p109-calendar-tools>span{flex:1;font-size:13px;color:#74899b}
+.p109-calendar-tools>button,.p109-calendar-page footer button{border:1px solid #cbdde9;border-radius:4px;background:#f7fafc;color:#32658b;padding:8px 13px;font:600 13px 'Segoe UI','Microsoft YaHei',sans-serif}
+.p109-calendar-tools>button:disabled{opacity:.45;cursor:default}.p109-calendar-page .p109-calendar-grid button{min-height:65px;border-radius:5px;box-sizing:border-box}
+.p109-calendar-page .p109-calendar-grid button.is-selected{outline:2px solid #428dc0;outline-offset:-2px}.p109-calendar-page .p109-calendar-grid button:focus-visible{outline:3px solid #276d9c;outline-offset:1px}
+.p109-calendar-page footer{justify-content:space-between;margin-top:20px;font-size:13px;color:#74899b}

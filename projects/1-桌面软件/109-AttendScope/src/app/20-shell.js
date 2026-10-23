@@ -144,19 +144,16 @@ function layoutHtml(){
           <button id="backupProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>完整项目备份 ZIP</button>
         </div>
       </div>
+      <button class="text-btn" id="p109Help" aria-haspopup="dialog">帮助</button>
       <button class="primary-btn r83-save-primary ${state.saved?'is-saved':'is-dirty'}" id="saveBtn" title="保存当前月">保存</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
-    </div>
-    <div class="top-actions">
-      <span class="action-divider"></span>
-      <button class="text-btn" id="p109Help" aria-haspopup="dialog">帮助</button>
-      <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
     </div>
     </div>
   </header>
 
   <div class="layout workspace-mode-${state.workspaceMode||'all'} ${state.analyticsPage==='stats'?'stats-active':''}">
     <aside class="sidebar">
+      <div class="p109-sidebar-content">
       ${state.workspaceMode==='classic'?`
       <section class="side-section calendar-section">
         <div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">全部</button></div>
@@ -206,6 +203,8 @@ function layoutHtml(){
         </div>
       </section>
 `:workspaceSidebarHtml()}
+      </div>
+      <footer class="p109-sidebar-footer"><button type="button" id="settingsBtn" aria-label="设置"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m9.5 3-.6 2-1.6.9-2-.4-2.5 4.3 1.4 1.6v1.8l-1.4 1.6 2.5 4.3 2-.4 1.6.9.6 2h5l.6-2 1.6-.9 2 .4 2.5-4.3-1.4-1.6v-1.8l1.4-1.6-2.5-4.3-2 .4-1.6-.9-.6-2z"/><circle cx="12" cy="12" r="3.2"/></svg><span>设置</span></button></footer>
     </aside>
 
     <main class="workspace">

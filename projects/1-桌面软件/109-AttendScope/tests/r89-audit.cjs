@@ -89,11 +89,11 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(async bytes=>p109OpenPortableFile(new File([Uint8Array.from(bytes)],'review.zip')),zip),'complete project ZIP reopens after page reload');
   check(await page.evaluate(()=>state.manualTempOutings.length===1&&Object.values(state.attendanceReview).filter(v=>v===false).length===1&&state.analysis.get(EMPLOYEES[0].id+'|8').attendanceFlags.some(f=>!f.accepted)&&state.judgmentMode==='manual'&&hasManualStatuses()),'reload retains independent manual half, attendance exclusions and final matrix mode');
   await page.evaluate(()=>{navigateWorkspace('data');state.dataSection='rules';render()});await page.locator('[data-calendar-editor]').click();
-  await page.locator('[data-calendar-date="2026-10-08"]').click();await page.keyboard.press('Escape');check(await page.evaluate(()=>dayType(8)==='work'),'canceling the calendar leaves the month unchanged');
-  await page.locator('[data-calendar-editor]').click();await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-date="2026-10-10"]').click();await page.locator('#p109CalendarApply').click();
+  await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('#p109CalendarClear').click();check(await page.evaluate(()=>dayType(8)==='work'),'selecting then clearing dates leaves the month unchanged');
+  await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-set="rest"]').click();await page.locator('#p109CalendarClear').click();await page.locator('[data-calendar-date="2026-10-10"]').click();await page.locator('[data-calendar-set="work"]').click();
   check(await page.evaluate(()=>dayType(8)==='rest'&&dayType(10)==='work'&&!state.saved&&state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings.length===0),'applying the month calendar changes eligibility and marks work unsaved');
   check(await page.evaluate(()=>{switchMonth(2026,11,true);const answer=dayType(1)==='rest'&&dayType(2)==='work'&&!attendanceDateIsWork('2026-10-08');switchMonth(2026,10);return answer&&dayType(8)==='rest'&&dayType(10)==='work'}),'new month defaults to weekdays and adjacent overtime reads the owning month calendar');
-  await page.locator('[data-calendar-editor]').click();await page.screenshot({path:path.join(out,'r89-calendar.png')});await page.keyboard.press('Escape');
+  await page.screenshot({path:path.join(out,'r89-calendar.png')});
   check(await page.evaluate(()=>{
    Object.assign(state,{workspaceMode:'person',selection:{type:'cell',employeeId:EMPLOYEES[0].id,day:8},chartDay:8,chartTab:'timeline'});render();const frames=[],original=window.requestAnimationFrame;
    try{

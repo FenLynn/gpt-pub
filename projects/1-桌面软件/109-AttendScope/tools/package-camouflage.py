@@ -24,7 +24,7 @@ def build(source, destination, password):
         raise ValueError("输出文件已存在，请选择新文件名")
     blob = source.read_bytes()
     runtime.program_files(blob)
-    receipt = runtime.canonical({"bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest()})
+    receipt = runtime.canonical({"bytes": len(blob), "sha256": hashlib.sha256(blob).hexdigest(), "name": source.name})
     plain = struct.pack("<I", len(receipt)) + receipt + blob
     size = 48_000
     names = []

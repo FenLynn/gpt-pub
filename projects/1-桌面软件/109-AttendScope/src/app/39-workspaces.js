@@ -94,16 +94,17 @@ function workspaceSidebarHtml(){
   [['overview','项目概况'],['months','月份库存'],['health','健康检测'],['storage','存储与文件']].map(([id,name])=>
    '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
   '<div class="r69-nav-category">数据维护</div>'+
-  [['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['records','原始记录'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
+  [['calendar','工作日管理'],['roster','名册与分组'],['rules','工作规则'],['templates','导入模板'],['records','原始记录'],['imports','导入历史'],['freezes','冻结与修订']].map(([id,name])=>
    '<button type="button" data-data-section="'+id+'" class="'+((state.dataSection||'records')===id?'active':'')+'">'+name+'</button>').join('')+
   '</div>':'';
- return '<div class="side-controls">'+groupControl+personControl+sub+'</div>'+
-   '<div class="side-bottom">'+(mode==='data'&&((state.dataSection||'records')!=='records'||r68UI.recordsView!=='rows')?'':'<section class="side-calendar calendar-section">'+
+ const calendar='<div class="side-bottom">'+(mode==='data'&&((state.dataSection||'records')!=='records'||r68UI.recordsView!=='rows')?'':'<section class="side-calendar calendar-section">'+
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">'+(mode==='person'?'返回全览':'清除选择')+'</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span></div></section>')+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
    '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
+ const controls='<div class="side-controls">'+groupControl+personControl+sub+'</div>';
+ return ['all','group','person'].includes(mode)?'<div class="p109-analysis-sidebar">'+calendar+controls+'</div>':controls+calendar;
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';

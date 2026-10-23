@@ -1,8 +1,4 @@
 /* Work/rest editor and review controls share the existing dialog and tooltip shell. */
-.p109-calendar-dialog{width:86vw;max-height:88dvh;overflow:auto;background:#fff;border:1px solid #dbe5ed;border-radius:12px;padding:22px;color:#35536a}
-.p109-calendar-dialog header,.p109-calendar-dialog footer{display:flex;align-items:center;gap:12px}.p109-calendar-dialog header strong{flex:1;font-size:18px}.p109-calendar-dialog header button{border:0;background:none;font-size:23px;color:#7890a1}
-.p109-calendar-dialog p{font-size:13px;color:#71899c}.p109-calendar-dialog footer{margin-top:20px}.p109-calendar-dialog footer span{flex:1}
-.p109-calendar-dialog footer button{border:1px solid #cbdfea;border-radius:6px;padding:8px 13px;color:#286a97;background:#f5faff}.p109-calendar-dialog footer .primary{background:#287fb7;color:#fff}
 .p109-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.p109-calendar-grid>b{text-align:center;font-size:12px;padding:7px;color:#6c8395}
 .p109-calendar-grid button{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-height:57px;border:1px solid #dce6ee;border-radius:7px;background:#f0faf5;color:#317b59;cursor:pointer}.p109-calendar-grid button.rest{background:#f1f3f5;color:#8998a4}.p109-calendar-grid button strong{font-size:15px}.p109-calendar-grid button small{font-size:11px}
 .workspace-mode-all .workspace-toolbar,.workspace-mode-group .workspace-toolbar{flex:none;min-height:37px;margin:0;padding:0 0 7px}.workspace-mode-all .workspace-toolbar strong,.workspace-mode-group .workspace-toolbar strong{line-height:26px}

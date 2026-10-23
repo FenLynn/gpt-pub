@@ -164,7 +164,7 @@ function bindSettings(){
   document.querySelectorAll('[data-settings-section]').forEach(b=>b.classList.toggle('active',b.dataset.settingsSection===id));
   writeCurrentSection();
  }
- const close=()=>{overlay.classList.add('hidden');r14SettingsDraft=null};
+ const close=()=>{overlay.classList.add('hidden');r14SettingsDraft=null;document.getElementById('settingsBtn')?.focus()};
  document.getElementById('settingsBtn').onclick=()=>{
   const p=r14Prefs();r14SettingsDraft={prefs:JSON.parse(JSON.stringify(p)),rules:{...RULES},tableKind:state.rawDataTab||'attendance'};
   section='appearance';overlay.classList.remove('hidden');
@@ -189,7 +189,7 @@ function bindSettings(){
     !Number.isInteger(d.rules.tempOutingGraceMinutes)||d.rules.tempOutingGraceMinutes<0||d.rules.tempOutingGraceMinutes>60){
     toast('请检查工作时段、宽限与重复判定参数',true);return;
   }
-  Object.assign(RULES,d.rules);state.prefs=d.prefs;state.saved=false;rememberMonth();reanalyze();close();render();
+  Object.assign(RULES,d.rules);state.prefs=d.prefs;state.saved=false;rememberMonth();reanalyze();close();render();document.getElementById('settingsBtn')?.focus();
   toast('设置已应用，保存工作空间后持久保留');
  };
 }

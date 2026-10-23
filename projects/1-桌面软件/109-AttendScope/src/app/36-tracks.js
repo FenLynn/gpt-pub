@@ -224,6 +224,7 @@ function mountAttendanceTimeline(a){
       const tag=document.createElement('span');
       tag.className='r72-attendance-tag r74-attendance-tag '+flag.kind+(flag.accepted===false?' is-excluded':'');
       tag.dataset.attendanceId=flag.id;
+      tag.tabIndex=0;
       const label=document.createElement('span');label.textContent=flag.label;tag.appendChild(label);
       const control=document.createElement('button');control.type='button';control.innerHTML=p109IntervalIcon(flag.accepted===false?'check':'close');
       control.setAttribute('aria-label',(flag.accepted===false?'恢复纳入':'排除统计')+' '+flag.label+' '+flag.time);
@@ -247,6 +248,7 @@ function mountAttendanceTimeline(a){
       const chosen=good||{x:Math.max(10,Math.min(width-w-10,preferred)),y:baseY};
       tag.style.left=chosen.x+'px';
       tag.style.top=chosen.y+'px';
+      if(chosen.x+w+25>width-5)tag.classList.add('control-left');
       tag.dataset.anchorX=String(pos[0]);
       placed.push({x:chosen.x,y:chosen.y,w,h});
     }
@@ -321,6 +323,7 @@ function mountAttendanceTimeline(a){
       box.style.top=Math.max(0,x1[1]-box.offsetHeight/2)+'px';
     }
   };
+  let hoverAddKind='';
   const syncTemporaryControls=()=>{
     const overlay=document.getElementById('temporaryReviewLayer');if(!overlay?.isConnected)return;
     overlay.replaceChildren();const groups=new Map(),visible=state.timelineRange||range;
@@ -351,11 +354,26 @@ function mountAttendanceTimeline(a){
       const canvas=document.createElement('canvas'),measure=canvas.getContext('2d');measure.font=labelFont;
       const textWidth=measure.measureText(model.tracks[lane].title).width;
       button.dataset.intervalAdd=kind;button.dataset.anchorY=String(pos[1]);button.style.top=(pos[1]-12)+'px';
+      button.classList.toggle('is-row-hovered',kind===hoverAddKind);
       button.style.right=(labelRight+textWidth+8)+'px';button.innerHTML=p109IntervalIcon('plus');
       button.title=label;button.setAttribute('aria-label',label);
       button.onclick=()=>p109OpenIntervalEditor(kind,a.employee.id,a.date);overlay.appendChild(button);
     }
   };
+  const panel=el.closest('.music-track-panel');
+  const showRowAdd=kind=>{hoverAddKind=kind;panel?.querySelectorAll('[data-interval-add]').forEach(n=>n.classList.toggle('is-row-hovered',n.dataset.intervalAdd===kind))};
+  if(panel){
+    panel.onpointermove=event=>{
+      if(chart.isDisposed()||!el.isConnected)return;
+      const y=event.clientY-el.getBoundingClientRect().top;
+      let kind='';for(const [name,lane] of [['outing',4],['overtime',5]]){
+        const point=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[0,lane]),prior=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[0,lane-1]);
+        if(point&&prior&&y>=point[1]-Math.abs(point[1]-prior[1])/2&&y<point[1]+Math.abs(point[1]-prior[1])/2)kind=name;
+      }
+      if(kind!==hoverAddKind)showRowAdd(kind);
+    };
+    panel.onpointerleave=()=>showRowAdd('');
+  }
   const syncAll=()=>{
     if(!el.isConnected||chart.isDisposed()||echarts.getInstanceByDom(el)!==chart)return;
     syncNavigator();syncOvertimeControls();syncAttendanceFlags();syncTemporaryControls();

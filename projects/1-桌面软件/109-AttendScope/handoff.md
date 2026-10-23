@@ -4,6 +4,7 @@
 > 仓库：`FenLynn/gpt-pub`  
 > 项目：`projects/1-桌面软件/109-AttendScope/`  
 > 日常开发分支：`p109-exp`  
+> 当前版本：0.2.16-preview / R90，schema 4；新入口和分发行为见 `docs/R90-侧栏与工作日管理.md`。旧 R34 基线与截图说明是历史背景。
 > R34 功能基线：`94d2bb12c97957899615bee90d46c16f450176a1`（R29 历史基线：`b65717a99d54deae18c45142272d98e71e27c2be`）  
 > 对应 R34 P109 CI：#202，success（#193 为历史 R29）。  
 > 不要直接把 `p109-stable` / `main` 当开发分支。
