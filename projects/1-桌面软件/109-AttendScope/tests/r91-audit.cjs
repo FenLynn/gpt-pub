@@ -52,7 +52,8 @@ module.exports=async({browser,out,root})=>{
   await page.evaluate(()=>{window.__r91Db=p109CalendarDb;window.__r91Set=Storage.prototype.setItem;p109CalendarDb=async()=>{throw Error('fixture')};Storage.prototype.setItem=function(k,v){if(k===P109_CALENDAR_KEY)throw Error('fixture');return __r91Set.call(this,k,v)}});
   await page.locator('[data-calendar-date="2028-03-02"]').click();await page.locator('[data-calendar-set="rest"]').click();
   const fallbackPromise=page.waitForEvent('download');await confirmed();const fallback=await fallbackPromise,fallbackBook=JSON.parse(fs.readFileSync(await fallback.path(),'utf8'));
-  check(fallbackBook.months['2028-03']['2028-03-02']==='rest'&&await page.evaluate(()=>p109CalendarUI.dirty&&p109CalendarUI.status.includes('无法持久保存')),'both storage failures download complete calendar and retain unsaved status');
+  check(fallbackBook.months['2028-03']['2028-03-02']==='rest'&&await page.evaluate(()=>p109CalendarType('2028-03-02')==='rest'&&p109CalendarUI.dirty&&p109CalendarUI.status.includes('无法持久保存')),'both storage failures still apply calendar in memory, download backup and retain unsaved status');
+  const fallbackImportPromise=page.waitForEvent('download');check(await page.evaluate(async value=>p109ImportCalendar(new File([value],'calendar.json')),exported),'calendar file can still load and work when all browser storage is blocked');await fallbackImportPromise;
   await page.evaluate(()=>{p109CalendarDb=__r91Db;Storage.prototype.setItem=__r91Set;p109CalendarUI.dirty=false;
    switchMonth(2028,3,true);window.__r91Payload=workingPayload();window.__r91Default=dayType(1);
   });

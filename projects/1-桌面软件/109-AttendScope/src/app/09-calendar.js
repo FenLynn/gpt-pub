@@ -63,8 +63,13 @@ async function p109StoreFixedCalendar(candidate){
  const book=p109ValidateCalendarBook(candidate);let local=false,db=false;
  try{localStorage.setItem(P109_CALENDAR_KEY,JSON.stringify(book));local=localStorage.getItem(P109_CALENDAR_KEY)===JSON.stringify(book)}catch(_){}
  try{await p109CalendarDb(book);db=true}catch(_){}
- if(!local&&!db){p109ExportCalendar(book);return false}
- p109FixedCalendar=book;return true;
+ p109FixedCalendar=book;return local||db;
+}
+function p109CalendarFallback(){
+ p109CalendarUI.dirty=true;
+ const message='本次日历已生效，但浏览器无法持久保存。';
+ try{p109ExportCalendar();p109CalendarUI.status=message+'已发起日历文件下载，请保存文件；下次使用“导入日历”恢复。'}
+ catch(_){p109CalendarUI.status=message+'下载未开始，请允许下载后点击“导出全部日历”备份。'}
 }
 const p109CalendarUI={key:'',draft:{},chosen:new Set(),dirty:false,saving:false,status:''};
 function p109CalendarBusy(){return !!(p109CalendarUI.saving||state.storageBusy||state.importCommitting||p109ConnectionBusy||p109ProjectBusy)}
@@ -113,8 +118,9 @@ async function p109ConfirmCalendar(){
  p109CalendarUI.saving=true;render();
  try{
   const key=p109CalendarUI.key,calendar={...p109CalendarUI.draft},book={...p109FixedCalendar,updatedAt:Math.max(Date.now(),p109FixedCalendar.updatedAt+1),months:{...p109FixedCalendar.months,[key]:calendar}};
-  if(!await p109StoreFixedCalendar(book)){p109CalendarUI.dirty=true;p109CalendarUI.status='浏览器无法持久保存，已发起日历文件下载。请保存文件；下次使用“导入日历”恢复。';return false}
+  const persisted=await p109StoreFixedCalendar(book);
   p109CalendarUI.dirty=false;const applied=p109ApplyFixedToWorking(key,calendar);
+  if(!persisted){p109CalendarFallback();return false}
   p109CalendarUI.status='已保存 '+key+' 固定日历。'+(applied?'同月工作数据已更新，请另行保存业务月份。':'可供新建月份使用；冻结与修订保持原日历。');return true;
  }catch(e){p109CalendarUI.status='日历未保存：'+e.message;return false}
  finally{p109CalendarUI.saving=false;render()}
@@ -128,9 +134,9 @@ async function p109ImportCalendar(file){
   if(!Object.keys(incoming.months).length)throw Error('文件没有日历月份');
   if(!window.confirm('导入 '+Object.keys(incoming.months).length+' 个月的固定日历？同月固定日历将替换，其他月份保留。未确认的日历编辑将丢弃。'))return false;
   const book={...p109FixedCalendar,updatedAt:Math.max(Date.now(),p109FixedCalendar.updatedAt+1),months:{...p109FixedCalendar.months,...incoming.months}};
-  if(!await p109StoreFixedCalendar(book))throw Error('浏览器无法保存；已发起合并日历下载，请保存文件');
+  const persisted=await p109StoreFixedCalendar(book);
   for(const [key,values] of Object.entries(incoming.months))p109ApplyFixedToWorking(key,values);
-  p109CalendarSelect(p109CalendarUI.key);p109CalendarUI.status='已导入 '+Object.keys(incoming.months).length+' 个月的固定日历';return true;
+  p109CalendarSelect(p109CalendarUI.key);if(!persisted)p109CalendarFallback();else p109CalendarUI.status='已导入 '+Object.keys(incoming.months).length+' 个月的固定日历';return true;
  }catch(e){p109CalendarUI.status='导入未完成：'+e.message;return false}
  finally{p109CalendarUI.saving=false;render()}
 }
