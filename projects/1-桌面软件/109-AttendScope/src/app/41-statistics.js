@@ -4,11 +4,13 @@ const AS_STAT_PALETTES=Object.freeze({
  leave:{top:'#8064c9',bottom:'#c0afe9',hover:'#6245b1'},
  trip:{top:'#6377d1',bottom:'#aab9f1',hover:'#4159b5'},
  outing:{top:'#3594b9',bottom:'#a1d7e9',hover:'#237499'},
+ tempOuting:{top:'#65a88a',bottom:'#badfce',hover:'#368364'},
  overtime:{top:OVERTIME_VISUALS.registered.top,bottom:OVERTIME_VISUALS.registered.bottom,hover:'#a94451'},
  punch:{top:'#5089c8',bottom:'#a9c9ed',hover:'#316dae'},
  status:{top:'#54a78b',bottom:'#b2ddca',hover:'#348269'}
 });
 function asStatPalette(family,metric){
+ if(family==='tempOuting'&&metric?.startsWith('red'))return {top:'#c66b76',bottom:'#edb9bf',hover:'#a74d5c'};
  if(family==='overtime'&&metric?.startsWith('candidate'))return {
   top:OVERTIME_VISUALS.auto.top,bottom:OVERTIME_VISUALS.auto.bottom,hover:OVERTIME_VISUALS.auto.hoverTop};
  if(family==='status'){
@@ -29,10 +31,11 @@ const AS_STAT_FAMILIES=[
  ['leave','请假',[['hours','记载请假工时','小时'],['count','请假记录数','条'],['people','涉及人数','人']]],
  ['trip','出差',[['days','出差日数','人日'],['estimatedHours','折算出差工时','小时'],['count','出差记录数','次'],['people','涉及人数','人']]],
  ['outing','外出',[['hours','记载外出时长','小时'],['count','外出记录数','次'],['people','涉及人数','人']]],
+ ['tempOuting','临时外出',[['count','临时外出次数','次'],['redCount','红色次数','次'],['greenCount','绿色次数','次'],['hours','班内外出时长','小时'],['redHours','红色班内时长','小时'],['people','涉及人数','人']]],
  ['overtime','加班',[['hours','加班合计时长','小时'],['registeredHours','登记加班时长','小时'],
   ['count','加班条目数','条'],['registeredCount','登记记录数','条'],
-  ['candidateCount','自动连续会话数','次'],['independentCount','独立加班次数','次'],['people','涉及人数','人'],
-  ['candidateHours','自动推算候选工时','小时'],['candidateDays','加班候选人日','人日'],['candidatePeople','加班候选人数','人']]],
+  ['candidateCount','自动与补录会话数','次'],['independentCount','独立加班次数','次'],['people','涉及人数','人'],
+  ['candidateHours','推算与补录工时','小时'],['candidateDays','加班候选人日','人日'],['candidatePeople','加班候选人数','人']]],
  ['punch','打卡',[['count','打卡记录数','次'],['people','打卡人数','人']]],
  ['status','考勤状态',[['normal','正常工作人日','人日'],['anomaly','异常工作人日','人日'],['absent','缺勤工作人日','人日'],['issue','异常及缺勤人日','人日'],['late','迟到人日','人日'],['early','早退人日','人日']]]
 ];
@@ -221,6 +224,13 @@ function asStatLedger(){
   add('punch','presence',id,day,1);
  });
  for(const a of state.analysis.values()){
+  for(const row of activeTemporaryOutings(a)){
+   add('tempOuting','count',a.employee.id,a.day,1);
+   add('tempOuting',row.status==='red'?'redCount':'greenCount',a.employee.id,a.day,1);
+   add('tempOuting','hours',a.employee.id,a.day,row.minutes/60);
+   if(row.status==='red')add('tempOuting','redHours',a.employee.id,a.day,row.minutes/60);
+   add('tempOuting','presence',a.employee.id,a.day,1);
+  }
   const accepted=activeAutoOvertimeSegments(a);
   const countedMinutes=accepted.reduce((sum,seg)=>sum+seg.minutes,0);
   if(countedMinutes>0){
@@ -388,7 +398,8 @@ function statisticsWorkspaceHtml(){
  const warning=c.family==='trip'?'出差日数按自然日去重；工时按设定工作时段折算，不代表实际出差时长':
   c.family==='leave'?'请假按记录逐条计数，时长扣午休并合并重叠区间；记录数不等于申请次数':
   c.family==='outing'?'外出时长来自记录区间并去除重叠时段；跨日记录按每日时段折算':
-  c.family==='overtime'?'登记加班与已勾选自动推算时段合并统计，取消勾选即排除；纳入统计不等于企业审批':
+  c.family==='tempOuting'?'只计工作日班次内部分；按最终红绿统计次数与时长，× 排除；原始报备保持独立':
+  c.family==='overtime'?'登记加班与已勾选自动推算、手工补录时段合并统计，取消勾选即排除；纳入统计不等于企业审批':
   c.family==='punch'?'每条原始打卡计一次，重复打卡仍按实际记录计入':
   '工作日的考勤状态与当前初始／人工判定视图保持一致';
  const unavailable=(c.family==='outing'&&!state.outings?.length)||

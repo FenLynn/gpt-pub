@@ -37,7 +37,7 @@ def build(root: pathlib.Path, destination: pathlib.Path):
         "appRevision": revision,
         "updateFormat": 1,
         "minimumUpdaterVersion": "0.2.3-preview",
-        "supportedDataSchemas": [data_schema],
+        "supportedDataSchemas": list(range(2, data_schema + 1)),
         "files": [
             {"path": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
             for name, data in allowed

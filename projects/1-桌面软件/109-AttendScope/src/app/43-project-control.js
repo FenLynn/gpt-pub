@@ -254,7 +254,7 @@ async function p109InitializeProject(root){
   state.projectDir=root; p109PendingDirectory=null;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
-  state.manualStatuses={};state.overtimeReview={};state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
+  state.manualStatuses={};state.overtimeReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
   state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.captureItems=[];
   state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.filter='main';
   state.selectedGroup=null;state.statsConfig=null;state.statsPersonId='';state.statsGroup='';

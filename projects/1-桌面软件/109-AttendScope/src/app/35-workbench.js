@@ -1,18 +1,18 @@
 /* P109 right-hand analysis: filter-aware charting, compact insight and linked raw evidence. */
 let rawTabulator=null,rawDialog=null,rawDialogOrigin=null,rawMove=null,pendingRawHighlight=null;
 const CHART_TABS=[['overview','总览'],['timeline','时间轴'],['stats','统计'],['issues','异常']];
-const FILTER_LABELS={main:'常规',normal:'正常',anomaly:'异常',absent:'缺勤',lateEarly:'迟到早退',trip:'出差',leave:'请假',outing:'外出',overtime:'加班'};
+const FILTER_LABELS={main:'常规',normal:'正常',anomaly:'异常',absent:'缺勤',lateEarly:'迟到早退',trip:'出差',leave:'请假',outing:'外出',overtime:'加班',tempOuting:'临时外出'};
 const JUDGMENT_LABELS={normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'};
 function safeTableText(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function insightMetric(label,value,tone=''){return '<div class="insight-row"><span>'+label+'</span><strong class="'+tone+'">'+safeTableText(value)+'</strong></div>'}
 function currentFilterLabel(){return FILTER_LABELS[state.filter]||'常规'}
-function behaviorFilterActive(){return ['trip','leave','outing','overtime'].includes(state.filter)}
+function behaviorFilterActive(){return ['trip','leave','outing','overtime','tempOuting'].includes(state.filter)}
 function analysisViewItems(ctx){
   const items=ctx.items||[],filter=state.filter||'main';
   if(filter==='main')return items.filter(a=>['normal','anomaly','absent'].includes(attendanceJudgment(a)));
   if(['normal','anomaly','absent'].includes(filter))return items.filter(a=>attendanceJudgment(a)===filter);
   if(filter==='lateEarly')return items.filter(attendanceHasLateEarly);
-  if(['trip','leave','outing','overtime'].includes(filter))return items.filter(a=>attendanceBehaviors(a).includes(filter));
+  if(['trip','leave','outing','overtime','tempOuting'].includes(filter))return items.filter(a=>attendanceBehaviors(a).includes(filter));
   return items;
 }
 function plotAnalysis(ctx){
@@ -93,7 +93,7 @@ function attendPlotHtml(ctx){
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
     if(day)return top+
-      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动加班计入选择"></div>'+r15PunchPreview(day)+'</div>';
+      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动与补录加班计入选择"></div><div id="temporaryReviewLayer" class="p109-temporary-layer" aria-label="临时外出改判与区间补录"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }
@@ -127,7 +127,7 @@ function timelineBehaviorSummaryRow(item,key){
   const included=activeAutoOvertimeSegments(item);
  const acceptedMinutes=included.reduce((sum,seg)=>sum+seg.minutes,0);
  const value=key==='overtime'&&item.autoOvertime?.segments?.length?
-    (rows.length?recorded+' · ':'')+'自动纳入 '+fmtMinutes(acceptedMinutes)+
+    (rows.length?recorded+' · ':'')+'推算/补录纳入 '+fmtMinutes(acceptedMinutes)+
     (included.length<item.autoOvertime.segments.length?' · 已排除 '+(item.autoOvertime.segments.length-included.length)+' 段':''):recorded;
   return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
@@ -138,7 +138,7 @@ function timelineFullInsightHtml(item){
   insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
   insightMetric('在岗',fmtMinutes(item.presence))+
   insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
-  (item.autoOvertime?.minutes?insightMetric('自动加班',fmtMinutes(accepted)+' · 待核'):'');
+  (item.autoOvertime?.minutes?insightMetric('推算/补录加班',fmtMinutes(accepted)+' · 待核'):'');
  let extra='';
  if(item.lunchEvidence==='未分段（工时按班次扣午休）')
   extra+='<p class="insight-issue">午休未分段：班内工时按班次估算</p>';
@@ -154,7 +154,7 @@ function timelineFullInsightHtml(item){
    '<header class="r74-insight-head"><strong>行为</strong><span>全天</span></header>'+
    '<div class="r74-behavior-list">'+
     ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
-   '</div></section>'+
+   '</div></section>'+p109TempDayHtml(item)+
   (extra?'<div class="r74-insight-evidence">'+extra+'</div>':'')+
  '</div>';
 }
@@ -185,6 +185,7 @@ function attendInsightHtml(ctx){
   }
   const heading=currentFilterLabel();
   let out='<div class="insight-heading"><strong>'+heading+'</strong><span>'+tabLabel+'</span></div>';
+  if(state.filter==='tempOuting')return out+p109TempSummaryHtml(view);
   if(state.filter!=='main'){
     const people=new Set(view.map(a=>a.employee.id)).size,days=new Set(view.map(a=>a.date)).size;
     if(behaviorFilterActive()){

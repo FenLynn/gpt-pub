@@ -68,7 +68,10 @@ function traditionalRows(){
        .reduce((sum,seg)=>sum+seg.minutes,0)),
       午休证据:a.lunchEvidence||'',加班候选说明:a.autoOvertime?.reason||'',
       登记加班记录数:a.overtime?.length||0,
-      异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班'})[k]).join('；'),
+      临时外出次数:activeTemporaryOutings(a).length,临时外出红色次数:activeTemporaryOutings(a).filter(r=>r.status==='red').length,
+      临时外出绿色次数:activeTemporaryOutings(a).filter(r=>r.status==='green').length,临时外出班内分钟:behaviorMinutes(a,'tempOuting'),
+      手工补录加班分钟:activeAutoOvertimeSegments(a).filter(r=>r.origin==='manual').reduce((sum,r)=>sum+r.minutes,0),
+      异常摘要:a.issues.join('；'),业务标记:attendanceBehaviors(a).map(k=>({trip:'出差',leave:'请假',outing:'外出',overtime:'加班',tempOuting:'临时外出'})[k]).join('；'),
       人工处理:(state.revisions.some(r=>r.key===e.id+'|'+d)||!!manualStatusFor(a))?'是':'否'});
   }
   return rows;
@@ -108,10 +111,22 @@ async function ensureProjectSkeleton(){
 function normalizeSavedMonth(payload){
   const schema=payload?.schemaVersion==null?1:Number(payload.schemaVersion);
   if(!payload||!Array.isArray(payload.records)||!Number.isInteger(schema)||schema<1||schema>P109_DATA_SCHEMA)return null;
-  for(const key of ['employees','leaves','trips','outings','overtimeEntries','imports','revisions'])
+  for(const key of ['employees','leaves','trips','outings','overtimeEntries','imports','revisions','manualTempOutings','manualOvertime'])
     if(payload[key]!=null&&!Array.isArray(payload[key]))return null;
+  if(payload.tempOutingReview!=null&&(typeof payload.tempOutingReview!=='object'||Array.isArray(payload.tempOutingReview)))return null;
+  if(Object.values(payload.tempOutingReview||{}).some(v=>!['green','red','exclude'].includes(v)))return null;
+  for(const field of ['manualTempOutings','manualOvertime']){
+    const ids=new Set();
+    for(const row of payload[field]||[]){
+      if(!row||typeof row.id!=='string'||!row.id||ids.has(row.id)||typeof row.employeeId!=='string'||
+        !strictISODate(row.date)||!validClock(row.start)||!validClock(row.end)||minutes(row.start)===minutes(row.end)||
+        (field==='manualTempOutings'&&minutes(row.end)<=minutes(row.start)))return null;
+      ids.add(row.id);
+    }
+  }
   payload=r62MigratePayload(structuredClone(payload));
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
+    tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
     employees:payload.employees||null,groups:payload.groups||null,
     fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
     revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
@@ -290,10 +305,11 @@ function projectPayload(){
     updatedAt:new Date().toISOString()};
 }
 function workingPayload(){
-  return {schemaVersion:2,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
+  return {schemaVersion:P109_DATA_SCHEMA,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
     employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},importProfile:r62ImportProfile(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
+    tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:state.manualTempOutings||[],manualOvertime:state.manualOvertime||[],
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
@@ -381,7 +397,7 @@ async function freezeSnapshot(){
   if(!state.projectDir&&!state.isDemo&&!await p109UsePortable())return false;
   state.storageBusy=true;
   try{
-  const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
+  const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:P109_DATA_SCHEMA,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
     appVersion:P109_APP_VERSION,sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
   const snapshot={manifest:{...manifest,analysisEngineVersion:P109_ENGINE_VERSION,workingSchema:P109_DATA_SCHEMA},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}

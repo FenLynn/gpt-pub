@@ -1,0 +1,125 @@
+'use strict';
+const fs=require('fs'),path=require('path'),assert=require('assert/strict'),{pathToFileURL}=require('url');
+module.exports=async({browser,out,root})=>{
+ const context=await browser.newContext({viewport:{width:1600,height:900},acceptDownloads:true}),page=await context.newPage(),errors=[],remote=[];
+ const report={revision:'R87',checks:[]},check=(v,label)=>{assert(v,label);report.checks.push(label)};
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))remote.push(r.url())});page.on('dialog',d=>d.accept());
+ try{
+  await page.goto(pathToFileURL(path.join(root,'index.html')).href);await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();
+  const rules=await page.evaluate(()=>{
+   const e=EMPLOYEES[0],date='2026-10-08',checks={};
+   window.__r87Employee=e;
+   window.__r87Seed=(events,reports=[])=>{
+    state.records=events.map(([time,direction],i)=>({recordId:'r87:'+i,employeeId:e.id,name:e.name,datetime:date+' '+time,time,direction}));
+    state.leaves=[];state.trips=[];state.outings=reports.map(([start,end],i)=>({id:'r87-report:'+i,employeeId:e.id,startDate:date,endDate:date,start,end}));
+    state.overtimeEntries=[];state.manualTempOutings=[];state.manualOvertime=[];state.tempOutingReview={};state.overtimeReview={};state.monthStores=new Map();
+    state.revisions=[];state.revisionSeq=0;Object.assign(RULES,P109_DEFAULT_RULES);reanalyze();return state.analysis.get(e.id+'|8');
+   };
+   const gap=(from,to,reports)=>__r87Seed([['08:25','进'],[from,'出'],[to,'进'],['17:10','出']],reports),rows=a=>a.temporaryOutings;
+   checks.default12=rows(gap('10:00','10:12'))[0].status==='green';
+   checks.strictSeconds=rows(gap('10:00:00','10:12:01'))[0].status==='red';
+   checks.unreported20=rows(gap('10:00','10:20'))[0].status==='red';
+   checks.covered25=rows(gap('10:00','10:20',[['09:58','10:23']]))[0].status==='green';
+   checks.edgeTolerance=rows(gap('10:00','10:24',[['10:02','10:22']]))[0].status==='green';
+   checks.edgeOutside=rows(gap('10:00','10:25',[['10:02','10:22']]))[0].status==='red';
+   checks.shiftedEqual=rows(gap('10:00','10:20',[['10:10','10:30']]))[0].status==='green';
+   checks.shiftedWithinGrace=rows(gap('10:00','10:22',[['10:10','10:30']]))[0].status==='green';
+   checks.longerThanReport=rows(gap('10:00','10:25',[['10:10','10:30']]))[0].status==='red';
+   checks.noOverlap=rows(gap('10:00','10:20',[['10:20','10:40']]))[0].status==='red';
+   checks.unrelatedReportsNotCombined=rows(gap('10:00','10:30',[['09:55','10:10'],['15:00','15:15']]))[0].status==='red';
+   checks.overlappingReportsUnion=rows(gap('10:00','10:30',[['09:59','10:20'],['10:15','10:31']]))[0].status==='green';
+   checks.reportNoDoubleMinutes=rows(gap('10:00','10:30',[['10:10','10:25'],['10:10','10:25']]))[0].status==='red';
+   checks.lunchExcluded=!rows(gap('11:40','13:30')).length;
+   const lunch=rows(gap('11:30','13:40'))[0];checks.lunchOnce=lunch.minutes===20&&lunch.parts.length===2;
+   const late=rows(__r87Seed([['08:25','进'],['17:00','出'],['20:00','进'],['21:00','出']]))[0];checks.afterShiftExcluded=late.minutes===10&&late.status==='green';
+   __r87Seed([['08:25','进'],['10:00','出'],['10:05','出'],['10:20','进'],['10:25','进'],['17:10','出']]);
+   checks.nearestNoReuse=state.analysis.get(e.id+'|8').temporaryOutings.length===1&&state.analysis.get(e.id+'|8').temporaryOutings[0].minutes===15;
+   checks.unknownBreaks=!rows(__r87Seed([['10:00','出'],['10:10','未标注'],['10:20','进']])).length;
+   let a=gap('10:00','10:13');RULES.tempOutingMinutes=15;reanalyze();checks.editLimit=state.analysis.get(e.id+'|8').temporaryOutings[0].status==='green';
+   RULES.tempOutingMinutes=10;RULES.tempOutingGraceMinutes=0;reanalyze();checks.zeroGrace=state.analysis.get(e.id+'|8').temporaryOutings[0].status==='red';
+   a=gap('10:00','10:20');const id=a.temporaryOutings[0].id;
+   p109SetTempDecision(id,'green');checks.manualGreen=p109TempSummary([...state.analysis.values()]).green===1;
+   p109SetTempDecision(id,'exclude');checks.exclusion=p109TempSummary([...state.analysis.values()]).count===0;
+   p109SetTempDecision(id,null);checks.restoreAutomatic=p109TempSummary([...state.analysis.values()]).red===1;
+   const ledger=asStatLedger();checks.statistics=asStatValue(ledger,'tempOuting','redCount',[e],[8])===1&&Math.abs(asStatValue(ledger,'tempOuting','hours',[e],[8])-1/3)<1e-8;
+   checks.originalUnchanged=state.records.length===4&&state.outings.length===0;
+   checks.oldDataDefaults=!!normalizeSavedMonth({schemaVersion:2,employees:[],records:[]})&&normalizeSavedMonth({schemaVersion:2,records:[]}).manualTempOutings.length===0;
+   checks.invalidManualRejected=normalizeSavedMonth({schemaVersion:2,records:[],manualTempOutings:[null]})===null;
+   gap('10:00','10:20',[['10:10','10:30']]);state.workspaceMode='person';state.selection={type:'cell',employeeId:e.id,day:8};state.chartDay=8;state.chartTab='timeline';state.timelineRange=null;render();
+   return checks;
+  });
+  for(const [name,passed] of Object.entries(rules))check(passed,'temporary outing rule: '+name);
+  await page.waitForFunction(()=>document.querySelectorAll('[data-interval-add]').length===2);
+  check(await page.locator('.p109-temp-actions').count()===1,'one hover control group per physical departure');
+  check(await page.evaluate(()=>{const a=state.analysis.get(__r87Employee.id+'|8'),bars=r14TrackData(a).bars.filter(b=>b.track==='outing');return bars[0].origin==='registered'&&bars[1].origin==='temporary'}),'registration is drawn below translucent temporary intervals');
+  await page.evaluate(()=>{
+   __r87Seed([['08:25','进'],['11:30','出'],['13:40','进'],['17:10','出']]);
+   state.timelineRange={key:__r87Employee.id+'|8',start:540,end:720};render();
+  });
+  await page.waitForFunction(()=>document.querySelectorAll('.p109-temp-actions').length===1);
+  check(await page.locator('.p109-temp-actions').count()===1,'zooming to the morning keeps controls for a split lunch departure');
+  await page.evaluate(()=>{__r87Seed([['08:25','进'],['10:00','出'],['10:20','进'],['17:10','出']],[['10:10','10:30']]);state.timelineRange=null;render()});
+  await page.waitForFunction(()=>document.querySelectorAll('.p109-temp-actions').length===1);
+  const point=await page.evaluate(()=>{
+   const el=document.getElementById('attendanceTimelineChart'),chart=echarts.getInstanceByDom(el),
+    [x,y]=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[610,4]),r=el.getBoundingClientRect();return {x:r.left+x,y:r.top+y-7};
+  });
+  await page.mouse.move(point.x,point.y);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.p109-temp-actions')).opacity==='1');
+  check(await page.locator('.p109-temp-actions button').count()===3,'hover reveals red, green and x on the actual interval');
+  await page.screenshot({path:path.join(out,'r87-temporary-covered.png')});
+  await page.locator('.p109-temp-actions .red').focus();await page.locator('.p109-temp-actions .red').click();
+  check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).red===1),'actual hover control changes red verdict and statistics');
+  await page.locator('.p109-temp-actions .exclude').focus();await page.locator('.p109-temp-actions .exclude').click();
+  check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).count===0),'actual x removes the interval from all statistics');
+  await page.locator('[data-temp-reset]').click();
+  await page.locator('[data-interval-add="outing"]').focus();await page.locator('[data-interval-add="outing"]').click();
+  await page.locator('#p109IntervalStart').fill('10:10');await page.locator('#p109IntervalEnd').fill('10:30');await page.locator('.p109-interval-dialog [type=submit]').click();
+  check((await page.locator('#p109IntervalError').textContent()).includes('重叠'),'manual departure rejects duplicate active evidence');
+  await page.locator('#p109IntervalStart').fill('15:00');await page.locator('#p109IntervalEnd').fill('15:18');await page.locator('.p109-interval-dialog [type=submit]').click();
+  check(await page.evaluate(()=>state.manualTempOutings.length===1&&p109TempSummary([...state.analysis.values()]).red===1),'manual departure is displayed and judged using the same rules');
+  await page.locator('[data-interval-add="overtime"]').focus();await page.locator('[data-interval-add="overtime"]').click();
+  await page.locator('#p109IntervalStart').fill('17:10');await page.locator('#p109IntervalEnd').fill('17:20');await page.locator('.p109-interval-dialog [type=submit]').click();
+  check(await page.evaluate(()=>state.manualOvertime.length===1&&activeAutoOvertimeSegments(state.analysis.get(__r87Employee.id+'|8')).some(s=>s.origin==='manual'&&s.minutes===10)),'manual overtime bypasses automatic threshold and appears immediately');
+  await page.locator('[data-interval-add="overtime"]').focus();await page.locator('[data-interval-add="overtime"]').click();
+  await page.locator('#p109IntervalStart').fill('17:10');await page.locator('#p109IntervalEnd').fill('17:20');await page.locator('.p109-interval-dialog [type=submit]').click();
+  check((await page.locator('#p109IntervalError').textContent()).includes('覆盖'),'fully covered overtime is rejected instead of creating an invisible duplicate');
+  await page.keyboard.press('Escape');check(await page.locator('#p109IntervalOverlay').count()===0&&await page.evaluate(()=>state.manualOvertime.length===1),'Escape cancels the editor without changing manual facts');
+  await page.screenshot({path:path.join(out,'r87-manual-intervals.png')});
+  const overtime=await page.evaluate(()=>{
+   const e=__r87Employee,checks={};__r87Seed([['08:25','进'],['19:00','出']]);
+   state.manualOvertime=[{id:'manual-overtime:'+e.id+':test',employeeId:e.id,date:'2026-10-08',start:'18:00',end:'19:30'}];
+   state.overtimeEntries=[{id:'reg1',employeeId:e.id,date:'2026-10-08',start:'18:15',end:'18:45'}];reanalyze();
+   let ledger=asStatLedger();checks.unionNoDouble=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-140/60)<1e-8;
+   const id=state.manualOvertime[0].id;setAutoOvertimeDecision(id,false);ledger=asStatLedger();
+   checks.exclusionRestoresAuto=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-110/60)<1e-8;
+   __r87Seed([]);state.manualOvertime=[{id:'manual-overtime:'+e.id+':night',employeeId:e.id,date:'2026-10-08',start:'23:00',end:'02:00'}];reanalyze();
+   checks.crossnight=activeAutoOvertimeSegments(state.analysis.get(e.id+'|8'))[0].minutes===60&&activeAutoOvertimeSegments(state.analysis.get(e.id+'|9'))[0].minutes===120;
+   __r87Seed([['08:25','进'],['10:00','出'],['10:20','进'],['17:10','出']]);
+   state.manualTempOutings=[{id:'manual-temp:'+e.id+':saved',employeeId:e.id,date:'2026-10-08',start:'15:00',end:'15:18'}];
+   state.manualOvertime=[{id:'manual-overtime:'+e.id+':saved',employeeId:e.id,date:'2026-10-08',start:'17:10',end:'17:20'}];
+   reanalyze();p109SetTempDecision(state.analysis.get(e.id+'|8').temporaryOutings[0].id,'green');
+   RULES.tempOutingMinutes=11;RULES.tempOutingGraceMinutes=3;state.isDemo=false;state.imports=[];state.saved=false;rememberMonth();
+   window.__r87Saved=workingPayload();const normalized=normalizeSavedMonth(workingPayload());
+   checks.payload=normalized.manualOvertime.length===1&&normalized.manualTempOutings.length===1&&Object.values(normalized.tempOutingReview).includes('green');
+   switchMonth(2026,11,true);checks.newMonthEmpty=!state.manualOvertime.length&&!state.manualTempOutings.length&&!Object.keys(state.tempOutingReview).length;
+   switchMonth(2026,10);checks.monthRestore=state.manualOvertime.length===1&&state.manualTempOutings.length===1&&RULES.tempOutingGraceMinutes===3;
+   return checks;
+  });
+  for(const [name,passed] of Object.entries(overtime))check(passed,'manual interval persistence/overtime: '+name);
+  check(await page.evaluate(async()=>{
+   state.projectDir=null;const portable=await p109PortableFromSession(),files=await p109PortableCollect(portable),{zip}=await p109ZipBuild(files);
+   return await p109OpenPortableFile(new File([zip],'r87-roundtrip.zip'))&&state.manualTempOutings.length===1&&state.manualOvertime.length===1&&RULES.tempOutingMinutes===11&&RULES.tempOutingGraceMinutes===3&&Object.values(state.tempOutingReview).includes('green');
+  }),'complete project ZIP restores manual intervals, adjustable rules and review choices');
+  check(await page.evaluate(async()=>{
+   await freezeSnapshot();const folder=await existingDir(await monthDirectory(),'snapshots'),entries=await p109Entries(folder),h=await p109File(await existingDir(folder,entries[0].name),'snapshot.json'),before=await(await h.getFile()).text(),snapshot=JSON.parse(before);
+   const id=state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings[0].id;p109SetTempDecision(id,'red');
+   return snapshot.working.schemaVersion===3&&snapshot.working.manualTempOutings.length===1&&snapshot.working.manualOvertime.length===1&&snapshot.working.tempOutingReview[id]==='green'&&before===await(await h.getFile()).text();
+  }),'freeze retains manual intervals and verdicts while later edits leave its bytes immutable');
+  await page.locator('#settingsBtn').click();await page.locator('[data-settings-section="rules"]').click();
+  await page.locator('#r87TempLimit').fill('8');await page.locator('#r87TempGrace').fill('0');await page.locator('#settingsApply').click();
+  check(await page.evaluate(()=>RULES.tempOutingMinutes===8&&RULES.tempOutingGraceMinutes===0&&!state.saved),'actual settings save zero grace and trigger recalculation');
+  check(!errors.length&&!remote.length,'no browser errors or remote requests');
+  fs.writeFileSync(path.join(out,'r87-audit.json'),JSON.stringify(report,null,2));console.log('P109_R87_AUDIT_PASS '+JSON.stringify(report));
+ }finally{await context.close()}
+};

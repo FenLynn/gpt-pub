@@ -160,7 +160,7 @@ async function run(){
   const cols=getComputedStyle(list).gridTemplateColumns.split(' ').filter(Boolean);
   return cols.length===2&&getComputedStyle(list).overflowY==='visible'&&
     list.scrollHeight<=list.clientHeight+1&&bounds.left>=sidebar.left&&bounds.right<=sidebar.right&&
-    bounds.top>=0&&buttons.length===9&&
+    bounds.top>=0&&buttons.length===10&&
     buttons.every(b=>getComputedStyle(b).whiteSpace==='nowrap'&&b.scrollHeight<=b.clientHeight+1);
  },'R44 two-column status picker must fit without scrollbars');
  await page.locator('#statusFilterButton').click();
@@ -499,7 +499,7 @@ async function run(){
  },'R74 title, search and group editor share one row');
  await page.screenshot({path:path.join(out,'r74-roster-one-row.png')});
  await page.locator('[data-data-section="rules"]').click();
- await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===8&&
+ await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===10&&
    document.querySelector('.r68-rule-grid')?.textContent.includes('上午打卡容差')&&
    document.querySelector('.r68-rule-grid')?.textContent.includes('下午打卡容差')&&
    !!document.getElementById('r68EditRules'),
@@ -1363,7 +1363,7 @@ async function run(){
  if(layout.month!=='2026-10'||layout.tabs!==4||layout.defaultFilter!=='main'||layout.recordCount<3600||
     Math.abs(layout.sidebar-212)>1||Math.abs(layout.frame-893)>2||layout.ratio<3.4||layout.ratio>7.5||
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
- await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===9&&!!document.getElementById('settingsBtn')&&
+ await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===10&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
     document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
  await check(page,()=>document.querySelector('.save-state.saved b')?.textContent==='✓'&&!document.querySelector('.save-state i'),'Save state should be semantic, not an unexplained dot');
@@ -1960,11 +1960,12 @@ async function run(){
  await require('./r84-audit.cjs')({browser,out,root});
  await require('./r85-audit.cjs')({browser,out,root});
  await require('./r86-audit.cjs')({browser,out,root});
+ await require('./r87-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R86',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R87',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

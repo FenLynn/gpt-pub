@@ -6,6 +6,7 @@ function rememberMonth(){
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
     rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
+    tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:structuredClone(state.manualTempOutings||[]),manualOvertime:structuredClone(state.manualOvertime||[]),
     calendarOverrides:{...state.calendarOverrides},snapshotContext:!!state.snapshotContext,activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
   });
 }
@@ -48,6 +49,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true,internal=false
   state.imports=next.imports;state.saved=next.saved;
   state.activeBranch=next.activeBranch||null;
   state.snapshotContext=!!next.snapshotContext;
+  state.tempOutingReview={...(next.tempOutingReview||{})};state.manualTempOutings=structuredClone(next.manualTempOutings||[]);state.manualOvertime=structuredClone(next.manualOvertime||[]);
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   Object.assign(RULES,P109_DEFAULT_RULES,next.rules||{});
   RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);

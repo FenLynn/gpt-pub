@@ -65,6 +65,9 @@ function settingsContent(section){
     '<label class="r14-setting-row"><span>'+label+'</span><input id="r14Rule_'+key+'" type="number" min="0" max="120" step="1"></label>').join('')+
    '<label class="r14-setting-row"><span>重复打卡判定（秒）</span><input id="r14Dup" type="number" min="0" max="1800" step="10"></label>'+
    '<label class="r14-setting-row"><span>加班候选最短时长（分钟）</span><input id="r14OvertimeMin" type="number" min="20" max="240" step="1"></label>'+
+   '<label class="r14-setting-row"><span>临时外出短时限额（分钟）</span><input id="r87TempLimit" type="number" min="0" max="240" step="1"></label>'+
+   '<label class="r14-setting-row"><span>临时外出冗余（分钟）<small>短时限额额外放宽；报备起止各允许此误差；错位时长比较也使用此值</small></span><input id="r87TempGrace" type="number" min="0" max="60" step="1"></label>'+
+   '<p class="r14-setting-note">默认临时外出 10 + 2 分钟内为绿。只计算工作日班次内部分；超过后需报备覆盖（起止各容差），或与报备实际重叠且班内总时长相差不超过冗余。红绿可人工调整，× 排除。补录临时外出不等于报备。</p>'+
    '<p class="r14-setting-note">午间 12:00 和晚间 17:30（含）之前离开不计自动加班，超过门槛则从 11:40 / 17:10 起算，不扣除前 20 分钟。登记加班重叠仍只扣重叠段。人工 ×/✓ 只修改统计纳入，不改变原始打卡，也不代表正式审批。</p>');
  case 'data':return sectionCard('数据与模拟','全部数据在本地浏览器解析与计算，不上传服务端。',
    '<div class="r14-readonly"><strong>当前工作空间</strong><span>'+monthKey()+'</span></div>'+
@@ -114,6 +117,7 @@ function bindSettings(){
    for(const k of ['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'])
     set('r14Rule_'+k,d.rules[k]??(k.endsWith('Start')?(d.rules.grace??5):0));
    set('r14Dup',d.rules.dupSeconds);set('r14OvertimeMin',d.rules.overtimeMinMinutes??20);
+   set('r87TempLimit',d.rules.tempOutingMinutes??10);set('r87TempGrace',d.rules.tempOutingGraceMinutes??2);
   }
   if(section==='table'){
    set('settingTableKind',d.tableKind||'attendance');
@@ -145,7 +149,8 @@ function bindSettings(){
    for(const k of ['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'])
     d.rules[k]=Number(v('r14Rule_'+k));
    d.rules.grace=d.rules.graceAmStart;d.rules.dupSeconds=Number(v('r14Dup'));
-   d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'))}
+   d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'));
+   d.rules.tempOutingMinutes=Number(v('r87TempLimit'));d.rules.tempOutingGraceMinutes=Number(v('r87TempGrace'))}
   if(section==='table'){
    const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};
    document.querySelectorAll('[data-config-column]').forEach(row=>{
@@ -179,7 +184,9 @@ function bindSettings(){
     !['graceAmStart','graceAmEnd','gracePmStart','gracePmEnd'].every(k=>
       Number.isInteger(d.rules[k])&&d.rules[k]>=0&&d.rules[k]<=120)||
     !Number.isFinite(d.rules.dupSeconds)||d.rules.dupSeconds<0||d.rules.dupSeconds>1800||
-    !Number.isInteger(d.rules.overtimeMinMinutes)||d.rules.overtimeMinMinutes<20||d.rules.overtimeMinMinutes>240){
+    !Number.isInteger(d.rules.overtimeMinMinutes)||d.rules.overtimeMinMinutes<20||d.rules.overtimeMinMinutes>240||
+    !Number.isInteger(d.rules.tempOutingMinutes)||d.rules.tempOutingMinutes<0||d.rules.tempOutingMinutes>240||
+    !Number.isInteger(d.rules.tempOutingGraceMinutes)||d.rules.tempOutingGraceMinutes<0||d.rules.tempOutingGraceMinutes>60){
     toast('请检查工作时段、宽限与重复判定参数',true);return;
   }
   Object.assign(RULES,d.rules);state.prefs=d.prefs;state.saved=false;rememberMonth();reanalyze();close();render();

@@ -198,6 +198,7 @@ function layoutHtml(){
             <option value="absent">缺勤</option>
             <option value="lateEarly">迟到早退</option>
             <option value="overtime">加班</option>
+            <option value="tempOuting">临时外出</option>
             <option value="leave">请假</option>
             <option value="trip">出差</option>
             <option value="outing">外出</option>
@@ -458,11 +459,11 @@ function matrixVisible(a){
  const judgment=attendanceJudgment(a);
  return state.filter==='main'?['normal','anomaly','absent'].includes(judgment):
    state.filter==='lateEarly'?attendanceHasLateEarly(a):
-   ['trip','leave','outing','overtime'].includes(state.filter)?
+   ['trip','leave','outing','overtime','tempOuting'].includes(state.filter)?
    attendanceBehaviors(a).includes(state.filter):judgment===state.filter;
 }
 function updateMatrixFilter(){
- document.getElementById('matrix')?.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
+ document.getElementById('matrix')?.classList.toggle('behavior-view',['trip','leave','outing','overtime','tempOuting'].includes(state.filter));
  document.querySelectorAll('.m-cell button[data-cell]').forEach(button=>{
    const [id,d]=button.dataset.cell.split('|'),a=state.analysis.get(id+'|'+d);
    const selected=state.selection.type==='cell'&&state.selection.employeeId===id&&state.selection.day===+d;
@@ -511,7 +512,7 @@ function renderMatrix(){
   html+='<div class="matrix-preview-frame focus-row inactive"></div><div class="matrix-preview-frame focus-col inactive"></div>';
   el.innerHTML=html;
   el.style.setProperty('--matrix-rows',String(visibleEmployees.length));
-  el.classList.toggle('behavior-view',['trip','leave','outing','overtime'].includes(state.filter));
+  el.classList.toggle('behavior-view',['trip','leave','outing','overtime','tempOuting'].includes(state.filter));
   el.classList.remove('focus-person','focus-date','focus-cell');
   if(state.selection.type==='person')el.classList.add('focus-person');
   if(state.selection.type==='date')el.classList.add('focus-date');
@@ -580,6 +581,7 @@ function analysisSelectionBadge(ctx){
 }
 
 function bindAnalysisPanel(ctx){
+  document.querySelectorAll('[data-temp-reset]').forEach(b=>b.onclick=()=>p109SetTempDecision(b.dataset.tempReset,null));
   document.querySelectorAll('[data-analysis-cell]').forEach(b=>b.onclick=()=>{const [id,d]=b.dataset.analysisCell.split('|');if(id&&d)selectCell(id,+d)});document.querySelectorAll('[data-analysis-day]').forEach(b=>b.onclick=()=>selectDate(+b.dataset.analysisDay));
   document.querySelectorAll('[data-record]').forEach(b=>b.onclick=()=>showRecord(b.dataset.record));
   document.querySelectorAll('[data-show-records]').forEach(b=>b.onclick=()=>{state.rawDataTab='attendance';renderRawTable(ctx)});
@@ -654,7 +656,7 @@ function escapeNameChar(ch){return String(ch).replace(/[&<>"']/g,c=>({'&':'&amp;
 
 const STATUS_FILTER_ITEMS=[
  ['main','常规','multi'],['normal','正常','normal'],['anomaly','异常','anomaly'],['absent','缺勤','absent'],
- ['lateEarly','迟到早退','late-early'],['trip','出差','trip'],['leave','请假','leave'],['outing','外出','outing'],['overtime','加班','overtime']
+ ['lateEarly','迟到早退','late-early'],['trip','出差','trip'],['leave','请假','leave'],['outing','外出','outing'],['overtime','加班','overtime'],['tempOuting','临时外出','temp-outing']
 ];
 function statusFilterSwatch(kind){
  if(kind==='multi')return '<span class="status-filter-dots"><i class="normal"></i><i class="anomaly"></i><i class="absent"></i></span>';

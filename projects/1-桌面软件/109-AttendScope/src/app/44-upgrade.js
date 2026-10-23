@@ -222,6 +222,9 @@ async function p109ShowUpdate(file){
  panel.querySelector('#p109UpdateClose').focus();
  try{bundle=await p109InspectUpdate(file);if(!panel.isConnected)return;
   panel.querySelector('#p109UpdateVersion').textContent='当前 '+P109_APP_VERSION+' → '+bundle.appVersion+(bundle.compare===0?'（同版本修复）':'');status.textContent='完整性与兼容性校验通过';
-  refresh();const remembered=await p109ReadProgram();if(remembered&&await remembered.queryPermission({mode:'readwrite'})==='granted')try{await setRoot(remembered)}catch(_){}
+  refresh();const remembered=await p109ReadProgram();
+  if(remembered&&typeof remembered.queryPermission==='function')try{
+   if(await remembered.queryPermission({mode:'readwrite'})==='granted')await setRoot(remembered);
+  }catch(_){}
  }catch(e){status.textContent=e.message;choose.disabled=true;install.textContent='校验未通过';install.disabled=true}
 }

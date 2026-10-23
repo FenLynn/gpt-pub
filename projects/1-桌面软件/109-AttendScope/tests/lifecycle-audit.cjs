@@ -373,6 +373,28 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const oldRoot=path.join(tmp,'old-version-install','考勤');
   fs.mkdirSync(path.dirname(oldRoot),{recursive:true});
   fs.cpSync(restoreDir,oldRoot,{recursive:true});
+  // Build a synthetic schema-2 fixture ONLY when it contains no schema-3
+  // decisions or manual intervals. This is not a production downgrade path.
+  const legacyValue=value=>{
+   if(!value||typeof value!=='object')return value;
+   for(const field of ['manualTempOutings','manualOvertime','tempOutingReview'])if(field in value){
+    if(Object.keys(value[field]||{}).length)throw Error('Cannot turn new manual facts into a legacy fixture');
+    delete value[field];
+   }
+   if(value.schemaVersion===3)value.schemaVersion=2;
+   if(value.workingSchema===3)value.workingSchema=2;
+   for(const key of Object.keys(value))legacyValue(value[key]);return value;
+  };
+  const legacyFiles=folder=>{
+   for(const entry of fs.readdirSync(folder,{withFileTypes:true})){
+    const file=path.join(folder,entry.name);
+    if(entry.isDirectory()){if(entry.name!=='raw'&&entry.name!=='backups')legacyFiles(file)}
+    else if(entry.name.endsWith('.json')){
+     const data=JSON.parse(fs.readFileSync(file,'utf8'));fs.writeFileSync(file,JSON.stringify(legacyValue(data)));
+    }
+   }
+  };
+  legacyFiles(oldRoot);
   const historicalCommit='71caeaa99b7eb41b71ee457d1334a8bcff2de561';
   const projectPath='projects/1-桌面软件/109-AttendScope/';
   const listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',historicalCommit,'--',projectPath],{encoding:'utf8'});
@@ -434,7 +456,46 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.r83UpdatePreservesData=fs.readFileSync(oldWorkingPath).equals(r83Working)&&fs.readFileSync(oldRawPath).equals(r83Raw);
   await open();report.r83UpdateReload=await page.evaluate(v=>P109_APP_VERSION===v&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲')&&!!document.querySelector('#importPopover #upgradeProjectBtn'),currentVersion);
 
+  // R86 uses the current upgrade wizard, whereas R77/R83 use older entries.
+  const r86Commit='f80c0c145f99618ca3c171dd42e0b440057728bd';
+  const installR86=()=>{
+   const listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r86Commit,'--',projectPath],{encoding:'utf8'});
+   if(listing.status!==0)throw Error('R86 source listing unavailable');
+   for(const file of listing.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+    const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r86Commit+':'+file],{maxBuffer:16*1024*1024});
+    if(source.status!==0)throw Error('Cannot read R86 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+   }
+  };
+  installR86();await open();
+  report.r86OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.12-preview'&&state.records.length===2&&!!state.projectDir);
+  const r86Working=fs.readFileSync(oldWorkingPath),r86Raw=fs.readFileSync(oldRawPath);
+  // A Node filesystem test handle is not a browser-native structured-cloneable
+  // directory. Choose it afresh instead of restoring its serialized plain object.
+  await page.evaluate(()=>p109RememberProgram(null));
+  await page.locator('#importBtn').click();const r86Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await(await r86Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(v=>document.querySelector('#p109UpdateVersion')?.textContent.includes(v),currentVersion);
+  if(await page.locator('#p109UpdateChoose').isDisabled())throw Error('R86 upgrade validation: '+await page.locator('#p109UpdateStatus').textContent());
+  try{await page.locator('#p109UpdateChoose').click({timeout:5000})}catch(e){
+   await page.screenshot({path:path.join(out,'r87-legacy-upgrade-failure.png')});
+   throw Error('R86 folder choice: '+await page.locator('#p109UpdateStatus').textContent());
+  }
+  await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();
+  await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
+  report.r86UpdatePreservesData=fs.readFileSync(oldWorkingPath).equals(r86Working)&&fs.readFileSync(oldRawPath).equals(r86Raw);
+  await open();
+  report.r86UpgradeReload=await page.evaluate(v=>P109_APP_VERSION===v&&state.records.length===2,currentVersion);
+  await page.evaluate(async()=>{
+   state.manualOvertime=[{id:'manual-overtime:legacy-test',employeeId:EMPLOYEES[0].id,date:'2026-10-08',start:'18:00',end:'19:00'}];
+   state.saved=false;rememberMonth();await saveWorking();
+  });
+  report.newWorkingHasSchema3=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===3;
+  installR86();await open();
+  report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
+
   const requiredTrue=[
+   'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasSchema3','oldProgramRejectsNewSchema',
    'r83OldVersionBoot','r83UpdatePreservesData','r83UpdateReload',
    'r77ImportedAttendanceFlags','r77OvertimeAndEarlyCoexist','r77ManualKeepsEvidence',
    'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',

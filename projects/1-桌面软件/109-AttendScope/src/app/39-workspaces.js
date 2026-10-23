@@ -25,7 +25,7 @@ function scopeVisibleEmployees(){
  return people;
 }
 function sidebarFilterHtml(){
- const options=[['main','常规'],['normal','正常'],['anomaly','异常'],['absent','缺勤'],['lateEarly','迟到早退'],['overtime','加班'],['leave','请假'],['trip','出差'],['outing','外出']];
+ const options=[['main','常规'],['normal','正常'],['anomaly','异常'],['absent','缺勤'],['lateEarly','迟到早退'],['overtime','加班'],['tempOuting','临时外出'],['leave','请假'],['trip','出差'],['outing','外出']];
  return '<section class="side-filter state-select-wrap"><label class="side-label" for="statusFilter">状态筛选</label>'+
   '<div class="status-filter-control"><button type="button" id="statusFilterButton" class="status-filter-button" aria-expanded="false">'+statusFilterLabel(state.filter)+'</button>'+
   '<div id="statusFilterMenu" class="status-filter-menu" role="listbox">'+statusFilterMenuHtml()+'</div>'+
@@ -103,7 +103,7 @@ function workspaceSidebarHtml(){
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>')+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
-   '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
+   '<div class="side-refinements">'+sidebarFilterHtml()+p109TempSidebarHtml()+'</div>')+'</div>';
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';

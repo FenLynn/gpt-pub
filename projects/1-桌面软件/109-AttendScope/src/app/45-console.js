@@ -227,7 +227,7 @@ function r72AddPerson(){
   if(!window.confirm('当前是演示数据。新增真实人员前需要清空演示人员与记录，是否继续？'))return;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.groups={};state.groupCatalog=[];state.fixedPeople=[];
-  state.nameAliases={};state.imports=[];state.manualStatuses={};state.overtimeReview={};
+  state.nameAliases={};state.imports=[];state.manualStatuses={};state.overtimeReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];
   state.revisions=[];state.revisionSeq=0;state.isDemo=false;
  }
  EMPLOYEES.push({id:personIdentity(name),name,department:'未分类'});
@@ -263,6 +263,7 @@ function r72RenamePerson(id){
   [key.startsWith(id+'|')?newId+key.slice(id.length):key,v]));
  state.overtimeReview=Object.fromEntries(Object.entries(state.overtimeReview||{}).map(([key,v])=>
   [key.replace('auto-visit:'+id+':','auto-visit:'+newId+':').replace('auto:'+id+':','auto:'+newId+':'),v]));
+ p109RenameIntervalState(state,id,newId);
  if(state.selection.employeeId===id)state.selection.employeeId=newId;
  r68UI.chosen=new Set([...r68UI.chosen].map(x=>x===id?newId:x));
  r72MarkDirty('rename-person',{employeeId:newId,from:oldName,to:name});
@@ -327,6 +328,8 @@ function r68RulesHtml(){
  ['下午打卡容差',RULES.gracePmStart+' / '+RULES.gracePmEnd+' 分钟'],
  ['重复打卡识别',RULES.dupSeconds+' 秒'],
  ['自动加班保护','晚 '+RULES.overtimeMinMinutes+' 分钟后才计整段'],
+ ['临时外出短时限额',p109TempRules().limit+' 分钟'],
+ ['临时外出冗余',p109TempRules().grace+' 分钟（报备起止各允许）'],
  ['手工修订',state.revisions.length+' 次'],
  ['日历调整',Object.keys(state.calendarOverrides||{}).filter(k=>k.startsWith(monthKey())).length+' 天']
  ];

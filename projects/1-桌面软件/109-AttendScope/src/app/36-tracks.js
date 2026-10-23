@@ -28,13 +28,19 @@ function r19PunchClusters(a,range,width,fixedLane=null){
 function r23BehaviorSegments(a,key){
   if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',sourceIds:[p.id]}));
   if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]}));
-  if(key==='outing')return (a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'外出',sourceIds:[p.id]}));
+  if(key==='outing')return [
+   ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',origin:'registered',sourceIds:[p.id]})),
+   ...(a.temporaryOutings||[]).flatMap(p=>p.parts.map(([from,to])=>({from,to,
+    title:(p.origin==='manual'?'补录':'自动')+'临时外出 · '+({green:'绿色',red:'红色',exclude:'已排除'}[p.status]),
+    origin:'temporary',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
+    manualDecision:p.manualDecision,segmentId:p.id,sourceIds:p.sourceIds})))
+  ];
   if(key==='overtime')return [
    ...(a.overtime||[]).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
     title:'登记加班',origin:'registered',sourceIds:[p.id]})),
    ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
-    title:p.accepted!==false?'自动加班 · 已勾选':'自动加班 · 已取消',
-    origin:'auto',accepted:p.accepted!==false,segmentId:p.id,sourceIds:null}))
+    title:(p.origin==='manual'?'补录加班':'自动加班')+(p.accepted!==false?' · 已勾选':' · 已取消'),
+    origin:p.origin||'auto',accepted:p.accepted!==false,segmentId:p.id,sourceIds:null}))
   ];
   return [];
 }
@@ -55,6 +61,7 @@ function r14TrackData(a,range=timelineRange(a),width=800){
       if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,
         sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
         accepted:seg.accepted!==false,segmentId:seg.segmentId||null});
+      if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manualDecision:seg.manualDecision});
     }
   }
   const workWindows=!isWorkday(a.day)||state.prefs?.timelineTracks?.rules===false?[]:[
@@ -81,6 +88,12 @@ function mountAttendanceTimeline(a){
     const d=model.bars[params.dataIndex];if(!d)return null;
     const p=api.coord([api.value(0),api.value(2)]),q=api.coord([api.value(1),api.value(2)]);
     const x=Math.min(p[0],q[0]),w=Math.max(1,Math.abs(q[0]-p[0])),h=Math.max(1,behaviorLaneHeight(api)+.5);
+    if(d.origin==='temporary'){
+      const palette=d.status==='red'?['rgba(214,76,88,.36)','#bc4e5a']:
+       d.status==='exclude'?['rgba(145,157,166,.12)','#9ba8b0']:['rgba(52,169,111,.34)','#2d9568'];
+      return {type:'rect',shape:{x,y:p[1]-h*.44,width:w,height:h*.61,r:2},
+       style:{fill:palette[0],stroke:palette[1],lineWidth:1,lineDash:d.status==='exclude'?[3,3]:undefined}};
+    }
     if(d.track==='overtime'){
       const kind=d.origin==='auto'?'auto':'registered';
       const palette=d.accepted===false?OVERTIME_VISUALS.excluded:OVERTIME_VISUALS[kind];
@@ -126,7 +139,7 @@ function mountAttendanceTimeline(a){
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
     const q=api.coord([1440,lane]);
     return {type:'text',style:{
-      x:chart.getWidth()-SIDE-8,y:q[1],text:track.title,fill:track.color,
+      x:chart.getWidth()-SIDE-(['outing','overtime'].includes(track.key)?30:8),y:q[1],text:track.title,fill:track.color,
       font:'700 14px "Segoe UI Variable", sans-serif',
       align:'right',verticalAlign:'middle',
       textShadowColor:'rgba(255,255,255,.96)',textShadowBlur:2
@@ -161,6 +174,9 @@ function mountAttendanceTimeline(a){
           const head=d.count>1?minuteText(d.start)+'–'+minuteText(d.end)+' · '+d.count+' 条':d.records[0].time+' · '+d.direction;
           return '<b>'+head+'</b>';
         }
+        if(d.origin==='temporary')return '<b>'+safeTableText(d.title)+'</b><div>'+p109IntervalClock(d.value[0])+'–'+p109IntervalClock(d.value[1])+
+          ' · 班内合计 '+p109IntervalDuration(d.minutes)+'</div><div>'+safeTableText(d.manualDecision?'人工改判；自动依据：'+d.reason:d.reason)+
+          '</div>'+(d.note?'<div>'+safeTableText(d.note)+'</div>':'');
         return '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
       }},
     xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
@@ -265,7 +281,8 @@ function mountAttendanceTimeline(a){
     // All residual bars share a review ID: provide ONE decision control at
     // the rightmost residual fragment, not duplicate ×/✓ for each fragment.
     const groups=new Map();
-    for(const seg of model.bars.filter(d=>d.track==='overtime'&&d.origin==='auto')){
+    const visible=state.timelineRange||range;
+    for(const seg of model.bars.filter(d=>d.track==='overtime'&&['auto','manual'].includes(d.origin)&&d.value[1]>visible.start&&d.value[0]<visible.end)){
       const prior=groups.get(seg.segmentId);
       if(!prior||seg.value[1]>prior.value[1])groups.set(seg.segmentId,seg);
     }
@@ -286,8 +303,9 @@ function mountAttendanceTimeline(a){
        const btn=document.createElement('button');
        btn.type='button';btn.className='overtime-review-btn'+(seg.accepted===accepted?' chosen':'');
        btn.textContent=glyph;
-       btn.title=word+'自动加班：'+minuteText(from)+'–'+minuteText(to)+'（仅调整统计纳入，不代表审批）';
-       btn.setAttribute('aria-label',word+' '+minuteText(from)+'–'+minuteText(to)+' 自动加班');
+       const label=seg.origin==='manual'?'补录加班':'自动加班';
+       btn.title=word+label+'：'+minuteText(from)+'–'+minuteText(to)+'（仅调整统计纳入，不代表审批）';
+       btn.setAttribute('aria-label',word+' '+minuteText(from)+'–'+minuteText(to)+' '+label);
        btn.setAttribute('aria-pressed',String(seg.accepted===accepted));
        btn.onclick=e=>{e.stopPropagation();setAutoOvertimeDecision(seg.segmentId,accepted)};
        box.appendChild(btn);
@@ -297,17 +315,51 @@ function mountAttendanceTimeline(a){
       overlay.appendChild(box);
     }
   };
-  chart.on('finished',()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags()});
-  requestAnimationFrame(()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags()});
+  const syncTemporaryControls=()=>{
+    const overlay=document.getElementById('temporaryReviewLayer');if(!overlay?.isConnected)return;
+    overlay.replaceChildren();const groups=new Map(),visible=state.timelineRange||range;
+    for(const row of model.bars.filter(d=>d.origin==='temporary'&&d.value[1]>visible.start&&d.value[0]<visible.end)){
+      const prior=groups.get(row.segmentId);if(!prior||row.value[1]>prior.value[1])groups.set(row.segmentId,row);
+    }
+    for(const row of groups.values()){
+      const [from,to,lane]=row.value,x=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,lane]),
+       left=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[from,lane]);
+      if(!x||!left||x[0]<=SIDE||left[0]>=chart.getWidth()-SIDE)continue;
+      const box=document.createElement('div');box.className='p109-temp-actions';box.dataset.tempId=row.segmentId;
+      box.style.left=Math.max(SIDE,Math.min(x[0]-70,chart.getWidth()-SIDE-74))+'px';
+      box.style.top=Math.max(0,x[1]-22)+'px';
+      for(const [status,glyph,title] of [['red','●','标为红色'],['green','●','标为绿色'],['exclude','×','排除统计']]){
+        const button=document.createElement('button');button.type='button';button.className=status;
+        button.textContent=glyph;button.title=title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
+        button.setAttribute('aria-label',button.title);button.setAttribute('aria-pressed',String(row.status===status));
+        button.onclick=e=>{e.stopPropagation();p109SetTempDecision(row.segmentId,status)};box.appendChild(button);
+      }
+      overlay.appendChild(box);
+    }
+    for(const [kind,lane,label] of [['outing',4,'补录临时外出'],['overtime',5,'补录加班']]){
+      const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[1440,lane]);if(!pos)continue;
+      const button=document.createElement('button');button.type='button';button.className='p109-interval-add';
+      button.dataset.intervalAdd=kind;button.style.top=(pos[1]-12)+'px';button.textContent='+';
+      button.title=label;button.setAttribute('aria-label',label);
+      button.onclick=()=>p109OpenIntervalEditor(kind,a.employee.id,a.date);overlay.appendChild(button);
+    }
+  };
+  const syncAll=()=>{syncNavigator();syncOvertimeControls();syncAttendanceFlags();syncTemporaryControls()};
+  chart.on('finished',syncAll);
+  requestAnimationFrame(syncAll);
   chart.on('mouseover',p=>{
     const segment=p?.data?.segmentId;
     if(p.seriesId==='bands'&&segment){
+      if(p.data.origin==='temporary'){
+        document.querySelectorAll('.p109-temp-actions').forEach(n=>n.classList.toggle('is-hovered',n.dataset.tempId===segment));return;
+      }
       state.overtimeHoverId=segment;
       overlayHighlight(segment);
     }
   });
   chart.on('mouseout',p=>{
     if(p?.data?.segmentId){state.overtimeHoverId='';
+      document.querySelectorAll('.p109-temp-actions').forEach(n=>n.classList.remove('is-hovered'));
       overlayHighlight('');}
   });
   function overlayHighlight(segmentId){
@@ -317,10 +369,10 @@ function mountAttendanceTimeline(a){
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}
-    if(p.seriesId==='bands'&&d.origin==='auto'&&d.segmentId){
+    if(p.seriesId==='bands'&&['auto','manual','temporary'].includes(d.origin)&&d.segmentId){
       // Clicking the band itself selects the current review state; the
       // explicit ✓ and × controls handle decisions.
-      syncOvertimeControls();return;
+      syncOvertimeControls();syncTemporaryControls();return;
     }
     if(p.seriesId==='bands'&&d.track&&d.sourceIds?.length)focusRawEvidence(d.track,d.sourceIds);
   });

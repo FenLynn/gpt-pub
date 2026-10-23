@@ -82,10 +82,12 @@ module.exports=async({browser,out,root})=>{
   }),'interrupted transaction is recovered from its hash-verified durable backup');
   // Install current again, then exercise the actual file chooser, directory step and wizard.
   check(await page.evaluate(()=>p109ApplyCodeUpdate(__updateFile,{programRoot:__runtime,confirmed:true})),'reinstall after recovery');
-  await page.evaluate(()=>p109RememberProgram(null));
+  await page.evaluate(()=>p109RememberProgram({name:'invalid remembered folder',kind:'directory'}));
   await page.locator('#importBtn').click();const chooser=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();await (await chooser).setFiles(zip);
   await page.waitForFunction(()=>document.querySelector('#p109UpdateVersion')?.textContent.includes(P109_APP_VERSION));
   check(await page.locator('#p109UpdateInstall').isDisabled(),'wizard requires explicit program-folder authorization on first use');
+  await page.evaluate(()=>p109ReadProgram());
+  check(await page.locator('#p109UpdateChoose').isEnabled(),'an unusable remembered directory never disables fresh folder authorization');
   await page.evaluate(()=>{window.showDirectoryPicker=async()=>__runtime});await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
   for(const [width,height] of [[1280,720],[1366,768],[1920,1080]]){await page.setViewportSize({width,height});check(await page.locator('.p109-update-panel').evaluate(el=>{const r=el.getBoundingClientRect();return r.width/innerWidth>.8&&r.top>=0&&r.bottom<=innerHeight}),'upgrade dialog fits viewport and exceeds 80% width: '+width)}
   await page.setViewportSize({width:1366,height:768});await page.screenshot({path:path.join(out,'r84-upgrade-ready.png')});

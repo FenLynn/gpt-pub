@@ -65,7 +65,7 @@ function applyImportRoster(plan,meta){
     const before=new Map(EMPLOYEES.map(e=>[e.id,personIdentity(e.name)]));
     state.fixedPeople=(state.fixedPeople||[]).map(id=>before.get(id)||id);
     state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
-    state.manualStatuses={};state.overtimeReview={};state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
+    state.manualStatuses={};state.overtimeReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
     state.imports=[meta];
     const pinGroups=state.projectProfile?.groups||state.groups;
     state.groups=Object.fromEntries(plan.people.filter(e=>(state.fixedPeople||[]).includes(e.id))
@@ -232,6 +232,7 @@ function attendanceBehaviors(a){
   if(a.trips?.length)results.push('trip');
   if(a.leaves?.length)results.push('leave');
   if(a.outings?.length||state.outings?.some(x=>x.employeeId===a.employee.id&&a.date>=x.startDate&&a.date<=x.endDate))results.push('outing');
+  if(activeTemporaryOutings(a).length)results.push('tempOuting');
   if(a.overtime?.length||activeAutoOvertimeSegments(a).length||
     (!isWorkday(a.day)&&a.punches.length)||state.overtimeEntries?.some(x=>x.employeeId===a.employee.id&&x.date===a.date))
    results.push('overtime');
@@ -241,13 +242,15 @@ function attendanceHasLateEarly(a){return !!a&&(a.attendanceFlags||[]).some(flag
 function attendanceCategory(a){return attendanceJudgment(a)}
 function matrixCategory(a,filter=state.filter){
   if(filter==='lateEarly'&&attendanceHasLateEarly(a))return 'lateEarly';
-  return ['trip','leave','outing','overtime'].includes(filter)&&attendanceBehaviors(a).includes(filter)?filter:
+  return ['trip','leave','outing','overtime','tempOuting'].includes(filter)&&attendanceBehaviors(a).includes(filter)?
+   (filter==='tempOuting'?(activeTemporaryOutings(a).some(r=>r.status==='red')?'tempOutingRed':'tempOutingGreen'):filter):
    attendanceJudgment(a,state.judgmentMode==='initial'?'initial':'final');
 }
-function categoryColor(category){return ATTEND_STATUS_COLORS[category]||ATTEND_BEHAVIOR_COLORS[category]||ATTEND_STATUS_COLORS.rest}
+function categoryColor(category){return ({tempOutingRed:'#dc8388',tempOutingGreen:'#78caa0'})[category]||ATTEND_STATUS_COLORS[category]||ATTEND_BEHAVIOR_COLORS[category]||ATTEND_STATUS_COLORS.rest}
 function outingFor(empId,date){return (state.outings||[]).filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
 function overtimeFor(empId,date){return attendanceDailyRegistered(empId,date)}
 function behaviorMinutes(a,kind){
+  if(kind==='tempOuting')return activeTemporaryOutings(a).reduce((sum,r)=>sum+r.minutes,0);
   const intervals=kind==='leave'?a.leaves:kind==='outing'?a.outings:kind==='overtime'?a.overtime:[];
   if(kind==='trip')return a.trips.length?Math.max(0,minutes(RULES.amEnd)-minutes(RULES.amStart))+Math.max(0,minutes(RULES.pmEnd)-minutes(RULES.pmStart)):0;
   return intervals.reduce((sum,x)=>sum+Math.max(0,minutes(x.end||'00:00')-minutes(x.start||'00:00')),0);
@@ -427,7 +430,7 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   from,to,id,qualifying,sessionFrom,sessionTo}));
  const registeredIntervals=analysisUnionSegments(registered.map(r=>[
   minutes(r.start||''),minutes(r.end||'')]));
- // Decide the 5-minute threshold on the continuous in→out evidence first.
+ // Decide the configured threshold on the continuous in→out evidence first.
  // Registered overtime is an accounting overlay, not an 'out' punch and must
  // NOT break one session into several independent threshold candidates.
  const residual=[],raw=[];
@@ -444,7 +447,7 @@ function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
   const all=analysisUnionSegments(fragments);
   raw.push(...all);
   // Fragments keep the identity of their continuous punch-backed session.
-  // A 4-minute leftover from a 15-minute session is eligible; a separate
+  // A 4-minute leftover from a 30-minute session is eligible; a separate
   // 4-minute punch session is not. Both are still non-overlapping with raw
   // registered entries in the statistics ledger.
   if((item.qualifying||end-begin)>minMinutes+1e-8){
@@ -472,16 +475,20 @@ function setAutoOvertimeDecision(segmentId,accepted){
  const before=found.accepted!==false,next=!!accepted;
  if(before===next)return true;
  if(!state.overtimeReview)state.overtimeReview={};
- for(const store of state.monthStores.values()){
+ for(const [key,store] of state.monthStores){
   if(!store.overtimeReview)store.overtimeReview={};
   if(next)delete store.overtimeReview[segmentId];
   else store.overtimeReview[segmentId]=false;
+  if(Number.isFinite(found.sessionFrom)&&Number.isFinite(found.sessionTo)){
+   const [y,m]=key.split('-').map(Number);
+   if(found.sessionFrom<Date.UTC(y,m,1)/60000&&found.sessionTo>Date.UTC(y,m-1,1)/60000)store.saved=false;
+  }
  }
  if(next)delete state.overtimeReview[segmentId];
  else state.overtimeReview[segmentId]=false;
  state.revisions.push({id:'R'+(++state.revisionSeq),key:found.employeeId+'|'+found.date,
   action:'auto-overtime-inclusion',segmentId,from:before,to:next,
-  time:new Date().toISOString(),note:'自动推算加班统计纳入选择（非审批）'});
+  time:new Date().toISOString(),note:'推算/补录加班统计纳入选择（非审批）'});
  state.saved=false;rememberMonth();reanalyze();render();
  return true;
 }
@@ -548,7 +555,8 @@ function analyzeDay(emp,d){
  const crossesLunch=pairs.some(([x,y])=>minutes(x.time)<lunchStart&&minutes(y.time)>lunchEnd);
  const lunchEvidence=crossesLunch?(isWorkday(d)?'未分段（班内工时按班次扣午休）':'连续在岗跨中午（不扣午休）'):
   morningPair&&lunchReturn?'有午休进出':'未明确';
- const autoOvertime=estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain);
+ const temporaryOutings=p109TemporaryOutings(emp,date,punches);
+ const autoOvertime=p109CompleteOvertime(estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain),emp.id,date,overtime);
  // A recalculated interval must not inherit a past exclusion from a DIFFERENT
  // imported evidence set even if its visible clock boundaries are identical.
  const sourceEvidence=[
@@ -562,13 +570,13 @@ function analyzeDay(emp,d){
  autoOvertime.segments=autoOvertime.segments.map(seg=>{
   // Shared ID links residual fragments to ONE uninterrupted in→out session.
   // One ×/✓ decision covers all of its parts, not only a fragment.
-  const id=seg.sessionId||'auto:'+emp.id+':'+date+':'+Math.round(seg.sessionFrom*60)+'-'+
+  const id=seg.id||seg.sessionId||'auto:'+emp.id+':'+date+':'+Math.round(seg.sessionFrom*60)+'-'+
    Math.round(seg.sessionTo*60)+':'+evidenceSuffix;
-  return {...seg,id,employeeId:emp.id,date,origin:'auto',
+  return {...seg,id,employeeId:emp.id,date,origin:seg.origin||'auto',
    accepted:state.overtimeReview?.[id]!==false&&
     ![...state.monthStores.values()].some(store=>store.overtimeReview?.[id]===false)};
  });
- if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length){
+ if(!state.records.length&&!state.leaves.length&&!state.trips.length&&!state.outings?.length&&!state.overtimeEntries?.length&&!state.manualOvertime?.length&&!state.manualTempOutings?.length){
   status='未导入';severity='rest';return pack();
  }
  if(!isWorkday(d)){
@@ -637,7 +645,7 @@ function analyzeDay(emp,d){
  }
  function pack(){return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
-  lunchEvidence,autoOvertime,attendanceFlags,marker:''}}
+  lunchEvidence,autoOvertime,temporaryOutings,attendanceFlags,marker:''}}
  return pack();
 }
 function reanalyze(){

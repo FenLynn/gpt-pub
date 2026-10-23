@@ -98,6 +98,7 @@ function r62MigratePayload(data){
     .replace('auto:'+oldId+':','auto:'+newId+':');
   }reviews[next]=value;
  }data.overtimeReview=reviews;
+ for(const [oldId,newId] of translation)p109RenameIntervalState(data,oldId,newId);
  return data;
 }
 function r62MigrateActive(){
@@ -105,10 +106,12 @@ function r62MigrateActive(){
  const data={employees:EMPLOYEES,groups:state.groups,records:state.records,
   leaves:state.leaves,trips:state.trips,outings:state.outings,
   overtimeEntries:state.overtimeEntries,manualStatuses:state.manualStatuses,
-  overtimeReview:state.overtimeReview};
+  overtimeReview:state.overtimeReview,tempOutingReview:state.tempOutingReview,
+  manualTempOutings:state.manualTempOutings,manualOvertime:state.manualOvertime};
  r62MigratePayload(data);
  EMPLOYEES=data.employees;state.groups=data.groups;
  state.manualStatuses=data.manualStatuses;state.overtimeReview=data.overtimeReview;
+ state.tempOutingReview=data.tempOutingReview;
  if(previousPerson)state.selection.employeeId=personIdentity(previousPerson);
 }
 function r62ImportProfile(){
@@ -264,6 +267,7 @@ function r79ImportCapture(){
  const before=p109CaptureSession();before.employees=structuredClone(EMPLOYEES);
  Object.assign(before.values,structuredClone({records:state.records,leaves:state.leaves,trips:state.trips,
   outings:state.outings,overtimeEntries:state.overtimeEntries,imports:state.imports,
+  tempOutingReview:state.tempOutingReview,manualTempOutings:state.manualTempOutings,manualOvertime:state.manualOvertime,
   monthStores:state.monthStores,groups:state.groups,manualStatuses:state.manualStatuses,overtimeReview:state.overtimeReview}));
  return before;
 }
