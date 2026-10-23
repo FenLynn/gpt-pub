@@ -206,7 +206,9 @@ async function p109ShowUpdate(file){
   if(install.dataset.reload){location.reload();return}if(running)return;running=true;panel.querySelectorAll('button').forEach(b=>b.disabled=true);
   const ok=await p109ApplyCodeUpdate(file,{programRoot,confirmed:true,onProgress:t=>status.textContent=t,onError:t=>status.textContent=t});
   running=false;panel.querySelector('#p109UpdateClose').disabled=false;panel.querySelector('#p109UpdateCancel').disabled=false;
-  if(ok){install.disabled=false;install.textContent='完成并重新载入';install.dataset.reload='1';status.textContent='更新成功，所有文件已核验。升级前备份位于程序及项目目录的 backups 文件夹。';choose.disabled=true}
+  if(ok){install.disabled=false;install.textContent='完成并重新载入';install.dataset.reload='1';status.textContent='更新成功，所有文件已核验。升级前备份位于程序及项目目录的 backups 文件夹。';choose.disabled=true;
+   panel.querySelector('#p109UpdateCancel').hidden=true;panel.querySelector('#p109UpdateClose').setAttribute('aria-label','完成并重新载入');
+  }
   else{choose.disabled=false;refresh()}
  };
  panel.querySelector('#p109UpdateClose').focus();
