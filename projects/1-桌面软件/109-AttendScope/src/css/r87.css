@@ -1,18 +1,21 @@
 .p109-temporary-layer{position:absolute;inset:0;z-index:15;pointer-events:none;overflow:hidden}
 .p109-temp-actions{position:absolute;display:flex;gap:2px;padding:2px;border:1px solid #d9e3e8;border-radius:5px;background:rgba(255,255,255,.96);pointer-events:auto;opacity:0;transition:opacity .12s;box-shadow:0 2px 8px #243e5020}
 .p109-temp-actions:is(.is-hovered,:hover,:focus-within){opacity:1}
-.p109-temp-actions button{display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:3px;background:transparent;font-size:17px;cursor:pointer}
+.p109-temp-actions button{display:grid;place-items:center;width:24px;height:24px;border:0;border-radius:3px;background:transparent;cursor:pointer}
 .p109-temp-actions .red{color:#c2525d}.p109-temp-actions .green{color:#279463}.p109-temp-actions .exclude{color:#748796}
 .p109-temp-actions button[aria-pressed=true]{background:#edf2f5;box-shadow:inset 0 0 0 1px currentColor}
 .p109-temp-actions button:focus-visible{outline:2px solid #2784c6;outline-offset:1px}
-.p109-interval-add{position:absolute;right:14px;display:grid;place-items:center;width:24px;height:24px;padding:0;border:1px solid #a9c4d5;border-radius:50%;background:#fff;color:#327da7;font-size:20px;line-height:1;pointer-events:auto;opacity:0;cursor:pointer}
+.p109-interval-add{position:absolute;display:grid;place-items:center;width:24px;height:24px;border:1px solid #a9c4d5;border-radius:50%;background:#fff;color:#327da7;pointer-events:auto;opacity:0;cursor:pointer}
+.p109-temp-actions button,.p109-interval-add,.overtime-review-actions .overtime-review-btn{box-sizing:border-box;min-width:0;min-height:0;padding:0;margin:0;line-height:0;font-size:0;flex:none;appearance:none}
+.p109-temp-actions button svg,.p109-interval-add svg,.overtime-review-btn svg{display:block;width:20px;height:20px;pointer-events:none;flex:none}
+.overtime-review-actions{box-sizing:border-box;height:auto;gap:2px;transform:none!important;transition:opacity .12s ease}
+.overtime-review-actions .overtime-review-btn{display:grid;place-items:center;width:24px;height:24px}
 .music-track-panel:hover .p109-interval-add,.p109-interval-add:focus-visible{opacity:1}
 .p109-temp-summary{margin:8px 0;padding:10px 12px;border:1px solid #e1e9ee;border-radius:8px;background:#fbfcfd;font-size:12px;color:#526b7e}
 .p109-temp-summary header,.p109-temp-summary>div{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .p109-temp-summary header{margin-bottom:7px;color:#355266}.p109-temp-summary strong{font-size:13px}
 .p109-temp-summary small{display:block;margin-top:6px;font-size:11px;color:#7c8f9c}
 .p109-temp-summary .temp-green,.p109-temp-details .green{color:#287e59}.p109-temp-summary .temp-red,.p109-temp-details .red{color:#b24c58}
-.side-refinements .p109-temp-summary{margin:5px 0 0;padding:8px}.p109-temp-summary.compact header{margin-bottom:4px}.p109-temp-summary.compact small{font-size:10px}
 .status-filter-dot.temp-outing{background:linear-gradient(90deg,#78caa0 50%,#dc8388 50%)}
 .p109-temp-details{padding:0 10px;font-size:11px}.p109-temp-details>div{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:4px 0}.p109-temp-details .exclude{color:#8c99a3}
 .p109-temp-details button{border:0;background:transparent;color:#397aa2;cursor:pointer;font-size:11px;white-space:nowrap}

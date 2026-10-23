@@ -32,7 +32,7 @@ function r23BehaviorSegments(a,key){
    ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',origin:'registered',sourceIds:[p.id]})),
    ...(a.temporaryOutings||[]).flatMap(p=>p.parts.map(([from,to])=>({from,to,
     title:(p.origin==='manual'?'补录':'自动')+'临时外出 · '+({green:'绿色',red:'红色',exclude:'已排除'}[p.status]),
-    origin:'temporary',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
+    origin:'temporary',manual:p.origin==='manual',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
     manualDecision:p.manualDecision,segmentId:p.id,sourceIds:p.sourceIds})))
   ];
   if(key==='overtime')return [
@@ -61,7 +61,7 @@ function r14TrackData(a,range=timelineRange(a),width=800){
       if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,
         sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
         accepted:seg.accepted!==false,segmentId:seg.segmentId||null});
-      if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manualDecision:seg.manualDecision});
+      if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manual:seg.manual,manualDecision:seg.manualDecision});
     }
   }
   const workWindows=!isWorkday(a.day)||state.prefs?.timelineTracks?.rules===false?[]:[
@@ -74,6 +74,7 @@ function mountAttendanceTimeline(a){
   const el=document.getElementById('attendanceTimelineChart');if(!el||!window.echarts)return;
   const chart=initAttendChart(el);if(!chart)return;
   const SIDE=12,SLIDER_BOTTOM=30,SLIDER_HEIGHT=34;
+  const labelFont='700 14px "Segoe UI Variable", sans-serif',labelRight=SIDE+8;
   const range=timelineRange(a);
   let model=r14TrackData(a,range,chart.getWidth());
   const behaviorRowHeight=(api)=>Math.max(1,Math.abs(api.size([0,1])[1]));
@@ -139,8 +140,8 @@ function mountAttendanceTimeline(a){
     const lane=api.value(2),track=model.tracks[lane];if(!track||lane<2)return null;
     const q=api.coord([1440,lane]);
     return {type:'text',style:{
-      x:chart.getWidth()-SIDE-(['outing','overtime'].includes(track.key)?30:8),y:q[1],text:track.title,fill:track.color,
-      font:'700 14px "Segoe UI Variable", sans-serif',
+      x:chart.getWidth()-labelRight,y:q[1],text:track.title,fill:track.color,
+      font:labelFont,
       align:'right',verticalAlign:'middle',
       textShadowColor:'rgba(255,255,255,.96)',textShadowBlur:2
     }};
@@ -276,7 +277,6 @@ function mountAttendanceTimeline(a){
     const overlay=document.getElementById('overtimeReviewLayer');
     if(!overlay||!overlay.isConnected)return;
     overlay.replaceChildren();
-    const lineH=Math.max(14,(chart.getHeight()-116)/6);
     // Registration can mask part of one continuous punch-backed session.
     // All residual bars share a review ID: provide ONE decision control at
     // the rightmost residual fragment, not duplicate ×/✓ for each fragment.
@@ -297,14 +297,14 @@ function mountAttendanceTimeline(a){
       box.className='overtime-review-actions'+(seg.accepted?'':' is-excluded')+
         (state.overtimeHoverId===seg.segmentId?' is-hovered':'');
       box.dataset.autoOvertimeId=seg.segmentId;
-      box.style.left=Math.max(0,Math.min(right-45,chart.getWidth()-48))+'px';
-      box.style.top=Math.max(0,x1[1]-lineH/2+2)+'px';
-      for(const [accepted,glyph,word] of [[false,'×','排除'],[true,'✓','纳入']]){
+      box.dataset.origin=seg.origin;box.dataset.anchorY=String(x1[1]);
+      const actions=seg.origin==='manual'?[[false,'close','删除']]:[[false,'close','排除'],[true,'check','纳入']];
+      for(const [accepted,icon,word] of actions){
        const btn=document.createElement('button');
        btn.type='button';btn.className='overtime-review-btn'+(seg.accepted===accepted?' chosen':'');
-       btn.textContent=glyph;
+       btn.innerHTML=p109IntervalIcon(icon);
        const label=seg.origin==='manual'?'补录加班':'自动加班';
-       btn.title=word+label+'：'+minuteText(from)+'–'+minuteText(to)+'（仅调整统计纳入，不代表审批）';
+       btn.title=word+label+'：'+minuteText(from)+'–'+minuteText(to)+(seg.origin==='manual'?'（直接删除这次补录）':'（仅调整统计纳入，不代表审批）');
        btn.setAttribute('aria-label',word+' '+minuteText(from)+'–'+minuteText(to)+' '+label);
        btn.setAttribute('aria-pressed',String(seg.accepted===accepted));
        btn.onclick=e=>{e.stopPropagation();setAutoOvertimeDecision(seg.segmentId,accepted)};
@@ -313,6 +313,8 @@ function mountAttendanceTimeline(a){
       box.onpointerenter=()=>box.classList.add('is-hovered');
       box.onpointerleave=()=>box.classList.remove('is-hovered');
       overlay.appendChild(box);
+      box.style.left=Math.max(0,Math.min(right-box.offsetWidth,chart.getWidth()-box.offsetWidth))+'px';
+      box.style.top=Math.max(0,x1[1]-box.offsetHeight/2)+'px';
     }
   };
   const syncTemporaryControls=()=>{
@@ -326,20 +328,26 @@ function mountAttendanceTimeline(a){
        left=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[from,lane]);
       if(!x||!left||x[0]<=SIDE||left[0]>=chart.getWidth()-SIDE)continue;
       const box=document.createElement('div');box.className='p109-temp-actions';box.dataset.tempId=row.segmentId;
-      box.style.left=Math.max(SIDE,Math.min(x[0]-70,chart.getWidth()-SIDE-74))+'px';
-      box.style.top=Math.max(0,x[1]-22)+'px';
-      for(const [status,glyph,title] of [['red','●','标为红色'],['green','●','标为绿色'],['exclude','×','排除统计']]){
+      const adjacent=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,lane-1]),height=Math.abs(x[1]-adjacent[1])+.5,
+       center=x[1]-height*.135;
+      box.dataset.anchorY=String(center);
+      for(const [status,icon,title] of [['red','circle','标为红色'],['green','circle','标为绿色'],['exclude','close',row.manual?'删除补录':'排除统计']]){
         const button=document.createElement('button');button.type='button';button.className=status;
-        button.textContent=glyph;button.title=title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
+        button.innerHTML=p109IntervalIcon(icon);button.title=title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
         button.setAttribute('aria-label',button.title);button.setAttribute('aria-pressed',String(row.status===status));
         button.onclick=e=>{e.stopPropagation();p109SetTempDecision(row.segmentId,status)};box.appendChild(button);
       }
       overlay.appendChild(box);
+      box.style.left=Math.max(SIDE,Math.min(x[0]-box.offsetWidth,chart.getWidth()-SIDE-box.offsetWidth))+'px';
+      box.style.top=Math.max(0,center-box.offsetHeight/2)+'px';
     }
     for(const [kind,lane,label] of [['outing',4,'补录临时外出'],['overtime',5,'补录加班']]){
       const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[1440,lane]);if(!pos)continue;
       const button=document.createElement('button');button.type='button';button.className='p109-interval-add';
-      button.dataset.intervalAdd=kind;button.style.top=(pos[1]-12)+'px';button.textContent='+';
+      const canvas=document.createElement('canvas'),measure=canvas.getContext('2d');measure.font=labelFont;
+      const textWidth=measure.measureText(model.tracks[lane].title).width;
+      button.dataset.intervalAdd=kind;button.dataset.anchorY=String(pos[1]);button.style.top=(pos[1]-12)+'px';
+      button.style.right=(labelRight+textWidth+8)+'px';button.innerHTML=p109IntervalIcon('plus');
       button.title=label;button.setAttribute('aria-label',label);
       button.onclick=()=>p109OpenIntervalEditor(kind,a.employee.id,a.date);overlay.appendChild(button);
     }

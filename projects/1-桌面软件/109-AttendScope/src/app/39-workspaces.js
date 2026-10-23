@@ -103,7 +103,7 @@ function workspaceSidebarHtml(){
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
   '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>')+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
-   '<div class="side-refinements">'+sidebarFilterHtml()+p109TempSidebarHtml()+'</div>')+'</div>';
+   '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
 }
 function workspaceToolbarHtml(){
  const mode=state.workspaceMode||'all';

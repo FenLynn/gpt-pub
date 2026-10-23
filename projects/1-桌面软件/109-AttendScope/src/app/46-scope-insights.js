@@ -72,8 +72,10 @@ function r68ScopeRender(){
    yAxis:{type:'value',minInterval:1,splitLine:{lineStyle:{color:'#edf2f7'}},
     axisLabel:{fontSize:12,color:'#62788a'},axisLine:{show:false}},
    series:[{name:'异常及缺勤',type:'line',data:daily.map(d=>d.value),smooth:.2,symbol:'circle',
-    symbolSize:4,lineStyle:{color:'#759e91',width:2},
-    itemStyle:{color:'#759e91'},areaStyle:{color:'rgba(129,177,155,.085)'}}]});
+    symbolSize:8,showSymbol:true,lineStyle:{color:'#759e91',width:2},
+    itemStyle:{color:'#fff',borderColor:'#759e91',borderWidth:2},
+    areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+     {offset:0,color:'rgba(117,158,145,.28)'},{offset:1,color:'rgba(117,158,145,0)'}])}}]});
   chart.on('click',e=>{const d=daily[e.dataIndex];if(d)selectDate(d.day,true)});
  }
  insight.querySelectorAll('[data-r68-rank]').forEach(b=>b.onclick=()=>{

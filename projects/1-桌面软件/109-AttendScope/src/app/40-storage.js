@@ -125,11 +125,12 @@ function normalizeSavedMonth(payload){
     }
   }
   payload=r62MigratePayload(structuredClone(payload));
+  const prunedManual=p109PruneExcludedManual(payload);
   return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
     employees:payload.employees||null,groups:payload.groups||null,
     fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:true,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
 let p109ConnectionBusy=false;
 function p109CaptureSession(){

@@ -1292,7 +1292,7 @@ async function run(){
  await check(page,info=>{
   const a=state.analysis.get(info.employee+'|'+info.day),segment=a?.autoOvertime?.segments?.find(s=>s.id===info.id);
   const controls=document.querySelectorAll('#overtimeReviewLayer .overtime-review-btn');
-  const active=[...controls].some(btn=>btn.textContent==='✓'&&btn.getAttribute('aria-pressed')==='true');
+  const active=[...controls].some(btn=>btn.getAttribute('aria-label')?.startsWith('纳入 ')&&btn.querySelector('svg')&&btn.getAttribute('aria-pressed')==='true');
   return !!segment&&segment.accepted&&active&&
    r14TrackData(a).bars.some(b=>b.origin==='auto'&&b.segmentId===info.id&&b.accepted);
  },overtimePick,'R57 solid automatic-overtime band must retain editable ✓/×');
@@ -1961,11 +1961,12 @@ async function run(){
  await require('./r85-audit.cjs')({browser,out,root});
  await require('./r86-audit.cjs')({browser,out,root});
  await require('./r87-audit.cjs')({browser,out,root});
+ await require('./r88-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R87',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R88',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

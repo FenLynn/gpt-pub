@@ -9,6 +9,11 @@ function p109IntervalClock(value){const t=attendanceClock(value);return t.endsWi
 function p109IntervalDuration(value){
  const seconds=Math.round(value*60);return seconds%60?Math.floor(seconds/60)+' 分 '+seconds%60+' 秒':fmtMinutes(value);
 }
+function p109IntervalIcon(kind){
+ const shape=kind==='circle'?'<circle cx="10" cy="10" r="5" fill="currentColor"/>':
+  '<path d="'+({plus:'M10 4v12M4 10h12',close:'M5 5l10 10M15 5L5 15',check:'M4 10l4 4 8-8'}[kind]||'')+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+ return '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false">'+shape+'</svg>';
+}
 function p109WorkParts(from,to,day){
  if(!isWorkday(day)||!Number.isFinite(from)||!Number.isFinite(to)||to<=from)return [];
  return [[minutes(RULES.amStart),minutes(RULES.amEnd)],[minutes(RULES.pmStart),minutes(RULES.pmEnd)]]
@@ -29,7 +34,7 @@ function p109TempDecision(parts,reports,day){
  }
  return {system:'red',reason:'超过短时外出限额，且报备未覆盖或时长不匹配'};
 }
-function p109TemporaryOutings(employee,date,punches){
+function p109TemporaryOutings(employee,date,punches,flags=[]){
  const day=Number(date.slice(8,10));if(!isWorkday(day))return [];
  const candidates=[];
  for(let i=1;i<punches.length;i++){
@@ -51,7 +56,9 @@ function p109TemporaryOutings(employee,date,punches){
    override=state.tempOutingReview?.[row.id];
   return {...row,...decision,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
    status:['green','red','exclude'].includes(override)?override:decision.system,manualDecision:!!override};
- }).filter(row=>row.minutes>0);
+ }).filter(row=>row.minutes>0&&!(row.origin==='manual'&&row.status==='exclude')&&
+  !(row.origin==='auto'&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
+    flags.some(flag=>flag.kind==='early'&&Math.abs(minutes(flag.time)-row.from)<1e-8)));
 }
 function activeTemporaryOutings(a){return (a?.temporaryOutings||[]).filter(row=>row.status!=='exclude')}
 function p109RenameIntervalState(data,oldId,newId){
@@ -82,10 +89,40 @@ function p109IntervalDirty(action,row,extra={}){
   action,segmentId:row.id,time:new Date().toISOString(),...extra});
  state.saved=false;rememberMonth();reanalyze();render();
 }
+function p109RemoveManualFacts(data,ids){
+ let changed=false;
+ for(const field of ['manualTempOutings','manualOvertime','revisions']){
+  const rows=data[field]||[],next=rows.filter(r=>!ids.has(field==='revisions'?r.segmentId:r.id));
+  if(rows.length!==next.length){data[field]=next;changed=true}
+ }
+ for(const field of ['tempOutingReview','overtimeReview'])if(data[field])for(const id of ids){
+  if(Object.prototype.hasOwnProperty.call(data[field],id)){delete data[field][id];changed=true}
+ }
+ return changed;
+}
+function p109PruneExcludedManual(data){
+ const ids=new Set([
+  ...(data.manualTempOutings||[]).filter(r=>data.tempOutingReview?.[r.id]==='exclude'),
+  ...(data.manualOvertime||[]).filter(r=>data.overtimeReview?.[r.id]===false)
+ ].map(r=>r.id));
+ return ids.size?p109RemoveManualFacts(data,ids):false;
+}
+function p109DeleteManualInterval(kind,id){
+ const field=kind==='outing'?'manualTempOutings':'manualOvertime',ids=new Set([id]),
+  exists=[state,...state.monthStores.values()].some(s=>(s[field]||[]).some(r=>r.id===id));
+ if(!exists)return false;
+ p109RemoveManualFacts(state,ids);const touched=[];
+ for(const [key,store] of state.monthStores)if(p109RemoveManualFacts(store,ids)){store.saved=false;touched.push(key)}
+ state.saved=false;rememberMonth();reanalyze();render();
+ const other=touched.filter(key=>key!==monthKey());
+ if(other.length&&!state.projectDir?.__p109Portable)toast('补录已删除；另请保存涉及的月份：'+other.join('、'));
+ return true;
+}
 function p109SetTempDecision(id,status){
  if(![null,'green','red','exclude'].includes(status))return false;
  const row=[...state.analysis.values()].flatMap(a=>a.temporaryOutings||[]).find(r=>r.id===id);
  if(!row)return false;
+ if(row.origin==='manual'&&status==='exclude')return p109DeleteManualInterval('outing',id);
  if(status!=='exclude'&&activeTemporaryOutings(state.analysis.get(row.employeeId+'|'+Number(row.date.slice(8,10))))
   .some(other=>other.id!==id&&other.parts.some(([a,b])=>row.parts.some(([x,y])=>intervalOverlap(a,b,x,y)>0)))){
   toast('与已纳入的临时外出重叠，请先排除重复区间',true);return false;
@@ -93,10 +130,6 @@ function p109SetTempDecision(id,status){
  const before=state.tempOutingReview?.[id]||null;state.tempOutingReview??={};
  if(status)state.tempOutingReview[id]=status;else delete state.tempOutingReview[id];
  p109IntervalDirty('temporary-outing-review',row,{from:before,to:status});return true;
-}
-function p109TempSidebarHtml(){
- const ids=new Set(state.workspaceMode==='person'?[state.selection.employeeId]:scopeVisibleEmployees().map(e=>e.id));
- return p109TempSummaryHtml([...state.analysis.values()].filter(a=>ids.has(a.employee.id)),true);
 }
 function p109TempDayHtml(item){
  const rows=item.temporaryOutings||[];
@@ -127,9 +160,9 @@ function p109CompleteOvertime(candidate,employeeId,date,registered){
    y<=a||x>=b?[[a,b]]:[[a,Math.min(x,b)],[Math.max(y,a),b]].filter(([p,q])=>q>p));
   return pieces.map(([from,to])=>({...row,from,to,minutes:to-from,employeeId,date}));
  };
- // Only included manual additions mask automatic evidence. Excluding a manual
- // addition restores any genuine automatic evidence underneath it.
+ // Deleting a manual addition restores genuine automatic evidence underneath.
  for(const row of manual){
+  if(excluded(row.id))continue;
   const accepted=!excluded(row.id),parts=subtract({...row,accepted},taken);
   segments.push(...parts);if(accepted)taken.push(...parts.map(p=>[p.from,p.to]));
  }

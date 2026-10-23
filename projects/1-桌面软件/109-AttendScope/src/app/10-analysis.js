@@ -472,6 +472,7 @@ function setAutoOvertimeDecision(segmentId,accepted){
  const found=[...state.analysis.values()].flatMap(a=>a.autoOvertime?.segments||[])
   .find(s=>s.id===segmentId);
  if(!found)return false;
+ if(found.origin==='manual'&&accepted===false)return p109DeleteManualInterval('overtime',segmentId);
  const before=found.accepted!==false,next=!!accepted;
  if(before===next)return true;
  if(!state.overtimeReview)state.overtimeReview={};
@@ -555,7 +556,6 @@ function analyzeDay(emp,d){
  const crossesLunch=pairs.some(([x,y])=>minutes(x.time)<lunchStart&&minutes(y.time)>lunchEnd);
  const lunchEvidence=crossesLunch?(isWorkday(d)?'未分段（班内工时按班次扣午休）':'连续在岗跨中午（不扣午休）'):
   morningPair&&lunchReturn?'有午休进出':'未明确';
- const temporaryOutings=p109TemporaryOutings(emp,date,punches);
  const autoOvertime=p109CompleteOvertime(estimateOvertimeCandidate(pairs,d,overtime,pairingUncertain),emp.id,date,overtime);
  // A recalculated interval must not inherit a past exclusion from a DIFFERENT
  // imported evidence set even if its visible clock boundaries are identical.
@@ -643,7 +643,7 @@ function analyzeDay(emp,d){
   if((leaves.length||trips.length||outings.length)&&severity==='normal')
    status=trips.length?'出差覆盖':leaves.length?'请假覆盖':'外出覆盖';
  }
- function pack(){return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
+ function pack(){const temporaryOutings=p109TemporaryOutings(emp,date,punches,attendanceFlags);return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
   lunchEvidence,autoOvertime,temporaryOutings,attendanceFlags,marker:''}}
  return pack();
