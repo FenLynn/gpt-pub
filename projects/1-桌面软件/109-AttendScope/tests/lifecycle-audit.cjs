@@ -373,16 +373,16 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const oldRoot=path.join(tmp,'old-version-install','考勤');
   fs.mkdirSync(path.dirname(oldRoot),{recursive:true});
   fs.cpSync(restoreDir,oldRoot,{recursive:true});
-  // Build a synthetic schema-2 fixture ONLY when it contains no schema-3
+  // Build a synthetic schema-2 fixture ONLY when it contains no later-schema
   // decisions or manual intervals. This is not a production downgrade path.
   const legacyValue=value=>{
    if(!value||typeof value!=='object')return value;
-   for(const field of ['manualTempOutings','manualOvertime','tempOutingReview'])if(field in value){
+   for(const field of ['manualTempOutings','manualOvertime','tempOutingReview','attendanceReview'])if(field in value){
     if(Object.keys(value[field]||{}).length)throw Error('Cannot turn new manual facts into a legacy fixture');
     delete value[field];
    }
-   if(value.schemaVersion===3)value.schemaVersion=2;
-   if(value.workingSchema===3)value.workingSchema=2;
+   if(value.schemaVersion>=3)value.schemaVersion=2;
+   if(value.workingSchema>=3)value.workingSchema=2;
    for(const key of Object.keys(value))legacyValue(value[key]);return value;
   };
   const legacyFiles=folder=>{
@@ -486,16 +486,44 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.r86UpdatePreservesData=fs.readFileSync(oldWorkingPath).equals(r86Working)&&fs.readFileSync(oldRawPath).equals(r86Raw);
   await open();
   report.r86UpgradeReload=await page.evaluate(v=>P109_APP_VERSION===v&&state.records.length===2,currentVersion);
+  const r88Commit='e43db9e162546f90951d22c4aa62e07c09eaef32';
+  const installR88=()=>{
+   const listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r88Commit,'--',projectPath],{encoding:'utf8'});
+   if(listing.status!==0)throw Error('R88 source listing unavailable');
+   for(const file of listing.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+    const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r88Commit+':'+file],{maxBuffer:16*1024*1024});
+    if(source.status!==0)throw Error('Cannot read R88 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+   }
+  };
+  installR88();await open();
+  report.r88OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.14-preview'&&state.records.length===2&&!!state.projectDir);
+  await page.evaluate(async()=>{
+   const employeeId=EMPLOYEES[0].id;
+   state.manualTempOutings=[{id:'r88-manual-lunch',employeeId,date:'2026-10-08',start:'11:30',end:'13:45'}];
+   state.tempOutingReview={'r88-manual-lunch':'red'};state.calendarOverrides={'2026-10-01':'holiday','2026-10-10':'adjusted-work'};
+   state.saved=false;rememberMonth();await saveWorking();p109RememberProgram(null);
+  });
+  const r88Working=fs.readFileSync(oldWorkingPath),r88Raw=fs.readFileSync(oldRawPath);
+  await page.locator('#importBtn').click();const r88Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await(await r88Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(v=>document.querySelector('#p109UpdateVersion')?.textContent.includes(v),currentVersion);
+  await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
+  report.r88UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r88Working)&&fs.readFileSync(oldRawPath).equals(r88Raw);
+  await open();report.r88Migration=await page.evaluate(()=>state.manualTempOutings.length===2&&state.manualTempOutings.every(row=>state.tempOutingReview[row.id]==='red')&&dayType(1)==='rest'&&dayType(10)==='work'&&!state.saved);
   await page.evaluate(async()=>{
    state.manualOvertime=[{id:'manual-overtime:legacy-test',employeeId:EMPLOYEES[0].id,date:'2026-10-08',start:'18:00',end:'19:00'}];
    state.saved=false;rememberMonth();await saveWorking();
   });
-  report.newWorkingHasSchema3=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===3;
+  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===4;
   installR86();await open();
   report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
+  installR88();await open();
+  report.r88RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
 
   const requiredTrue=[
-   'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasSchema3','oldProgramRejectsNewSchema',
+   'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasCurrentSchema','oldProgramRejectsNewSchema',
+   'r88OldVersionBoot','r88UpgradePreservesBytes','r88Migration','r88RejectsNewSchema',
    'r83OldVersionBoot','r83UpdatePreservesData','r83UpdateReload',
    'r77ImportedAttendanceFlags','r77OvertimeAndEarlyCoexist','r77ManualKeepsEvidence',
    'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',

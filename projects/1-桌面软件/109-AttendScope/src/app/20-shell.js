@@ -77,6 +77,17 @@ function render(){
   else renderAnalysisPanel();
 }
 
+function p109ExportMenuHtml(){return `<div class="system-menu-anchor">
+ <button class="text-btn" id="exportMenuButton" data-system-menu="exportMenu" aria-expanded="false" aria-controls="exportMenu" aria-haspopup="menu">导出</button>
+ <div class="system-menu" id="exportMenu" role="menu" aria-label="导出操作" hidden>
+  <button id="exportTable" role="menuitem">${state.workspaceMode==='stats'?'当前统计 XLSX':'全月考勤明细 XLSX'}</button>
+  <button id="exportCsv" role="menuitem">${state.workspaceMode==='stats'?'当前统计 CSV':'全月考勤明细 CSV'}</button>
+  ${state.workspaceMode==='stats'?'<button id="exportMonthlyTable" role="menuitem">全月考勤明细 XLSX</button>':''}
+  <div class="system-menu-divider"></div><button id="captureView" role="menuitem">当前视图截图 PNG</button>
+  <button id="printReport" role="menuitem" aria-expanded="false" aria-controls="r63PdfPicker">选择截图合成 PDF…</button>
+  <div class="system-menu-divider"></div><span class="system-menu-caption">导出当前原始数据</span>
+  ${[['attendance','考勤'],['leave','请假'],['trip','出差'],['outing','外出'],['overtime','登记加班']].map(([kind,label])=>'<button role="menuitem" data-export-source="'+kind+'">'+label+' XLSX</button>').join('')}
+ </div><div id="r63PdfPicker" class="r63-pdf-picker" role="dialog" aria-label="截图 PDF" hidden></div></div>`}
 function layoutHtml(){
   return `
   <header class="topbar">
@@ -115,6 +126,7 @@ function layoutHtml(){
           <button id="upgradeProjectBtn" class="p109-upgrade-import" type="button">程序升级 ZIP…</button>
         </div>
       </div>
+      ${p109ExportMenuHtml()}
       <div class="system-menu-anchor">
         <button class="text-btn" id="projectMenuButton" data-system-menu="projectMenu" aria-expanded="false" aria-controls="projectMenu" aria-haspopup="menu">项目</button>
         <div class="system-menu" id="projectMenu" role="menu" aria-label="项目操作" hidden>
@@ -136,21 +148,6 @@ function layoutHtml(){
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
     </div>
     <div class="top-actions">
-      <div class="system-menu-anchor">
-        <button class="text-btn" id="exportMenuButton" data-system-menu="exportMenu" aria-expanded="false" aria-controls="exportMenu" aria-haspopup="menu">导出</button>
-        <div class="system-menu" id="exportMenu" role="menu" aria-label="导出操作" hidden>
-          <button id="exportTable" role="menuitem">${state.workspaceMode==='stats'?'当前统计 XLSX':'全月考勤明细 XLSX'}</button>
-          <button id="exportCsv" role="menuitem">${state.workspaceMode==='stats'?'当前统计 CSV':'全月考勤明细 CSV'}</button>
-          ${state.workspaceMode==='stats'?'<button id="exportMonthlyTable" role="menuitem">全月考勤明细 XLSX</button>':''}
-          <div class="system-menu-divider"></div>
-          <button id="captureView" role="menuitem">当前视图截图 PNG</button>
-          <button id="printReport" role="menuitem" aria-expanded="false" aria-controls="r63PdfPicker">选择截图合成 PDF…</button>
-          <div class="system-menu-divider"></div>
-          <span class="system-menu-caption">导出当前原始数据</span>
-          ${[['attendance','考勤'],['leave','请假'],['trip','出差'],['outing','外出'],['overtime','登记加班']].map(([kind,label])=>'<button role="menuitem" data-export-source="'+kind+'">'+label+' XLSX</button>').join('')}
-        </div>
-        <div id="r63PdfPicker" class="r63-pdf-picker" role="dialog" aria-label="截图 PDF" hidden></div>
-      </div>
       <span class="action-divider"></span>
       <button class="text-btn" id="p109Help" aria-haspopup="dialog">帮助</button>
       <button class="settings-toggle" id="settingsBtn" title="设置" aria-label="设置">⚙</button>
@@ -167,7 +164,6 @@ function layoutHtml(){
         <div class="calendar-key">
           <span><i class="work"></i>工作日</span>
           <span><i class="rest"></i>休息日</span>
-          <span><i class="adjust"></i>调休上班</span>
         </div>
       </section>
 
@@ -213,9 +209,10 @@ function layoutHtml(){
     </aside>
 
     <main class="workspace">
-      ${workspaceToolbarHtml()}
+      ${['all','group'].includes(state.workspaceMode)?'':workspaceToolbarHtml()}
       <div class="workbench">
         <section class="matrix-zone" aria-label="月度员工考勤状态矩阵">
+          ${['all','group'].includes(state.workspaceMode)?workspaceToolbarHtml():''}
           <div class="matrix-wrap" id="matrixScroll"><div class="matrix" id="matrix"></div></div>
         </section>
         ${['all','group'].includes(state.workspaceMode)?'<aside id="scopeInsights" class="scope-insights" aria-label="统计分析"></aside>':''}

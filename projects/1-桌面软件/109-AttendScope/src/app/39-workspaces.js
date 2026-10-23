@@ -36,7 +36,7 @@ function sidebarFilterHtml(){
   '<button type="button" data-judgment-mode="manual" class="'+(state.judgmentMode==='manual'?'active':'')+'" '+(hasManualStatuses()?'':'disabled')+'>人工</button></div></section>';
 }
 
-/* Shared month-strip palette: work/rest/holiday use exactly the calendar dayType;
+/* Shared month-strip palette: work/rest use exactly the calendar dayType;
    status and manual override are sourced from the common analyzed facts. */
 function personMonthStripHtml(){
  const id=state.selection.employeeId||EMPLOYEES[0]?.id;
@@ -46,19 +46,19 @@ function personMonthStripHtml(){
  const days=Array.from({length:monthDays()},(_,i)=>{
   const day=i+1,info=state.analysis.get(id+'|'+day),type=dayType(day);
   const rawManual=info?manualStatusFor(info):null;
-  const final=rawManual||attendanceJudgmentSystem(info);
+  const final=info?attendanceJudgment(info):'rest';
   const tone=final==='normal'?'normal':final==='anomaly'?'anomaly':final==='absent'?'absent':'rest';
   const autoSegments=info?.autoOvertime?.segments||[];
   const included=autoSegments.filter(seg=>seg.accepted!==false).length;
-  const hasAuto=autoSegments.length>0||(info?.overtime?.length||0)>0,hasLateEarly=attendanceHasLateEarly(info);
-  const flagText=hasLateEarly?info.attendanceFlags.map(f=>f.label+' '+f.time).join('、'):'';
+  const hasAuto=autoSegments.length>0||(info?.overtime?.length||0)>0,hasLateEarly=attendanceHasLateEarly(info),excludedFlags=(info?.attendanceFlags||[]).filter(f=>!f.accepted).length;
+  const flagText=(info?.attendanceFlags||[]).map(f=>f.label+' '+f.time+(f.accepted?'':'（已排除）')).join('、');
   const adjusted=rawManual&&rawManual!==attendanceJudgmentSystem(info);
   const title=isoDate(day)+' · '+dayTypeText(type)+' · '+({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'}[final]||final)+
    (flagText?' · 系统检测：'+flagText:'')+(adjusted?' · 人工已调整判定（系统检测证据保留）':'')+
    (autoSegments.length?' · 自动加班候选 '+autoSegments.length+' 段（纳入 '+included+' 段、排除 '+(autoSegments.length-included)+' 段）':'')+
    (info?.overtime?.length?' · 登记加班 '+info.overtime.length+' 项':'');
   return '<button type="button" class="person-day '+type+' '+(selected===day?'selected':'')+
-    (hasAuto?' has-auto-overtime':'')+(hasLateEarly?' has-late-early':'')+
+    (hasAuto?' has-auto-overtime':'')+(hasLateEarly?' has-late-early':excludedFlags?' has-excluded-attendance':'')+
     '" data-person-day="'+day+'" title="'+escapeNameChar(title)+'" aria-current="'+(selected===day?'date':'false')+'">'+
     '<span class="person-day-number">'+pad(day)+'</span>'+
     (rawManual?'<span class="person-day-check" aria-label="人工修正">✓</span>':'')+
@@ -101,7 +101,7 @@ function workspaceSidebarHtml(){
    '<div class="side-bottom">'+(mode==='data'&&((state.dataSection||'records')!=='records'||r68UI.recordsView!=='rows')?'':'<section class="side-calendar calendar-section">'+
   '<div class="calendar-caption"><span>月历</span><button class="quiet-link" id="clearSelection">'+(mode==='person'?'返回全览':'清除选择')+'</button></div>'+
   '<div id="calendar" class="calendar-grid"></div><div class="calendar-key"><span><i class="work"></i>工作日</span>'+
-  '<span><i class="rest"></i>休息日</span><span><i class="adjust"></i>调休上班</span></div></section>')+
+  '<span><i class="rest"></i>休息日</span></div></section>')+
   (mode==='data'||mode==='project'?'<div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>':
    '<div class="side-refinements">'+sidebarFilterHtml()+'</div>')+'</div>';
 }

@@ -222,9 +222,13 @@ function mountAttendanceTimeline(a){
       const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[at,flag.kind==='late'?0:1]);
       if(!pos||!Number.isFinite(pos[0])||!Number.isFinite(pos[1]))continue;
       const tag=document.createElement('span');
-      tag.className='r72-attendance-tag r74-attendance-tag '+flag.kind;
-      tag.textContent=flag.label;
-      tag.dataset.r73Tip=flag.label+' · '+flag.time+'（对应实际打卡）';
+      tag.className='r72-attendance-tag r74-attendance-tag '+flag.kind+(flag.accepted===false?' is-excluded':'');
+      tag.dataset.attendanceId=flag.id;
+      const label=document.createElement('span');label.textContent=flag.label;tag.appendChild(label);
+      const control=document.createElement('button');control.type='button';control.innerHTML=p109IntervalIcon(flag.accepted===false?'check':'close');
+      control.setAttribute('aria-label',(flag.accepted===false?'恢复纳入':'排除统计')+' '+flag.label+' '+flag.time);
+      control.onclick=event=>{event.stopPropagation();p109SetAttendanceDecision(flag.id,flag.accepted===false)};tag.appendChild(control);
+      tag.dataset.r73Tip=flag.label+' · '+flag.time+'（对应实际打卡；'+(flag.accepted===false?'已排除，可恢复':'已纳入，可单独排除')+'）';
       tag.setAttribute('aria-label',flag.label+' · '+flag.time);
       layer.appendChild(tag);
       const w=tag.offsetWidth||58,h=tag.offsetHeight||23;

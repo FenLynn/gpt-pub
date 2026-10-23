@@ -1,0 +1,23 @@
+/* Work/rest editor and review controls share the existing dialog and tooltip shell. */
+.p109-calendar-dialog{width:86vw;max-height:88dvh;overflow:auto;background:#fff;border:1px solid #dbe5ed;border-radius:12px;padding:22px;color:#35536a}
+.p109-calendar-dialog header,.p109-calendar-dialog footer{display:flex;align-items:center;gap:12px}.p109-calendar-dialog header strong{flex:1;font-size:18px}.p109-calendar-dialog header button{border:0;background:none;font-size:23px;color:#7890a1}
+.p109-calendar-dialog p{font-size:13px;color:#71899c}.p109-calendar-dialog footer{margin-top:20px}.p109-calendar-dialog footer span{flex:1}
+.p109-calendar-dialog footer button{border:1px solid #cbdfea;border-radius:6px;padding:8px 13px;color:#286a97;background:#f5faff}.p109-calendar-dialog footer .primary{background:#287fb7;color:#fff}
+.p109-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.p109-calendar-grid>b{text-align:center;font-size:12px;padding:7px;color:#6c8395}
+.p109-calendar-grid button{display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;min-height:57px;border:1px solid #dce6ee;border-radius:7px;background:#f0faf5;color:#317b59;cursor:pointer}.p109-calendar-grid button.rest{background:#f1f3f5;color:#8998a4}.p109-calendar-grid button strong{font-size:15px}.p109-calendar-grid button small{font-size:11px}
+.workspace-mode-all .workspace-toolbar,.workspace-mode-group .workspace-toolbar{flex:none;min-height:37px;margin:0;padding:0 0 7px}.workspace-mode-all .workspace-toolbar strong,.workspace-mode-group .workspace-toolbar strong{line-height:26px}
+.workspace-mode-person .r74-attendance-tag{gap:3px;padding:2px 4px 2px 6px;max-width:150px}
+.r74-attendance-tag button{display:grid;place-items:center;width:22px;height:22px;min-width:0;min-height:0;padding:0;margin:0;border:0;border-radius:3px;background:transparent;color:inherit;cursor:pointer;opacity:0;font-size:0;line-height:0}
+.r74-attendance-tag button svg{width:16px;height:16px;display:block;pointer-events:none}.r74-attendance-tag:is(:hover,:focus-within) button{opacity:1}.r74-attendance-tag button:focus-visible{outline:2px solid #418fc8}
+.workspace-mode-person .r74-attendance-tag.is-excluded{background:#f5f6f7;color:#9aa6af;border-color:#d3dae0;box-shadow:none}
+.person-day.has-excluded-attendance::before{content:"";position:absolute;left:2px;top:3px;width:5px;height:5px;border-radius:50%;border:1px solid #a6b2bc;background:transparent;z-index:2}.person-day.has-excluded-attendance.has-auto-overtime::before{left:9px}
+.workspace-mode-person .r74-insight-head{padding-bottom:5px;margin-bottom:4px}.workspace-mode-person .r74-insight-head>span{display:flex;align-items:center;gap:4px;font-size:12px!important}.workspace-mode-person .r74-insight-head .r71-help{padding:0;min-height:18px}
+.workspace-mode-person .r74-insight-section{padding-top:6px}.workspace-mode-person .r74-overview-metrics .insight-row{min-height:27px!important;padding:4px 0!important}.workspace-mode-person .r74-behavior-list .insight-behavior-row{min-height:25px!important;padding:3px 0!important}
+.workspace-mode-person .r74-behavior-list .insight-behavior-row span,.workspace-mode-person .r74-behavior-list .insight-behavior-row strong{font-size:12.5px!important}.p109-no-business{font-size:12px;color:#9aaab7;padding:4px 0}
+.p109-temp-summary{display:flex;flex-wrap:wrap;align-items:center;gap:5px 12px;border:0;border-top:1px solid #e3ebf1;border-radius:0;background:transparent;padding:7px 0 3px;margin:5px 0 0;font-size:12px}.p109-temp-summary header{gap:9px;margin:0}.p109-temp-summary>div{flex:1;gap:9px}.p109-temp-summary strong{font-size:12.5px}
+.p109-temp-details{padding:3px 0;font-size:11px}.p109-temp-details summary{cursor:pointer;color:#7b92a4;padding:3px 0}.p109-temp-details>div{padding:3px 0}
+.workspace-mode-person .r74-behavior-list .insight-behavior-row.active{padding:3px 0!important}
+.workspace-mode-person .r74-unified-insight .status-control-row{min-height:27px!important}
+.workspace-mode-person .r74-unified-insight .status-control-row+.status-control-row{margin-top:2px}
+.workspace-mode-person .r74-unified-insight .initial-judgment,.workspace-mode-person .r74-unified-insight .manual-status-buttons button{height:25px!important}
+.workspace-mode-person .r74-unified-insight{padding-bottom:3px}

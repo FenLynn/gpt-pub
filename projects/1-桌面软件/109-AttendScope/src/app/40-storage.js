@@ -58,9 +58,11 @@ function traditionalRows(){
   for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++){
     const a=state.analysis.get(e.id+'|'+d);
     rows.push({姓名:e.name,部门:e.department,组别:groupOf(e),日期:a.date,星期:'周'+weekdayLabel(d),
-      日期性质:a.dayType==='adjust'?'调休工作日':a.dayType==='work'?'工作日':a.dayType==='holiday'?'节假日':'休息日',
+      日期性质:a.dayType==='work'?'工作日':'休息日',
       状态:a.status,严重度:a.severity==='problem'?'明确问题':a.severity==='suspect'?'疑似异常':a.severity==='excused'?'请假/出差':a.severity==='rest'?'休息':'正常',
-      系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(manualStatusFor(a)||attendanceJudgmentSystem(a)),
+      系统判定:judgmentChinese(attendanceJudgmentSystem(a)),人工判定:manualStatusFor(a)?judgmentChinese(manualStatusFor(a)):'',最终判定:judgmentChinese(attendanceJudgment(a)),
+      迟到纳入次数:activeAttendanceFlags(a).filter(f=>f.kind==='late').length,早退纳入次数:activeAttendanceFlags(a).filter(f=>f.kind==='early').length,
+      迟到早退排除次数:(a.attendanceFlags||[]).filter(f=>!f.accepted).length,
       首次进入:a.firstIn||'',最后离开:a.lastOut||'',确认在岗分钟:Math.round(a.presence||0),
       班内工时分钟:Math.round(a.workMinutes||0),加班候选分钟:Math.round(a.autoOvertime?.minutes||0),
       加班自动纳入分钟:Math.round(activeAutoOvertimeSegments(a).reduce((sum,seg)=>sum+seg.minutes,0)),
@@ -104,8 +106,7 @@ async function ensureProjectSkeleton(){
   if(!await readJSON(config,'work_rules.json'))await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
   const calendarFile=String(YEAR)+'.json';
   if(!await readJSON(calendar,calendarFile)){
-    await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:YEAR===2026?
-      {'2026-10-01':'holiday','2026-10-02':'holiday','2026-10-03':'holiday','2026-10-04':'holiday','2026-10-05':'holiday','2026-10-06':'holiday','2026-10-07':'holiday','2026-10-10':'adjusted-work'}:{}},null,2));
+    await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:{}},null,2));
   }
 }
 function normalizeSavedMonth(payload){
@@ -115,22 +116,25 @@ function normalizeSavedMonth(payload){
     if(payload[key]!=null&&!Array.isArray(payload[key]))return null;
   if(payload.tempOutingReview!=null&&(typeof payload.tempOutingReview!=='object'||Array.isArray(payload.tempOutingReview)))return null;
   if(Object.values(payload.tempOutingReview||{}).some(v=>!['green','red','exclude'].includes(v)))return null;
+  if(payload.attendanceReview!=null&&(typeof payload.attendanceReview!=='object'||Array.isArray(payload.attendanceReview)||Object.values(payload.attendanceReview).some(v=>typeof v!=='boolean')))return null;
   for(const field of ['manualTempOutings','manualOvertime']){
     const ids=new Set();
     for(const row of payload[field]||[]){
       if(!row||typeof row.id!=='string'||!row.id||ids.has(row.id)||typeof row.employeeId!=='string'||
         !strictISODate(row.date)||!validClock(row.start)||!validClock(row.end)||minutes(row.start)===minutes(row.end)||
-        (field==='manualTempOutings'&&minutes(row.end)<=minutes(row.start)))return null;
+        (field==='manualTempOutings'&&(minutes(row.end)<=minutes(row.start)||(row.part!=null&&!['am','pm'].includes(row.part)))))return null;
       ids.add(row.id);
     }
   }
   payload=r62MigratePayload(structuredClone(payload));
   const prunedManual=p109PruneExcludedManual(payload);
-  return {records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
-    tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
+  const splitManual=p109SplitManualOutings(payload),calendar=p109CalendarValues(payload.calendarOverrides,payload.year,payload.month,schema<4),
+    calendarChanged=JSON.stringify(calendar)!==JSON.stringify(payload.calendarOverrides??null);
+  return {schemaVersion:P109_DATA_SCHEMA,records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
+    attendanceReview:payload.attendanceReview||{},tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
     employees:payload.employees||null,groups:payload.groups||null,
-    fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:payload.calendarOverrides||null,
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
+    fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:calendar,
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual&&!splitManual&&!calendarChanged,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
 let p109ConnectionBusy=false;
 function p109CaptureSession(){
@@ -207,7 +211,9 @@ async function p109ReadProject(handle,project){
     if(raw.year!=null&&(Number(raw.year)!==Number(y)||Number(raw.month)!==Number(m)))throw Error(key+' 工作状态年月与目录不一致');
     if(!stored.employees)stored.employees=structuredClone(people);
     if(!stored.rules)stored.rules={...rules};
-    if(stored.calendarOverrides==null)stored.calendarOverrides={...calendar};
+    const beforeCalendar=JSON.stringify(stored.calendarOverrides);
+    stored.calendarOverrides=p109CalendarValues(stored.calendarOverrides??calendar,y,m,Number(raw.schemaVersion||1)<4);
+    if(beforeCalendar!==JSON.stringify(stored.calendarOverrides))stored.saved=false;
     months.set(key,stored);if(result.recovered)recovered.push(key);
   }
   let current=active.year+'-'+pad(active.month);
@@ -310,7 +316,7 @@ function workingPayload(){
     employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},importProfile:r62ImportProfile(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
-    tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:state.manualTempOutings||[],manualOvertime:state.manualOvertime||[],
+    attendanceReview:{...(state.attendanceReview||{})},tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:state.manualTempOutings||[],manualOvertime:state.manualOvertime||[],
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
@@ -366,9 +372,10 @@ async function restoreWorkingFile(file){
  if(frozen&&(Number(source.manifest?.year)!==yr||Number(source.manifest?.month)!==mo||
    Number(source.manifest?.schemaVersion)>P109_DATA_SCHEMA))throw Error('冻结元数据与工作状态不一致或版本不兼容');
  if(frozen){normalized.snapshotContext=true;
-   if(normalized.calendarOverrides==null)normalized.calendarOverrides={...(source.config?.calendarOverrides||{})};
+   if(normalized.calendarOverrides==null)normalized.calendarOverrides=p109CalendarValues(source.config?.calendarOverrides||{},yr,mo,Number(working.schemaVersion||1)<4);
    if(!normalized.rules)normalized.rules={...(source.config?.rules||P109_DEFAULT_RULES)};
  }
+ if(normalized.calendarOverrides==null)normalized.calendarOverrides=p109CalendarValues({},yr,mo,Number(working.schemaVersion||1)<4);
  const isolated=!!state.projectDir&&(frozen||!!working.branch);
  if(!window.confirm('将导入 '+yr+' 年 '+mo+' 月'+(isolated?'到独立修订副本，保留主 working 和已有冻结。':'工作状态（包括人工修订），同月未保存内容将被替换。')+'是否继续？'))return false;
  rememberMonth();

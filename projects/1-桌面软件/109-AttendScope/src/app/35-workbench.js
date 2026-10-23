@@ -31,7 +31,7 @@ function plotTitle(ctx){
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
 function manualJudgmentHtml(item){
-  const initial=attendanceJudgmentSystem(item),rawManual=manualStatusFor(item),manual=rawManual===initial?null:rawManual;
+  const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item),effective=attendanceJudgmentSystem({...item,initialSeverity:item.severity,initialStatus:item.status});
   return '<section class="insight-card status-card">'+
     '<div class="status-control-row initial-row"><span>初始</span>'+
       '<button type="button" class="initial-judgment '+initial+'" data-manual-clear title="恢复初始判断">'+JUDGMENT_LABELS[initial]+'</button>'+
@@ -39,9 +39,9 @@ function manualJudgmentHtml(item){
     '<div class="status-control-row manual-row"><span>人工</span>'+
       '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
         [['normal','正常'],['anomaly','异常'],['absent','缺勤']].map(([x,t])=>{
-          const locked=x===initial;
+          const locked=x===effective&&!manual;
           const label=state.workspaceMode==='classic'?(manual===x?t:''):t;
-          return '<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+(locked?'initial-disabled ':'')+x+'" '+(locked?'disabled aria-disabled="true"':'')+' title="'+(locked?'与初始判断相同，不能作为人工修改':'人工改为'+t)+'">'+label+'</button>';
+          return '<button type="button" role="radio" aria-label="'+t+'" aria-checked="'+(manual===x?'true':'false')+'" data-manual-status="'+x+'" class="'+(manual===x?'active ':'')+(locked?'initial-disabled ':'')+x+'" '+(locked?'disabled aria-disabled="true"':'')+' title="'+(locked?'与当前自动判断相同，无需人工修改':'人工改为'+t)+'">'+label+'</button>';
         }).join('')+
       '</div>'+
     '</div>'+
@@ -53,14 +53,16 @@ function setManualStatusForCurrent(status){
   const day=sel.type==='cell'?sel.day:sel.type==='person'?(state.chartDay||nearestRecordedDay(sel.employeeId)):null;
   if(!employeeId||!day)return;
   const key=employeeId+'|'+day,item=state.analysis.get(key);state.manualStatuses??={};
-  if(status&&item&&status===attendanceJudgmentSystem(item))return;
+  if(status&&item&&!manualStatusFor(item)&&status===attendanceJudgmentSystem({...item,initialSeverity:item.severity,initialStatus:item.status}))return;
   const before=manualStatusFor(item),system=attendanceJudgmentSystem(item);
-  if(before===status)return;
+  const restoreFlags=!status&&(item.attendanceFlags||[]).some(flag=>!flag.accepted);
+  if(before===status&&!restoreFlags)return;
+  if(restoreFlags)for(const flag of item.attendanceFlags||[])delete state.attendanceReview[flag.id];
   if(status)state.manualStatuses[key]=status;else delete state.manualStatuses[key];
   state.revisions.push({id:'R'+(++state.revisionSeq),key,action:'manual-status',
     from:before||system,to:status||system,time:new Date().toISOString(),note:'人工判定变更'});
   if(status)state.judgmentMode='manual';else if(!hasManualStatuses())state.judgmentMode='initial';
-  state.saved=false;rememberMonth();render();
+  state.saved=false;rememberMonth();reanalyze();render();
 }
 function employeeAutoOvertimeDays(employeeId){
  return Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1)))
@@ -126,49 +128,44 @@ function timelineBehaviorSummaryRow(item,key){
   const recorded=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
   const included=activeAutoOvertimeSegments(item);
  const acceptedMinutes=included.reduce((sum,seg)=>sum+seg.minutes,0);
- const value=key==='overtime'&&item.autoOvertime?.segments?.length?
-    (rows.length?recorded+' · ':'')+'推算/补录纳入 '+fmtMinutes(acceptedMinutes)+
-    (included.length<item.autoOvertime.segments.length?' · 已排除 '+(item.autoOvertime.segments.length-included.length)+' 段':''):recorded;
-  return '<div class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
+ const excluded=(item.autoOvertime?.segments?.length||0)-included.length,
+  total=analysisUnionMinutes([...rows.map(r=>[minutes(r.start),minutes(r.end)]),...included.map(r=>[r.from,r.to])]),
+  value=key==='overtime'?fmtMinutes(total):recorded,
+  tip=key==='overtime'?'登记 '+recorded+'；推算/补录纳入 '+fmtMinutes(acceptedMinutes)+'；排除 '+excluded+' 段。纳入统计不代表审批。':FILTER_LABELS[key]+'：'+recorded;
+  return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
- const accepted=item.autoOvertime?.minutes?
-  activeAutoOvertimeSegments(item).reduce((sum,seg)=>sum+seg.minutes,0):0;
  const metrics=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
   insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
   insightMetric('在岗',fmtMinutes(item.presence))+
-  insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+
-  (item.autoOvertime?.minutes?insightMetric('推算/补录加班',fmtMinutes(accepted)+' · 待核'):'');
- let extra='';
- if(item.lunchEvidence==='未分段（工时按班次扣午休）')
-  extra+='<p class="insight-issue">午休未分段：班内工时按班次估算</p>';
- if(item.autoOvertime?.reason&&(item.autoOvertime.minutes>0||item.overtime?.length))
-  extra+='<p class="insight-evidence">加班判断：'+safeTableText(item.autoOvertime.reason)+'</p>';
- if(item.issues.length)extra+='<p class="insight-issue">'+safeTableText(item.issues.slice(0,2).join('、'))+'</p>';
+  insightMetric('班内工时',fmtMinutes(item.workMinutes??0));
+ const explanation=['初始判定：'+JUDGMENT_LABELS[attendanceJudgmentSystem(item)],
+  ...item.issues,item.lunchEvidence,item.autoOvertime?.reason].filter(Boolean).join('；'),
+  behaviors=['trip','leave','outing','overtime'].filter(key=>timelineBehaviorRows(item,key).length||
+   (key==='overtime'&&item.autoOvertime?.segments?.length)||(key==='outing'&&item.temporaryOutings?.length));
  return '<div class="r74-unified-insight">'+
   '<section class="r74-insight-section r74-overview">'+
-   '<header class="r74-insight-head"><strong>概况</strong><span>考勤 '+item.punches.length+' 条</span></header>'+
+   '<header class="r74-insight-head"><strong>概况</strong><span>最终 '+JUDGMENT_LABELS[attendanceJudgment(item)]+' · '+item.punches.length+' 条 '+r71Hint(explanation)+'</span></header>'+
    manualJudgmentHtml(item)+
    '<div class="r74-overview-metrics">'+metrics+'</div></section>'+
   '<section class="r74-insight-section r74-behaviors">'+
    '<header class="r74-insight-head"><strong>行为</strong><span>全天</span></header>'+
    '<div class="r74-behavior-list">'+
-    ['trip','leave','outing','overtime'].map(key=>timelineBehaviorSummaryRow(item,key)).join('')+
+    (behaviors.length?behaviors.map(key=>timelineBehaviorSummaryRow(item,key)).join(''):'<span class="p109-no-business">暂无登记业务</span>')+
    '</div></section>'+p109TempDayHtml(item)+
-  (extra?'<div class="r74-insight-evidence">'+extra+'</div>':'')+
  '</div>';
 }
 function personalLateEarlySummaryHtml(employeeId){
  const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1))).filter(Boolean);
  const flagged=days.filter(attendanceHasLateEarly);
- const late=days.reduce((n,a)=>n+a.attendanceFlags.filter(f=>f.kind==='late').length,0);
- const early=days.reduce((n,a)=>n+a.attendanceFlags.filter(f=>f.kind==='early').length,0);
+ const late=days.reduce((n,a)=>n+activeAttendanceFlags(a).filter(f=>f.kind==='late').length,0);
+ const early=days.reduce((n,a)=>n+activeAttendanceFlags(a).filter(f=>f.kind==='early').length,0);
  return '<section class="r77-anomaly-summary" aria-label="系统识别的迟到早退">'+
-  '<header><strong>迟到早退</strong><small>系统识别 · 人工判定独立</small></header>'+
+  '<header><strong>迟到早退</strong><small>已纳入 · 排除保留底稿</small></header>'+
   '<div class="r77-anomaly-totals"><span>迟到 <b>'+late+' 次</b></span><span>早退 <b>'+early+
   ' 次</b></span><span>涉及 <b>'+flagged.length+' 天</b></span></div>'+
   '<div class="r77-anomaly-days">'+(flagged.length?flagged.map(a=>
-   '<button type="button" data-person-anomaly-day="'+a.day+'" title="'+safeTableText(a.attendanceFlags.map(f=>f.label+' '+f.time).join('、'))+
+   '<button type="button" data-person-anomaly-day="'+a.day+'" title="'+safeTableText(activeAttendanceFlags(a).map(f=>f.label+' '+f.time).join('、'))+
    (manualStatusFor(a)?' · 人工已调整判定':'')+'" aria-label="'+pad(a.day)+'日异常，查看时间轴">'+pad(a.day)+'日</button>'
   ).join(''):'<span>本月无明确迟到早退记录</span>')+'</div></section>';
 }

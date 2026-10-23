@@ -30,7 +30,7 @@ module.exports=async({browser,out,root})=>{
    checks.overlappingReportsUnion=rows(gap('10:00','10:30',[['09:59','10:20'],['10:15','10:31']]))[0].status==='green';
    checks.reportNoDoubleMinutes=rows(gap('10:00','10:30',[['10:10','10:25'],['10:10','10:25']]))[0].status==='red';
    checks.lunchExcluded=!rows(gap('11:40','13:30')).length;
-   const lunch=rows(gap('11:30','13:40'))[0];checks.lunchOnce=lunch.minutes===20&&lunch.parts.length===2;
+   const lunch=rows(gap('11:30','13:40'));checks.lunchSplit=lunch.length===2&&lunch.every(r=>r.minutes===10&&r.parts.length===1);
    const late=rows(__r87Seed([['08:25','进'],['17:00','出'],['20:00','进'],['21:00','出']]))[0];checks.afterShiftExcluded=late.minutes===10&&late.status==='green';
    __r87Seed([['08:25','进'],['10:00','出'],['10:05','出'],['10:20','进'],['10:25','进'],['17:10','出']]);
    checks.nearestNoReuse=state.analysis.get(e.id+'|8').temporaryOutings.length===1&&state.analysis.get(e.id+'|8').temporaryOutings[0].minutes===15;
@@ -72,7 +72,7 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).red===1),'actual hover control changes red verdict and statistics');
   await page.locator('.p109-temp-actions .exclude').focus();await page.locator('.p109-temp-actions .exclude').click();
   check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).count===0),'actual x removes the interval from all statistics');
-  await page.locator('[data-temp-reset]').click();
+  await page.locator('.p109-temp-details summary').click();await page.locator('[data-temp-reset]').click();
   await page.locator('[data-interval-add="outing"]').focus();await page.locator('[data-interval-add="outing"]').click();
   await page.locator('#p109IntervalStart').fill('10:10');await page.locator('#p109IntervalEnd').fill('10:30');await page.locator('.p109-interval-dialog [type=submit]').click();
   check((await page.locator('#p109IntervalError').textContent()).includes('重叠'),'manual departure rejects duplicate active evidence');
@@ -114,7 +114,7 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(async()=>{
    await freezeSnapshot();const folder=await existingDir(await monthDirectory(),'snapshots'),entries=await p109Entries(folder),h=await p109File(await existingDir(folder,entries[0].name),'snapshot.json'),before=await(await h.getFile()).text(),snapshot=JSON.parse(before);
    const id=state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings[0].id;p109SetTempDecision(id,'red');
-   return snapshot.working.schemaVersion===3&&snapshot.working.manualTempOutings.length===1&&snapshot.working.manualOvertime.length===1&&snapshot.working.tempOutingReview[id]==='green'&&before===await(await h.getFile()).text();
+   return snapshot.working.schemaVersion===P109_DATA_SCHEMA&&snapshot.working.manualTempOutings.length===1&&snapshot.working.manualOvertime.length===1&&snapshot.working.tempOutingReview[id]==='green'&&before===await(await h.getFile()).text();
   }),'freeze retains manual intervals and verdicts while later edits leave its bytes immutable');
   await page.locator('#settingsBtn').click();await page.locator('[data-settings-section="rules"]').click();
   await page.locator('#r87TempLimit').fill('8');await page.locator('#r87TempGrace').fill('0');await page.locator('#settingsApply').click();

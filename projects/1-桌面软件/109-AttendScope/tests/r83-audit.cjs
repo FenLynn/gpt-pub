@@ -27,10 +27,10 @@ module.exports=async({browser,out,root})=>{
     background:s.backgroundColor,color:s.color,fontWeight:Number(s.fontWeight)||0,
     title:el.title,primary:el.classList.contains('r83-save-primary')};
   });
-  check(saveStyle.visible&&saveStyle.primary&&saveStyle.width>=58&&saveStyle.height>=30&&
-    saveStyle.background!=='rgba(0, 0, 0, 0)'&&saveStyle.color==='rgb(255, 255, 255)'&&
+  check(saveStyle.visible&&saveStyle.primary&&saveStyle.width>=40&&saveStyle.width<60&&saveStyle.height>=25&&saveStyle.height<=30&&
+    saveStyle.background!=='rgba(0, 0, 0, 0)'&&saveStyle.color==='rgb(23, 107, 159)'&&
     saveStyle.fontWeight>=700&&saveStyle.title.includes('当前月'),
-   'save is a filled, high-contrast primary action');
+   'save remains compact with blue emphasis');
 
   const overnight=await page.evaluate(()=>{
    const original={records:state.records,leaves:state.leaves,trips:state.trips,

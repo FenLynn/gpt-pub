@@ -242,8 +242,8 @@ function asStatLedger(){
   const id=a.employee.id,k=attendanceJudgment(a);
   if(['normal','anomaly','absent'].includes(k))add('status',k,id,a.day,1);
   if(k==='anomaly'||k==='absent')add('status','issue',id,a.day,1);
-  if(a.issues?.some(s=>String(s).includes('迟到')))add('status','late',id,a.day,1);
-  if(a.issues?.some(s=>String(s).includes('早退')))add('status','early',id,a.day,1);
+  if(activeAttendanceFlags(a).some(flag=>flag.kind==='late'))add('status','late',id,a.day,1);
+  if(activeAttendanceFlags(a).some(flag=>flag.kind==='early'))add('status','early',id,a.day,1);
  }
  // Actual overtime events are connected intervals, not source record counts.
  const physical=new Map(),seen=new Set();

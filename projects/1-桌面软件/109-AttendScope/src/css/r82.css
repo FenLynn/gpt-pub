@@ -1,5 +1,5 @@
 /* Content determines scroll extent; viewport caps only apply when needed. */
-.layout.workspace-mode-all .matrix-zone,.layout.workspace-mode-group .matrix-zone{height:auto!important;min-height:0!important;max-height:calc(100dvh - var(--topbar) - 76px)!important}
+.layout.workspace-mode-all .matrix-zone,.layout.workspace-mode-group .matrix-zone{height:auto!important;min-height:0!important;max-height:calc(100dvh - var(--topbar) - 26px)!important}
 .layout.workspace-mode-all .matrix-wrap,.layout.workspace-mode-group .matrix-wrap{min-height:0!important;flex:0 1 auto!important}
 .r82-storage-locations{padding:18px 22px;border:1px solid #dfe8f0;border-radius:10px;background:#fff;margin:0 0 16px;min-width:0}
 .r82-storage-locations h3{margin:0 0 8px;color:#2b4b65;font-size:16px}

@@ -1,4 +1,4 @@
-function dayTypeText(t){return {work:'工作日',adjust:'调休工作日',rest:'休息日',holiday:'节假日'}[t]}
+function dayTypeText(t){return {work:'工作日',rest:'休息日',outside:'无此日期'}[t]||'休息日'}
 /* Retained evidence helpers only; retired duplicate HTML/SVG timelines. */
 function escapeNameText(x){return String(x).replace(/[&<>\"']/g,v=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[v]))}
 

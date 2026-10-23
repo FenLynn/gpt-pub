@@ -19,7 +19,7 @@ function p109WorkParts(from,to,day){
  return [[minutes(RULES.amStart),minutes(RULES.amEnd)],[minutes(RULES.pmStart),minutes(RULES.pmEnd)]]
   .map(([a,b])=>[Math.max(a,from),Math.min(b,to)]).filter(([a,b])=>b>a);
 }
-function p109TempDecision(parts,reports,day){
+function p109TempDecision(parts,reports,day,shift=null){
  const {limit,grace}=p109TempRules(),duration=analysisUnionMinutes(parts);
  if(duration<=limit+grace+1e-8)return {system:'green',reason:'班内外出不超过 '+limit+' + '+grace+' 分钟'};
  // Merge overlapping registrations without adding their durations twice.
@@ -28,7 +28,10 @@ function p109TempDecision(parts,reports,day){
   if(!parts.some(([a,b])=>intervalOverlap(a,b,from,to)>0))continue;
   if(parts.every(([a,b])=>a>=from-grace-1e-8&&b<=to+grace+1e-8))
    return {system:'green',reason:'报备覆盖实际班内外出（起止各容差 '+grace+' 分钟）'};
-  const reported=p109WorkParts(from,to,day),registered=analysisUnionMinutes(reported);
+  let reported=p109WorkParts(from,to,day);
+  if(shift){const window=shift==='am'?[minutes(RULES.amStart),minutes(RULES.amEnd)]:[minutes(RULES.pmStart),minutes(RULES.pmEnd)];
+   reported=reported.map(([a,b])=>[Math.max(a,window[0]),Math.min(b,window[1])]).filter(([a,b])=>b>a)}
+  const registered=analysisUnionMinutes(reported);
   if(Math.abs(duration-registered)<=grace+1e-8)
    return {system:'green',reason:'与报备有实际重叠，班内时长相差不超过 '+grace+' 分钟'};
  }
@@ -51,26 +54,59 @@ function p109TemporaryOutings(employee,date,punches,flags=[]){
    candidates.push({id:row.id,from:minutes(row.start),to:minutes(row.end),origin:'manual',note:row.note||''});
  }
  const reports=outingFor(employee.id,date);
- return candidates.map(row=>{
-  const parts=p109WorkParts(row.from,row.to,day),decision=p109TempDecision(parts,reports,day),
-   override=state.tempOutingReview?.[row.id];
-  return {...row,...decision,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
-   status:['green','red','exclude'].includes(override)?override:decision.system,manualDecision:!!override};
+ return candidates.flatMap(row=>{
+  const manual=(state.manualTempOutings||[]).find(r=>r.id===row.id),
+   windows=[['am',minutes(RULES.amStart),minutes(RULES.amEnd)],['pm',minutes(RULES.pmStart),minutes(RULES.pmEnd)]],
+   pieces=windows.filter(([shift])=>!manual?.part||manual.part===shift).map(([shift,a,b])=>({shift,part:[Math.max(a,row.from),Math.min(b,row.to)]})).filter(r=>r.part[1]>r.part[0]),split=pieces.length>1;
+  return pieces.map(({shift,part})=>{
+   const id=split?row.id+':'+shift:row.id,parts=[part],decision=p109TempDecision(parts,reports,day,shift),
+    override=state.tempOutingReview?.[id]??state.tempOutingReview?.[row.id];
+   return {...row,...decision,id,parentId:row.id,sourceFrom:row.from,sourceTo:row.to,from:part[0],to:part[1],split,shift,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
+    status:['green','red','exclude'].includes(override)?override:decision.system,manualDecision:!!override};
+  });
  }).filter(row=>row.minutes>0&&!(row.origin==='manual'&&row.status==='exclude')&&
-  !(row.origin==='auto'&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
+  !(row.origin==='auto'&&!row.split&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
     flags.some(flag=>flag.kind==='early'&&Math.abs(minutes(flag.time)-row.from)<1e-8)));
+}
+function p109SplitManualOutings(data){
+ const rules={...P109_DEFAULT_RULES,...(data.rules||RULES)},next=[];let changed=false;
+ for(const row of data.manualTempOutings||[]){
+  if(row.part){next.push(row);continue}
+  const pieces=[['am',rules.amStart,rules.amEnd],['pm',rules.pmStart,rules.pmEnd]]
+   .filter(([,a,b])=>Math.min(minutes(row.end),minutes(b))>Math.max(minutes(row.start),minutes(a)));
+  if(!pieces.length){next.push(row);continue}
+  changed=true;
+  for(const [part] of pieces){
+   const id=pieces.length>1?row.id+':'+part:row.id;next.push({...row,id,part});
+   if(id!==row.id&&Object.prototype.hasOwnProperty.call(data.tempOutingReview||{},row.id))data.tempOutingReview[id]=data.tempOutingReview[row.id];
+  }
+  if(pieces.length>1){
+   if(data.tempOutingReview)delete data.tempOutingReview[row.id];
+   data.revisions=(data.revisions||[]).flatMap(revision=>revision.segmentId===row.id?pieces.map(([part])=>({...revision,id:revision.id+':'+part,segmentId:row.id+':'+part})):revision);
+  }
+ }
+ if(changed)data.manualTempOutings=next;return changed;
+}
+function p109SetAttendanceDecision(id,accepted){
+ const flag=[...state.analysis.values()].flatMap(a=>a.attendanceFlags||[]).find(r=>r.id===id);
+ if(!flag)return false;
+ state.attendanceReview??={};const before=state.attendanceReview[id]!==false;
+ if(accepted)delete state.attendanceReview[id];else state.attendanceReview[id]=false;
+ state.revisions.push({id:'R'+(++state.revisionSeq),key:flag.employeeId+'|'+Number(flag.date.slice(8,10)),action:'attendance-flag-inclusion',segmentId:id,from:before,to:!!accepted,time:new Date().toISOString()});
+ state.saved=false;rememberMonth();reanalyze();render();return true;
 }
 function activeTemporaryOutings(a){return (a?.temporaryOutings||[]).filter(row=>row.status!=='exclude')}
 function p109RenameIntervalState(data,oldId,newId){
  if(oldId===newId)return;
  const change=key=>String(key).replace('temp:'+oldId+':','temp:'+newId+':')
   .replace('manual-temp:'+oldId+':','manual-temp:'+newId+':')
-  .replace('manual-overtime:'+oldId+':','manual-overtime:'+newId+':');
+  .replace('manual-overtime:'+oldId+':','manual-overtime:'+newId+':').replace('attendance:'+oldId+':','attendance:'+newId+':');
  for(const field of ['manualTempOutings','manualOvertime'])for(const row of data[field]||[]){
   if(row.employeeId===oldId)row.employeeId=newId;row.id=change(row.id);
  }
- for(const field of ['tempOutingReview','overtimeReview'])
+ for(const field of ['tempOutingReview','overtimeReview','attendanceReview'])
   data[field]=Object.fromEntries(Object.entries(data[field]||{}).map(([key,v])=>[change(key),v]));
+ for(const revision of data.revisions||[])if(revision.segmentId)revision.segmentId=change(revision.segmentId);
 }
 function p109TempSummary(items){
  const rows=items.filter(Boolean).flatMap(activeTemporaryOutings);
@@ -79,14 +115,15 @@ function p109TempSummary(items){
 }
 function p109TempSummaryHtml(items,compact=false){
  const total=p109TempSummary(items),{limit,grace}=p109TempRules();
- return '<section class="p109-temp-summary'+(compact?' compact':'')+'" aria-label="临时外出统计">'+
+ return '<section tabindex="0" data-r73-tip="班次内统计；短时限额 '+limit+' 分钟，冗余 '+grace+' 分钟。自动 × 排除留痕，手工 × 删除本段；跨午休分别统计。" class="p109-temp-summary'+(compact?' compact':'')+'" aria-label="临时外出统计">'+
   '<header><strong>临时外出</strong><span>'+total.count+' 次</span></header>'+
   '<div><span class="temp-green">绿色 <b>'+total.green+'</b></span><span class="temp-red">红色 <b>'+total.red+'</b></span><span>'+fmtMinutes(total.minutes)+'</span></div>'+
-  '<small>班次内 · '+limit+' + '+grace+' 分钟 · × 不计入</small></section>';
+  '</section>';
 }
 function p109IntervalDirty(action,row,extra={}){
- state.revisions.push({id:'R'+(++state.revisionSeq),key:row.employeeId+'|'+Number(row.date.slice(8,10)),
-  action,segmentId:row.id,time:new Date().toISOString(),...extra});
+ const facts=action==='add-temporary-outing'?(state.manualTempOutings||[]).filter(r=>r.id===row.id||r.id.startsWith(row.id+':')):[row];
+ for(const fact of facts)state.revisions.push({id:'R'+(++state.revisionSeq),key:fact.employeeId+'|'+Number(fact.date.slice(8,10)),
+  action,segmentId:fact.id,time:new Date().toISOString(),...extra});
  state.saved=false;rememberMonth();reanalyze();render();
 }
 function p109RemoveManualFacts(data,ids){
@@ -128,15 +165,21 @@ function p109SetTempDecision(id,status){
   toast('与已纳入的临时外出重叠，请先排除重复区间',true);return false;
  }
  const before=state.tempOutingReview?.[id]||null;state.tempOutingReview??={};
+ if(row.parentId!==id&&Object.prototype.hasOwnProperty.call(state.tempOutingReview,row.parentId)){
+  for(const sibling of [...state.analysis.values()].flatMap(a=>a.temporaryOutings||[]).filter(r=>r.parentId===row.parentId))
+   if(!Object.prototype.hasOwnProperty.call(state.tempOutingReview,sibling.id))state.tempOutingReview[sibling.id]=state.tempOutingReview[row.parentId];
+  delete state.tempOutingReview[row.parentId];
+ }
  if(status)state.tempOutingReview[id]=status;else delete state.tempOutingReview[id];
  p109IntervalDirty('temporary-outing-review',row,{from:before,to:status});return true;
 }
 function p109TempDayHtml(item){
  const rows=item.temporaryOutings||[];
- return p109TempSummaryHtml([item])+(rows.length?'<div class="p109-temp-details">'+rows.map(row=>
+ if(!rows.length)return '';
+ return p109TempSummaryHtml([item])+'<details class="p109-temp-details"><summary>区间明细 · '+rows.length+' 段</summary>'+rows.map(row=>
   '<div class="'+row.status+'"><span>'+safeTableText((row.origin==='manual'?'补录 ':'')+p109IntervalClock(row.from)+'–'+p109IntervalClock(row.to))+
   ' · '+p109IntervalDuration(row.minutes)+(row.status==='exclude'?' · 已排除':'')+'</span>'+
-  (row.manualDecision?'<button type="button" data-temp-reset="'+safeTableText(row.id)+'">恢复自动</button>':'')+'</div>').join('')+'</div>':'');
+  (row.manualDecision?'<button type="button" data-temp-reset="'+safeTableText(row.id)+'">恢复自动</button>':'')+'</div>').join('')+'</details>';
 }
 function p109ManualOvertimeFor(employeeId,date){
  const day=attendanceUtcMinute(date),rows=[];
@@ -221,6 +264,7 @@ function p109OpenIntervalEditor(kind,employeeId,date){
    if(analysisUnionMinutes(covered)>=finish-begin-1e-8){error.textContent='所选时段已由登记或已纳入的补录覆盖，无需重复添加';return}
   }
   const field=outing?'manualTempOutings':'manualOvertime';state[field]??=[];state[field].push(row);
+  if(outing)p109SplitManualOutings(state);
   close();p109IntervalDirty(outing?'add-temporary-outing':'add-manual-overtime',row,{start:row.start,end:row.end,note:row.note});
  };
  start.focus();

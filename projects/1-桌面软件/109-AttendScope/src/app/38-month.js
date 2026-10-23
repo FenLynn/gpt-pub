@@ -1,12 +1,13 @@
 /* Month-scoped datasets, with independent in-memory workspaces and global manual groups. */
 function rememberMonth(){
   state.monthStores.set(monthKey(),{
+    schemaVersion:P109_DATA_SCHEMA,
     employees:EMPLOYEES.map(e=>({...e})),groups:{...state.groups},fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],isDemo:!!state.isDemo,
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
     rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
-    tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:structuredClone(state.manualTempOutings||[]),manualOvertime:structuredClone(state.manualOvertime||[]),
+    attendanceReview:{...(state.attendanceReview||{})},tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:structuredClone(state.manualTempOutings||[]),manualOvertime:structuredClone(state.manualOvertime||[]),
     calendarOverrides:{...state.calendarOverrides},snapshotContext:!!state.snapshotContext,activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
   });
 }
@@ -29,7 +30,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true,internal=false
       profile.groupCatalog:(state.groupCatalog||[]);
     const pinnedImport=profile.pinImport&&profile.importProfile?profile.importProfile:r62ImportProfile();
     state.monthStores.set(key,{employees:pinnedPeople.map(e=>({...e})),groups:{...pinnedGroups},fixedPeople:[...pinnedFixed],nameAliases:{...(profile.nameAliases||state.nameAliases||{})},groupCatalog:[...catalog],isDemo:!!state.isDemo,records:[],leaves:[],trips:[],revisions:[],revisionSeq:0,imports:[],saved:false,outings:[],overtimeEntries:[],manualStatuses:{},overtimeReview:{},judgmentMode:'initial',rules:{...(profile.pinRules&&profile.workRules?profile.workRules:RULES)},prefs:{...state.prefs},importProfile:structuredClone(pinnedImport),
-     calendarOverrides:{...state.calendarOverrides},activeBranch:null});
+     attendanceReview:{},calendarOverrides:{},activeBranch:null});
   }
   if(key!==monthKey()&&preserveCurrent)rememberMonth();
   YEAR=year;MONTH=month;
@@ -49,7 +50,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true,internal=false
   state.imports=next.imports;state.saved=next.saved;
   state.activeBranch=next.activeBranch||null;
   state.snapshotContext=!!next.snapshotContext;
-  state.tempOutingReview={...(next.tempOutingReview||{})};state.manualTempOutings=structuredClone(next.manualTempOutings||[]);state.manualOvertime=structuredClone(next.manualOvertime||[]);
+  state.attendanceReview={...(next.attendanceReview||{})};state.tempOutingReview={...(next.tempOutingReview||{})};state.manualTempOutings=structuredClone(next.manualTempOutings||[]);state.manualOvertime=structuredClone(next.manualOvertime||[]);
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
   Object.assign(RULES,P109_DEFAULT_RULES,next.rules||{});
   RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);

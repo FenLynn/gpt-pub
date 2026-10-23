@@ -114,7 +114,7 @@ module.exports=async function runUiAudit({browser,out,root}){
   await page.locator('#statusFilterButton').click();
   check(await page.locator('[data-filter-value="lateEarly"]').count()===1,'late/early status filter option missing');
   const filterColor=await page.locator('[data-filter-value="lateEarly"] .status-filter-dot').evaluate(el=>getComputedStyle(el).backgroundColor);
-  check(filterColor==='rgb(217, 137, 69)','late/early filter color is not the dedicated amber-orange',filterColor);
+  check(filterColor==='rgb(66, 137, 197)','late/early filter color is not the dedicated blue',filterColor);
   await page.locator('[data-filter-value="lateEarly"]').click();
   await page.waitForFunction(()=>state.filter==='lateEarly');
   const filteredCells=await page.evaluate(()=>({
@@ -127,7 +127,7 @@ module.exports=async function runUiAudit({browser,out,root}){
     getComputedStyle(document.querySelector('#matrix button.s-lateEarly')).backgroundColor:''
   }));
   check(filteredCells.count>0&&filteredCells.allMatch,'late/early filter highlights unrelated cells',filteredCells);
-  check(filteredCells.color==='rgb(217, 137, 69)','matrix late/early color differs from the filter swatch',filteredCells);
+  check(filteredCells.color==='rgb(66, 137, 197)','matrix late/early color differs from the filter swatch',filteredCells);
   await page.locator('#statusFilterButton').click();
   await page.locator('[data-filter-value="main"]').click();
   await page.waitForFunction(()=>state.filter==='main');
@@ -157,7 +157,7 @@ module.exports=async function runUiAudit({browser,out,root}){
    if(!hadOvertime)el.classList.remove('has-auto-overtime');
    return result;
   });
-  check(dotStyles.beforeContent!=='none'&&dotStyles.beforeColor==='rgb(217, 137, 69)'&&
+  check(dotStyles.beforeContent!=='none'&&dotStyles.beforeColor==='rgb(66, 137, 197)'&&
    dotStyles.afterContent!=='none'&&dotStyles.beforeLeft==='9px'&&dotStyles.afterLeft==='2px'&&
    dotStyles.beforeColor!==dotStyles.afterColor,'late/early and overtime dots do not coexist distinctly',dotStyles);
   await dayMarker.click();

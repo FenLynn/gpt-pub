@@ -65,7 +65,7 @@ function applyImportRoster(plan,meta){
     const before=new Map(EMPLOYEES.map(e=>[e.id,personIdentity(e.name)]));
     state.fixedPeople=(state.fixedPeople||[]).map(id=>before.get(id)||id);
     state.records=[];state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
-    state.manualStatuses={};state.overtimeReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
+    state.manualStatuses={};state.overtimeReview={};state.attendanceReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.judgmentMode='initial';state.revisions=[];state.revisionSeq=0;
     state.imports=[meta];
     const pinGroups=state.projectProfile?.groups||state.groups;
     state.groups=Object.fromEntries(plan.people.filter(e=>(state.fixedPeople||[]).includes(e.id))
@@ -205,7 +205,7 @@ function tripFor(empId,date){return state.trips.filter(x=>x.employeeId===empId&&
 function intervalOverlap(a1,a2,b1,b2){return Math.max(0,Math.min(a2,b2)-Math.max(a1,b1))}
 /* R15: judgments and behaviors are independent dimensions. Purple is selection only. */
 const ATTEND_STATUS_COLORS=Object.freeze({normal:'#78caa0',anomaly:'#e6c36f',absent:'#e58f90',rest:'#eef2f6'});
-const ATTEND_BEHAVIOR_COLORS=Object.freeze({trip:'#6b7fd7',leave:'#8a6fd1',outing:'#3c9dc4',overtime:'#c876a0',lateEarly:'#d98945'});
+const ATTEND_BEHAVIOR_COLORS=Object.freeze({trip:'#6b7fd7',leave:'#8a6fd1',outing:'#3c9dc4',overtime:'#c876a0',lateEarly:'#4289c5'});
 const ATTEND_EVENT_COLORS=Object.freeze({in:'#1f5a9f',out:'#8a5b3d'});
 function manualStatusKey(aOrId,day){
   return typeof aOrId==='string'?aOrId+'|'+day:aOrId.employee.id+'|'+aOrId.day;
@@ -214,10 +214,11 @@ function manualStatusFor(a){return state.manualStatuses?.[manualStatusKey(a)]||n
 function hasManualStatuses(){return !!state.manualStatuses&&Object.keys(state.manualStatuses).length>0}
 function attendanceJudgmentSystem(a){
   if(!isWorkday(a.day))return 'rest';
-  if(a.severity==='excused')return 'normal';
-  if(a.status==='缺勤')return 'absent';
-  if(a.severity==='problem'||a.severity==='suspect')return 'anomaly';
-  if(a.severity==='normal')return 'normal';
+  const severity=a.initialSeverity??a.severity,status=a.initialStatus??a.status;
+  if(severity==='excused')return 'normal';
+  if(status==='缺勤')return 'absent';
+  if(severity==='problem'||severity==='suspect')return 'anomaly';
+  if(severity==='normal')return 'normal';
   return 'rest';
 }
 function attendanceJudgment(a,mode='final'){
@@ -225,7 +226,8 @@ function attendanceJudgment(a,mode='final'){
   // The initial system verdict is a comparison view only. Every canonical
   // output/aggregate reads the operator's final verdict first, without
   // modifying the source punches or the original automated diagnosis.
-  return mode==='initial'?initial:(manualStatusFor(a)||initial);
+  const effective=attendanceJudgmentSystem({...a,initialSeverity:a.severity,initialStatus:a.status});
+  return mode==='initial'?initial:(manualStatusFor(a)||effective);
 }
 function attendanceBehaviors(a){
   const results=[];
@@ -238,7 +240,8 @@ function attendanceBehaviors(a){
    results.push('overtime');
   return results;
 }
-function attendanceHasLateEarly(a){return !!a&&(a.attendanceFlags||[]).some(flag=>flag.kind==='late'||flag.kind==='early')}
+function activeAttendanceFlags(a){return (a?.attendanceFlags||[]).filter(flag=>flag.accepted!==false)}
+function attendanceHasLateEarly(a){return activeAttendanceFlags(a).some(flag=>flag.kind==='late'||flag.kind==='early')}
 function attendanceCategory(a){return attendanceJudgment(a)}
 function matrixCategory(a,filter=state.filter){
   if(filter==='lateEarly'&&attendanceHasLateEarly(a))return 'lateEarly';
@@ -333,11 +336,8 @@ function attendanceVisitEvents(employeeId){
 }
 function attendanceDateIsWork(date){
  if(date.slice(0,7)===monthISO())return isWorkday(Number(date.slice(8,10)));
- const custom=state.calendarOverrides?.[date];
- if(['holiday','rest'].includes(custom))return false;
- if(['work','adjust','adjusted-work'].includes(custom))return true;
- const day=new Date(date+'T00:00:00Z').getUTCDay();
- return day!==0&&day!==6;
+ const other=state.monthStores.get(date.slice(0,7));
+ return p109CalendarType(date,other?.calendarOverrides||state.calendarOverrides)==='work';
 }
 function attendanceVisitEligibleMinutes(visit){
  let total=0;
@@ -581,7 +581,7 @@ function analyzeDay(emp,d){
  }
  if(!isWorkday(d)){
   if(punches.length||overtime.length){status='非工作日有出勤记录';severity=pairingUncertain?'suspect':'normal'}
-  else{status=typ==='holiday'?'节假日':'休息';severity='rest'}
+  else{status='休息';severity='rest'}
   return pack();
  }
  if(!punches.length&&!pairs.length){
@@ -643,7 +643,23 @@ function analyzeDay(emp,d){
   if((leaves.length||trips.length||outings.length)&&severity==='normal')
    status=trips.length?'出差覆盖':leaves.length?'请假覆盖':'外出覆盖';
  }
- function pack(){const temporaryOutings=p109TemporaryOutings(emp,date,punches,attendanceFlags);return {employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
+ function pack(){
+  const initialSeverity=severity,initialStatus=status,initialIssues=[...issues];
+  for(const flag of attendanceFlags){
+   const punch=punches.find(p=>p.time===flag.time&&p.direction===(flag.kind==='late'?'进':'出'));
+   const evidence=[punch?.recordId||'',punch?.importId||'',punch?.datetime||flag.time,punch?.direction||''].join('/');
+   flag.id='attendance:'+emp.id+':'+date+':'+flag.kind+':'+flag.label+':'+evidence;
+   Object.assign(flag,{employeeId:emp.id,date,accepted:state.attendanceReview?.[flag.id]!==false});
+  }
+  if(attendanceFlags.some(flag=>!flag.accepted)){
+   const active=activeAttendanceFlags({attendanceFlags});
+   issues=issues.filter(message=>!attendanceFlags.some(flag=>!flag.accepted&&flag.label===message));
+   if(active.length){severity='problem';status=active.map(flag=>flag.label).join('/')}
+   else if(issues.length){severity='suspect';status='疑似打卡异常'}
+   else{severity='normal';status=trips.length?'出差覆盖':leaves.length?'请假覆盖':outings.length?'外出覆盖':'正常'}
+  }
+  const temporaryOutings=p109TemporaryOutings(emp,date,punches,attendanceFlags);
+  return {initialSeverity,initialStatus,initialIssues,employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
   lunchEvidence,autoOvertime,temporaryOutings,attendanceFlags,marker:''}}
  return pack();

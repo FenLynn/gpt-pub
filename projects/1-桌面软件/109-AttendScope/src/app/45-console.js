@@ -338,7 +338,8 @@ function r68RulesHtml(){
   '<div class="r68-rule-grid">'+items.map(([title,value])=>
    '<div><span>'+r68Esc(title)+'</span><strong>'+r68Esc(value)+'</strong></div>').join('')+'</div>'+
   '<div class="r68-note">自动加班：12:00 / 17:30（含）前离开不计；超过门槛后，从 11:40 / 17:10 起完整计时，不扣除 20 分钟。连续跨午休的工作不能当作午间加班。</div>'+
-  '<button class="r68-btn" id="r68PinRules">固定本月规则为项目默认</button>';
+  '<button class="r68-btn" id="r68PinRules">固定本月规则为项目默认</button> '+
+  '<button class="r68-btn" type="button" data-calendar-editor>编辑本月工作 / 休息日</button>';
 }
 function r68TemplatesHtml(){
  const profile=r62ImportProfile(),templates=profile.templates||{};

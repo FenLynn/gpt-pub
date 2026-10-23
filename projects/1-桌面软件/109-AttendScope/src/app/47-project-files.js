@@ -16,7 +16,7 @@ function p109ActivateWorkSession(){p109WriteMode('work');p109ClearTransientFiles
 function p109BlankWork(){
  const base=structuredClone(p109DemoSession);p109RestoreSession(base);
  EMPLOYEES=[];Object.assign(state,{projectDir:null,isDemo:false,records:[],leaves:[],trips:[],outings:[],overtimeEntries:[],
-  imports:[],revisions:[],revisionSeq:0,manualStatuses:{},overtimeReview:{},groups:{},groupCatalog:[],fixedPeople:[],nameAliases:{},
+  imports:[],revisions:[],revisionSeq:0,manualStatuses:{},overtimeReview:{},attendanceReview:{},groups:{},groupCatalog:[],fixedPeople:[],nameAliases:{},
   monthStores:new Map(),projectProfile:null,activeBranch:null,snapshotContext:false,saved:true,calendarOverrides:{},
   importProfile:{rules:R62_DEFAULT_DIRECTIONS.map(r=>({...r})),templates:{}},workspaceMode:'data',dataSection:'overview',selection:{type:'overall'}});
  Object.assign(RULES,P109_DEFAULT_RULES);p109ClearTransientFiles();rememberMonth();reanalyze();render();

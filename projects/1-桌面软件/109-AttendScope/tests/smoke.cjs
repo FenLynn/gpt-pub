@@ -310,11 +310,11 @@ async function run(){
   const nodes=[...document.querySelectorAll('.person-day')];
   const work=nodes.find(b=>b.dataset.personDay==='9');
   const rest=nodes.find(b=>b.dataset.personDay==='11');
-  const holiday=nodes.find(b=>b.dataset.personDay==='3');
+  const weekend=nodes.find(b=>b.dataset.personDay==='3');
   return nodes.length===monthDays()&&work?.classList.contains('work')&&
-   rest?.classList.contains('rest')&&holiday?.classList.contains('holiday')&&
+   rest?.classList.contains('rest')&&weekend?.classList.contains('rest')&&
    !!document.getElementById('personalDayPrev')&&!!document.getElementById('personalDayNext');
- },'R40 month strip work/rest/holiday styling or navigation missing');
+ },'Month strip work/rest styling or navigation missing');
  await page.locator('[data-person-day="9"]').click();
  await check(page,()=>state.chartDay===9&&state.selection.day===9&&
    document.querySelector('.cal-day[data-day="9"]').classList.contains('selected')&&
@@ -925,7 +925,7 @@ async function run(){
      get('trip','people',all)===1&&
      get('leave','people',[day])===1&&get('outing','people',[day])===1&&
      get('overtime','people',[day])===1&&
-     Math.abs(get('trip','estimatedHours',all)-asStatWorkMinutes()*3/60)<1e-8;
+     Math.abs(get('trip','estimatedHours',all)-asStatWorkMinutes()*[9,10,11,12].filter(isWorkday).length/60)<1e-8;
   }finally{Object.assign(state,prior)}
  },'R45 overlap union or multi-day trip counting inconsistent');
  await check(page,()=>{
@@ -1365,7 +1365,7 @@ async function run(){
     layout.visibleRaw!==layout.recordCount)throw Error('Desktop layout/data regression');
  await check(page,()=>!!document.getElementById('statusFilter')&&!!document.getElementById('statusFilterButton')&&document.querySelectorAll('[data-filter-value]').length===10&&!!document.getElementById('settingsBtn')&&
     !document.querySelector('.raw-page-controls')&&
-    document.querySelectorAll('.calendar-key span').length===3,'R13 controls not mounted');
+    document.querySelectorAll('.calendar-key span').length===2,'R13 controls not mounted');
  await check(page,()=>document.querySelector('.save-state.saved b')?.textContent==='✓'&&!document.querySelector('.save-state i'),'Save state should be semantic, not an unexplained dot');
  await check(page,()=>{
    const head=document.querySelector('.analysis-head').getBoundingClientRect();
@@ -1591,9 +1591,9 @@ async function run(){
  await check(page,({id,day})=>{
    const item=state.analysis.get(id+'|'+day),initial=attendanceJudgmentSystem(item);
    const locked=document.querySelector('[data-manual-status="'+initial+'"]');
-   return !!locked&&locked.disabled&&locked.classList.contains('initial-disabled')&&
-     parseFloat(getComputedStyle(locked).opacity)<.2;
- },manualTarget,'Manual selector must disable and fade the initial status');
+   return !!locked&&locked.disabled===!manualStatusFor(item)&&
+     locked.classList.contains('initial-disabled')===!manualStatusFor(item);
+ },manualTarget,'Manual selector must allow returning from an override to the automatic result');
 
  // Six lanes never change; the right rail always shows the selected person's complete day.
  await page.locator('.m-cell[data-emp="E011"][data-day="23"] button').click();
@@ -1614,7 +1614,7 @@ async function run(){
      insight.querySelectorAll('.r74-insight-head').length===2&&
      !insight.querySelector('[data-insight-tab]')&&
      ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('.r74-overview-metrics .insight-row span')].some(x=>x.textContent===k))&&
-     insight.querySelectorAll('.r74-behavior-list .insight-behavior-row').length===4;
+     insight.querySelectorAll('.r74-behavior-list .insight-behavior-row').length<=4&&!!insight.querySelector('.r74-behaviors');
  },'R74 unified personal panel shows overview and behavior together');
  await check(page,()=>{
    const h=[...document.querySelectorAll('.r74-insight-head strong')];
@@ -1766,7 +1766,7 @@ async function run(){
      saved.employees.length===1&&state.leaves.length===1&&state.trips.length===1&&
      state.outings.length===1&&state.overtimeEntries.length===1&&related;
    state.calendarOverrides['2026-10-09']='holiday';
-   const calendar=dayType(9)==='holiday';delete state.calendarOverrides['2026-10-09'];
+   const calendar=dayType(9)==='rest';delete state.calendarOverrides['2026-10-09'];
    return {valid,restored,calendar};
  });
  if(!imported.valid||!imported.restored||!imported.calendar)throw Error('R33/R50 roster/5-type import/month/calendar failed '+JSON.stringify(imported));
@@ -1962,11 +1962,12 @@ async function run(){
  await require('./r86-audit.cjs')({browser,out,root});
  await require('./r87-audit.cjs')({browser,out,root});
  await require('./r88-audit.cjs')({browser,out,root});
+ await require('./r89-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R88',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R89',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

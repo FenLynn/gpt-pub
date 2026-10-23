@@ -1,5 +1,5 @@
 /* R76 · Late/early indicators and a clear personal-overview return path. */
-:root{--r76-late-early:#d98945}
+:root{--r76-late-early:#4289c5}
 .status-filter-dot.late-early{background:var(--r76-late-early)!important}
 .m-cell button.s-lateEarly{background:var(--r76-late-early)!important}
 .person-day.has-late-early{position:relative}

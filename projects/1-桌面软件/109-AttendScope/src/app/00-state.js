@@ -1,8 +1,8 @@
 'use strict';
-const P109_DATA_SCHEMA=3;
-const P109_APP_VERSION='0.2.14-preview';
-const P109_APP_REVISION='R88';
-const P109_ENGINE_VERSION='R88';
+const P109_DATA_SCHEMA=4;
+const P109_APP_VERSION='0.2.15-preview';
+const P109_APP_REVISION='R89';
+const P109_ENGINE_VERSION='R89';
 const XLSX=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}
@@ -25,13 +25,13 @@ const RULES={amStart:'08:30',amEnd:'11:40',pmStart:'13:30',pmEnd:'17:10',
 const P109_DEFAULT_RULES=Object.freeze({...RULES});
 const state={calendarOverrides:{},isDemo:true,records:[],leaves:[],trips:[],analysis:new Map(),selection:{type:'overall'},filter:'main',judgmentMode:'initial',manualStatuses:{},overtimeReview:{},zoom:1,compact:true,projectDir:null,imports:[],revisionSeq:0,revisions:[],saved:true,groups:Object.fromEntries(EMPLOYEES.map(e=>[e.id,e.department+'组'])),monthStores:new Map(),nameAliases:{},fixedPeople:[],groupCatalog:['综合组','研发组','生产组','质检组','保障组'],workspaceMode:'all',selectedGroup:null,scopeSearch:'',attentionOnly:false,chartTab:'overview',chartDay:null,rawDataTab:'attendance',rawPageSize:25,rawPage:1,rawPopout:false,outings:[],overtimeEntries:[],prefs:{fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'}};
 const scenarioNames={normal:'正常',late:'迟到',early:'早退',absent:'缺勤',multiin:'多进一出',multiout:'一进多出',missingout:'缺少出',missingin:'缺少进',longout:'长时间外出',duplicate:'疑似重复打卡',overtime:'非工作日出勤'};
-Object.assign(state,{tempOutingReview:{},manualTempOutings:[],manualOvertime:[]});
+Object.assign(state,{attendanceReview:{},tempOutingReview:{},manualTempOutings:[],manualOvertime:[]});
 function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${YEAR}-${pad(MONTH)}-${pad(d)}`}
 function minutes(t){const [h,m,s='0']=String(t).split(':');return +h*60 + +m + (+s)/60}
 function fmtMinutes(m){if(m==null||!Number.isFinite(m))return '—';const total=Math.max(0,Math.round(m)),h=Math.floor(total/60),mi=total%60;return `${h}h ${pad(mi)}m`}
 function weekdayLabel(d){return ['日','一','二','三','四','五','六'][new Date(YEAR,MONTH-1,d).getDay()]}
-function dayType(d){if(d>monthDays()||d<1)return 'outside';const ds=isoDate(d),custom=state.calendarOverrides?.[ds];if(custom==='holiday'||custom==='rest')return custom;if(custom==='adjusted-work'||custom==='adjust'||custom==='work')return 'adjust'; if(YEAR===2026&&MONTH===10&&d>=1&&d<=7)return 'holiday'; if(ds==='2026-10-10')return 'adjust'; const wd=new Date(YEAR,MONTH-1,d).getDay(); return wd===0||wd===6?'rest':'work'}
-function isWorkday(d){const t=dayType(d);return t==='work'||t==='adjust'}
+function dayType(d){return d>monthDays()||d<1?'outside':p109CalendarType(isoDate(d),state.calendarOverrides)}
+function isWorkday(d){return dayType(d)==='work'}
 function seeded(n){let x=(n*9301+49297)%233280;return x/233280}
 function jitter(base,delta,seed){const m=minutes(base)+Math.floor((seeded(seed)*2-1)*delta);return `${pad(Math.floor(m/60))}:${pad(Math.floor(m%60))}:${pad(Math.floor(seeded(seed+17)*60))}`}
 function rec(emp,d,time,dir,scenario,idx){return {recordId:`demo:${emp.id}:${pad(d)}:${idx}`,employeeId:emp.id,name:emp.name,datetime:`${isoDate(d)} ${time}`,time,direction:dir,source:'模拟考勤_2026年10月.xlsx',sheet:'考勤',row:1000+d*100+Number(emp.id.slice(1))*10+idx,scenario}}
