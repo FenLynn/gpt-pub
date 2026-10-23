@@ -10,3 +10,15 @@
 #saveBtn.r83-save-primary.is-saved{background:#3f83ae!important;border-color:#3f83ae!important;box-shadow:0 1px 4px rgba(43,102,140,.14)}
 #projectMenu #freezeBtn{font-weight:680;color:#236b9f}
 @media(max-width:1280px){#saveBtn.r83-save-primary{min-width:58px;padding-inline:12px!important}}
+/* Upgrade uses the established dialog shell; only actual overflow scrolls. */
+.p109-upgrade-import{display:block;width:100%;padding:12px 16px;border:0;border-radius:6px;background:transparent;color:#236b9f;text-align:left;font-size:14px;font-weight:650;cursor:pointer}
+.p109-upgrade-import:hover{background:#edf5fb}
+.p109-update-panel{width:86vw;max-height:88vh;display:flex;flex-direction:column;background:#fff;border:1px solid #dbe5ed;border-radius:14px;box-shadow:0 18px 60px #263b4b30;color:#344f62}
+.p109-update-panel header,.p109-update-panel footer{display:flex;align-items:center;gap:12px;padding:18px 24px;flex:none}
+.p109-update-panel header{justify-content:space-between;border-bottom:1px solid #e1eaf0}
+.p109-update-panel h2{margin:0;font-size:20px}.p109-update-panel footer{justify-content:flex-end;border-top:1px solid #e1eaf0}
+.p109-update-body{padding:16px 24px;overflow:auto;min-height:0;font-size:15px;line-height:1.8}
+.p109-update-body ol{margin:14px 0;padding-left:24px}.p109-update-panel button{min-height:36px;padding:6px 16px;border:1px solid #d4e0e9;border-radius:7px;background:#f7fafc;color:#315c79;cursor:pointer}
+.p109-update-panel button.primary-btn{background:#197fc3;color:white;border-color:#197fc3}.p109-update-panel button:disabled{opacity:.5;cursor:default}
+.p109-update-panel #p109UpdateStatus{padding:12px 16px;border-radius:8px;background:#edf5fb;overflow-wrap:anywhere}
+.p109-update-panel #p109UpdateDirectory{overflow-wrap:anywhere}

@@ -147,6 +147,7 @@ module.exports=async({browser,out,root})=>{
   await page.screenshot({path:path.join(out,'r79-import-960.png')});await page.locator('#r62Cancel').click();
   const zip=path.join(out,'r79-separated-update.zip'),pack=cp.spawnSync('python3',[path.join(root,'tools/package-release.py'),root,zip],{encoding:'utf8'});
   if(pack.status!==0)throw Error('Cannot build update fixture: '+pack.stderr);
+  check(await page.evaluate(()=>saveWorking()),'save all edited work before updating code');
   check(await page.evaluate(async({bytes,currentVersion})=>{
    const original=JSON.stringify(workingPayload()),workingFile=await (await (await (await state.projectDir.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('working'),
     diskBefore=await (await workingFile.getFileHandle('state.json')).getFile().then(f=>f.text()),

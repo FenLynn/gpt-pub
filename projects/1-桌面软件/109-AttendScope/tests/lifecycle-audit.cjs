@@ -353,10 +353,14 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
    beforeOriginal=fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
-  await page.locator('#projectMenuButton').click();
+  await page.locator('#importBtn').click();
   const updateChoice=page.waitForEvent('filechooser',{timeout:30000});
   await page.locator('#upgradeProjectBtn').click();
   await (await updateChoice).setFiles({name:'P109-update.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(()=>document.querySelector('#p109UpdateVersion')?.textContent.includes(P109_APP_VERSION));
+  await page.locator('#p109UpdateChoose').click();
+  await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();
   await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
   report.codeUpdateDataUntouched=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')).equals(beforeWorking)&&
    fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv')).equals(beforeOriginal);
@@ -412,7 +416,26 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.crossVersionUpgradeVerified=report.oldVersionInstallBoot&&report.crossVersionUpgradePreservesData&&
    report.crossVersionBackupCreated&&report.crossVersionCodeUpdated&&report.crossVersionUpgradeRestoresDataAfterReload;
 
+  // Also exercise the exact R83 updater the user is currently running.
+  const r83Commit='ef254f113a4e2e7a17b80b7daea6cbda4f402f5f';
+  const r83Listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r83Commit,'--',projectPath],{encoding:'utf8'});
+  if(r83Listing.status!==0)throw Error('R83 source listing unavailable');
+  const r83Files=r83Listing.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')});
+  if(r83Files.length<50)throw Error('R83 fixture incomplete');
+  for(const file of r83Files){const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r83Commit+':'+file],{maxBuffer:16*1024*1024});
+   if(source.status!==0)throw Error('Cannot read R83 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+  }
+  await open();
+  report.r83OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.9-preview'&&state.records.length===2&&!!state.projectDir);
+  await page.evaluate(()=>saveWorking());const r83Working=fs.readFileSync(oldWorkingPath),r83Raw=fs.readFileSync(oldRawPath);
+  await page.locator('#projectMenuButton').click();const r83Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await (await r83Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(()=>document.querySelector('.toast')?.textContent.includes('程序更新已写入'),null,{timeout:60000});
+  report.r83UpdatePreservesData=fs.readFileSync(oldWorkingPath).equals(r83Working)&&fs.readFileSync(oldRawPath).equals(r83Raw);
+  await open();report.r83UpdateReload=await page.evaluate(v=>P109_APP_VERSION===v&&state.records.length===2&&EMPLOYEES.some(e=>e.name==='测试甲')&&!!document.querySelector('#importPopover #upgradeProjectBtn'),currentVersion);
+
   const requiredTrue=[
+   'r83OldVersionBoot','r83UpdatePreservesData','r83UpdateReload',
    'r77ImportedAttendanceFlags','r77OvertimeAndEarlyCoexist','r77ManualKeepsEvidence',
    'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',
    'manualOverridePersisted','previousWorkingPreserved','snapshotUnchanged','reloadRestores',

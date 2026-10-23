@@ -19,6 +19,8 @@ def build(root: pathlib.Path, destination: pathlib.Path):
     if not match:
         raise ValueError("Missing application version")
     app_version = match.group(1)
+    revision = re.search(r"const P109_APP_REVISION='([^']+)';", version_source)[1]
+    data_schema = int(re.search(r"const P109_DATA_SCHEMA=(\d+);", version_source)[1])
     sources = [root / "index.html", root / "README.md"] + sorted(
         f for f in (root / "src").rglob("*") if f.is_file()
     )
@@ -32,7 +34,10 @@ def build(root: pathlib.Path, destination: pathlib.Path):
         "schemaVersion": 1,
         "projectId": PROJECT,
         "appVersion": app_version,
-        "supportedDataSchemas": [2],
+        "appRevision": revision,
+        "updateFormat": 1,
+        "minimumUpdaterVersion": "0.2.3-preview",
+        "supportedDataSchemas": [data_schema],
         "files": [
             {"path": name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
             for name, data in allowed

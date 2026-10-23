@@ -111,6 +111,8 @@ function layoutHtml(){
           ${importMenuRow('出差','tripInput','sampleTrip')}
           ${importMenuRow('外出','outingInput','sampleOuting')}
           ${importMenuRow('登记加班','overtimeInput','sampleOvertime')}
+          <div class="system-menu-divider"></div>
+          <button id="upgradeProjectBtn" class="p109-upgrade-import" type="button">程序升级 ZIP…</button>
         </div>
       </div>
       <div class="system-menu-anchor">
@@ -125,7 +127,6 @@ function layoutHtml(){
           <button id="restoreBtn" role="menuitem">恢复月度工作 / 冻结 JSON</button>
           <button id="restoreZipBtn" role="menuitem">恢复整个项目 ZIP</button>
           <button id="backupProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>完整项目备份 ZIP</button>
-          <button id="upgradeProjectBtn" role="menuitem" ${state.projectDir?'':'disabled'}>安全更新程序 ZIP</button>
         </div>
       </div>
       <button class="primary-btn r83-save-primary ${state.saved?'is-saved':'is-dirty'}" id="saveBtn" title="保存当前月">保存</button>
