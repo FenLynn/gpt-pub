@@ -63,8 +63,10 @@ module.exports=async({browser,out,root})=>{
    return result;
   });for(const [name,value] of Object.entries(facts))check(value,'facts and compatibility: '+name);
   await page.waitForSelector('[data-attendance-id]');await page.locator('[data-attendance-id]').first().hover();await page.locator('[data-attendance-id] button').first().click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-attendance-id].is-excluded').length===1&&Object.values(state.attendanceReview).filter(v=>v===false).length===1);
   check(await page.locator('[data-attendance-id].is-excluded').count()===1,'actual attendance x leaves a gray recoverable tag');
   await page.locator('[data-attendance-id].is-excluded').hover();await page.locator('[data-attendance-id].is-excluded button').click();
+  await page.waitForFunction(()=>document.querySelectorAll('[data-attendance-id]').length===2&&!document.querySelector('[data-attendance-id].is-excluded')&&!Object.values(state.attendanceReview).some(v=>v===false));
   check(await page.locator('[data-attendance-id].is-excluded').count()===0,'actual gray tag check restores inclusion');
   const dot=await page.locator('[data-person-day="8"]').evaluate(n=>getComputedStyle(n,'::before').backgroundColor);check(dot==='rgb(66, 137, 197)','date marker is blue and separate from pink overtime');
   await page.evaluate(()=>p109OpenIntervalEditor('outing',__r89Employee.id,'2026-10-08'));
