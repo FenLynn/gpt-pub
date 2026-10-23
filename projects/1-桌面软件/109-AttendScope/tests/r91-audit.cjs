@@ -103,7 +103,10 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(()=>Object.values(state.tempOutingReview).includes('red')&&Object.values(state.overtimeReview).includes(false)),'external actions update outing and overtime decisions');
   await page.evaluate(()=>{state.timelineRange={key:'r91-person|8',start:590,end:620};render()});await page.waitForSelector('.p109-temp-actions[data-placement="above"]');
   check(await page.locator('.p109-temp-actions').evaluate(n=>n.offsetTop+n.offsetHeight<=Number(n.dataset.bandTop)-5&&n.offsetLeft+n.offsetWidth<=n.parentElement.clientWidth-64),'zoom edge falls above band without covering it or track labels');
-  await page.locator('.p109-temp-actions .green').focus();await page.screenshot({path:path.join(out,'r91-edge-actions.png')});
+  await page.locator('.p109-temp-actions .green').focus();
+  await page.evaluate(()=>echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).setOption({animation:false}));
+  check(await page.locator('.p109-temp-actions .green').evaluate(n=>n===document.activeElement),'keyboard focus survives chart redraw at zoom edge');
+  await page.waitForFunction(()=>+getComputedStyle(document.querySelector('.p109-temp-actions')).opacity>.95);await page.screenshot({path:path.join(out,'r91-edge-actions.png')});
   await page.locator('.p109-temp-actions .green').focus();await page.locator('.p109-temp-actions .green').click();
   await page.evaluate(()=>{state.timelineRange=null;render()});await page.screenshot({path:path.join(out,'r91-person.png')});
   check(!errors.length&&!remote.length,'no script errors or runtime network requests');report.errors=errors;

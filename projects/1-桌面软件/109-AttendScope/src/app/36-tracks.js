@@ -396,7 +396,14 @@ function mountAttendanceTimeline(a){
   }
   const syncAll=()=>{
     if(!el.isConnected||chart.isDisposed()||echarts.getInstanceByDom(el)!==chart)return;
+    const active=document.activeElement,owner=panel?.contains(active)?active.closest('[data-attendance-id],[data-auto-overtime-id],[data-temp-id],[data-interval-add]'):null,
+     key=owner&&['attendanceId','autoOvertimeId','tempId','intervalAdd'].find(k=>owner.dataset[k]!=null),id=key&&owner.dataset[key],
+     index=owner&&active!==owner?[...owner.querySelectorAll('button')].indexOf(active):-1;
     syncNavigator();syncOvertimeControls();syncAttendanceFlags();syncTemporaryControls();
+    // ECharts also finishes when a tooltip refreshes. Keep keyboard position
+    // while rebuilding the corresponding HTML overlay controls.
+    if(key){const next=[...panel.querySelectorAll('[data-attendance-id],[data-auto-overtime-id],[data-temp-id],[data-interval-add]')].find(n=>n.dataset[key]===id);
+     (index<0?next:next?.querySelectorAll('button')[index])?.focus({preventScroll:true})}
   };
   chart.on('finished',syncAll);
   requestAnimationFrame(syncAll);
