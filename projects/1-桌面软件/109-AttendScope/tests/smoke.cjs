@@ -1302,7 +1302,12 @@ async function run(){
   const before=asStatValue(asStatLedger(),'overtime','hours',[a.employee],[a.day]);
   state.__r53Before={hours:before,minutes:seg.minutes};
  },overtimePick);
- await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"]').hover();
+ const hoverOvertimeEvidence=async()=>{
+  const point=await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"]').evaluate(n=>{const r=n.parentElement.getBoundingClientRect();return {x:r.left+(Number(n.dataset.bandLeft)+Number(n.dataset.bandRight))/2,y:r.top+(Number(n.dataset.bandTop)+Number(n.dataset.bandBottom))/2}});
+  await page.mouse.move(point.x,point.y);
+  await page.waitForFunction(id=>+getComputedStyle([...document.querySelectorAll('[data-auto-overtime-id]')].find(n=>n.dataset.autoOvertimeId===id)).opacity>.95,overtimePick.id);
+ };
+ await hoverOvertimeEvidence();
  await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').first().click();
  await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"].is-excluded');
  await check(page,info=>{
@@ -1314,7 +1319,7 @@ async function run(){
    workingPayload().overtimeReview[info.id]===false&&layer;
  },overtimePick,'R53 × must fade segment, persist exclusion and remove its minutes from total');
  await page.screenshot({path:path.join(out,'r53-auto-overtime-excluded.png')});
- await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"]').hover();
+ await hoverOvertimeEvidence();
  await page.locator('[data-auto-overtime-id="'+overtimePick.id+'"] .overtime-review-btn').nth(1).click();
  await page.waitForSelector('[data-auto-overtime-id="'+overtimePick.id+'"]:not(.is-excluded)');
  await check(page,info=>{
@@ -1964,11 +1969,12 @@ async function run(){
  await require('./r88-audit.cjs')({browser,out,root});
  await require('./r89-audit.cjs')({browser,out,root});
  await require('./r90-audit.cjs')({browser,out,root});
+ await require('./r91-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R90',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R91',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

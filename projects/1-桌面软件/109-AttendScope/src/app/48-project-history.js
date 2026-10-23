@@ -144,6 +144,7 @@ async function p109RestoreLastProject({startup=true}={}){
 }
 p109RefreshRecentMenu();
 const p109RecentReady=(async()=>{
+ await p109LoadFixedCalendar();
  p109DemoSession=structuredClone(p109CaptureSession());
  if(p109ReadMode()==='work')p109BlankWork();
  await p109RestoreLastProject();

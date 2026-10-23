@@ -35,7 +35,10 @@ function r73ShowTooltip(target){
  target.setAttribute('aria-describedby','r73FloatingTip');
  r73TipNode.style.left='0px';r73TipNode.style.top='0px';
  r73TipNode.classList.add('is-visible');
- const r=target.getBoundingClientRect(),w=r73TipNode.offsetWidth,h=r73TipNode.offsetHeight;
+ const rects=[target.getBoundingClientRect()];
+ if(target.matches('.r74-attendance-tag'))rects.push(...[...target.querySelectorAll('button')].map(n=>n.getBoundingClientRect()));
+ const r={left:Math.min(...rects.map(x=>x.left)),right:Math.max(...rects.map(x=>x.right)),top:Math.min(...rects.map(x=>x.top)),bottom:Math.max(...rects.map(x=>x.bottom))};r.width=r.right-r.left;r.height=r.bottom-r.top;
+ const w=r73TipNode.offsetWidth,h=r73TipNode.offsetHeight;
  let x=r.left+r.width/2-w/2, y=r.top-h-12,below=false,side='';
  // A heading tooltip must never cover the app header or page title.
  // When space allows, dock it beside the info symbol instead of above it.
@@ -59,6 +62,7 @@ function r73ShowTooltip(target){
 function r73WireTooltips(){
  if(r73TipInstalled)return;r73TipInstalled=true;
  document.addEventListener('pointerover',e=>{
+  if(e.target.closest?.('.r74-attendance-tag button')){r73HideTooltip();return}
   const target=e.target.closest?.('[data-r73-tip]');
   if(target&&target!==r73TipTarget)r73ShowTooltip(target)
  });
@@ -67,6 +71,7 @@ function r73WireTooltips(){
    !r73TipTarget.contains(e.relatedTarget))r73HideTooltip()
  });
  document.addEventListener('focusin',e=>{
+  if(e.target.closest?.('.r74-attendance-tag button')){r73HideTooltip();return}
   if(e.target.matches?.('[data-r73-tip]'))r73ShowTooltip(e.target)
  });
  document.addEventListener('focusout',e=>{

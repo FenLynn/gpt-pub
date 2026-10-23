@@ -1,0 +1,19 @@
+.p109-calendar-period{display:flex;align-items:center;gap:8px}.p109-calendar-period>strong{min-width:72px;text-align:center;font-size:15px}
+.p109-calendar-period>button{width:32px;height:33px;padding:0;font-size:22px}.p109-calendar-period label{margin-left:12px}
+.p109-calendar-page select{height:34px;min-width:92px;border:1px solid #cddce7;border-radius:4px;background:white;color:#35536a;padding:4px 8px;font:inherit}
+.p109-calendar-period>button,.p109-calendar-transfer>button{border:1px solid #cbdde9;border-radius:4px;background:#f7fafc;color:#32658b}
+.p109-calendar-period>button:disabled{opacity:.4;cursor:default}.p109-calendar-page footer>span{margin-right:auto}
+.p109-calendar-page #p109CalendarConfirm{color:#fff;background:#247eaf;border-color:#247eaf}.p109-calendar-page #p109CalendarConfirm:disabled{opacity:.6;cursor:wait}
+#p109CalendarStatus{font-size:13px;line-height:1.6;min-height:21px;margin:12px 0;color:#486c86}
+.p109-calendar-transfer{display:flex;align-items:center;flex-wrap:wrap;gap:10px;border-top:1px solid #e2eaf0;padding-top:14px;font-size:13px;color:#74899b}.p109-calendar-transfer>button{padding:7px 12px;font:inherit}
+.workspace-mode-person .r74-overview-metrics{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);column-gap:24px;padding:3px 0 0}
+.workspace-mode-person .p109-metric-column{min-width:0}.workspace-mode-person .p109-metric-column+.p109-metric-column{border-left:1px solid #e2eaf0;padding-left:14px}
+.workspace-mode-person .r74-overview-metrics .insight-row{display:flex;align-items:center;justify-content:space-between;gap:8px!important;min-height:27px!important;padding:4px 0!important}
+.workspace-mode-person .r74-overview-metrics .insight-row span{font-size:12px!important}.workspace-mode-person .r74-overview-metrics .insight-row strong{line-height:1.25}
+.workspace-mode-person .inspector-insight .r74-insight-section:first-child{padding-top:0!important}
+.workspace-mode-person .inspector-insight .r74-behaviors{padding-top:4px!important}
+.workspace-mode-person .p109-temp-summary{padding-top:5px}.workspace-mode-person .p109-temp-details{padding:0}.workspace-mode-person .p109-temp-details summary{padding:2px 0}
+.p109-temp-actions,.overtime-review-actions{pointer-events:none!important;z-index:2}
+.p109-temp-actions:is(.is-hovered,:hover,:focus-within),.overtime-review-actions:is(.is-hovered,:hover,:focus-within){pointer-events:auto!important}
+.p109-temp-actions::before,.overtime-review-actions::before{content:"";position:absolute;right:100%;top:-2px;width:8px;height:calc(100% + 4px)}
+.p109-temp-actions[data-placement="above"]::before,.overtime-review-actions[data-placement="above"]::before{top:100%;right:0;width:100%;height:8px}

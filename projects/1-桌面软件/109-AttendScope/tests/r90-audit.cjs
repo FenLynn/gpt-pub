@@ -40,17 +40,20 @@ module.exports=async({browser,out,root})=>{
   const before=await page.evaluate(()=>JSON.stringify(state.calendarOverrides));await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-date="2026-10-09"]').click();
   check(await page.evaluate(()=>p109CalendarUI.chosen.size===2)&&await page.evaluate(()=>JSON.stringify(state.calendarOverrides))===before,'multiple selection does not modify calendar');
   await page.locator('[data-calendar-set="rest"]').click();
+  await page.locator('#p109CalendarConfirm').click();await page.waitForFunction(()=>!p109CalendarUI.saving);
   check(await page.evaluate(()=>dayType(8)==='rest'&&dayType(9)==='rest'&&!state.saved&&state.monthStores.get('2026-10').calendarOverrides['2026-10-09']==='rest'),'batch rest applies and enters month save state');
-  await page.locator('[data-calendar-set="work"]').click();check(await page.evaluate(()=>dayType(8)==='work'&&dayType(9)==='work'),'batch work restores selected days');
+  await page.locator('[data-calendar-set="work"]').click();await page.locator('#p109CalendarConfirm').click();await page.waitForFunction(()=>!p109CalendarUI.saving);check(await page.evaluate(()=>dayType(8)==='work'&&dayType(9)==='work'),'confirmed batch work restores selected days');
   await page.locator('#p109CalendarAll').click();check(await page.locator('[data-calendar-date][aria-pressed="true"]').count()===31,'select all month days');await page.locator('#p109CalendarClear').click();
   check(await page.locator('[data-calendar-set="rest"]').isDisabled(),'clear selection disables empty batch');
-  accept=false;await page.locator('#p109CalendarMonth').fill('2026-11');await page.locator('#p109CalendarMonth').dispatchEvent('change');
-  check(await page.evaluate(()=>monthKey()==='2026-10')&&await page.locator('#p109CalendarMonth').inputValue()==='2026-10','cancel new month preserves month and selector');
-  accept=true;await page.locator('#p109CalendarMonth').fill('2026-11');await page.locator('#p109CalendarMonth').dispatchEvent('change');await page.waitForFunction(()=>monthKey()==='2026-11');
-  check(await page.locator('[data-calendar-date]').count()===30,'month picker creates and opens month with correct day count');
+  await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-set="rest"]').click();
+  accept=false;await page.locator('#p109CalendarMonth').selectOption('11');
+  check(await page.evaluate(()=>monthKey()==='2026-10')&&await page.locator('#p109CalendarMonth').inputValue()==='10','cancel draft discard preserves calendar and business month');
+  accept=true;await page.locator('#p109CalendarMonth').selectOption('11');
+  check(await page.locator('[data-calendar-date]').count()===30&&await page.evaluate(()=>monthKey()==='2026-10'&&!state.monthStores.has('2026-11')),'calendar picker changes editor without creating a business month');
   await page.locator('[data-calendar-date="2026-11-02"]').click();await page.locator('[data-calendar-set="rest"]').click();
-  await page.locator('#p109CalendarMonth').fill('2026-10');await page.locator('#p109CalendarMonth').dispatchEvent('change');
-  check(await page.evaluate(()=>monthKey()==='2026-10'&&dayType(8)==='work'&&state.monthStores.get('2026-11').calendarOverrides['2026-11-02']==='rest'),'month switching retains separate calendar edits');
+  await page.locator('#p109CalendarConfirm').click();await page.waitForFunction(()=>!p109CalendarUI.saving);
+  await page.locator('#p109CalendarMonth').selectOption('10');
+  check(await page.evaluate(()=>monthKey()==='2026-10'&&dayType(8)==='work'&&p109FixedCalendar.months['2026-11']['2026-11-02']==='rest'&&!state.monthStores.has('2026-11')),'calendar months save independently of business months');
   await page.screenshot({path:path.join(out,'r90-calendar.png')});
   await page.evaluate(()=>{
    YEAR=2026;MONTH=10;EMPLOYEES=[{id:'r90-person',name:'核查人员'}];state.groups={'r90-person':'核查组'};state.groupCatalog=['核查组'];

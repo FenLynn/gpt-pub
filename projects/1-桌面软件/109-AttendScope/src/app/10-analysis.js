@@ -336,8 +336,10 @@ function attendanceVisitEvents(employeeId){
 }
 function attendanceDateIsWork(date){
  if(date.slice(0,7)===monthISO())return isWorkday(Number(date.slice(8,10)));
+ if(state.snapshotContext||state.activeBranch)return p109CalendarType(date,state.calendarOverrides,false)==='work';
  const other=state.monthStores.get(date.slice(0,7));
- return p109CalendarType(date,other?.calendarOverrides||state.calendarOverrides)==='work';
+ const context=other||state;
+ return p109CalendarType(date,other?.calendarOverrides||state.calendarOverrides,!context.snapshotContext&&!context.activeBranch)==='work';
 }
 function attendanceVisitEligibleMinutes(visit){
  let total=0;

@@ -1,8 +1,8 @@
 'use strict';
 const P109_DATA_SCHEMA=4;
-const P109_APP_VERSION='0.2.16-preview';
-const P109_APP_REVISION='R90';
-const P109_ENGINE_VERSION='R90';
+const P109_APP_VERSION='0.2.17-preview';
+const P109_APP_REVISION='R91';
+const P109_ENGINE_VERSION='R91';
 const XLSX=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}
@@ -30,7 +30,7 @@ function pad(n){return String(n).padStart(2,'0')} function isoDate(d){return `${
 function minutes(t){const [h,m,s='0']=String(t).split(':');return +h*60 + +m + (+s)/60}
 function fmtMinutes(m){if(m==null||!Number.isFinite(m))return '—';const total=Math.max(0,Math.round(m)),h=Math.floor(total/60),mi=total%60;return `${h}h ${pad(mi)}m`}
 function weekdayLabel(d){return ['日','一','二','三','四','五','六'][new Date(YEAR,MONTH-1,d).getDay()]}
-function dayType(d){return d>monthDays()||d<1?'outside':p109CalendarType(isoDate(d),state.calendarOverrides)}
+function dayType(d){return d>monthDays()||d<1?'outside':p109CalendarType(isoDate(d),state.calendarOverrides,!state.snapshotContext&&!state.activeBranch)}
 function isWorkday(d){return dayType(d)==='work'}
 function seeded(n){let x=(n*9301+49297)%233280;return x/233280}
 function jitter(base,delta,seed){const m=minutes(base)+Math.floor((seeded(seed)*2-1)*delta);return `${pad(Math.floor(m/60))}:${pad(Math.floor(m%60))}:${pad(Math.floor(seeded(seed+17)*60))}`}

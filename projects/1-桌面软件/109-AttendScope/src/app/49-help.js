@@ -8,7 +8,7 @@ function p109UnsavedMonths(){
  return result;
 }
 function p109BeforeUnload(event){
- if(!p109UnsavedMonths().length&&!state.storageBusy&&!state.importCommitting&&!p109ProjectBusy)return;
+ if(!p109UnsavedMonths().length&&!state.storageBusy&&!state.importCommitting&&!p109ProjectBusy&&!p109CalendarUI.dirty&&!p109CalendarUI.saving)return;
  event.preventDefault();event.returnValue='';
 }
 window.addEventListener('beforeunload',p109BeforeUnload);

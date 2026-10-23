@@ -313,7 +313,7 @@ function projectPayload(){
 }
 function workingPayload(){
   return {schemaVersion:P109_DATA_SCHEMA,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
-    employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...state.calendarOverrides},importProfile:r62ImportProfile(),
+    employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...(state.snapshotContext||state.activeBranch?state.calendarOverrides:{}),...p109CalendarMonthValues(YEAR,MONTH,state.calendarOverrides,!state.snapshotContext&&!state.activeBranch)},importProfile:r62ImportProfile(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
     attendanceReview:{...(state.attendanceReview||{})},tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:state.manualTempOutings||[],manualOvertime:state.manualOvertime||[],
@@ -407,9 +407,9 @@ async function freezeSnapshot(){
   try{
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:P109_DATA_SCHEMA,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
     appVersion:P109_APP_VERSION,sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
-  const snapshot={manifest:{...manifest,analysisEngineVersion:P109_ENGINE_VERSION,workingSchema:P109_DATA_SCHEMA},config:{
- employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:{...state.calendarOverrides}
- },working:workingPayload()};
+  const calendar=p109CalendarSnapshotValues(),snapshot={manifest:{...manifest,analysisEngineVersion:P109_ENGINE_VERSION,workingSchema:P109_DATA_SCHEMA},config:{
+ employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:calendar
+ },working:{...workingPayload(),calendarOverrides:calendar}};
   const txt=JSON.stringify(snapshot,null,2);
   if(state.projectDir){
     try{

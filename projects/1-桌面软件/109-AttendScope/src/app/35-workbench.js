@@ -135,10 +135,10 @@ function timelineBehaviorSummaryRow(item,key){
   return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
- const metrics=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
+ const metrics='<div class="p109-metric-column">'+insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
+  insightMetric('在岗',fmtMinutes(item.presence))+'</div><div class="p109-metric-column">'+
   insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-  insightMetric('在岗',fmtMinutes(item.presence))+
-  insightMetric('班内工时',fmtMinutes(item.workMinutes??0));
+  insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+'</div>';
  const explanation=['初始判定：'+JUDGMENT_LABELS[attendanceJudgmentSystem(item)],
   ...item.issues,item.lunchEvidence,item.autoOvertime?.reason].filter(Boolean).join('；'),
   behaviors=['trip','leave','outing','overtime'].filter(key=>timelineBehaviorRows(item,key).length||

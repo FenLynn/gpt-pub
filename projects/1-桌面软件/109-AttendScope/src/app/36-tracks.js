@@ -279,6 +279,17 @@ function mountAttendanceTimeline(a){
     });
   };
   syncNavSelection();
+  const placeReview=(box,left,right,center,bandTop,bandBottom)=>{
+    const edge=chart.getWidth()-SIDE,w=box.offsetWidth,h=box.offsetHeight,gap=6;
+    const beside=right+gap+w<=edge;
+    box.dataset.placement=beside?'right':'above';
+    box.dataset.bandLeft=String(left);box.dataset.bandRight=String(right);box.dataset.bandTop=String(bandTop);box.dataset.bandBottom=String(bandBottom);
+    box.style.left=(beside?right+gap:Math.max(SIDE,Math.min(right,edge-w)))+'px';
+    box.style.top=Math.max(0,beside?center-h/2:bandTop-h-gap)+'px';
+    box.dataset.anchorY=String(beside?center:bandTop-h/2-gap);
+    box.onpointerenter=()=>box.classList.add('is-hovered');
+    box.onpointerleave=()=>box.classList.remove('is-hovered');
+  };
   const syncOvertimeControls=()=>{
     const overlay=document.getElementById('overtimeReviewLayer');
     if(!overlay||!overlay.isConnected)return;
@@ -319,11 +330,11 @@ function mountAttendanceTimeline(a){
       box.onpointerenter=()=>box.classList.add('is-hovered');
       box.onpointerleave=()=>box.classList.remove('is-hovered');
       overlay.appendChild(box);
-      box.style.left=Math.max(0,Math.min(right-box.offsetWidth,chart.getWidth()-box.offsetWidth))+'px';
-      box.style.top=Math.max(0,x1[1]-box.offsetHeight/2)+'px';
+      const prior=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,4]),height=Math.abs(x1[1]-prior[1])+.5;
+      placeReview(box,Math.max(left,SIDE),Math.min(right,chart.getWidth()-SIDE),x1[1],x1[1]-height/2,x1[1]+height/2);
     }
   };
-  let hoverAddKind='';
+  let hoverAddKind='',temporaryHoverId='';
   const syncTemporaryControls=()=>{
     const overlay=document.getElementById('temporaryReviewLayer');if(!overlay?.isConnected)return;
     overlay.replaceChildren();const groups=new Map(),visible=state.timelineRange||range;
@@ -334,7 +345,7 @@ function mountAttendanceTimeline(a){
       const [from,to,lane]=row.value,x=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,lane]),
        left=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[from,lane]);
       if(!x||!left||x[0]<=SIDE||left[0]>=chart.getWidth()-SIDE)continue;
-      const box=document.createElement('div');box.className='p109-temp-actions';box.dataset.tempId=row.segmentId;
+      const box=document.createElement('div');box.className='p109-temp-actions'+(temporaryHoverId===row.segmentId?' is-hovered':'');box.dataset.tempId=row.segmentId;
       const adjacent=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[to,lane-1]),height=Math.abs(x[1]-adjacent[1])+.5,
        center=x[1]-height*.135;
       box.dataset.anchorY=String(center);
@@ -345,8 +356,9 @@ function mountAttendanceTimeline(a){
         button.onclick=e=>{e.stopPropagation();p109SetTempDecision(row.segmentId,status)};box.appendChild(button);
       }
       overlay.appendChild(box);
-      box.style.left=Math.max(SIDE,Math.min(x[0]-box.offsetWidth,chart.getWidth()-SIDE-box.offsetWidth))+'px';
-      box.style.top=Math.max(0,center-box.offsetHeight/2)+'px';
+      placeReview(box,Math.max(left[0],SIDE),Math.min(x[0],chart.getWidth()-SIDE),center,x[1]-height*.44,x[1]+height*.17);
+      box.onpointerenter=()=>{temporaryHoverId=row.segmentId;box.classList.add('is-hovered')};
+      box.onpointerleave=()=>{temporaryHoverId='';box.classList.remove('is-hovered')};
     }
     for(const [kind,lane,label] of [['outing',4,'补录临时外出'],['overtime',5,'补录加班']]){
       const pos=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[1440,lane]);if(!pos)continue;
@@ -365,14 +377,21 @@ function mountAttendanceTimeline(a){
   if(panel){
     panel.onpointermove=event=>{
       if(chart.isDisposed()||!el.isConnected)return;
-      const y=event.clientY-el.getBoundingClientRect().top;
+      const bounds=el.getBoundingClientRect(),y=event.clientY-bounds.top,x=event.clientX-bounds.left;
+      temporaryHoverId='';state.overtimeHoverId='';
+      panel.querySelectorAll('.p109-temp-actions,.overtime-review-actions').forEach(box=>{
+        const r=box.getBoundingClientRect(),inBand=x>=Number(box.dataset.bandLeft)&&x<=Number(box.dataset.bandRight)&&y>=Number(box.dataset.bandTop)&&y<=Number(box.dataset.bandBottom),
+         inMenu=(box.classList.contains('is-hovered')||box.matches(':hover,:focus-within'))&&event.clientX>=r.left-8&&event.clientX<=r.right+2&&event.clientY>=r.top-2&&event.clientY<=r.bottom+8;
+        const hovered=inBand||inMenu;box.classList.toggle('is-hovered',hovered);
+        if(hovered){if(box.dataset.tempId)temporaryHoverId=box.dataset.tempId;else state.overtimeHoverId=box.dataset.autoOvertimeId}
+      });
       let kind='';for(const [name,lane] of [['outing',4],['overtime',5]]){
         const point=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[0,lane]),prior=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[0,lane-1]);
         if(point&&prior&&y>=point[1]-Math.abs(point[1]-prior[1])/2&&y<point[1]+Math.abs(point[1]-prior[1])/2)kind=name;
       }
       if(kind!==hoverAddKind)showRowAdd(kind);
     };
-    panel.onpointerleave=()=>showRowAdd('');
+    panel.onpointerleave=()=>{showRowAdd('');temporaryHoverId='';state.overtimeHoverId='';panel.querySelectorAll('.p109-temp-actions,.overtime-review-actions').forEach(n=>n.classList.remove('is-hovered'))};
   }
   const syncAll=()=>{
     if(!el.isConnected||chart.isDisposed()||echarts.getInstanceByDom(el)!==chart)return;
@@ -380,25 +399,6 @@ function mountAttendanceTimeline(a){
   };
   chart.on('finished',syncAll);
   requestAnimationFrame(syncAll);
-  chart.on('mouseover',p=>{
-    const segment=p?.data?.segmentId;
-    if(p.seriesId==='bands'&&segment){
-      if(p.data.origin==='temporary'){
-        document.querySelectorAll('.p109-temp-actions').forEach(n=>n.classList.toggle('is-hovered',n.dataset.tempId===segment));return;
-      }
-      state.overtimeHoverId=segment;
-      overlayHighlight(segment);
-    }
-  });
-  chart.on('mouseout',p=>{
-    if(p?.data?.segmentId){state.overtimeHoverId='';
-      document.querySelectorAll('.p109-temp-actions').forEach(n=>n.classList.remove('is-hovered'));
-      overlayHighlight('');}
-  });
-  function overlayHighlight(segmentId){
-    document.querySelectorAll('#overtimeReviewLayer .overtime-review-actions').forEach(el=>
-      el.classList.toggle('is-hovered',!!segmentId&&el.dataset.autoOvertimeId===segmentId));
-  }
   chart.on('click',p=>{
     const d=p.data||{};
     if(p.seriesId==='punches'&&d.records?.length){focusRawEvidence('attendance',d.records.map(r=>r.recordId));return}

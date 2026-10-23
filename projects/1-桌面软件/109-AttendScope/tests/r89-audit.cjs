@@ -91,7 +91,8 @@ module.exports=async({browser,out,root})=>{
   await page.evaluate(()=>{navigateWorkspace('data');state.dataSection='rules';render()});await page.locator('[data-calendar-editor]').click();
   await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('#p109CalendarClear').click();check(await page.evaluate(()=>dayType(8)==='work'),'selecting then clearing dates leaves the month unchanged');
   await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-set="rest"]').click();await page.locator('#p109CalendarClear').click();await page.locator('[data-calendar-date="2026-10-10"]').click();await page.locator('[data-calendar-set="work"]').click();
-  check(await page.evaluate(()=>dayType(8)==='rest'&&dayType(10)==='work'&&!state.saved&&state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings.length===0),'applying the month calendar changes eligibility and marks work unsaved');
+  await page.locator('#p109CalendarConfirm').click();await page.waitForFunction(()=>!p109CalendarUI.saving);
+  check(await page.evaluate(()=>dayType(8)==='rest'&&dayType(10)==='work'&&!state.saved&&state.analysis.get(EMPLOYEES[0].id+'|8').temporaryOutings.length===0),'confirming the month calendar changes eligibility and marks work unsaved');
   check(await page.evaluate(()=>{switchMonth(2026,11,true);const answer=dayType(1)==='rest'&&dayType(2)==='work'&&!attendanceDateIsWork('2026-10-08');switchMonth(2026,10);return answer&&dayType(8)==='rest'&&dayType(10)==='work'}),'new month defaults to weekdays and adjacent overtime reads the owning month calendar');
   await page.screenshot({path:path.join(out,'r89-calendar.png')});
   check(await page.evaluate(()=>{
