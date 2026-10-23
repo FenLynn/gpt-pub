@@ -99,6 +99,19 @@ jobs:
           CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           export CHROME_BIN
           node "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
+      - name: Build verified offline upgrade candidate
+        shell: bash
+        run: |
+          APP="projects/1-桌面软件/109-AttendScope"
+          python3 "$APP/tools/package-release.py" "$APP" "$RUNNER_TEMP/p109-candidate/P109-upgrade.zip"
+          cd "$RUNNER_TEMP/p109-candidate"
+          sha256sum P109-upgrade.zip > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p109-offline-upgrade-candidate
+          path: ${{ runner.temp }}/p109-candidate
+          retention-days: 14
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
