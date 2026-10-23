@@ -4,6 +4,7 @@ function p109UnsavedMonths(){
  const result=[];
  if(!state.saved&&!state.isDemo)result.push(monthKey());
  for(const [key,month] of state.monthStores)if(key!==monthKey()&&!month.saved&&!month.isDemo)result.push(key);
+ if(state.projectDir?.__p109Portable&&state.projectDir.pending&&!result.includes(monthKey()))result.push(monthKey());
  return result;
 }
 function p109BeforeUnload(event){
@@ -22,11 +23,12 @@ function p109ProgramLocationHtml(){
   (location.protocol==='file:'?'<button id="r81CopyProgram" type="button">复制路径</button>':'')+
   '</div>'+(dirty.length?'<div class="r82-location-unsaved">未保存月份：'+dirty.join('、')+'<button id="r81SaveReminder" type="button">保存当前月</button></div>':'');
 }
-function p109StorageLocationsHtml(){return '<section class="r82-storage-locations" aria-label="目录位置"><h3>目录位置</h3>'+p109ProjectLocationHtml()+p109ProgramLocationHtml()+'<p>项目路径仅作本机备注；点击目录名可在页面中浏览实际项目文件。</p></section>'}
+function p109StorageLocationsHtml(){return '<section class="r82-storage-locations" aria-label="目录位置"><h3>目录位置</h3>'+p109ProjectLocationHtml()+p109ProgramLocationHtml()+'<p>项目路径仅作本机备注；点击目录名可在页面中浏览实际项目文件。</p></section>'+(typeof p109EnvironmentHtml==='function'?p109EnvironmentHtml():'')}
 const p109DirectoryNotes=new WeakMap();
 function p109ActiveRecent(){return typeof p109RecentState==='undefined'?null:p109RecentState.items.find(x=>x.handle===state.projectDir)}
 function p109ProjectDirectoryNote(){return state.projectDir?(p109DirectoryNotes.get(state.projectDir)||p109ActiveRecent()?.directoryPath||''):''}
 function p109ProjectLocationHtml(){
+ if(state.projectDir?.__p109Portable)return '<div class="r81-project-location"><strong>便携项目</strong><span>数据在当前页面内存中；关闭前请下载完整项目包</span></div>';
  const connected=!!state.projectDir,note=p109ProjectDirectoryNote(),label=connected?(note||state.projectDir.name):(state.isDemo?'Demo · 演示数据':'尚未连接项目');
  return '<div class="r81-project-location"><strong>项目数据目录</strong><button id="r81ProjectBrowse" type="button" title="'+escapeNameChar(label)+' · 点击浏览项目文件">'+escapeNameChar(label)+'</button>'+
   (connected?'<span class="r81-path-origin">'+(note?'手动记录':'浏览器仅提供目录名')+'</span><button id="r81CopyProject" class="r81-copy" type="button">复制路径</button>'+

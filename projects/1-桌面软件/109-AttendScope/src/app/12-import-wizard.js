@@ -321,6 +321,11 @@ function r62WireImport(){
    p109RestoreSession(before);reanalyze();render();
    d.error=e.name==='AbortError'?'已取消，原数据已保留。':e.name==='NotAllowedError'?'项目目录没有写入权限，请重新授权后重试。':('导入失败：'+e.message);
    r62ShowImport();
+   const help=document.createElement('button');help.id='r85ImportFallback';help.type='button';help.textContent='目录不可写？转为便携模式后重试';
+   document.querySelector('.r62-dialog footer')?.prepend(help);
+   help.onclick=async()=>{const draft=r62ImportDraft;r62ImportDraft=null;document.querySelector('.r62-overlay')?.remove();
+    try{if(await p109UsePortable()){draft.error='已转为便携模式，请再次确认导入。关闭前须下载完整项目包。'}}finally{r62ImportDraft=draft;r62ShowImport()}
+   };
   }finally{state.importCommitting=false}
  };
  r79ValidateImport();

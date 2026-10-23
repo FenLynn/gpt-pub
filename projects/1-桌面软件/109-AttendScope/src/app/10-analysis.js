@@ -191,7 +191,7 @@ async function p109ImportBusiness(kind,file,prepared=null){
  // Persist an immutable copy before changing the roster or live dataset.
  const meta={...await persistImportedFile(file,kind,out.length,importId),mode,addedCount:combined.added,mergedCount:combined.merged};
  applyImportRoster(plan,meta);if(!state.isDemo)p109WriteMode('work');acceptImportedRows(kind,combined.rows,plan,result.failed.length);
- if(typeof p109SourceCache!=='undefined'&&!state.projectDir)p109SourceCache.set(importId,file);
+ if(typeof p109SourceCache!=='undefined')p109SourceCache.set(importId,file);
  toast('已'+(mode==='replace'?'替换':'合并')+'：新增 '+combined.added+' 条'+(combined.merged?'，重合 '+combined.merged+' 条（保留来源）':''));
  return {count:out.length,added:combined.added,merged:combined.merged,skipped:result.failed.length};
 }

@@ -31,6 +31,8 @@ async function p109RecentWrite(item,lastId,removeId=null){
 }
 function p109RecentSorted(){return [...p109RecentState.items].sort((a,b)=>b.openedAt-a.openedAt)}
 async function p109RememberProject(handle,projectName=''){
+ if(handle?.__p109Portable){try{localStorage.setItem('p109-last-work-mode','portable')}catch(_){}p109RefreshRecentMenu();return}
+ try{localStorage.removeItem('p109-last-work-mode')}catch(_){}
  p109RecentState.serial++;
  let existing;
  for(const item of p109RecentState.items){
@@ -117,6 +119,8 @@ async function p109RestoreLastProject({startup=true}={}){
   if(serial!==p109RecentState.serial)return;
   p109RecentState.items=data.items.filter(x=>x.handle?.kind==='directory'&&typeof x.handle.getDirectoryHandle==='function');p109RecentState.lastId=data.lastId;p109RefreshRecentMenu();
   const item=p109RecentState.items.find(x=>x.id===data.lastId);
+  let portable=false;try{portable=localStorage.getItem('p109-last-work-mode')==='portable'}catch(_){}
+  if(portable&&!state.projectDir&&!p109RecentState.interacted){p109BlankWork();p109ShowWorkHome();return}
   if(startup&&!item&&!state.projectDir&&!p109RecentState.interacted){p109ShowModeChooser(true);return}
   if(startup&&item&&!state.projectDir&&!p109RecentState.interacted)p109BlankWork();
   if(!item&&!state.projectDir&&!p109RecentState.interacted){p109ShowWorkHome();return}

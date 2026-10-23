@@ -1,0 +1,108 @@
+'use strict';
+const fs=require('fs'),path=require('path'),http=require('http'),cp=require('child_process'),assert=require('assert/strict');
+module.exports=async({browser,out,root})=>{
+ root=path.resolve(root);const report={revision:'R85',checks:[]},errors=[];
+ const check=(ok,label)=>{assert(ok,label);report.checks.push(label)};
+ const update=path.join(out,'r85-compatibility-upgrade.zip'),pack=cp.spawnSync('python3',[path.join(root,'tools/package-release.py'),root,update],{encoding:'utf8'});
+ if(pack.status!==0)throw Error(pack.stderr);
+ const server=http.createServer((req,res)=>{const p=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
+  if(!p.startsWith(root+path.sep)){res.writeHead(403);res.end();return}try{res.setHeader('Content-Type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.svg':'image/svg+xml'})[path.extname(p)]||'application/octet-stream');res.end(fs.readFileSync(p))}catch(_){res.writeHead(404);res.end()}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const url='http://127.0.0.1:'+server.address().port+'/index.html';
+ const context=await browser.newContext({viewport:{width:1366,height:900}}),page=await context.newPage();
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const csv=(month)=>'姓名,打卡时间,进出\n便携甲,2026-'+month+'-08 08:25:00,进\n便携甲,2026-'+month+'-08 17:20:00,出\n';
+ const upload=async(month)=>{await page.locator('#attendanceInput').setInputFiles({name:'原件 中文 '+month+'.csv',mimeType:'text/csv',buffer:Buffer.from(csv(month))});await page.waitForFunction(()=>!!document.getElementById('r62Commit')&&!document.getElementById('r62Commit').disabled);await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting)};
+ try{
+  await page.addInitScript(()=>{
+   Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:undefined});
+   Object.defineProperty(window,'indexedDB',{configurable:true,value:undefined});
+   Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('blocked','SecurityError')}});
+  });
+  await page.goto(url);await page.evaluate(()=>p109RecentReady);await page.locator('#r80Work').click();await page.locator('#r85NewPortable').click();
+  await page.waitForFunction(()=>!!state.projectDir?.__p109Portable&&!p109ProjectBusy);
+  check(await page.evaluate(()=>!p109Environment().directory&&!p109Environment().history&&!state.isDemo&&EMPLOYEES.length===0&&p109UnsavedMonths().length>0),'portable work starts with directory APIs, IndexedDB and localStorage all unavailable');
+  await upload('10');const source=await page.evaluate(()=>state.imports[0].id);
+  check(await page.evaluate(async id=>{let h=state.projectDir;const p=p109SourcePath(state.imports.find(x=>x.id===id)),name=p.pop();for(const part of p)h=await existingDir(h,part);return await (await h.getFileHandle(name)).getFile().then(f=>f.text())},source)===csv('10'),'portable imports preserve exact original bytes');
+  check(await page.evaluate(()=>freezeSnapshot()),'portable mode creates an immutable snapshot');
+  const frozen=await page.evaluate(async()=>{const snaps=await (await (await (await state.projectDir.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('snapshots');for await(const [name,h] of snaps.entries())return {name,text:await (await h.getFileHandle('snapshot.json')).getFile().then(f=>f.text())}});
+  await page.evaluate(()=>{state.manualStatuses[EMPLOYEES[0].id+'|8']='normal';state.saved=false;rememberMonth();switchMonth(2026,11,true)});await upload('11');
+  const download=page.waitForEvent('download');await page.locator('#saveBtn').click();const file=await download,filePath=path.join(out,'r85-portable-project.zip');await file.saveAs(filePath);
+  check(await page.evaluate(()=>state.projectDir.pending&&p109UnsavedMonths().length>0),'starting a download never falsely clears unsaved protection');
+  await page.evaluate(()=>{state.groups[EMPLOYEES[0].id]='下载后新增';state.saved=false});await page.locator('#p109ConfirmDownload').click();
+  check(await page.evaluate(()=>state.projectDir.pending)&&/发生变化/.test(await page.locator('#p109TransferState').textContent()),'download confirmation cannot clear edits made after packaging');
+  await page.evaluate(()=>{delete state.groups[EMPLOYEES[0].id];state.groups[EMPLOYEES[0].id]='未分组'});
+  const fresh=page.waitForEvent('download');await page.evaluate(()=>saveWorking());await (await fresh).saveAs(filePath);
+  await page.locator('#p109ConfirmDownload').click();check(await page.evaluate(()=>!state.projectDir.pending&&!p109UnsavedMonths().length),'only explicit download confirmation clears portable pending state');
+  await page.locator('#p109TransferClose').click();
+  await page.reload();await page.evaluate(()=>p109RecentReady);await page.locator('#r80Work').click();
+  const choose=page.waitForEvent('filechooser');await page.locator('#r85OpenPortable').click();await (await choose).setFiles(filePath);await page.waitForFunction(()=>!!state.projectDir?.__p109Portable&&!p109ProjectBusy);
+  check(await page.evaluate(()=>state.monthStores.has('2026-10')&&state.monthStores.has('2026-11')&&state.records.length===2&&p109UnsavedMonths().length===0),'a complete project package reopens after page closure without browser storage');
+  await page.evaluate(()=>switchMonth(2026,10));
+  check(await page.evaluate(async({source,frozen})=>{const p=p109SourcePath(state.imports.find(x=>x.id===source)),name=p.pop();let h=state.projectDir;for(const part of p)h=await existingDir(h,part);
+   const original=await (await h.getFileHandle(name)).getFile().then(f=>f.text());let s=state.projectDir;for(const part of ['data','2026','10','snapshots',frozen.name])s=await existingDir(s,part);
+   return original.includes('便携甲')&&state.manualStatuses[EMPLOYEES[0].id+'|8']==='normal'&&await (await s.getFileHandle('snapshot.json')).getFile().then(f=>f.text())===frozen.text;
+  },{source,frozen}),'round-trip retains original files, manual decisions and unchanged frozen snapshot bytes');
+  await page.evaluate(()=>p109OpenSource(state.imports[0].id));await page.waitForSelector('.r80-original-grid');check((await page.locator('.r80-original-grid').textContent()).includes('便携甲'),'restored portable original remains directly browsable');await page.keyboard.press('Escape');
+  await page.evaluate(()=>{state.workspaceMode='data';state.dataSection='storage';render()});
+  check((await page.locator('body').textContent()).includes('环境与备用方案'),'storage page gives one capability and fallback summary');
+  await page.screenshot({path:path.join(out,'r85-portable-environment.png')});
+  check(await page.evaluate(async bytes=>{
+   const original=state.projectDir,rows=await p109ZipRead(new File([Uint8Array.from(bytes)],'good.zip'));rows.find(f=>f.name.endsWith('state.json')).data[0]^=1;
+   const ok=await p109OpenPortableFile(new File([XLSX.writeArchive(rows)],'corrupt.zip'));
+   return !ok&&state.projectDir===original&&state.records.length===2;
+  },[...fs.readFileSync(filePath)]),'a corrupt project ZIP is rejected without replacing the open project');
+  await page.evaluate(async()=>{const parts=p109SourcePath(state.imports[0]),name=parts.pop();let h=state.projectDir;for(const part of parts)h=await existingDir(h,part);await writeFile(h,name,'corrupted original')});
+  check(await page.evaluate(()=>p109ExportPortable())===false&&/哈希不一致/.test(await page.locator('#p109FallbackReason').textContent()),'an original changed on disk cannot be repackaged as intact evidence');
+  await page.locator('#p109TransferClose').click();
+  // Remove one original; a full backup must now be refused rather than silently incomplete.
+  await page.evaluate(async()=>{const parts=p109SourcePath(state.imports[0]),name=parts.pop();let h=state.projectDir;for(const part of parts)h=await existingDir(h,part);await h.removeEntry(name)});
+  check(await page.evaluate(()=>p109ExportPortable())===false,'missing original files prevent a falsely labelled complete package');
+  check((await page.locator('#p109FallbackReason').textContent()).includes('缺少'),'missing-original failure explicitly offers rescue instead');
+  const rescueDownload=page.waitForEvent('download');await page.locator('#p109FallbackRescue').click();const rescuePath=path.join(out,'r85-rescue.json');await (await rescueDownload).saveAs(rescuePath);
+  const rescue=JSON.parse(fs.readFileSync(rescuePath,'utf8'));check(rescue.months.length===2&&rescue.context==='rescue','rescue JSON includes every loaded month and identifies its limited scope');
+  await page.locator('#p109TransferClose').click();
+  check(await page.evaluate(async bytes=>p109OpenPortableFile(new File([Uint8Array.from(bytes)],'rescue.json')),[...fs.readFileSync(rescuePath)]),'rescue JSON can be reopened to continue working');
+  check(await page.evaluate(()=>state.projectDir.rescue&&state.monthStores.size===2),'rescue workspace is explicitly distinguished from a complete project');
+  await page.evaluate(()=>{window.__subtle=Object.getOwnPropertyDescriptor(crypto,'subtle');Object.defineProperty(crypto,'subtle',{configurable:true,value:undefined});state.saved=false});
+  check(await page.evaluate(()=>!p109Environment().hash),'missing hash support is detected');
+  check(await page.evaluate(()=>p109ExportPortable())===false&&/安全项目包/.test(await page.locator('#p109FallbackReason').textContent()),'missing hash support refuses unsafe archives and offers rescue JSON');
+  const noHashRescue=page.waitForEvent('download');await page.locator('#p109FallbackRescue').click();await (await noHashRescue).saveAs(path.join(out,'r85-no-hash-rescue.json'));
+  check(await page.evaluate(()=>p109UnsavedMonths().length>0),'rescue download retains unsaved protection');
+  await page.evaluate(()=>{window.__objectUrl=URL.createObjectURL;URL.createObjectURL=undefined});
+  check(await page.evaluate(()=>p109RescueDownload())===false&&await page.evaluate(()=>p109UnsavedMonths().length>0),'download API unavailable is explicit and never claims work was saved');
+  await page.evaluate(()=>{URL.createObjectURL=__objectUrl;if(__subtle)Object.defineProperty(crypto,'subtle',__subtle);else delete crypto.subtle;p109CloseTransfer();window.DecompressionStream=undefined});
+  check(await page.evaluate(()=>!p109Environment().compressedXlsx),'missing XLSX decompression is detected');
+  await upload('10');check(await page.evaluate(()=>state.records.length===2&&state.imports.length===2),'CSV import remains usable without XLSX decompression');
+  check(!errors.length,'portable fallback has no runtime errors');
+ }finally{await context.close()}
+ const native=await browser.newContext({viewport:{width:1366,height:900}}),p=await native.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
+ try{
+  await p.goto(url);await p.evaluate(()=>p109RecentReady);await p.locator('#r80Demo').click();
+  check(await p.evaluate(async()=>{window.__disk=await (await navigator.storage.getDirectory()).getDirectoryHandle('r85-disk-'+crypto.randomUUID(),{create:true});return p109InitializeProject(__disk)}),'initialize native project for permission-failure test');
+  await p.locator('#attendanceInput').setInputFiles({name:'disk.csv',mimeType:'text/csv',buffer:Buffer.from(csv('10'))});await p.locator('#r62Commit').click();await p.waitForFunction(()=>!r62ImportDraft);await p.evaluate(()=>saveWorking());
+  const before=await p.evaluate(async()=>{const h=await (await (await (await __disk.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('working');return (await (await h.getFileHandle('state.json')).getFile()).text()});
+  await p.evaluate(()=>{state.groups[EMPLOYEES[0].id]='保留的修改';state.saved=false;const original=writeFile;window.__normalWrite=original;writeFile=async(h,n,d)=>{if(!h.__p109Portable)throw new DOMException('disk denied','NotAllowedError');return original(h,n,d)}});
+  check(await p.evaluate(()=>saveWorking())===false,'native write failure preserves dirty work');
+  const downloaded=p.waitForEvent('download');await p.locator('#p109FallbackPortable').click();await (await downloaded).saveAs(path.join(out,'r85-recovered-portable.zip'));
+  check(await p.evaluate(()=>state.projectDir.__p109Portable&&state.groups[EMPLOYEES[0].id]==='保留的修改'),'permission failure can switch to portable while retaining live edits');
+  await p.locator('#p109ConfirmDownload').click();await p.locator('#p109TransferClose').click();
+  check(await p.evaluate(async()=>{const h=await (await (await (await __disk.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('working');return (await (await h.getFileHandle('state.json')).getFile()).text()})===before,'fallback does not overwrite the original disk project');
+  await p.evaluate(()=>connectProjectDir(__disk));
+  await p.locator('#attendanceInput').setInputFiles({name:'retry.csv',mimeType:'text/csv',buffer:Buffer.from(csv('10'))});await p.locator('#r62Commit').click();await p.waitForSelector('#r85ImportFallback');
+  check(await p.evaluate(()=>!!r62ImportDraft&&state.imports.length===1&&!state.importCommitting),'an import write failure retains its draft and the existing imports');
+  await p.locator('#r85ImportFallback').click();await p.waitForFunction(()=>state.projectDir.__p109Portable&&!!r62ImportDraft&&!p109ProjectBusy);
+  await p.locator('#r62Commit').click();await p.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
+  check(await p.evaluate(async()=>{const imp=state.imports.find(x=>x.name==='retry.csv');let h=state.projectDir;const parts=p109SourcePath(imp),name=parts.pop();for(const part of parts)h=await existingDir(h,part);return state.imports.length===2&&state.records.length===2&&(await (await h.getFileHandle(name)).getFile()).size>0}),'the same draft retries in portable mode, preserving earlier records and new original bytes');
+  const retrySaved=p.waitForEvent('download');await p.evaluate(()=>saveWorking());await (await retrySaved).saveAs(path.join(out,'r85-import-retry.zip'));await p.locator('#p109ConfirmDownload').click();await p.locator('#p109TransferClose').click();
+  check(await p.evaluate(async bytes=>{
+   writeFile=__normalWrite;const runtime=await (await navigator.storage.getDirectory()).getDirectoryHandle('r85-program-'+crypto.randomUUID(),{create:true}),app=await dir(await dir(runtime,'src'),'app');
+   await writeFile(runtime,'index.html','<!doctype html><title>P109 program</title>');await writeFile(app,'00-state.js',"const P109_APP_VERSION='0.2.10-preview';");await writeFile(app,'43-project-control.js','// P109');
+   const originalRoot=state.projectDir,revision=originalRoot.revision;
+   const ok=await p109ApplyCodeUpdate(new File([Uint8Array.from(bytes)],'upgrade.zip'),{programRoot:runtime,confirmed:true});
+   const backups=await p109Entries(await existingDir(runtime,'backups'));
+   return ok&&state.projectDir===originalRoot&&!originalRoot.pending&&originalRoot.revision===revision&&backups.some(x=>x.name.startsWith('pre-upgrade-'));
+  },[...fs.readFileSync(update)]),'a saved portable project can upgrade a native program folder with durable backups and no fake-handle call');
+  check(!errors.length,'all compatibility paths have no script errors');
+  fs.writeFileSync(path.join(out,'r85-audit.json'),JSON.stringify(report,null,2));console.log('P109_R85_AUDIT_PASS '+JSON.stringify(report));
+ }finally{await native.close();await new Promise(r=>server.close(r))}
+};

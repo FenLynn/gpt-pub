@@ -102,7 +102,7 @@ function layoutHtml(){
         </div>
       </div>
     <div class="month-actions">
-      <span class="save-state ${state.saved?'saved':'dirty'}" title="${state.projectDir?'项目目录中的工作状态':'未连接项目目录；请初始化项目或下载 JSON 保存'}"><b aria-hidden="true">${state.saved?'✓':'!'}</b>${state.projectDir?(state.saved?'已保存':'未保存'):state.isDemo?'演示数据':'仅内存'}</span>
+      <span class="save-state ${state.saved&&!state.projectDir?.pending?'saved':'dirty'}" title="${state.projectDir?.__p109Portable?'便携模式：下载并确认完整项目包后才算保存':state.projectDir?'项目目录中的工作状态':'未连接项目目录；可下载完整项目包'}"><b aria-hidden="true">${state.saved&&!state.projectDir?.pending?'✓':'!'}</b>${state.projectDir?.__p109Portable?((!state.projectDir.pending&&state.saved)?'项目包已确认':'待下载项目包'):state.projectDir?(state.saved?'已保存':'未保存'):state.isDemo?'演示数据':'仅内存'}</span>
       <div class="import-anchor">
         <button class="text-btn" id="importBtn" aria-expanded="false" aria-controls="importPopover">导入</button>
         <div class="import-popover" id="importPopover">
@@ -120,6 +120,9 @@ function layoutHtml(){
         <div class="system-menu" id="projectMenu" role="menu" aria-label="项目操作" hidden>
           <button id="connectDir" role="menuitem">连接 / 切换项目目录</button>
           <button id="initializeProject" role="menuitem">新建空白项目</button>
+          <button id="p109PortableNew" role="menuitem">新建便携项目</button>
+          <button id="p109PortableOpen" role="menuitem">打开项目 ZIP / 救援 JSON</button>
+          <button id="p109PortableExport" role="menuitem">下载完整便携项目 ZIP</button>
           <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
           <div id="p109RecentList">${typeof p109RecentMenuHtml==='function'?p109RecentMenuHtml():''}</div>
           <div class="system-menu-divider"></div>

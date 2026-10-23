@@ -1,7 +1,7 @@
 /* P109 month-scoped persistence. Raw imports are copied into their month, never rewritten. */
 function downloadBlob(blob,name){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),500);
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
 }
 function r62CsvCell(v){
  let s=String(v??'');
@@ -129,6 +129,7 @@ function p109RestoreSession(saved){
 function p109ConfirmProjectSwitch(){
   rememberMonth();
   const dirty=[...state.monthStores].filter(([,m])=>!m.saved&&!m.isDemo).map(([key])=>key);
+  if(state.projectDir?.__p109Portable&&state.projectDir.pending&&!dirty.includes(monthKey()))dirty.push(monthKey());
   return !dirty.length||window.confirm('以下月份有未保存内容：'+dirty.join('、')+'。切换项目会放弃这些内存修改；建议取消并先保存。仍要切换？');
 }
 async function p109OptionalDirectory(root,name){
@@ -204,7 +205,7 @@ async function p109ReadProject(handle,project){
 }
 async function connectProjectDir(savedHandle=null,options={}){
   if(savedHandle?.kind!=='directory')savedHandle=null;
-  if(!savedHandle&&!window.showDirectoryPicker){toast('当前浏览器不支持目录读写，请使用最新版 Chrome/Edge',true);return false}
+  if(!savedHandle&&!window.showDirectoryPicker){p109ShowStorageFallback('当前浏览器不支持目录读写。可新建便携项目或打开项目 ZIP');return false}
   if(p109ConnectionBusy||p109ProjectBusy||state.storageBusy||r63ReadingImport||r62ImportDraft){toast('请等待当前文件操作完成并关闭导入预览后再切换项目',true);return false}
   p109ConnectionBusy=true;
   try{
@@ -233,11 +234,11 @@ async function connectProjectDir(savedHandle=null,options={}){
     Object.assign(asNavHistory,{back:[],forward:[],current:null,restoring:false});
     Object.assign(r68UI,{chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
-    r68UI.projectSerial++;r68UI.treeSerial++;render();
+    r68UI.projectSerial++;r68UI.treeSerial++;if(typeof p109CloseTransfer==='function')p109CloseTransfer();document.getElementById('p109ModeOverlay')?.remove();render();
     const notice=typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'';
     toast((loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目')+notice);
     return true;
-  }catch(e){if(e.name!=='AbortError')toast('目录连接失败：'+e.message,true);return false}
+  }catch(e){if(e.name!=='AbortError')p109ShowStorageFallback('目录连接失败：'+e.message);return false}
   finally{p109ConnectionBusy=false}
 }
 async function p109RequireWriteAccess(handle,request=true){
@@ -286,6 +287,8 @@ function workingPayload(){
 }
 async function saveWorking(options={}){
   if(state.storageBusy||state.importCommitting||p109ConnectionBusy||(p109ProjectBusy&&!options.initializing)){toast('正在处理项目文件，请稍后保存',true);return false}
+  if(state.projectDir?.__p109Portable&&!options.initializing)return p109ExportPortable();
+  if(!state.projectDir&&!state.isDemo&&!options.initializing)return p109ExportPortable({adopt:true});
   state.storageBusy=true;
   try{
   const payload=JSON.stringify(workingPayload(),null,2);
@@ -309,8 +312,8 @@ async function saveWorking(options={}){
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
       const current=workingPayload(),written=JSON.parse(payload);delete current.savedAt;delete written.savedAt;
       state.saved=JSON.stringify(current)===JSON.stringify(written);rememberMonth();
-      render();toast(state.saved?'已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'):'已保存，操作期间的新修改仍需再次保存');return true;
-    }catch(e){toast('目录保存失败：'+e.message,true);return false}
+      if(typeof p109CloseTransfer==='function')p109CloseTransfer();render();toast(state.saved?'已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'):'已保存，操作期间的新修改仍需再次保存');return true;
+    }catch(e){p109ShowStorageFallback('目录保存失败：'+e.message);return false}
   }
   downloadBlob(new Blob([payload],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_working.json');
   state.saved=true;rememberMonth();render();toast('已下载当前月份工作状态 JSON');
@@ -361,6 +364,7 @@ async function restoreWorkingFile(file){
 }
 async function freezeSnapshot(){
   if(state.storageBusy||state.importCommitting||p109ConnectionBusy||p109ProjectBusy){toast('正在处理项目文件，请稍后冻结',true);return false}
+  if(!state.projectDir&&!state.isDemo&&!await p109UsePortable())return false;
   state.storageBusy=true;
   try{
   const id='F'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9),manifest={schemaVersion:2,snapshotId:id,year:YEAR,month:MONTH,createdAt:new Date().toISOString(),
@@ -378,8 +382,8 @@ async function freezeSnapshot(){
       const folder=await dir(snapshots,id);
       await writeFile(folder,'snapshot.json',txt);
       if(JSON.stringify(await readJSON(folder,'snapshot.json'))!==JSON.stringify(snapshot))throw Error('冻结写入校验失败');
-      toast('已冻结 '+monthKey()+' · '+id);return true;
-    }catch(e){toast('冻结失败：'+e.message,true);return false}
+      if(state.projectDir.__p109Portable)render();toast(state.projectDir.__p109Portable?'已生成冻结；请下载新的完整项目包保存':'已冻结 '+monthKey()+' · '+id);return true;
+    }catch(e){p109ShowStorageFallback('冻结未完成：'+e.message+'。重新授权后重试，或转为便携项目后重新冻结');return false}
   }
   downloadBlob(new Blob([txt],{type:'application/json'}),r63FileStem()+'_'+monthKey()+'_'+id+'.json');
   toast('已下载不可变冻结快照 '+id);

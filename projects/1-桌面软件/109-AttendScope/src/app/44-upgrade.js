@@ -20,6 +20,7 @@ function p109CompareVersion(a,b){
 }
 async function p109UpgradePick(){
  if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting||r62ImportDraft){toast('请等待当前文件操作完成',true);return}
+ if(!p109Environment().directory){p109ShowStorageFallback('当前环境无法原地升级。先下载项目包，再完整解压新版程序到新文件夹，打开新版并载入项目包');return}
  document.getElementById('importPopover')?.classList.remove('open');document.getElementById('importBtn')?.setAttribute('aria-expanded','false');
  const chooser=document.createElement('input');chooser.type='file';chooser.accept='.zip,application/zip';
  chooser.onchange=async()=>{
@@ -56,7 +57,8 @@ async function p109ApplyCodeUpdate(file,options={}){
   // Archive is written on disk BEFORE any application file is replaced.
   const files=[],limits={count:0,bytes:0};
   await p109ArchiveWalk(root,'',files,limits);
-  const sameDirectory=programRoot===root||!!(await programRoot.isSameEntry?.(root));
+  const sameDirectory=programRoot===root||(!root.__p109Portable&&!!(await programRoot.isSameEntry?.(root)));
+  const backupRoot=root.__p109Portable?programRoot:root;
   {
    for(const name of ['index.html','README.md','p109-release-manifest.json']){
     const h=await p109File(programRoot,name);if(!h)continue;
@@ -69,14 +71,14 @@ async function p109ApplyCodeUpdate(file,options={}){
   }
   const {zip}=await p109ZipBuild(files);
   const archive=new Uint8Array(await zip.arrayBuffer()),backupHash=await p109Hash(archive),
-   backupFolder=await dir(root,'backups'),
+   backupFolder=await dir(backupRoot,'backups'),
    backupName='pre-upgrade-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8)+'.zip';
   if(await p109File(backupFolder,backupName))throw Error('备份文件已存在，禁止覆盖');
   await writeFile(backupFolder,backupName,archive);
   const persisted=await p109File(backupFolder,backupName);
   if(backupHash!==await p109Hash(new Uint8Array(await (await persisted.getFile()).arrayBuffer())))
    throw Error('升级前项目备份写盘校验失败，未更新任何程序文件');
-  if(!sameDirectory){const backup=await dir(programRoot,'backups');await writeFile(backup,backupName,archive);
+  if(!sameDirectory&&backupRoot!==programRoot){const backup=await dir(programRoot,'backups');await writeFile(backup,backupName,archive);
    const saved=await p109File(backup,backupName);if(backupHash!==await p109Hash(new Uint8Array(await (await saved.getFile()).arrayBuffer())))throw Error('程序备份副本校验失败');
   }
   const ordered=[...upgrades.filter(f=>f.name!=='index.html'),manifestFile,upgrades.find(f=>f.name==='index.html')];
@@ -201,12 +203,12 @@ async function p109ShowUpdate(file){
   if(p109CompareVersion(version,P109_APP_VERSION)!==0)throw Error('文件夹版本与当前页面不同，请选择当前程序目录');
   programRoot=root;panel.querySelector('#p109UpdateDirectory').textContent='程序文件夹：'+root.name+' · '+version;choose.textContent='更换程序文件夹';await p109RememberProgram(root);refresh();
  };
- choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError')status.textContent=e.message}};
+ choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError')status.textContent=e.message+'。无法授权时，先下载确认项目包，再把新版完整解压到新文件夹继续。'}};
  install.onclick=async()=>{
   if(install.dataset.reload){location.reload();return}if(running)return;running=true;panel.querySelectorAll('button').forEach(b=>b.disabled=true);
   const ok=await p109ApplyCodeUpdate(file,{programRoot,confirmed:true,onProgress:t=>status.textContent=t,onError:t=>status.textContent=t});
   running=false;panel.querySelector('#p109UpdateClose').disabled=false;panel.querySelector('#p109UpdateCancel').disabled=false;
-  if(ok){install.disabled=false;install.textContent='完成并重新载入';install.dataset.reload='1';status.textContent='更新成功，所有文件已核验。升级前备份位于程序及项目目录的 backups 文件夹。';choose.disabled=true;
+  if(ok){install.disabled=false;install.textContent='完成并重新载入';install.dataset.reload='1';status.textContent='更新成功，所有文件已核验。升级前备份位于程序目录的 backups 文件夹。'+(state.projectDir?.__p109Portable?'重新载入后，请手动打开已确认下载的最新项目 ZIP。':state.projectDir?'独立项目目录也保留备份。':'');choose.disabled=true;
    panel.querySelector('#p109UpdateCancel').hidden=true;panel.querySelector('#p109UpdateClose').setAttribute('aria-label','完成并重新载入');
   }
   else{choose.disabled=false;refresh()}

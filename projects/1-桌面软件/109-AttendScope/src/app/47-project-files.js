@@ -55,6 +55,7 @@ function p109ShowWorkHome(){
  node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80WorkTitle">工作项目</h2><p>程序与项目数据分别存放，可随时切换项目</p></div><button id="r80ModeClose" aria-label="关闭工作入口">×</button></header>'+
   '<div class="r80-work-actions"><button id="r80NewProject"><strong>新建空白项目</strong><span>选择一个独立的空数据文件夹</span></button>'+
   '<button id="r80ConnectProject"><strong>连接已有项目</strong><span>选择包含 project.json 的数据文件夹</span></button></div>'+
+  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>不需目录授权，下载项目 ZIP 保存</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button></div>'+
   '<footer><button id="r80ChooseAgain">切换 Demo / Work</button><button id="r80MemoryWork">先在空白工作区导入</button></footer></div>';
  document.body.appendChild(node);node.addEventListener('keydown',e=>p109TrapDialogFocus(e,node));
  node.querySelector('#r80ModeClose').onclick=()=>node.remove();
@@ -70,6 +71,7 @@ function p109ShowWorkHome(){
 }
 function p109CurrentProjectName(){
  if(!state.projectDir)return state.isDemo?'演示项目':'未连接项目';
+ if(state.projectDir.__p109Portable)return state.projectDir.name+' · 便携';
  const recent=typeof p109RecentState==='undefined'?null:p109RecentState.items.find(x=>x.id===p109RecentState.lastId);
  return recent?.label||state.projectDir.name;
 }

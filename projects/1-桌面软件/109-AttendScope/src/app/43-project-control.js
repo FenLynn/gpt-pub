@@ -240,7 +240,7 @@ async function p109InitializeProject(root){
  let previous=null;
  try{
  if(!root){
-   if(!window.showDirectoryPicker){p109Status('请使用支持目录读写的 Chrome/Edge',true);return false}
+   if(!window.showDirectoryPicker){p109ShowStorageFallback('当前环境不能直接创建目录项目，请使用新建便携项目');return false}
    root=await showDirectoryPicker({mode:'readwrite'});
  }
  const entries=await p109Entries(root);
@@ -274,9 +274,9 @@ async function p109InitializeProject(root){
   r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
   p109ActivateWorkSession();
   if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle());
-  render();p109Status('空白项目已初始化并保存，可以开始导入'+
+  render();p109Status(root.__p109Portable?'已新建便携项目。可开始导入，关闭前须下载完整项目包':'空白项目已初始化并保存，可以开始导入'+
    (typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':''));return true;
- }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109Status('初始化失败，请检查目录权限：'+e.message,true);return false}
+ }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109ShowStorageFallback('初始化失败，请检查目录权限：'+e.message);return false}
  finally{p109ProjectBusy=false}
 }
 
@@ -395,25 +395,26 @@ async function p109ArchiveWalk(folder,prefix,files,limits){
  }
 }
 async function p109BackupProject(){
+ if(state.projectDir?.__p109Portable)return p109ExportPortable();
  if(!state.projectDir||p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting||r62ImportDraft)return;
  p109ProjectBusy=true;
  try{
   const audit=await p109AuditProject();
   if(!audit.initialized)throw Error('项目尚未初始化');
-  if(!state.saved&&
-   !window.confirm('当前月份仍有未保存修改。备份只包含磁盘上已保存的内容，建议先保存。继续备份？'))return;
+  if(p109UnsavedMonths().length&&
+   !window.confirm('有月份仍有未保存修改：'+p109UnsavedMonths().join('、')+'。此备份只包含磁盘已保存内容；要同时保留内存修改，请取消并选择“下载完整便携项目 ZIP”。继续备份磁盘内容？'))return;
   const files=[],limits={count:0,bytes:0};
   await p109ArchiveWalk(state.projectDir,'',files,limits);
   const {zip,manifest}=await p109ZipBuild(files);
   downloadBlob(zip,r63FileStem()+'_项目备份_'+new Date().toISOString().slice(0,10)+'.zip');
   p109Status('已导出完整项目备份：'+limits.count+' 个文件（包含代码时可直接迁移）');
   return manifest;
- }catch(e){p109Status('备份失败：'+e.message,true)}
+ }catch(e){p109ShowStorageFallback('目录备份失败：'+e.message)}
  finally{p109ProjectBusy=false}
 }
 async function p109RestoreArchive(){
  if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting)return;
- if(!window.showDirectoryPicker){p109Status('该浏览器不支持写入本地目录',true);return}
+ if(!window.showDirectoryPicker){p109PickPortable();return}
  let target;
  try{target=await showDirectoryPicker({mode:'readwrite'});
   if((await p109Entries(target)).length)throw Error('恢复仅允许选择空目录，防止覆盖已有项目');
