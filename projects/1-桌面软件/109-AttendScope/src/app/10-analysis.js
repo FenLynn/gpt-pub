@@ -211,7 +211,7 @@ function manualStatusKey(aOrId,day){
   return typeof aOrId==='string'?aOrId+'|'+day:aOrId.employee.id+'|'+aOrId.day;
 }
 function manualStatusFor(a){return state.manualStatuses?.[manualStatusKey(a)]||null}
-function hasManualStatuses(){return !!state.manualStatuses&&Object.keys(state.manualStatuses).length>0}
+function hasManualStatuses(){return Object.keys(state.manualStatuses||{}).length>0||Object.values(state.attendanceReview||{}).some(value=>value===false)}
 function attendanceJudgmentSystem(a){
   if(!isWorkday(a.day))return 'rest';
   const severity=a.initialSeverity??a.severity,status=a.initialStatus??a.status;

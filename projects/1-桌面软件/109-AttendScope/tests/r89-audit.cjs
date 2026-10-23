@@ -36,6 +36,7 @@ module.exports=async({browser,out,root})=>{
    result.ledgerUsesFlags=asStatValue(asStatLedger(),'status','late',[e],[8])===1;
    for(const flag of [...a.attendanceFlags])p109SetAttendanceDecision(flag.id,false);a=state.analysis.get(e.id+'|8');
    result.excludeAll=attendanceJudgment(a)==='normal'&&attendanceJudgmentSystem(a)==='anomaly'&&!attendanceHasLateEarly(a)&&asStatValue(asStatLedger(),'status','late',[e],[8])===0&&asStatValue(asStatLedger(),'status','early',[e],[8])===0;
+   result.matrixSharesDecision=matrixCategory(a)==='normal'&&state.judgmentMode==='manual'&&hasManualStatuses();
    result.sourceUnchanged=JSON.stringify(state.records)===before&&a.workMinutes===work&&traditionalRows().find(r=>r.日期===date).迟到早退排除次数===3;
    state.manualStatuses[e.id+'|8']='anomaly';result.dayOverrideWins=attendanceJudgment(a)==='anomaly';delete state.manualStatuses[e.id+'|8'];
    __r89Show();setManualStatusForCurrent('absent');setManualStatusForCurrent('normal');
@@ -86,7 +87,7 @@ module.exports=async({browser,out,root})=>{
   const zip=await page.evaluate(async()=>{state.projectDir=null;const files=await p109PortableCollect(await p109PortableFromSession()),result=await p109ZipBuild(files);return [...new Uint8Array(await result.zip.arrayBuffer())]});
   await page.reload();await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();
   check(await page.evaluate(async bytes=>p109OpenPortableFile(new File([Uint8Array.from(bytes)],'review.zip')),zip),'complete project ZIP reopens after page reload');
-  check(await page.evaluate(()=>state.manualTempOutings.length===1&&Object.values(state.attendanceReview).filter(v=>v===false).length===1&&state.analysis.get(EMPLOYEES[0].id+'|8').attendanceFlags.some(f=>!f.accepted)),'reload retains independent manual half and attendance exclusions');
+  check(await page.evaluate(()=>state.manualTempOutings.length===1&&Object.values(state.attendanceReview).filter(v=>v===false).length===1&&state.analysis.get(EMPLOYEES[0].id+'|8').attendanceFlags.some(f=>!f.accepted)&&state.judgmentMode==='manual'&&hasManualStatuses()),'reload retains independent manual half, attendance exclusions and final matrix mode');
   await page.evaluate(()=>{navigateWorkspace('data');state.dataSection='rules';render()});await page.locator('[data-calendar-editor]').click();
   await page.locator('[data-calendar-date="2026-10-08"]').click();await page.keyboard.press('Escape');check(await page.evaluate(()=>dayType(8)==='work'),'canceling the calendar leaves the month unchanged');
   await page.locator('[data-calendar-editor]').click();await page.locator('[data-calendar-date="2026-10-08"]').click();await page.locator('[data-calendar-date="2026-10-10"]').click();await page.locator('#p109CalendarApply').click();

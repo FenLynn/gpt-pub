@@ -92,6 +92,7 @@ function p109SetAttendanceDecision(id,accepted){
  if(!flag)return false;
  state.attendanceReview??={};const before=state.attendanceReview[id]!==false;
  if(accepted)delete state.attendanceReview[id];else state.attendanceReview[id]=false;
+ if(!accepted)state.judgmentMode='manual';else if(!hasManualStatuses())state.judgmentMode='initial';
  state.revisions.push({id:'R'+(++state.revisionSeq),key:flag.employeeId+'|'+Number(flag.date.slice(8,10)),action:'attendance-flag-inclusion',segmentId:id,from:before,to:!!accepted,time:new Date().toISOString()});
  state.saved=false;rememberMonth();reanalyze();render();return true;
 }

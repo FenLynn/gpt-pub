@@ -51,7 +51,7 @@ function switchMonth(year,month,create=false,preserveCurrent=true,internal=false
   state.activeBranch=next.activeBranch||null;
   state.snapshotContext=!!next.snapshotContext;
   state.attendanceReview={...(next.attendanceReview||{})};state.tempOutingReview={...(next.tempOutingReview||{})};state.manualTempOutings=structuredClone(next.manualTempOutings||[]);state.manualOvertime=structuredClone(next.manualOvertime||[]);
-  state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&Object.keys(state.manualStatuses).length?'manual':'initial';
+  state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&hasManualStatuses()?'manual':'initial';
   Object.assign(RULES,P109_DEFAULT_RULES,next.rules||{});
   RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);
   if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
