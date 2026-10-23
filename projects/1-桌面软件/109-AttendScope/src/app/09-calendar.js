@@ -2,6 +2,7 @@
 'use strict';
 const P109_CALENDAR_KEY='p109-fixed-calendar-v1';
 let p109FixedCalendar={schemaVersion:1,kind:'P109-Fixed-Calendar',updatedAt:0,months:{}};
+let p109FixedCalendarTemporary=false;
 function p109CalendarDates(key){
  const [year,month]=key.split('-').map(Number);
  return Array.from({length:new Date(Date.UTC(year,month,0)).getUTCDate()},(_,i)=>key+'-'+String(i+1).padStart(2,'0'));
@@ -63,7 +64,7 @@ async function p109StoreFixedCalendar(candidate){
  const book=p109ValidateCalendarBook(candidate);let local=false,db=false;
  try{localStorage.setItem(P109_CALENDAR_KEY,JSON.stringify(book));local=localStorage.getItem(P109_CALENDAR_KEY)===JSON.stringify(book)}catch(_){}
  try{await p109CalendarDb(book);db=true}catch(_){}
- p109FixedCalendar=book;return local||db;
+ p109FixedCalendar=book;p109FixedCalendarTemporary=!local&&!db;return local||db;
 }
 function p109CalendarFallback(){
  p109CalendarUI.dirty=true;
@@ -91,7 +92,7 @@ function p109CalendarPageHtml(){
   '<div class="p109-calendar-grid" id="p109CalendarGrid" aria-label="'+year+' 年 '+month+' 月日期多选">'+['一','二','三','四','五','六','日'].map(x=>'<b>周'+x+'</b>').join('')+'<span></span>'.repeat((new Date(Date.UTC(year,month-1,1)).getUTCDay()+6)%7)+dates.map((date,i)=>{
    const type=draft[date];return '<button type="button" data-calendar-date="'+date+'" class="'+type+(chosen.has(date)?' is-selected':'')+'" aria-pressed="'+chosen.has(date)+'" aria-label="'+date+' '+(type==='work'?'工作日':'休息日')+'"><strong>'+(i+1)+'</strong><small>'+(type==='work'?'工作日':'休息日')+'</small></button>';
   }).join('')+'</div><footer><span>工作日 '+work+' 天 · 休息日 '+(dates.length-work)+' 天</span><button type="button" id="p109CalendarWeekdays">按周一至周五重置</button><button type="button" id="p109CalendarConfirm" '+(saving?'disabled':'')+'>'+(saving?'正在保存…':'确认保存当月')+'</button></footer>'+
-  '<div id="p109CalendarStatus" role="status">'+r68Esc(status||(dirty?'有未确认的日历修改':p109FixedCalendar.months[key]?'当月固定日历已保存':'尚未保存当月固定日历'))+'</div><div class="p109-calendar-transfer"><button type="button" id="p109CalendarExport">导出全部日历</button><button type="button" id="p109CalendarImport">导入日历</button><input id="p109CalendarFile" type="file" accept=".json" hidden><span>换浏览器或程序位置前，请导出日历备份。</span></div></section>';
+  '<div id="p109CalendarStatus" role="status">'+r68Esc(status||(dirty?'有未确认的日历修改':p109FixedCalendarTemporary?'本次临时日历尚未持久保存，请导出备份。':p109FixedCalendar.months[key]?'当月固定日历已保存':'尚未保存当月固定日历'))+'</div><div class="p109-calendar-transfer"><button type="button" id="p109CalendarExport">导出全部日历</button><button type="button" id="p109CalendarImport">导入日历</button><input id="p109CalendarFile" type="file" accept=".json" hidden><span>换浏览器或程序位置前，请导出日历备份。</span></div></section>';
 }
 function p109ApplyCalendar(changes){
  if(p109CalendarBusy())return false;

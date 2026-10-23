@@ -54,6 +54,7 @@ module.exports=async({browser,out,root})=>{
   const fallbackPromise=page.waitForEvent('download');await confirmed();const fallback=await fallbackPromise,fallbackBook=JSON.parse(fs.readFileSync(await fallback.path(),'utf8'));
   check(fallbackBook.months['2028-03']['2028-03-02']==='rest'&&await page.evaluate(()=>p109CalendarType('2028-03-02')==='rest'&&p109CalendarUI.dirty&&p109CalendarUI.status.includes('无法持久保存')),'both storage failures still apply calendar in memory, download backup and retain unsaved status');
   const fallbackImportPromise=page.waitForEvent('download');check(await page.evaluate(async value=>p109ImportCalendar(new File([value],'calendar.json')),exported),'calendar file can still load and work when all browser storage is blocked');await fallbackImportPromise;
+  check(await page.evaluate(()=>{p109CalendarSelect('2028-04');render();const e=new Event('beforeunload',{cancelable:true});p109BeforeUnload(e);return e.defaultPrevented&&document.getElementById('p109CalendarStatus').textContent.includes('临时日历')}),'changing editor month cannot clear temporary-calendar warning or close protection');
   await page.evaluate(()=>{p109CalendarDb=__r91Db;Storage.prototype.setItem=__r91Set;p109CalendarUI.dirty=false;
    switchMonth(2028,3,true);window.__r91Payload=workingPayload();window.__r91Default=dayType(1);
   });
