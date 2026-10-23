@@ -30,3 +30,4 @@
 .p109-calendar-tools>button:disabled{opacity:.45;cursor:default}.p109-calendar-page .p109-calendar-grid button{min-height:65px;border-radius:5px;box-sizing:border-box}
 .p109-calendar-page .p109-calendar-grid button.is-selected{outline:2px solid #428dc0;outline-offset:-2px}.p109-calendar-page .p109-calendar-grid button:focus-visible{outline:3px solid #276d9c;outline-offset:1px}
 .p109-calendar-page footer{justify-content:space-between;margin-top:20px;font-size:13px;color:#74899b}
+.raw-float-btn{display:inline-flex;align-items:center;justify-content:center}

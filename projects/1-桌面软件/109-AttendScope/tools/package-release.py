@@ -22,7 +22,8 @@ def build(root: pathlib.Path, destination: pathlib.Path):
     revision = re.search(r"const P109_APP_REVISION='([^']+)';", version_source)[1]
     data_schema = int(re.search(r"const P109_DATA_SCHEMA=(\d+);", version_source)[1])
     sources = [root / "index.html", root / "README.md"] + sorted(
-        f for f in (root / "src").rglob("*") if f.is_file()
+        (f for f in (root / "src").rglob("*") if f.is_file()),
+        key=lambda f: f.relative_to(root).as_posix(),
     )
     allowed = []
     for item in sources:

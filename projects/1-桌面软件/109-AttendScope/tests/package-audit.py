@@ -45,6 +45,10 @@ def run():
         source, outer = base / "P109-升级包-测试.zip", base / "analysis.zip"
         password = "audit-only-test-input"
         release.build(ROOT, source)
+        with zipfile.ZipFile(source) as archive:
+            paths = json.loads(archive.read('p109-release-manifest.json'))['files']
+            paths = [row['path'] for row in paths if row['path'].startswith('src/')]
+            check(paths == sorted(paths), 'program manifest uses platform-independent path ordering')
         receipt = builder.build(source, outer, password)
         check(receipt["sourceSha256"] == hashlib.sha256(source.read_bytes()).hexdigest(), "original package hash")
         with zipfile.ZipFile(outer) as archive:

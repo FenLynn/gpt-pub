@@ -247,7 +247,7 @@ function attendWorkbenchHtml(ctx){
     '<div class="raw-tabs">'+[['attendance','考勤'],['trip','出差'],['leave','请假'],['outing','外出'],['overtime','加班']].map(([id,name])=>
       '<button data-raw-tab="'+id+'" class="'+(tab===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
     '<span class="raw-count" id="rawRowCount"></span>'+ 
-    '<button class="raw-float-btn" id="rawFloat" title="弹出可拖动、可缩放表格" aria-label="弹出原始表格">⛶</button></div>'+
+    '<button class="raw-float-btn" id="rawFloat" title="弹出可拖动、可缩放表格" aria-label="弹出原始表格"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></svg></button></div>'+
     '<div id="rawDataTable" class="raw-table" aria-label="原始表格"></div></section>';
 }
 function mountPlotTabs(ctx){
