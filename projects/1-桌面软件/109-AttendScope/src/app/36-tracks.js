@@ -36,7 +36,7 @@ function r23BehaviorSegments(a,key){
     manualDecision:p.manualDecision,businessCovered:p.businessCovered,segmentId:p.id,sourceIds:p.sourceIds})))
   ];
   if(key==='overtime')return [
-   ...(a.overtime||[]).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
+   ...p109RegisteredOvertime(a).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
     title:'登记加班',origin:'registered',sourceIds:[p.id]})),
    ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
     title:(p.origin==='manual'?'补录加班':'自动加班')+(p.accepted!==false?' · 已勾选':' · 已取消'),

@@ -1,7 +1,7 @@
 'use strict';
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
- const r={...(rules||{})},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
+ const r={...(rules||{}),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2)},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
   return {...r,overtimeRuleVersion:1,overtimeMinMinutes:number(r.overtimeMinMinutes,20,20)};
  const modern=r.overtimeRuleVersion===2;
@@ -11,6 +11,7 @@ function p109NormalizeOvertimeRules(rules,keepLegacy=false){
 function p109ValidOvertimeRules(rules){
  if(rules==null)return true;
  if(typeof rules!=='object'||Array.isArray(rules))return false;
+ if(rules.businessRuleVersion!=null&&![1,2].includes(rules.businessRuleVersion))return false;
  if(rules.overtimeRuleVersion==null)return true;
  if(rules.overtimeRuleVersion===1)return Number.isInteger(rules.overtimeMinMinutes)&&rules.overtimeMinMinutes>=20&&rules.overtimeMinMinutes<=240;
  return rules.overtimeRuleVersion===2&&['overtimeAfterMinutes','overtimeBeforeMinutes','overtimeMinMinutes'].every(key=>
@@ -28,6 +29,32 @@ function p109OvertimeSnapshotRules(){
   if(rules)contexts[key]={...P109_DEFAULT_RULES,...p109NormalizeOvertimeRules(rules)};
  }
  contexts[monthKey()]={...RULES};return contexts;
+}
+function p109BusinessPriority(rules=RULES){return rules.businessRuleVersion===2}
+function p109PriorityAbsences(employeeId,date){
+ if(!p109BusinessPriority())return [];
+ if(state.snapshotContext&&date.slice(0,7)!==monthKey())return [];
+ const source=date.slice(0,7)===monthKey()?state:state.monthStores.get(date.slice(0,7))||state,
+  trips=[...(source.trips||[]),...(source===state?[]:state.trips||[])];
+ if(trips.some(r=>r.employeeId===employeeId&&date>=r.startDate&&date<=r.endDate))return [[0,1440]];
+ return analysisUnionSegments((source.leaves||[]).filter(r=>r.employeeId===employeeId&&r.date===date)
+  .map(r=>[minutes(r.start||RULES.amStart),minutes(r.end||RULES.pmEnd)]));
+}
+function p109CountedOvertimeParts(date,from,to){
+ if(!p109BusinessPriority()||!attendanceDateIsWork(date))return [[from,to]];
+ const rules=date.slice(0,7)===monthKey()?RULES:(state.snapshotContext?state.overtimeRuleContexts?.[date.slice(0,7)]:state.monthStores.get(date.slice(0,7))?.rules)||RULES;
+ return p109SubtractOvertime([[from,to]],[[minutes(rules.amStart),minutes(rules.amEnd)],[minutes(rules.pmStart),minutes(rules.pmEnd)]]);
+}
+function p109CountedOvertimeAbsolute(from,to){
+ const parts=[];
+ for(let day=Math.floor(from/1440)*1440;day<to;day+=1440)
+  for(const [a,b] of p109CountedOvertimeParts(attendanceDateFromMinute(day),Math.max(from,day)-day,Math.min(to,day+1440)-day))parts.push([day+a,day+b]);
+ return analysisUnionSegments(parts);
+}
+function p109RegisteredOvertime(item){return item.countedOvertime||item.overtime||[]}
+function p109OvertimeDaySources(rows,date){
+ return rows.flatMap(row=>p109CountedOvertimeParts(date,minutes(row.start),minutes(row.end)).map(([from,to])=>
+  ({...row,start:attendanceClock(from),end:attendanceClock(to)})));
 }
 function p109BufferedVisitParts(visit,rules=RULES){
  const after=rules.overtimeAfterMinutes,before=rules.overtimeBeforeMinutes,parts=[],blocked=[];

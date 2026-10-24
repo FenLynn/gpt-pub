@@ -42,9 +42,10 @@ function p109TempDecision(parts,reports,day,shift=null){
 }
 function p109TemporaryOutings(employee,date,punches,pairs=attendanceDailyVisits(employee.id,date)){
  const day=Number(date.slice(8,10));if(!isWorkday(day))return [];
- const candidates=[];
- for(let i=1;i<punches.length;i++){
-  const exit=punches[i-1],enter=punches[i];
+ const candidates=[],priority=p109PriorityAbsences(employee.id,date),modern=p109BusinessPriority();
+ const candidatePunches=punches.filter(p=>!modern||['进','出'].includes(p.direction)||!priority.some(([a,b])=>minutes(p.time)>=a&&minutes(p.time)<=b));
+ for(let i=1;i<candidatePunches.length;i++){
+  const exit=candidatePunches[i-1],enter=candidatePunches[i];
   if(exit.direction!=='出'||enter.direction!=='进')continue;
   const from=minutes(exit.time),to=minutes(enter.time);
   if(to<=from)continue;
@@ -52,23 +53,37 @@ function p109TemporaryOutings(employee,date,punches,pairs=attendanceDailyVisits(
   candidates.push({id:'temp:'+employee.id+':'+evidence(exit)+'>'+evidence(enter),
    from,to,origin:'auto',sourceIds:[exit.recordId,enter.recordId].filter(Boolean)});
  }
+ // A leave touching a shift boundary can establish a missing return/departure
+ // without inventing an unknown punch. The actual terminal card remains evidence.
+ if(modern&&priority.length&&punches.length){
+  const first=punches[0],last=punches.at(-1),begin=minutes(RULES.amStart),finish=minutes(RULES.pmEnd),
+   addBoundary=(from,to,card,side)=>{
+    if(to<=from||!priority.some(([a,b])=>intervalOverlap(from,to,a,b)>0))return;
+    candidates.push({id:'temp-boundary:'+employee.id+':'+date+':'+side+':'+(card.recordId||card.datetime),from,to,origin:'auto',leaveBoundary:true,sourceIds:[card.recordId].filter(Boolean)});
+   };
+  if(first.direction==='进'&&pairs.some(([enter])=>minutes(enter.time)===minutes(first.time)))addBoundary(begin,minutes(first.time),first,'return');
+  if(last.direction==='出'&&pairs.some(([,exit])=>minutes(exit.time)===minutes(last.time)))addBoundary(minutes(last.time),finish,last,'departure');
+ }
  for(const row of state.manualTempOutings||[]){
   if(row.employeeId===employee.id&&row.date===date&&validClock(row.start)&&validClock(row.end))
    candidates.push({id:row.id,from:minutes(row.start),to:minutes(row.end),origin:'manual',note:row.note||''});
  }
- const reports=[...outingFor(employee.id,date),...tripFor(employee.id,date).map(r=>({...r,start:'00:00',end:'24:00'}))],completedExits=new Set(pairs.map(([,exit])=>minutes(exit.time)));
+ const reports=[...outingFor(employee.id,date),...(modern?[]:tripFor(employee.id,date).map(r=>({...r,start:'00:00',end:'24:00'})))],completedExits=new Set(pairs.map(([,exit])=>minutes(exit.time)));
  return candidates.flatMap(row=>{
   const manual=(state.manualTempOutings||[]).find(r=>r.id===row.id),
    windows=[['am',minutes(RULES.amStart),minutes(RULES.amEnd)],['pm',minutes(RULES.pmStart),minutes(RULES.pmEnd)]],
    pieces=windows.filter(([shift])=>!manual?.part||manual.part===shift).map(([shift,a,b])=>({shift,part:[Math.max(a,row.from),Math.min(b,row.to)]})).filter(r=>r.part[1]>r.part[0]),split=pieces.length>1;
-  return pieces.map(({shift,part})=>{
-   const id=split?row.id+':'+shift:row.id,parts=[part],decision=p109TempDecision(parts,reports,day,shift),
-    override=state.tempOutingReview?.[id]??state.tempOutingReview?.[row.id];
-   return {...row,...decision,id,parentId:row.id,sourceFrom:row.from,sourceTo:row.to,from:part[0],to:part[1],split,shift,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
+  return pieces.flatMap(({shift,part})=>{
+   const baseId=split?row.id+':'+shift:row.id,uncovered=p109SubtractOvertime([part],priority),clipped=analysisUnionMinutes(uncovered)<part[1]-part[0]-1e-8;
+   return uncovered.map(part=>{
+   const id=clipped?baseId+':gap:'+Math.round(part[0]*60)+'-'+Math.round(part[1]*60):baseId,parts=[part],decision=p109TempDecision(parts,reports,day,shift),
+    override=state.tempOutingReview?.[id]??state.tempOutingReview?.[baseId]??state.tempOutingReview?.[row.id];
+   return {...row,...decision,id,parentId:row.id,leaveBoundary:row.leaveBoundary||clipped,sourceFrom:row.from,sourceTo:row.to,from:part[0],to:part[1],split,shift,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
+    reason:(clipped?'已扣除出差/请假覆盖，仅核查本段；':'')+decision.reason,
     status:override==='exclude'?'exclude':decision.businessCovered?'green':['green','red'].includes(override)?override:decision.system,manualDecision:!!override&&(!decision.businessCovered||override==='exclude')};
-  });
+  })});
  }).filter(row=>row.minutes>0&&!(row.origin==='manual'&&row.status==='exclude')&&
-  !(row.origin==='auto'&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
+  !(row.origin==='auto'&&!row.leaveBoundary&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
     completedExits.has(row.sourceFrom)&&row.sourceTo>=minutes(row.shift==='am'?RULES.amEnd:RULES.pmEnd)&&
     row.sourceFrom>=minutes(row.shift==='am'?RULES.amStart:RULES.pmStart)));
 }
@@ -165,7 +180,7 @@ function p109SetTempDecision(id,status){
  const row=[...state.analysis.values()].flatMap(a=>a.temporaryOutings||[]).find(r=>r.id===id);
  if(!row)return false;
  if(row.businessCovered&&status==='red'){toast('该时段已由出差/外出报备完全覆盖，以报备为准',true);return false}
- if(row.origin==='manual'&&status==='exclude')return p109DeleteManualInterval('outing',id);
+ if(row.origin==='manual'&&status==='exclude')return p109DeleteManualInterval('outing',row.parentId||id);
  if(status!=='exclude'&&activeTemporaryOutings(state.analysis.get(row.employeeId+'|'+Number(row.date.slice(8,10))))
   .some(other=>other.id!==id&&other.parts.some(([a,b])=>row.parts.some(([x,y])=>intervalOverlap(a,b,x,y)>0)))){
   toast('与已纳入的临时外出重叠，请先排除重复区间',true);return false;
@@ -181,7 +196,8 @@ function p109SetTempDecision(id,status){
 }
 function p109TempDayHtml(item){
  const rows=item.temporaryOutings||[];
- return '<div class="p109-temp-block">'+p109TempSummaryHtml([item])+ '<button class="p109-temp-detail-button" type="button" data-temp-details="'+safeTableText(item.employee.id)+'" data-temp-day="'+item.day+'" '+(rows.length?'':'disabled')+'>区间明细 · '+rows.length+' 段</button></div>';
+ const details='<button class="p109-temp-detail-button" type="button" data-temp-details="'+safeTableText(item.employee.id)+'" data-temp-day="'+item.day+'" '+(rows.length?'':'disabled')+'>区间明细 · '+rows.length+' 段</button>';
+ return '<div class="p109-temp-block">'+p109TempSummaryHtml([item]).replace('</header>',(rows.length?details:'')+'</header>')+'</div>';
 }
 function p109ShowTempDetails(employeeId,day){
  const item=state.analysis.get(employeeId+'|'+day);if(!item)return;
@@ -212,7 +228,7 @@ function p109ManualOvertimeFor(employeeId,date){
  return rows;
 }
 function p109CompleteOvertime(candidate,employeeId,date,registered){
- const manual=p109ManualOvertimeFor(employeeId,date),
+ const manual=p109ManualOvertimeFor(employeeId,date).flatMap(row=>p109CountedOvertimeParts(date,row.from,row.to).map(([from,to])=>({...row,from,to}))),
   excluded=id=>state.overtimeReview?.[id]===false||[...state.monthStores.values()].some(s=>s.overtimeReview?.[id]===false),
   regs=registered.map(r=>[minutes(r.start),minutes(r.end)]),taken=[...regs],segments=[];
  const subtract=(row,intervals)=>{
@@ -228,7 +244,8 @@ function p109CompleteOvertime(candidate,employeeId,date,registered){
   segments.push(...parts);if(accepted)taken.push(...parts.map(p=>[p.from,p.to]));
  }
  for(const row of candidate.segments){
-  segments.push(...subtract({...row,id:row.sessionId,origin:'auto',accepted:!excluded(row.sessionId)},taken));
+  for(const [from,to] of p109CountedOvertimeParts(date,row.from,row.to))
+   segments.push(...subtract({...row,from,to,id:row.sessionId,origin:'auto',accepted:!excluded(row.sessionId)},taken));
  }
  return {...candidate,segments,minutes:segments.reduce((sum,s)=>sum+s.minutes,0),
   reason:manual.length?'自动推算与手工补录共用统计；登记、补录与自动区间不重复计时':candidate.reason};
@@ -271,14 +288,16 @@ function p109OpenIntervalEditor(kind,employeeId,date){
   const row={id:(outing?'manual-temp:':'manual-overtime:')+employeeId+':'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
    employeeId,date,start:start.value,end:end.value,note:form.querySelector('#p109IntervalNote').value.trim(),origin:'manual'};
   if(outing){
+   if(!p109SubtractOvertime(parts,p109PriorityAbsences(employeeId,date)).length){error.textContent='所选班内时段已由出差或请假完整覆盖，无需补录临时外出';return}
    const conflict=activeTemporaryOutings(state.analysis.get(employeeId+'|'+Number(date.slice(8,10))))
-    .some(r=>r.parts.some(([a,b])=>parts.some(([x,y])=>intervalOverlap(a,b,x,y)>0)));
+    .some(r=>r.parts.some(([a,b])=>p109SubtractOvertime(parts,p109PriorityAbsences(employeeId,date)).some(([x,y])=>intervalOverlap(a,b,x,y)>0)));
    if(conflict){error.textContent='与已有临时外出重叠。请先用 × 排除原区间，再补录，避免重复统计';return}
   }else{
    const begin=attendanceUtcMinute(date,row.start),finish=attendanceUtcMinute(date,row.end)+(to<from?1440:0),
     covered=[...attendanceAdjacentRows('overtimeEntries'),...attendanceAdjacentRows('manualOvertime').filter(r=>state.overtimeReview?.[r.id]!==false)]
      .filter(r=>r.employeeId===employeeId&&strictISODate(r.date)&&validClock(r.start)&&validClock(r.end))
      .map(r=>[Math.max(begin,attendanceUtcMinute(r.date,r.start)),Math.min(finish,attendanceUtcMinute(r.date,r.end)+(minutes(r.end)<minutes(r.start)?1440:0))]);
+   if(!p109CountedOvertimeAbsolute(begin,finish).length){error.textContent='所选时段全部处于工作日班次内，不能补录为加班；原有登记仍可在原始记录中核查';return}
    if(analysisUnionMinutes(covered)>=finish-begin-1e-8){error.textContent='所选时段已由登记或已纳入的补录覆盖，无需重复添加';return}
   }
   const field=outing?'manualTempOutings':'manualOvertime';state[field]??=[];state[field].push(row);

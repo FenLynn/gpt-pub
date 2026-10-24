@@ -31,7 +31,7 @@ module.exports=async({browser,out,root})=>{
     splitReports:temp('E047',9).length===2&&temp('E047',9)[0].status==='green'&&temp('E047',9)[1].status==='red',
     outingCoversGap:temp('E044',13)[0]?.businessCovered&&temp('E044',13)[0]?.status==='green',
     outingCoversEarly:!get('E046',14).attendanceFlags.some(f=>f.kind==='early')&&temp('E046',14)[0]?.businessCovered,
-    tripCoversBoth:!get('E047',12).attendanceFlags.length&&temp('E047',12).length===2&&temp('E047',12).every(t=>t.businessCovered&&t.status==='green'),
+    tripCoversBoth:!get('E047',12).attendanceFlags.length&&temp('E047',12).length===0,
     unknownNoBridge:!temp('E048',12).some(t=>t.sourceFrom===600&&t.sourceTo===620),
     missingNight:overtime('E048',[8,9])===0,
     dense:temp('E050',8).length===60&&Math.abs(temp('E050',8).reduce((n,t)=>n+t.minutes,0)-10)<1e-7,
@@ -87,7 +87,7 @@ module.exports=async({browser,out,root})=>{
   await select('E050',9);
   const source=await page.evaluate(()=>({records:JSON.stringify(state.records),range:{...state.timelineRange}}));
   await page.evaluate(()=>echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).dispatchAction({type:'dataZoom',startValue:600,endValue:900}));
-  await page.waitForFunction(()=>state.timelineRange.start===600&&state.timelineRange.end===900);await page.locator('#p109TimelineReset').click();
+  await page.waitForFunction(()=>state.timelineRange.start===600&&state.timelineRange.end===900);await page.locator('#attendanceTimelineChart').hover({position:{x:40,y:80}});await page.locator('#p109TimelineReset').click();
   check(await page.evaluate(()=>state.timelineRange.start===360&&state.timelineRange.end===1430),'reset button restores this day expanded initial range');
   check(await page.evaluate(before=>JSON.stringify(state.records)===before,source.records),'reset cannot modify raw punch records');
   await select('E045',8);await page.evaluate(()=>echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart')).dispatchAction({type:'dataZoom',startValue:660,endValue:720}));await page.locator('#p109TimelineReset').focus();await page.keyboard.press('Enter');

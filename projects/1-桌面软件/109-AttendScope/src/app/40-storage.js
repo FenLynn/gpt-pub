@@ -274,7 +274,7 @@ async function connectProjectDir(savedHandle=null,options={}){
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
     r68UI.projectSerial++;r68UI.treeSerial++;if(typeof p109CloseTransfer==='function')p109CloseTransfer();document.getElementById('p109ModeOverlay')?.remove();render();
     const notice=(typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'')+
-      ([...loaded.months.values()].some(m=>m.overtimeRulesMigrated)?'；旧加班规则已迁移为班后扣除、班前门槛、最低时长，请核查后保存':'');
+      ([...loaded.months.values()].some(m=>m.overtimeRulesMigrated)?'；旧规则已更新：出差/请假优先，自动加班按三参数核查，请核查后保存':'');
     toast((loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目')+notice);
     return true;
   }catch(e){if(e.name!=='AbortError')p109ShowStorageFallback('目录连接失败：'+e.message);return false}

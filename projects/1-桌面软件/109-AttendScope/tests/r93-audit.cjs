@@ -58,12 +58,12 @@ module.exports=async({browser,out,root})=>{
     seed([['2026-10-08','18:00:00','进'],['2026-10-08','18:03:00','未标注'],['2026-10-08','18:20:00','出']]);result.unknownDoesNotInvent=value(8)===0;
     const legacy={schemaVersion:4,year:2026,month:10,employees:[e],records:[],rules:{...P109_DEFAULT_RULES,overtimeRuleVersion:undefined,overtimeAfterMinutes:undefined,overtimeBeforeMinutes:undefined,overtimeMinMinutes:30},calendarOverrides:p109CalendarMonthValues(2026,10,{},false)};
     const upgraded=normalizeSavedMonth(legacy),historical=normalizeSavedMonth(legacy,true);
-    result.migration=upgraded.schemaVersion===5&&upgraded.rules.overtimeRuleVersion===2&&upgraded.rules.overtimeAfterMinutes===30&&upgraded.rules.overtimeBeforeMinutes===5&&upgraded.rules.overtimeMinMinutes===5&&!upgraded.saved;
+    result.migration=upgraded.schemaVersion===6&&upgraded.rules.overtimeRuleVersion===2&&upgraded.rules.overtimeAfterMinutes===30&&upgraded.rules.overtimeBeforeMinutes===5&&upgraded.rules.overtimeMinMinutes===5&&!upgraded.saved;
     result.historicalKeepsPolicy=historical.rules.overtimeRuleVersion===1&&historical.rules.overtimeMinMinutes===30;
     seed(pair('08:30:00','17:36:00'),[],{overtimeRuleVersion:1,overtimeMinMinutes:20});result.legacyFormulaStillAvailable=approx(value(8),26);
     seed([['2026-10-08','08:30:00','进'],['2026-10-08','17:10:00','出']],[],{overtimeRuleVersion:1,overtimeMinMinutes:20});result.legacyContinuousLunchUnchanged=value(8)===0;
     result.invalidNewRules=normalizeSavedMonth({...legacy,rules:{...P109_DEFAULT_RULES,overtimeAfterMinutes:-1}})===null&&normalizeSavedMonth({...legacy,rules:{...P109_DEFAULT_RULES,overtimeMinMinutes:0}})===null;
-    result.schemaProtection=normalizeSavedMonth({...legacy,schemaVersion:6})===null;
+    result.schemaProtection=normalizeSavedMonth({...legacy,schemaVersion:7})===null;
     return result;
    }finally{YEAR=saved.year;MONTH=saved.month;Object.assign(state,{records:saved.records,leaves:saved.leaves,trips:saved.trips,outings:saved.outings,overtimeEntries:saved.overtimeEntries,monthStores:saved.monthStores,manualOvertime:saved.manualOvertime,overtimeReview:saved.overtimeReview,snapshotContext:saved.snapshotContext,overtimeRuleContexts:saved.overtimeRuleContexts,revisions:saved.revisions,revisionSeq:saved.revisionSeq,saved:saved.saved});Object.assign(RULES,saved.rules);reanalyze();render()}
   });report.cases=cases;for(const [name,value] of Object.entries(cases))check(value,'buffered overtime: '+name);
@@ -75,10 +75,10 @@ module.exports=async({browser,out,root})=>{
   check(zoom.span<1.01&&zoom.counts.length>=6&&zoom.counts.every(n=>n===1),'one-minute zoom separates each ten-second punch');
   check(new Set(zoom.labels).size>=3,'zoomed time axis exposes distinct second-level labels');report.zoom=zoom;
   await page.screenshot({path:path.join(out,'r93-seconds-zoom.png')});
-  await page.locator('#p109TimelineZoomIn').click();await page.locator('#p109TimelineZoomIn').click();await page.locator('#p109TimelineZoomIn').click();
+  await page.locator('#attendanceTimelineChart').hover({position:{x:40,y:80}});await page.locator('#p109TimelineZoomIn').click();await page.locator('#attendanceTimelineChart').hover({position:{x:40,y:80}});await page.locator('#p109TimelineZoomIn').click();await page.locator('#attendanceTimelineChart').hover({position:{x:40,y:80}});await page.locator('#p109TimelineZoomIn').click();
   check(await page.evaluate(()=>Math.abs(state.timelineRange.end-state.timelineRange.start-1/6)<1e-5),'zoom button reaches ten-second span');
   await page.locator('#p109TimelineZoomOut').focus();await page.keyboard.press('Enter');check(await page.evaluate(()=>Math.abs(state.timelineRange.end-state.timelineRange.start-1/3)<1e-5),'keyboard zoom out doubles the span');
-  await page.locator('#p109TimelineReset').click();check(await page.evaluate(()=>state.timelineRange.start===480&&state.timelineRange.end===1200),'reset restores the ordinary initial range');
+  await page.locator('#attendanceTimelineChart').hover({position:{x:40,y:80}});await page.locator('#p109TimelineReset').click();check(await page.evaluate(()=>state.timelineRange.start===480&&state.timelineRange.end===1200),'reset restores the ordinary initial range');
   check(await page.evaluate(before=>JSON.stringify(state.records)===before,raw),'zoom operations preserve all raw evidence');
   await page.locator('#settingsBtn').click();await page.locator('[data-settings-section="rules"]').click();
   check(await page.locator('#r93OvertimeAfter').inputValue()==='20'&&await page.locator('#r93OvertimeBefore').inputValue()==='5'&&await page.locator('#r14OvertimeMin').inputValue()==='5','settings exposes the three correct defaults');

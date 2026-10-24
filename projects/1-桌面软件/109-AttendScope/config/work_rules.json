@@ -10,6 +10,7 @@
   "gracePmStart": 5,
   "gracePmEnd": 0,
   "dupSeconds": 120,
+  "businessRuleVersion": 2,
   "overtimeRuleVersion": 2,
   "overtimeAfterMinutes": 20,
   "overtimeBeforeMinutes": 5,

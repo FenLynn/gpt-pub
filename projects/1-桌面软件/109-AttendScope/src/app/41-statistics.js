@@ -167,11 +167,11 @@ function asStatLedger(){
   for(let day=1;day<=dayCount;day++){
    const dayStart=attendanceUtcMinute(isoDate(day)),dayEnd=dayStart+1440;
    if(start>=dayEnd||finish<=dayStart)continue;
-   const x=Math.max(start,dayStart)-dayStart,y=Math.min(finish,dayEnd)-dayStart;
+   const x=Math.max(start,dayStart)-dayStart,y=Math.min(finish,dayEnd)-dayStart,parts=p109CountedOvertimeParts(isoDate(day),x,y);
    const key=id+'|'+day,list=registeredByDay.get(key)||[];
-   list.push([x,y]);registeredByDay.set(key,list);
-   add('overtime','presence',id,day,1);
-   putInterval('overtime',id,day,attendanceClock(x),attendanceClock(y),false);
+   list.push(...parts);registeredByDay.set(key,list);
+   if(parts.length)add('overtime','presence',id,day,1);
+   for(const [a,b] of parts)putInterval('overtime',id,day,attendanceClock(a),attendanceClock(b),false);
   }
  });
  // User-included inferred intervals coexist with registered overtime. They are
@@ -253,12 +253,13 @@ function asStatLedger(){
   const start=attendanceUtcMinute(r.date,r.start),end=attendanceUtcMinute(r.date,r.end)+
    (minutes(r.end)<minutes(r.start)?1440:0),id=r.employeeId;
   const key=id+'|'+(r.id||r.importId+'|'+r.date+'|'+r.start+'|'+r.end);
-  if(seen.has(key))continue;seen.add(key);collect(id,start,end);
+  if(seen.has(key))continue;seen.add(key);for(const [from,to] of p109CountedOvertimeAbsolute(start,end))collect(id,from,to);
  }
  for(const a of state.analysis.values())for(const seg of activeAutoOvertimeSegments(a)){
-  const key='auto|'+seg.id;if(seen.has(key))continue;seen.add(key);
-  collect(a.employee.id,seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)),
-   seg.sessionTo??attendanceUtcMinute(a.date,attendanceClock(seg.to)));
+  if(!p109BusinessPriority()){
+   const key='auto|'+seg.id;if(seen.has(key))continue;seen.add(key);
+   collect(a.employee.id,seg.sessionFrom??attendanceUtcMinute(a.date,attendanceClock(seg.from)),seg.sessionTo??attendanceUtcMinute(a.date,attendanceClock(seg.to)));
+  }else collect(a.employee.id,attendanceUtcMinute(a.date,attendanceClock(seg.from)),attendanceUtcMinute(a.date,attendanceClock(seg.to)));
  }
  for(const [id,list] of physical){
   list.sort((a,b)=>a[0]-b[0]);let start=null,end=null;

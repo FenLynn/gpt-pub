@@ -70,7 +70,7 @@ function settingsContent(section){
    '<label class="r14-setting-row"><span>临时外出短时限额（分钟）</span><input id="r87TempLimit" type="number" min="0" max="240" step="1"></label>'+
    '<label class="r14-setting-row"><span>临时外出冗余（分钟）<small>短时限额额外放宽；报备起止各允许此误差；错位时长比较也使用此值</small></span><input id="r87TempGrace" type="number" min="0" max="60" step="1"></label>'+
    '<p class="r14-setting-note">默认临时外出 10 + 2 分钟内为绿。只计算工作日班次内部分；超过后需报备覆盖（起止各容差），或与报备实际重叠且班内总时长相差不超过冗余。红绿可人工调整，× 排除。补录临时外出不等于报备。</p>'+
-   '<p class="r14-setting-note">默认班后扣20分钟、班前门槛5分钟、最低5分钟。12:10下班计10分钟，17:36计6分钟，08:24上班计6分钟，08:26不计。连续在岗跨午休也计入，默认12:00–13:30共90分钟。独立完整区间分别判断最低时长，不拼凑多段短时；登记和补录保持明确时段，仅扣重。历史冻结保留旧口径，应用本页可将独立修订切换到新口径，原冻结不变。</p>');
+   '<p class="r14-setting-note">默认班后扣20分钟、班前门槛5分钟、最低5分钟。12:10下班计10分钟，17:36计6分钟，08:24上班计6分钟，08:26不计。连续在岗跨午休也计入，默认12:00–13:30共90分钟。独立完整区间分别判断最低时长，不拼凑多段短时；登记和补录保持明确时段，仅扣重。出差/请假覆盖的缺岗先扣除；所有加班先排除班内，班外并集去重。历史冻结保留旧口径，应用本页可将独立修订切换到新口径，原冻结不变。</p>');
  case 'data':return sectionCard('数据与模拟','全部数据在本地浏览器解析与计算，不上传服务端。',
    '<div class="r14-readonly"><strong>当前工作空间</strong><span>'+monthKey()+'</span></div>'+
    '<div class="r14-readonly"><strong>原始考勤</strong><span>'+state.records.length+' 条</span></div>'+
@@ -154,7 +154,7 @@ function bindSettings(){
     d.rules[k]=Number(v('r14Rule_'+k));
    d.rules.grace=d.rules.graceAmStart;d.rules.dupSeconds=Number(v('r14Dup'));
    d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'));
-   d.rules.overtimeRuleVersion=2;d.rules.overtimeAfterMinutes=Number(v('r93OvertimeAfter'));d.rules.overtimeBeforeMinutes=Number(v('r93OvertimeBefore'));
+   d.rules.businessRuleVersion=2;d.rules.overtimeRuleVersion=2;d.rules.overtimeAfterMinutes=Number(v('r93OvertimeAfter'));d.rules.overtimeBeforeMinutes=Number(v('r93OvertimeBefore'));
    d.rules.tempOutingMinutes=Number(v('r87TempLimit'));d.rules.tempOutingGraceMinutes=Number(v('r87TempGrace'))}
   if(section==='table'){
    const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};

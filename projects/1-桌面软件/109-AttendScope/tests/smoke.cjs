@@ -1971,11 +1971,12 @@ async function run(){
  await require('./r91-audit.cjs')({browser,out,root});
  await require('./r92-audit.cjs')({browser,out,root});
  await require('./r93-audit.cjs')({browser,out,root});
+ await require('./r94-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R93',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R94',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

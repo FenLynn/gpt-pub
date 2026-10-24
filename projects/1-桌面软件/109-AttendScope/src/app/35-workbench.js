@@ -30,7 +30,7 @@ function plotTitle(ctx){
   if(tab==='timeline')return '时间轴';
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
-function p109TimelineZoomHtml(){return '<button type="button" class="p109-timeline-zoom zoom-in" id="p109TimelineZoomIn" aria-label="放大时间轴" title="放大时间轴，可至10秒跨度">+</button><button type="button" class="p109-timeline-zoom zoom-out" id="p109TimelineZoomOut" aria-label="缩小时间轴" title="缩小时间轴">−</button>'}
+function p109TimelineZoomHtml(){return '<div class="p109-timeline-tools" role="group" aria-label="时间轴范围工具"><button type="button" class="p109-timeline-zoom zoom-in" id="p109TimelineZoomIn" aria-label="放大时间轴" title="放大时间轴，可至10秒跨度">+</button><button type="button" class="p109-timeline-zoom zoom-out" id="p109TimelineZoomOut" aria-label="缩小时间轴" title="缩小时间轴">−</button>'}
 function manualJudgmentHtml(item,explanation=''){
   const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item),effective=attendanceJudgmentSystem({...item,initialSeverity:item.severity,initialStatus:item.status});
   return '<section class="insight-card status-card">'+
@@ -96,14 +96,14 @@ function attendPlotHtml(ctx){
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
     if(day)return top+
-      '<div class="plot-axis music-track-panel">'+p109TimelineZoomHtml()+'<button type="button" id="p109TimelineReset" aria-label="重置时间轴范围" title="恢复当日初始时间范围"><svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a6.3 6.3 0 1 1-.2 5M4 3v4h4"/></svg></button><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动与补录加班计入选择"></div><div id="temporaryReviewLayer" class="p109-temporary-layer" aria-label="临时外出改判与区间补录"></div>'+r15PunchPreview(day)+'</div>';
+      '<div class="plot-axis music-track-panel">'+p109TimelineZoomHtml()+'<button type="button" id="p109TimelineReset" aria-label="重置时间轴范围" title="恢复当日初始时间范围"><svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a6.3 6.3 0 1 1-.2 5M4 3v4h4"/></svg></button></div><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动与补录加班计入选择"></div><div id="temporaryReviewLayer" class="p109-temporary-layer" aria-label="临时外出改判与区间补录"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }
   return top+'<div id="overviewTrendChart" class="overview-trend-chart plot-chart"></div>';
 }
 function timelineBehaviorRows(item,key){
-  return ({trip:item.trips||[],leave:item.leaves||[],outing:item.outings||[],overtime:item.overtime||[]})[key]||[];
+  return ({trip:item.trips||[],leave:item.leaves||[],outing:item.outings||[],overtime:p109RegisteredOvertime(item)})[key]||[];
 }
 function timelineBehaviorClock(row,key,edge){
   const fallback=key==='overtime'
@@ -126,14 +126,16 @@ function timelineBehaviorInsight(item,key){
 }
 function timelineBehaviorSummaryRow(item,key){
   const rows=timelineBehaviorRows(item,key),active=state.filter===key;
-  const recorded=rows.length?(rows.length+'项 · '+fmtMinutes(behaviorMinutes(item,key))):'—';
+  const count=new Set(rows.map((r,i)=>r.id||i)).size,
+   recordedMinutes=key==='overtime'?analysisUnionMinutes(rows.map(r=>[minutes(r.start),minutes(r.end)])):behaviorMinutes(item,key),
+   recorded=rows.length?(count+'项 · '+fmtMinutes(recordedMinutes)):'—';
   const included=activeAutoOvertimeSegments(item);
  const acceptedMinutes=included.reduce((sum,seg)=>sum+seg.minutes,0);
  const excluded=(item.autoOvertime?.segments?.length||0)-included.length,
   total=analysisUnionMinutes([...rows.map(r=>[minutes(r.start),minutes(r.end)]),...included.map(r=>[r.from,r.to])]),
   value=key==='overtime'?fmtMinutes(total):recorded,
-  tip=key==='overtime'?'登记 '+recorded+'；推算/补录纳入 '+fmtMinutes(acceptedMinutes)+'；排除 '+excluded+' 段。纳入统计不代表审批。':FILTER_LABELS[key]+'：'+recorded;
-  return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
+  tip=key==='overtime'?'登记 '+recorded+'；推算/补录纳入 '+fmtMinutes(acceptedMinutes)+'；排除 '+excluded+' 段。'+(item.overtimeConflictMinutes>0?'原登记/补录含班内 '+p109IntervalDuration(item.overtimeConflictMinutes)+'，已从加班扣除，原始记录保留。':'')+'纳入统计不代表审批。':FILTER_LABELS[key]+'：'+recorded;
+  return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+(key==='overtime'&&item.overtimeConflictMinutes>0?' <small class="p109-overtime-conflict" aria-label="登记或补录含班内时段，已扣除">!</small>':'')+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
  const metrics=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+

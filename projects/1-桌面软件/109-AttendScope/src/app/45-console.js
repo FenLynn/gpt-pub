@@ -333,6 +333,7 @@ function r68RulesHtml(){
  ['下午打卡容差',RULES.gracePmStart+' / '+RULES.gracePmEnd+' 分钟'],
  ['重复打卡识别',RULES.dupSeconds+' 秒'],
  ['自动加班口径',RULES.overtimeRuleVersion===1?'历史口径：超过 '+RULES.overtimeMinMinutes+' 分钟计整段':'班后扣 '+RULES.overtimeAfterMinutes+' 分钟；班前门槛 '+RULES.overtimeBeforeMinutes+' 分钟；最低 '+RULES.overtimeMinMinutes+' 分钟'],
+ ['报备与加班边界',p109BusinessPriority()?'出差/请假优先；班内不计加班，班外取并集':'历史冻结口径；编辑规则可将独立修订切换到新口径'],
  ['临时外出短时限额',p109TempRules().limit+' 分钟'],
  ['临时外出冗余',p109TempRules().grace+' 分钟（报备起止各允许）'],
  ['手工修订',state.revisions.length+' 次'],
