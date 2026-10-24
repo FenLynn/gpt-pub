@@ -1,4 +1,4 @@
-"""Windows distribution ZIP output and failure isolation checks."""
+"""ZIP publication and Windows distribution failure isolation checks."""
 import ast
 import hashlib
 import importlib.util
@@ -34,8 +34,49 @@ def rejects(call, label):
     else:
         raise AssertionError(label)
 def run():
+    with tempfile.TemporaryDirectory(prefix="p109-publication-audit-") as temporary:
+        base = Path(temporary)
+        source = base / "private.zip"
+        with zipfile.ZipFile(source, "x", compression=zipfile.ZIP_STORED) as archive:
+            archive.writestr("中文 目录/index.html", "offline")
+        source.chmod(0o600)
+        original = source.read_bytes()
+        destination = base / "交付 包.zip"
+        receipt = release.publish(source, destination)
+        check(destination.read_bytes() == original and receipt["sha256"] == hashlib.sha256(original).hexdigest(), "publication preserves every archive byte")
+        check(source.read_bytes() == original, "publication leaves source intact")
+        control = base / "normal-file"
+        control.write_bytes(b"control")
+        check(destination.stat().st_mode == control.stat().st_mode, "publication uses destination default permissions")
+        try:
+            release.publish(source, destination)
+        except FileExistsError:
+            checks.append("publication refuses existing destination")
+        else:
+            raise AssertionError("existing delivery overwritten")
+        check(destination.read_bytes() == original, "refused overwrite preserves delivery")
+        damaged = base / "damaged.zip"
+        damaged.write_bytes(original[:-22])
+        rejected = base / "rejected.zip"
+        try:
+            release.publish(damaged, rejected)
+        except zipfile.BadZipFile:
+            checks.append("invalid ZIP rejected before publication")
+        else:
+            raise AssertionError("invalid ZIP published")
+        check(not rejected.exists(), "invalid ZIP leaves no output")
+        with patch.object(release.os, "fsync", side_effect=OSError("test")):
+            try:
+                release.publish(source, rejected)
+            except OSError:
+                checks.append("publication write failure reported")
+            else:
+                raise AssertionError("write failure ignored")
+        check(not rejected.exists() and source.read_bytes() == original, "publication removes partial output only")
+        proc = subprocess.run([sys.executable, "-I", "-S", str(ROOT / "tools/package-release.py"), "--publish", str(source), str(rejected)], capture_output=True)
+        check(proc.returncode == 0 and rejected.read_bytes() == original and json.loads(proc.stdout)["sha256"] == receipt["sha256"], "publication CLI supports Unicode and spaces without dependencies")
     if sys.platform != "win32":
-        print("P109_PACKAGE_AUDIT_SKIP Windows CNG required")
+        print("P109_PACKAGE_AUDIT_PASS " + json.dumps({"checks": len(checks), "items": checks, "windowsCng": "not available"}))
         return
     cipher, tag = runtime.aes_gcm(bytes(16), bytes(16), bytes(12), b"")
     check(cipher.hex() == "0388dace60b6a392f328c2b971b2fe78" and tag.hex() == "ab6e47d42cec13bdf53a67b21257bddf", "NIST AES-GCM known vector")

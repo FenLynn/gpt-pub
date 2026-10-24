@@ -2,16 +2,54 @@
 """Build a clean offline P109 package from source; never include user/project data.
 
 Usage: python tools/package-release.py PATH_TO_P109 OUTPUT.zip
+       python tools/package-release.py --publish STAGED.zip OUTPUT.zip
 This builder is for development/CI only. Extracted runtime needs no Python.
 """
 import hashlib
 import json
+import os
 import pathlib
 import re
 import sys
 import zipfile
 
 PROJECT = "P109-AttendScope"
+
+def publish(source: pathlib.Path, destination: pathlib.Path):
+    """Copy validated bytes into a new file inheriting its destination's ACL.
+
+    A same-volume rename preserves a private staging file's Windows DACL.
+    Never rename/copy metadata from staging into a user-facing delivery.
+    Existing destinations, including symbolic links, are not overwritten.
+    """
+    source = source.resolve(strict=True)
+    destination = destination.parent.resolve(strict=True) / destination.name
+    created = False
+    try:
+        with source.open("rb") as incoming:
+            with zipfile.ZipFile(incoming) as archive:
+                if archive.testzip():
+                    raise ValueError("Source ZIP CRC verification failed")
+            incoming.seek(0)
+            digest = hashlib.sha256()
+            with destination.open("xb") as outgoing:
+                created = True
+                while chunk := incoming.read(1024 * 1024):
+                    outgoing.write(chunk)
+                    digest.update(chunk)
+                outgoing.flush()
+                os.fsync(outgoing.fileno())
+        delivered = hashlib.sha256(destination.read_bytes()).hexdigest()
+        if delivered != digest.hexdigest():
+            raise RuntimeError("Published ZIP hash verification failed")
+        with zipfile.ZipFile(destination) as archive:
+            if archive.testzip():
+                raise RuntimeError("Published ZIP CRC verification failed")
+    except BaseException:
+        if created:
+            destination.unlink()
+        raise
+    return {"output": str(destination), "sha256": delivered, "bytes": destination.stat().st_size}
 
 def build(root: pathlib.Path, destination: pathlib.Path):
     version_source = (root / "src/app/00-state.js").read_text(encoding="utf-8")
@@ -55,6 +93,9 @@ def build(root: pathlib.Path, destination: pathlib.Path):
     print(json.dumps({"output": str(destination), "files": len(allowed), "version": app_version}))
 
 if __name__ == "__main__":
+    if len(sys.argv) == 4 and sys.argv[1] == "--publish":
+        print(json.dumps(publish(pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3]))))
+        sys.exit(0)
     if len(sys.argv) != 3:
-        sys.exit("Usage: package-release.py P109_ROOT OUTPUT.zip")
+        sys.exit("Usage: package-release.py P109_ROOT OUTPUT.zip | --publish STAGED.zip OUTPUT.zip")
     build(pathlib.Path(sys.argv[1]).resolve(), pathlib.Path(sys.argv[2]).resolve())

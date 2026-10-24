@@ -106,6 +106,7 @@ jobs:
         shell: bash
         run: |
           APP="projects/1-桌面软件/109-AttendScope"
+          python3 "$APP/tests/package-audit.py"
           python3 "$APP/tools/package-release.py" "$APP" "$RUNNER_TEMP/p109-candidate/P109-upgrade.zip"
           cd "$RUNNER_TEMP/p109-candidate"
           sha256sum P109-upgrade.zip > SHA256SUMS.txt
