@@ -1,8 +1,8 @@
 'use strict';
 const P109_DATA_SCHEMA=4;
-const P109_APP_VERSION='0.2.17-preview';
-const P109_APP_REVISION='R91';
-const P109_ENGINE_VERSION='R91';
+const P109_APP_VERSION='0.2.18-preview';
+const P109_APP_REVISION='R92';
+const P109_ENGINE_VERSION='R92';
 const XLSX=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}
@@ -38,6 +38,7 @@ function rec(emp,d,time,dir,scenario,idx){return {recordId:`demo:${emp.id}:${pad
 function generateMock(){
   const records=[];
   for(const emp of EMPLOYEES){const ei=Number(emp.id.slice(1));for(let d=1;d<=monthDays();d++){
+    if(emp.demoExtreme)continue;
     const typ=dayType(d); const key=(ei*37+d*19)%100; let sc='normal';
     if(!isWorkday(d)){
       // Stable, reproducible 2D hash; avoids artificial diagonal overtime bands.
@@ -107,7 +108,7 @@ function generateMock(){
   for(let i=2;i<=50;i+=8){const id='E'+String(i).padStart(3,'0'),d=9+(i*5)%17;trips.push(trip(id,d,Math.min(30,d+1),'项目出差','外地','演示批量出差'))}
   for(let i=4;i<=50;i+=7){const id='E'+String(i).padStart(3,'0'),d=11+(i*4)%17;outings.push(outing(id,d,d,'09:40','11:20','外出办事','演示批量外出'))}
   for(let i=5;i<=50;i+=7){const id='E'+String(i).padStart(3,'0'),d=12+(i*5)%18;overtimeEntries.push(overtimeEntry(id,d,'18:05','20:40','项目加班','演示批量加班'))}
-  return {records,leaves,trips,outings,overtimeEntries};
+  return p109ExtremeDemo({records,leaves,trips,outings,overtimeEntries});
 }
 function plusSeconds(t,s){let [h,m,ss]=t.split(':').map(Number);let x=h*3600+m*60+ss+s;return `${pad(Math.floor(x/3600)%24)}:${pad(Math.floor(x%3600/60))}:${pad(x%60)}`}
 function leave(id,d,start,end,type,note){const e=EMPLOYEES.find(x=>x.id===id);return {id:`L-${id}-${d}`,employeeId:id,name:e.name,date:isoDate(d),start,end,type,note}}

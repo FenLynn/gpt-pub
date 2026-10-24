@@ -33,7 +33,7 @@ function r23BehaviorSegments(a,key){
    ...(a.temporaryOutings||[]).flatMap(p=>p.parts.map(([from,to])=>({from,to,
     title:(p.origin==='manual'?'补录':'自动')+'临时外出 · '+({green:'绿色',red:'红色',exclude:'已排除'}[p.status]),
     origin:'temporary',manual:p.origin==='manual',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
-    manualDecision:p.manualDecision,segmentId:p.id,sourceIds:p.sourceIds})))
+    manualDecision:p.manualDecision,businessCovered:p.businessCovered,segmentId:p.id,sourceIds:p.sourceIds})))
   ];
   if(key==='overtime')return [
    ...(a.overtime||[]).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
@@ -61,7 +61,7 @@ function r14TrackData(a,range=timelineRange(a),width=800){
       if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,
         sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
         accepted:seg.accepted!==false,segmentId:seg.segmentId||null});
-      if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manual:seg.manual,manualDecision:seg.manualDecision});
+      if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manual:seg.manual,manualDecision:seg.manualDecision,businessCovered:seg.businessCovered});
     }
   }
   const workWindows=!isWorkday(a.day)||state.prefs?.timelineTracks?.rules===false?[]:[
@@ -352,7 +352,8 @@ function mountAttendanceTimeline(a){
       box.dataset.anchorY=String(center);
       for(const [status,icon,title] of [['red','circle','标为红色'],['green','circle','标为绿色'],['exclude','close',row.manual?'删除补录':'排除统计']]){
         const button=document.createElement('button');button.type='button';button.className=status;
-        button.innerHTML=p109IntervalIcon(icon);button.title=title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
+        button.innerHTML=p109IntervalIcon(icon);button.disabled=status==='red'&&!!row.businessCovered;
+        button.title=button.disabled?'出差/外出报备完全覆盖，以报备为准':title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
         button.setAttribute('aria-label',button.title);button.setAttribute('aria-pressed',String(row.status===status));
         button.onclick=e=>{e.stopPropagation();p109SetTempDecision(row.segmentId,status)};box.appendChild(button);
       }
@@ -433,4 +434,10 @@ function mountAttendanceTimeline(a){
       ]
     });
   });
+  const reset=document.getElementById('p109TimelineReset');
+  if(reset)reset.onclick=()=>{
+    const initial=p109InitialTimelineRange(a);state.timelineRange=initial;
+    chart.dispatchAction({type:'dataZoom',startValue:initial.start,endValue:initial.end});
+    reset.focus({preventScroll:true});
+  };
 }

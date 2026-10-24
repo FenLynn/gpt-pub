@@ -48,8 +48,8 @@ module.exports=async({browser,out,root})=>{
    result.otherIssueStays=attendanceJudgment(state.analysis.get(e.id+'|8'))==='anomaly';
    a=__r89Seed([['08:45','进'],['17:10','出']]);p109SetAttendanceDecision(a.attendanceFlags[0].id,false);__r89Show();setManualStatusForCurrent(null);
    result.initialRestoresFlags=activeAttendanceFlags(state.analysis.get(e.id+'|8')).length===1;
-   a=__r89Seed([['08:25','进'],['11:30','出'],['13:45','进'],['17:10','出']]);const parts=a.temporaryOutings;
-   result.split=parts.length===2&&parts[0].minutes===10&&parts[1].minutes===15&&parts[0].status==='green'&&parts[1].status==='red'&&p109TempSummary([a]).minutes===25;
+   a=__r89Seed([['08:25','进'],['11:28','出'],['13:45','进'],['17:10','出']]);const parts=a.temporaryOutings;
+   result.split=parts.length===2&&parts[0].minutes===12&&parts[1].minutes===15&&parts[0].status==='green'&&parts[1].status==='red'&&p109TempSummary([a]).minutes===27;
    state.tempOutingReview[parts[0].parentId]='red';reanalyze();p109SetTempDecision(parts[0].id,'green');a=state.analysis.get(e.id+'|8');
    result.oldChoiceInherited=a.temporaryOutings[0].status==='green'&&a.temporaryOutings[1].status==='red';
    p109SetTempDecision(parts[0].id,'exclude');a=state.analysis.get(e.id+'|8');result.splitExclusion=p109TempSummary([a]).count===1&&p109TempSummary([a]).minutes===15&&a.temporaryOutings[0].status==='exclude';

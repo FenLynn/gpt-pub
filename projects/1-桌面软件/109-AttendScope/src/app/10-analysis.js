@@ -526,12 +526,9 @@ function analyzeDay(emp,d){
   else suspect('缺少对应进入记录');
   pairingUncertain=true;
  }
- const covers=(rows,start,end)=>rows.some(x=>minutes(x.start||'00:00')<=minutes(start)&&minutes(x.end||'24:00')>=minutes(end));
- const overlapEnough=(rows,start,end,need=180)=>rows.some(x=>
-   intervalOverlap(minutes(x.start||'00:00'),minutes(x.end||'24:00'),minutes(start),minutes(end))>=need);
- const fullExcused=trips.length>0||covers(leaves,RULES.amStart,RULES.pmEnd)||covers(outings,RULES.amStart,RULES.pmEnd);
- const morningLeave=trips.length>0||overlapEnough(leaves,RULES.amStart,RULES.amEnd)||overlapEnough(outings,RULES.amStart,RULES.amEnd);
- const afternoonLeave=trips.length>0||overlapEnough(leaves,RULES.pmStart,RULES.pmEnd)||overlapEnough(outings,RULES.pmStart,RULES.pmEnd);
+ const business=analysisUnionSegments([...leaves,...outings,...trips].map(x=>[minutes(x.start||'00:00'),minutes(x.end||'24:00')]));
+ const businessCovers=(start,end)=>{const a=typeof start==='number'?start:minutes(start),b=typeof end==='number'?end:minutes(end);return b<=a||business.some(([x,y])=>x<=a+1e-8&&y>=b-1e-8)};
+ const morningLeave=businessCovers(RULES.amStart,RULES.amEnd),afternoonLeave=businessCovers(RULES.pmStart,RULES.pmEnd),fullExcused=morningLeave&&afternoonLeave;
  const lunchStart=minutes(RULES.amEnd),lunchEnd=minutes(RULES.pmStart);
  const attendanceFlags=[];
  // A shift-end exit is proven early only if no subsequent check-in
@@ -598,7 +595,7 @@ function analyzeDay(emp,d){
   const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
   const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
   if(firstIn&&!morningLeave){
-   if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart){
+   if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart&&!businessCovers(RULES.amStart,firstMinute)){
     severity='problem';issues.push('迟到');status='迟到';
     attendanceFlags.push({kind:'late',label:'迟到',time:firstIn.time});
    }else if(!morningEvidence&&firstMinute>lunchStart){
@@ -609,7 +606,7 @@ function analyzeDay(emp,d){
    const lastMinute=minutes(lastOut.time);
    // Without any complete afternoon exit, a lunchtime "出" cannot
    // establish a definite early departure.
-   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-afternoonEndGrace){
+   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-afternoonEndGrace&&!businessCovers(lastMinute,RULES.pmEnd)){
     severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
     attendanceFlags.push({kind:'early',label:'早退',time:lastOut.time});
    }else if(!afternoonEvidence||pending){
@@ -617,7 +614,7 @@ function analyzeDay(emp,d){
    }
   }
   const morningExit=!morningLeave?earlyDeparture(RULES.amStart,RULES.amEnd,morningEndGrace):null;
-  if(morningExit){
+  if(morningExit&&!businessCovers(minutes(morningExit.time),lunchStart)){
    if(!pairingUncertain){
     if(!issues.includes('上午早退'))issues.push('上午早退');
     attendanceFlags.push({kind:'early',label:'上午早退',time:morningExit.time});
@@ -626,9 +623,7 @@ function analyzeDay(emp,d){
   }
   if(morningPair&&lunchReturn&&!afternoonLeave){
    const returnMinute=minutes(lunchReturn[0].time);
-   const covered=[...leaves,...outings].some(row=>
-     minutes(row.start||'00:00')<=lunchEnd+afternoonGrace&&
-     minutes(row.end||'00:00')>=returnMinute-afternoonGrace);
+   const covered=businessCovers(lunchEnd,returnMinute);
    if(returnMinute>lunchEnd+afternoonGrace&&!covered&&!trips.length){
     // Completed afternoon evidence permits a definite late check; missing
     // afternoon punches remain an uncertainty, never a fabricated absence.
@@ -660,7 +655,7 @@ function analyzeDay(emp,d){
    else if(issues.length){severity='suspect';status='疑似打卡异常'}
    else{severity='normal';status=trips.length?'出差覆盖':leaves.length?'请假覆盖':outings.length?'外出覆盖':'正常'}
   }
-  const temporaryOutings=p109TemporaryOutings(emp,date,punches,attendanceFlags);
+  const temporaryOutings=p109TemporaryOutings(emp,date,punches,pairs);
   return {initialSeverity,initialStatus,initialIssues,employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
   lunchEvidence,autoOvertime,temporaryOutings,attendanceFlags,marker:''}}

@@ -30,11 +30,11 @@ function plotTitle(ctx){
   if(tab==='timeline')return '时间轴';
   return currentFilterLabel()+(ctx.type==='person'||ctx.type==='cell'?'每日分布':ctx.type==='date'?'当日分布':'趋势');
 }
-function manualJudgmentHtml(item){
+function manualJudgmentHtml(item,explanation=''){
   const initial=attendanceJudgmentSystem(item),manual=manualStatusFor(item),effective=attendanceJudgmentSystem({...item,initialSeverity:item.severity,initialStatus:item.status});
   return '<section class="insight-card status-card">'+
     '<div class="status-control-row initial-row"><span>初始</span>'+
-      '<button type="button" class="initial-judgment '+initial+'" data-manual-clear title="恢复初始判断">'+JUDGMENT_LABELS[initial]+'</button>'+
+      '<button type="button" class="initial-judgment '+initial+'" data-manual-clear title="'+safeTableText('恢复初始判断'+(explanation?'；'+explanation:''))+'">'+JUDGMENT_LABELS[initial]+'</button>'+
     '</div>'+
     '<div class="status-control-row manual-row"><span>人工</span>'+
       '<div class="manual-status-buttons" role="radiogroup" aria-label="人工判定">'+
@@ -95,7 +95,7 @@ function attendPlotHtml(ctx){
   if(tab==='stats')return top+'<div class="plot-chart plot-stats"><div id="statsChartMain" class="echarts-stat-chart"></div><div id="statsChartSecondary" class="echarts-stat-chart"></div></div>';
   if(tab==='timeline'){
     if(day)return top+
-      '<div class="plot-axis music-track-panel"><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动与补录加班计入选择"></div><div id="temporaryReviewLayer" class="p109-temporary-layer" aria-label="临时外出改判与区间补录"></div>'+r15PunchPreview(day)+'</div>';
+      '<div class="plot-axis music-track-panel"><button type="button" id="p109TimelineReset" aria-label="重置时间轴范围" title="恢复当日初始时间范围"><svg viewBox="0 0 20 20" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a6.3 6.3 0 1 1-.2 5M4 3v4h4"/></svg></button><div id="attendanceTimelineChart" class="echarts-timeline-chart" role="img" aria-label="多轨考勤时间轴"></div><div id="attendanceFlagsLayer" class="r72-attendance-flags" aria-label="迟到与早退标记"></div><div id="overtimeReviewLayer" class="overtime-review-layer" aria-label="自动与补录加班计入选择"></div><div id="temporaryReviewLayer" class="p109-temporary-layer" aria-label="临时外出改判与区间补录"></div>'+r15PunchPreview(day)+'</div>';
     if(ctx.type==='date')return top+'<div class="plot-day-scroller"><div id="attendanceDayChart" class="echarts-date-chart" style="height:'+Math.max(550,ctx.items.length*17)+'px"></div></div>';
     return top+'<div class="plot-empty">选择人员或日期，查看时间轴</div>';
   }
@@ -135,24 +135,18 @@ function timelineBehaviorSummaryRow(item,key){
   return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){
- const metrics='<div class="p109-metric-column">'+insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
-  insightMetric('在岗',fmtMinutes(item.presence))+'</div><div class="p109-metric-column">'+
+ const metrics=insightMetric('首进',item.firstIn?.slice(0,5)||'—','tone-in')+
   insightMetric('末出',item.lastOut?.slice(0,5)||'—','tone-out')+
-  insightMetric('班内工时',fmtMinutes(item.workMinutes??0))+'</div>';
+  insightMetric('在岗',fmtMinutes(item.presence))+insightMetric('班内工时',fmtMinutes(item.workMinutes??0));
  const explanation=['初始判定：'+JUDGMENT_LABELS[attendanceJudgmentSystem(item)],
   ...item.issues,item.lunchEvidence,item.autoOvertime?.reason].filter(Boolean).join('；'),
-  behaviors=['trip','leave','outing','overtime'].filter(key=>timelineBehaviorRows(item,key).length||
-   (key==='overtime'&&item.autoOvertime?.segments?.length)||(key==='outing'&&item.temporaryOutings?.length));
- return '<div class="r74-unified-insight">'+
-  '<section class="r74-insight-section r74-overview">'+
-   '<header class="r74-insight-head"><strong>概况</strong><span>最终 '+JUDGMENT_LABELS[attendanceJudgment(item)]+' · '+item.punches.length+' 条 '+r71Hint(explanation)+'</span></header>'+
-   manualJudgmentHtml(item)+
-   '<div class="r74-overview-metrics">'+metrics+'</div></section>'+
-  '<section class="r74-insight-section r74-behaviors">'+
-   '<header class="r74-insight-head"><strong>行为</strong><span>全天</span></header>'+
-   '<div class="r74-behavior-list">'+
-    (behaviors.length?behaviors.map(key=>timelineBehaviorSummaryRow(item,key)).join(''):'<span class="p109-no-business">暂无登记业务</span>')+
-   '</div></section>'+p109TempDayHtml(item)+
+  behaviors=['trip','leave','outing','overtime'];
+ return '<div class="r74-unified-insight p109-day-inspector">'+
+  '<section class="p109-inspector-block p109-day-status" aria-label="初始与人工判定">'+manualJudgmentHtml(item,explanation)+'</section>'+
+  '<section class="p109-inspector-block r74-overview-metrics" aria-label="首进末出与工时">'+metrics+'</section>'+
+  '<section class="p109-inspector-block r74-behaviors" aria-label="业务时间统计"><div class="r74-behavior-list">'+behaviors.map(key=>timelineBehaviorSummaryRow(item,key)).join('')+'</div></section>'+
+  '<section class="p109-inspector-block" aria-label="临时外出统计">'+p109TempDayHtml(item)+'</section>'+
+  '<section class="p109-inspector-block p109-day-evidence" aria-label="打卡证据"><div id="timelineEvidence" class="insight-evidence"><span class="p109-evidence-placeholder">'+item.punches.length+' 条打卡 · 点击箭头或原始记录查看来源</span></div></section>'+
  '</div>';
 }
 function personalLateEarlySummaryHtml(employeeId){
@@ -178,7 +172,7 @@ function attendInsightHtml(ctx){
   const eligible=(monthly?monthlyItems:ctx.items||[]).filter(a=>isWorkday(a.day)&&attendanceJudgment(a)!=='rest');
   const tabLabel=({overview:'总览',timeline:'时间轴',stats:'统计',issues:'异常'}[tab]);
   if(tab==='timeline'&&item){
-    return timelineFullInsightHtml(item)+'<div id="timelineEvidence" class="insight-evidence"></div>';
+    return timelineFullInsightHtml(item);
   }
   const heading=currentFilterLabel();
   let out='<div class="insight-heading"><strong>'+heading+'</strong><span>'+tabLabel+'</span></div>';

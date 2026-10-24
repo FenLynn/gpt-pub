@@ -85,11 +85,11 @@ module.exports=async({browser,out,root})=>{
   for(const width of [1280,1366,1440,1600,1920]){
    await page.setViewportSize({width,height:width===1280?720:900});await page.evaluate(()=>render());await page.waitForSelector('.p109-temp-actions');
    const g=await page.evaluate(()=>{
-    const cols=[...document.querySelectorAll('.p109-metric-column')].map(n=>n.getBoundingClientRect()),inspector=document.querySelector('.inspector-insight'),chart=document.getElementById('attendanceTimelineChart').getBoundingClientRect();
+    const cols=[...document.querySelectorAll('.r74-overview-metrics .insight-row')].map(n=>n.getBoundingClientRect()),inspector=document.querySelector('.inspector-insight'),chart=document.getElementById('attendanceTimelineChart').getBoundingClientRect();
     return {width:innerWidth,gap:cols[1].left-cols[0].right,size:[inspector.scrollHeight,inspector.clientHeight,inspector.scrollWidth,inspector.clientWidth],details:[...inspector.querySelectorAll('.r74-unified-insight,.r74-insight-section,.p109-temp-summary,.p109-temp-details')].map(n=>({cls:n.className,rect:n.getBoundingClientRect().toJSON(),css:[getComputedStyle(n).padding,getComputedStyle(n).margin,getComputedStyle(n).height,getComputedStyle(n).minHeight]})),fit:inspector.scrollHeight<=inspector.clientHeight+1&&inspector.scrollWidth<=inspector.clientWidth+1,
      actions:[...document.querySelectorAll('.p109-temp-actions,.overtime-review-actions')].map(n=>{const b=n.getBoundingClientRect(),p=n.parentElement.getBoundingClientRect();return {placement:n.dataset.placement,outside:n.dataset.placement==='right'?b.left>=p.left+Number(n.dataset.bandRight)+5:b.bottom<=p.top+Number(n.dataset.bandTop)-5,fit:b.left>=chart.left&&b.right<=chart.right+1}})};
    });report.geometry.push(g);
-   check(g.gap>=23&&g.fit,'inspector has separated columns without overflow '+width+' '+JSON.stringify(g));
+   check(g.gap>=6&&g.fit,'inspector has four metrics without overflow '+width+' '+JSON.stringify(g));
    check(g.actions.length>=2&&g.actions.every(x=>x.outside&&x.fit),'interval controls sit outside bands and within chart '+width);
   }
   await page.setViewportSize({width:1600,height:900});await page.evaluate(()=>render());

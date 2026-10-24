@@ -557,8 +557,8 @@ async function run(){
    const before=analyzeDay(e,9),after=analyzeDay(e,10),original=JSON.stringify(state.records);
    if(!approx(before.autoOvertime.minutes,240)||!approx(after.autoOvertime.minutes,120)||
     before.autoOvertime.segments[0].id!==after.autoOvertime.segments[0].id||
-    timelineRange(before).start!==0||timelineRange(before).end!==1440||
-    timelineRange(after).start!==0||timelineRange(after).end!==1440)return false;
+    timelineRange(before).start!==480||timelineRange(before).end!==1440||
+    timelineRange(after).start!==0||timelineRange(after).end!==1200)return false;
    state.analysis=new Map([[e.id+'|9',before],[e.id+'|10',after]]);
    let ledger=asStatLedger();
    const val=(m,d)=>asStatValue(ledger,'overtime',m,[e],d);
@@ -888,10 +888,11 @@ async function run(){
   const counts=k=>asStatValue(ledger,k,'count',people,days);
   const eligible=state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')&&people.some(e=>e.id===r.employeeId)).length;
   const distinctPunchPeople=new Set(state.records.filter(r=>r.datetime.startsWith(monthISO()+'-')).map(r=>r.employeeId)).size;
+  // Overnight slices and registration residuals still describe one physical session.
+  const inferredSessions=new Set([...state.analysis.values()].flatMap(activeAutoOvertimeSegments).map(s=>s.id)).size;
   return counts('punch')===eligible&&asStatValue(ledger,'punch','people',people,days)===distinctPunchPeople&&counts('leave')===state.leaves.length&&
     counts('trip')===state.trips.length&&counts('outing')===state.outings.length&&
-    counts('overtime')===state.overtimeEntries.length+
-     [...state.analysis.values()].reduce((sum,a)=>sum+activeAutoOvertimeSegments(a).length,0)&&
+    counts('overtime')===state.overtimeEntries.length+inferredSessions&&
     asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
     asStatValue(ledger,'trip','estimatedHours',people,days)>0;
  },'R45 event ledger counts, trip days or time units inconsistent');
@@ -1616,19 +1617,17 @@ async function run(){
    const keys=r14TrackData(state.analysis.get('E011|23')).tracks.map(t=>t.key),insight=document.querySelector('.inspector-insight');
    return JSON.stringify(keys)===JSON.stringify(['in','out','trip','leave','outing','overtime'])&&
      !!insight.querySelector('.r74-unified-insight')&&
-     insight.querySelectorAll('.r74-insight-head').length===2&&
+     insight.querySelectorAll('.p109-inspector-block').length===5&&
      !insight.querySelector('[data-insight-tab]')&&
      ['首进','末出','在岗'].every(k=>[...insight.querySelectorAll('.r74-overview-metrics .insight-row span')].some(x=>x.textContent===k))&&
      insight.querySelectorAll('.r74-behavior-list .insight-behavior-row').length<=4&&!!insight.querySelector('.r74-behaviors');
  },'R74 unified personal panel shows overview and behavior together');
  await check(page,()=>{
-   const h=[...document.querySelectorAll('.r74-insight-head strong')];
-   const rows=[...document.querySelectorAll('.r74-behavior-list .insight-behavior-row')];
-   return h.length===2&&h[0].textContent==='概况'&&h[1].textContent==='行为'&&
-    Math.abs(parseFloat(getComputedStyle(h[0]).fontSize)-parseFloat(getComputedStyle(h[1]).fontSize))<.5&&
-    rows.length===4&&['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&
-    rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
- },'R74 matched overview/behavior typography and filters');
+   const metrics=[...document.querySelectorAll('.r74-overview-metrics .insight-row')].map(n=>n.getBoundingClientRect()),rows=[...document.querySelectorAll('.r74-behavior-list .insight-behavior-row')];
+   const compact=state.workspaceMode!=='person'||Math.max(...metrics.map(n=>n.y))-Math.min(...metrics.map(n=>n.y))<1.5;
+   return !document.querySelector('.r74-insight-head')&&metrics.length===4&&compact&&
+    rows.length===4&&['出差','请假','外出','加班'].every(k=>rows.some(r=>r.textContent.includes(k)))&&rows.find(r=>r.classList.contains('leave'))?.classList.contains('active');
+ },'R92 compact content blocks and one-row metrics retain business filters');
  await page.screenshot({path:path.join(out,'r29-leave-timeline.png')});
  await page.locator('#statusFilter').selectOption('main');
 
@@ -1970,11 +1969,12 @@ async function run(){
  await require('./r89-audit.cjs')({browser,out,root});
  await require('./r90-audit.cjs')({browser,out,root});
  await require('./r91-audit.cjs')({browser,out,root});
+ await require('./r92-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R91',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R92',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

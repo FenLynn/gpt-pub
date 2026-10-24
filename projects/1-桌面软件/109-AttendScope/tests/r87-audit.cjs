@@ -30,8 +30,8 @@ module.exports=async({browser,out,root})=>{
    checks.overlappingReportsUnion=rows(gap('10:00','10:30',[['09:59','10:20'],['10:15','10:31']]))[0].status==='green';
    checks.reportNoDoubleMinutes=rows(gap('10:00','10:30',[['10:10','10:25'],['10:10','10:25']]))[0].status==='red';
    checks.lunchExcluded=!rows(gap('11:40','13:30')).length;
-   const lunch=rows(gap('11:30','13:40'));checks.lunchSplit=lunch.length===2&&lunch.every(r=>r.minutes===10&&r.parts.length===1);
-   const late=rows(__r87Seed([['08:25','进'],['17:00','出'],['20:00','进'],['21:00','出']]))[0];checks.afterShiftExcluded=late.minutes===10&&late.status==='green';
+   const lunch=rows(gap('11:30','13:40'));checks.lunchSplit=lunch.length===1&&lunch[0].shift==='pm'&&lunch[0].minutes===10&&lunch[0].parts.length===1;
+   const late=rows(__r87Seed([['08:25','进'],['17:00','出'],['20:00','进'],['21:00','出']]))[0];checks.afterShiftExcluded=late===undefined;
    __r87Seed([['08:25','进'],['10:00','出'],['10:05','出'],['10:20','进'],['10:25','进'],['17:10','出']]);
    checks.nearestNoReuse=state.analysis.get(e.id+'|8').temporaryOutings.length===1&&state.analysis.get(e.id+'|8').temporaryOutings[0].minutes===15;
    checks.unknownBreaks=!rows(__r87Seed([['10:00','出'],['10:10','未标注'],['10:20','进']])).length;
@@ -53,7 +53,7 @@ module.exports=async({browser,out,root})=>{
   check(await page.locator('.p109-temp-actions').count()===1,'one hover control group per physical departure');
   check(await page.evaluate(()=>{const a=state.analysis.get(__r87Employee.id+'|8'),bars=r14TrackData(a).bars.filter(b=>b.track==='outing');return bars[0].origin==='registered'&&bars[1].origin==='temporary'}),'registration is drawn below translucent temporary intervals');
   await page.evaluate(()=>{
-   __r87Seed([['08:25','进'],['11:30','出'],['13:40','进'],['17:10','出']]);
+   __r87Seed([['08:25','进'],['11:20','出'],['13:50','进'],['17:10','出']]);
    state.timelineRange={key:__r87Employee.id+'|8',start:540,end:720};render();
   });
   await page.waitForFunction(()=>document.querySelectorAll('.p109-temp-actions').length===1);
@@ -72,7 +72,7 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).red===1),'actual hover control changes red verdict and statistics');
   await page.locator('.p109-temp-actions .exclude').focus();await page.locator('.p109-temp-actions .exclude').click();
   check(await page.evaluate(()=>p109TempSummary([...state.analysis.values()]).count===0),'actual x removes the interval from all statistics');
-  await page.locator('.p109-temp-details summary').click();await page.locator('[data-temp-reset]').click();
+  await page.locator('[data-temp-details]').click();await page.locator('[data-temp-reset]').click();await page.locator('[data-temp-close]').click();
   await page.locator('[data-interval-add="outing"]').focus();await page.locator('[data-interval-add="outing"]').click();
   await page.locator('#p109IntervalStart').fill('10:10');await page.locator('#p109IntervalEnd').fill('10:30');await page.locator('.p109-interval-dialog [type=submit]').click();
   check((await page.locator('#p109IntervalError').textContent()).includes('重叠'),'manual departure rejects duplicate active evidence');

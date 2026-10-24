@@ -21,6 +21,9 @@ function p109WorkParts(from,to,day){
 }
 function p109TempDecision(parts,reports,day,shift=null){
  const {limit,grace}=p109TempRules(),duration=analysisUnionMinutes(parts);
+ const coverage=analysisUnionSegments(reports.map(r=>[minutes(r.start),minutes(r.end)]));
+ if(parts.every(([a,b])=>coverage.some(([from,to])=>from<=a+1e-8&&to>=b-1e-8)))
+  return {system:'green',businessCovered:true,reason:'出差/外出报备完全覆盖，以报备为准'};
  if(duration<=limit+grace+1e-8)return {system:'green',reason:'班内外出不超过 '+limit+' + '+grace+' 分钟'};
  // Merge overlapping registrations without adding their durations twice.
  const clusters=analysisUnionSegments(reports.map(r=>[minutes(r.start),minutes(r.end)]));
@@ -37,7 +40,7 @@ function p109TempDecision(parts,reports,day,shift=null){
  }
  return {system:'red',reason:'超过短时外出限额，且报备未覆盖或时长不匹配'};
 }
-function p109TemporaryOutings(employee,date,punches,flags=[]){
+function p109TemporaryOutings(employee,date,punches,pairs=attendanceDailyVisits(employee.id,date)){
  const day=Number(date.slice(8,10));if(!isWorkday(day))return [];
  const candidates=[];
  for(let i=1;i<punches.length;i++){
@@ -53,7 +56,7 @@ function p109TemporaryOutings(employee,date,punches,flags=[]){
   if(row.employeeId===employee.id&&row.date===date&&validClock(row.start)&&validClock(row.end))
    candidates.push({id:row.id,from:minutes(row.start),to:minutes(row.end),origin:'manual',note:row.note||''});
  }
- const reports=outingFor(employee.id,date);
+ const reports=[...outingFor(employee.id,date),...tripFor(employee.id,date).map(r=>({...r,start:'00:00',end:'24:00'}))],completedExits=new Set(pairs.map(([,exit])=>minutes(exit.time)));
  return candidates.flatMap(row=>{
   const manual=(state.manualTempOutings||[]).find(r=>r.id===row.id),
    windows=[['am',minutes(RULES.amStart),minutes(RULES.amEnd)],['pm',minutes(RULES.pmStart),minutes(RULES.pmEnd)]],
@@ -62,11 +65,12 @@ function p109TemporaryOutings(employee,date,punches,flags=[]){
    const id=split?row.id+':'+shift:row.id,parts=[part],decision=p109TempDecision(parts,reports,day,shift),
     override=state.tempOutingReview?.[id]??state.tempOutingReview?.[row.id];
    return {...row,...decision,id,parentId:row.id,sourceFrom:row.from,sourceTo:row.to,from:part[0],to:part[1],split,shift,employeeId:employee.id,date,parts,minutes:analysisUnionMinutes(parts),
-    status:['green','red','exclude'].includes(override)?override:decision.system,manualDecision:!!override};
+    status:override==='exclude'?'exclude':decision.businessCovered?'green':['green','red'].includes(override)?override:decision.system,manualDecision:!!override&&(!decision.businessCovered||override==='exclude')};
   });
  }).filter(row=>row.minutes>0&&!(row.origin==='manual'&&row.status==='exclude')&&
-  !(row.origin==='auto'&&!row.split&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
-    flags.some(flag=>flag.kind==='early'&&Math.abs(minutes(flag.time)-row.from)<1e-8)));
+  !(row.origin==='auto'&&row.minutes<p109TempRules().limit+p109TempRules().grace-1e-8&&
+    completedExits.has(row.sourceFrom)&&row.sourceTo>=minutes(row.shift==='am'?RULES.amEnd:RULES.pmEnd)&&
+    row.sourceFrom>=minutes(row.shift==='am'?RULES.amStart:RULES.pmStart)));
 }
 function p109SplitManualOutings(data){
  const rules={...P109_DEFAULT_RULES,...(data.rules||RULES)},next=[];let changed=false;
@@ -118,7 +122,7 @@ function p109TempSummaryHtml(items,compact=false){
  const total=p109TempSummary(items),{limit,grace}=p109TempRules();
  return '<section tabindex="0" data-r73-tip="班次内统计；短时限额 '+limit+' 分钟，冗余 '+grace+' 分钟。自动 × 排除留痕，手工 × 删除本段；跨午休分别统计。" class="p109-temp-summary'+(compact?' compact':'')+'" aria-label="临时外出统计">'+
   '<header><strong>临时外出</strong><span>'+total.count+' 次</span></header>'+
-  '<div><span class="temp-green">绿色 <b>'+total.green+'</b></span><span class="temp-red">红色 <b>'+total.red+'</b></span><span>'+fmtMinutes(total.minutes)+'</span></div>'+
+  '<div><span class="temp-green">绿色 <b>'+total.green+'</b></span><span class="temp-red">红色 <b>'+total.red+'</b></span><span>'+p109IntervalDuration(total.minutes)+'</span></div>'+
   '</section>';
 }
 function p109IntervalDirty(action,row,extra={}){
@@ -160,6 +164,7 @@ function p109SetTempDecision(id,status){
  if(![null,'green','red','exclude'].includes(status))return false;
  const row=[...state.analysis.values()].flatMap(a=>a.temporaryOutings||[]).find(r=>r.id===id);
  if(!row)return false;
+ if(row.businessCovered&&status==='red'){toast('该时段已由出差/外出报备完全覆盖，以报备为准',true);return false}
  if(row.origin==='manual'&&status==='exclude')return p109DeleteManualInterval('outing',id);
  if(status!=='exclude'&&activeTemporaryOutings(state.analysis.get(row.employeeId+'|'+Number(row.date.slice(8,10))))
   .some(other=>other.id!==id&&other.parts.some(([a,b])=>row.parts.some(([x,y])=>intervalOverlap(a,b,x,y)>0)))){
@@ -176,12 +181,24 @@ function p109SetTempDecision(id,status){
 }
 function p109TempDayHtml(item){
  const rows=item.temporaryOutings||[];
- if(!rows.length)return '';
- return p109TempSummaryHtml([item])+'<details class="p109-temp-details"><summary>区间明细 · '+rows.length+' 段</summary>'+rows.map(row=>
+ return '<div class="p109-temp-block">'+p109TempSummaryHtml([item])+ '<button class="p109-temp-detail-button" type="button" data-temp-details="'+safeTableText(item.employee.id)+'" data-temp-day="'+item.day+'" '+(rows.length?'':'disabled')+'>区间明细 · '+rows.length+' 段</button></div>';
+}
+function p109ShowTempDetails(employeeId,day){
+ const item=state.analysis.get(employeeId+'|'+day);if(!item)return;
+ document.getElementById('p109TempDetailsDialog')?.remove();
+ const node=document.createElement('section');node.id='p109TempDetailsDialog';node.className='p109-recent-overlay';node.setAttribute('role','dialog');node.setAttribute('aria-modal','true');node.setAttribute('aria-labelledby','p109TempDetailsTitle');
+ node.innerHTML='<div class="p109-temp-dialog"><header><h2 id="p109TempDetailsTitle">'+safeTableText(item.employee.name)+' · '+pad(day)+' 日临时外出</h2><button type="button" data-temp-close aria-label="关闭临时外出明细">×</button></header><div class="p109-temp-details">'+(item.temporaryOutings||[]).map(row=>
   '<div class="'+row.status+'"><span>'+safeTableText((row.origin==='manual'?'补录 ':'')+p109IntervalClock(row.from)+'–'+p109IntervalClock(row.to))+
   ' · '+p109IntervalDuration(row.minutes)+(row.status==='exclude'?' · 已排除':'')+'</span>'+
-  (row.manualDecision?'<button type="button" data-temp-reset="'+safeTableText(row.id)+'">恢复自动</button>':'')+'</div>').join('')+'</details>';
+  '<span>'+({red:'红色',green:'绿色',exclude:'排除'}[row.status])+'</span>'+(row.manualDecision?'<button type="button" data-temp-reset="'+safeTableText(row.id)+'">恢复自动</button>':'')+'</div>').join('')+'</div></div>';
+ document.body.appendChild(node);
+ const close=()=>{node.remove();document.querySelector('[data-temp-details="'+CSS.escape(employeeId)+'"]')?.focus()};
+ node.querySelector('[data-temp-close]').onclick=close;
+ node.querySelectorAll('[data-temp-reset]').forEach(button=>button.onclick=()=>{p109SetTempDecision(button.dataset.tempReset,null);p109ShowTempDetails(employeeId,day)});
+ node.onclick=e=>{if(e.target===node)close()};node.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}else p109TrapDialogFocus(e,node)};
+ node.querySelector('[data-temp-close]').focus();
 }
+document.addEventListener('click',e=>{const b=e.target.closest?.('[data-temp-details]');if(b)p109ShowTempDetails(b.dataset.tempDetails,Number(b.dataset.tempDay))});
 function p109ManualOvertimeFor(employeeId,date){
  const day=attendanceUtcMinute(date),rows=[];
  for(const row of attendanceAdjacentRows('manualOvertime')){

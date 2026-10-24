@@ -84,14 +84,16 @@ function minuteText(v){
   return pad(Math.floor(m/60))+':'+pad(m%60);
 }
 
+function p109InitialTimelineRange(a){
+ const points=[...(a.punches||[]).map(p=>minutes(p.time)),...(a.pairs||[]).flatMap(([x,y])=>[minutes(x.time),minutes(y.time)]),
+  ...(a.autoOvertime?.segments||[]).flatMap(s=>[s.from,s.to]),...(a.overtime||[]).flatMap(r=>[minutes(r.start),minutes(r.end)])].filter(Number.isFinite);
+ const first=points.length?Math.min(...points):480,last=points.length?Math.max(...points):1200;
+ return {key:a.employee.id+'|'+a.day,start:Math.max(0,first<480?first-30:480),end:Math.min(1440,last>1200?last+30:1200)};
+}
 function timelineRange(a){
   const key=`${a.employee.id}|${a.day}`;
   if(!state.timelineRange||state.timelineRange.key!==key){
-   // A midnight-spanning session cannot be displayed in the legacy
-   // 05:00–23:00 viewport: the last/first hours would be cropped.
-   const touchesMidnight=(a.pairs||[]).some(([x,y])=>minutes(x.time)<1||minutes(y.time)>=1440)||
-    (a.autoOvertime?.segments||[]).some(s=>s.from<1||s.to>=1440);
-   state.timelineRange={key,start:touchesMidnight?0:300,end:touchesMidnight?1440:1380};
+   state.timelineRange=p109InitialTimelineRange(a);
   }
   return state.timelineRange;
 }
