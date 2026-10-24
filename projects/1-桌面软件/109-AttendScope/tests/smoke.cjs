@@ -499,7 +499,8 @@ async function run(){
  },'R74 title, search and group editor share one row');
  await page.screenshot({path:path.join(out,'r74-roster-one-row.png')});
  await page.locator('[data-data-section="rules"]').click();
- await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===10&&
+ await check(page,()=>document.querySelectorAll('.r68-rule-grid>div').length===11&&
+   document.querySelector('.r68-rule-grid')?.textContent.includes('报备与加班边界')&&
    document.querySelector('.r68-rule-grid')?.textContent.includes('上午打卡容差')&&
    document.querySelector('.r68-rule-grid')?.textContent.includes('下午打卡容差')&&
    !!document.getElementById('r68EditRules'),
