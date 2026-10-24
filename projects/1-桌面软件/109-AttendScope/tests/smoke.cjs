@@ -532,7 +532,7 @@ async function run(){
    records:state.records,leaves:state.leaves,trips:state.trips,outings:state.outings,
    overtimeEntries:state.overtimeEntries,analysis:state.analysis,
    overtimeReview:{...(state.overtimeReview||{})},monthStores:state.monthStores,
-   year:YEAR,month:MONTH
+   year:YEAR,month:MONTH,rules:{...RULES}
   };
   const e=EMPLOYEES[0];
   const make=(date,clock,direction,i)=>({
@@ -542,6 +542,7 @@ async function run(){
   const approx=(x,y)=>Math.abs(x-y)<1e-8;
   try{
    state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
+   Object.assign(RULES,{overtimeRuleVersion:1,overtimeMinMinutes:20});
    state.overtimeReview={};state.monthStores=new Map();
    YEAR=2026;MONTH=10;
    const sundayDate='2026-10-11';
@@ -614,7 +615,7 @@ async function run(){
     trips:preserved.trips,outings:preserved.outings,overtimeEntries:preserved.overtimeEntries,
     analysis:preserved.analysis,overtimeReview:preserved.overtimeReview,
     monthStores:preserved.monthStores});
-   YEAR=preserved.year;MONTH=preserved.month;
+   YEAR=preserved.year;MONTH=preserved.month;Object.assign(RULES,preserved.rules);
    state.timelineRange=null;
   }
  },'R61 weekend noon, midnight 4+2, cross-month 4+2, registration union and uniform staff labels');
@@ -640,8 +641,9 @@ async function run(){
     unclosed.issues.includes('迟到')&&unclosed.attendanceFlags.some(f=>f.kind==='late')&&RULES.graceAmEnd===0;
   }finally{[state.records,state.leaves,state.trips,state.outings]=originals;reanalyze()}
  },'R72 early departure return and zero-grace proof, with anchored late flags');
- // R68: strictly more than 20 min after shift-end; never deduct grace.
+ // Preserve the historical version-1 formula used by old frozen workspaces.
  await check(page,()=>{
+  const preserved={...RULES};Object.assign(RULES,{overtimeRuleVersion:1,overtimeMinMinutes:20});try{
   if(RULES.overtimeMinMinutes!==20)return false;
   const pair=(a,b)=>[{time:a},{time:b}];
   const calc=ls=>estimateOvertimeCandidate(ls,8,[]);
@@ -658,15 +660,16 @@ async function run(){
     morning.minutes===25&&atNoon.minutes===0&&
     acrossLunch.minutes===25&&separate.minutes===0&&
     registered.minutes===35&&registered.segments.length===2&&
-    setting.includes('id="r14OvertimeMin"')&&setting.includes('min="20"');
+    setting.includes('id="r14OvertimeMin"')&&setting.includes('id="r93OvertimeAfter"')&&setting.includes('id="r93OvertimeBefore"');
   if(!verdict)throw Error('R68_OT_CASES '+JSON.stringify({
    min:RULES.overtimeMinMinutes,boundary:boundary.minutes,before:before.minutes,
    late:late.minutes,morning:morning.minutes,atNoon:atNoon.minutes,acrossLunch:acrossLunch.minutes,
    separate:separate.minutes,registered:registered.minutes,registeredSegments:registered.segments.length,
-   settings:setting.includes('min="20"')
+   settings:setting.includes('id="r93OvertimeAfter"')
   }));
   return true;
- },'R68 >20min lunch/evening grace without deduction, no lunch spanning overcount');
+  }finally{Object.assign(RULES,preserved)}
+ },'historical R68 formula remains available without losing current three-parameter settings');
  // R60: consecutive 'in' punches without an intervening 'out' are
  // ONE continuous attendance visit. Threshold checks the original visit,
  // while registered entries affect only accounting, not attendance identity.
@@ -680,7 +683,7 @@ async function run(){
   }));
   try{
    state.leaves=[];state.trips=[];state.outings=[];
-   state.overtimeEntries=[];RULES.overtimeMinMinutes=20;
+   state.overtimeEntries=[];Object.assign(RULES,{overtimeRuleVersion:1,overtimeMinMinutes:20});
    state.records=punch([['17:05','进'],['17:18','进'],['18:27','进'],['18:35','进'],['19:16','出']]);
    const frozen=JSON.stringify(state.records);
    const continuous=analyzeDay(e,day);
@@ -737,7 +740,7 @@ async function run(){
   };
   const fail=(name,data)=>{throw Error('R56_CASE '+name+' '+JSON.stringify(data))};
   try{
-   state.trips=[];state.outings=[];RULES.overtimeMinMinutes=30;
+   state.trips=[];state.outings=[];Object.assign(RULES,{overtimeRuleVersion:1,overtimeMinMinutes:30});
    const ordinary=examine(day,[['08:25','进'],['11:45','出'],['13:25','进'],['17:15','出']]);
    if(ordinary.severity!=='normal'||ordinary.workMinutes!==410||
       ordinary.autoOvertime.minutes!==0||ordinary.lunchEvidence!=='有午休进出')
@@ -1213,11 +1216,8 @@ async function run(){
  // candidate. Check both the source evidence and the user-visible route.
  await check(page,()=>{
   const a=state.analysis.get('E001|12');
-  return state.isDemo&&!!a&&a.autoOvertime?.minutes===115&&
-   a.autoOvertime.segments.length===1&&
-   a.autoOvertime.segments[0].from===1030&&
-   a.autoOvertime.segments[0].to===1145;
- },'R56 weekday candidate must start at 17:10 and end at 19:05');
+  return state.isDemo&&!!a&&a.autoOvertime?.segments.some(s=>s.from===1050&&s.to===1145&&s.minutes===95);
+ },'weekday evening candidate deducts 20 minutes and runs from 17:30 to 19:05');
  await page.evaluate(()=>{
   state.workspaceMode='person';state.analyticsPage='main';
   state.selection={type:'cell',employeeId:'E001',day:1};
@@ -1970,11 +1970,12 @@ async function run(){
  await require('./r90-audit.cjs')({browser,out,root});
  await require('./r91-audit.cjs')({browser,out,root});
  await require('./r92-audit.cjs')({browser,out,root});
+ await require('./r93-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R92',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R93',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

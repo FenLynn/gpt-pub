@@ -22,6 +22,8 @@
 .p109-evidence-placeholder{display:block;color:#8a9eaf;line-height:18px}
 #p109TimelineReset{position:absolute;right:8px;top:2px;width:27px;height:25px;display:grid;place-items:center;padding:0;border:1px solid #d6e3ec;border-radius:4px;background:#fff;color:#527c98;z-index:25;cursor:pointer}
 #p109TimelineReset:hover{background:#eef6fb}#p109TimelineReset:focus-visible{outline:2px solid #428dc0;outline-offset:1px}
+.p109-timeline-zoom{position:absolute;top:2px;width:27px;height:25px;display:grid;place-items:center;padding:0;border:1px solid #d6e3ec;border-radius:4px;background:#fff;color:#527c98;z-index:25;cursor:pointer;font:18px/1 'Segoe UI',sans-serif}
+.p109-timeline-zoom.zoom-in{right:72px}.p109-timeline-zoom.zoom-out{right:40px}.p109-timeline-zoom:hover{background:#eef6fb}.p109-timeline-zoom:focus-visible{outline:2px solid #428dc0;outline-offset:1px}
 .p109-temp-actions button:disabled{opacity:.3;cursor:default}
 .p109-temp-dialog{width:min(86vw,1100px);max-height:80vh;overflow:auto;background:#fff;border:1px solid #d4e0ea;border-radius:9px;padding:18px 22px;color:#3d5b70;box-shadow:0 15px 50px #19344c2a}
 .p109-temp-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.p109-temp-dialog h2{font-size:17px;margin:0}.p109-temp-dialog [data-temp-close]{border:0;background:transparent;color:#6b8396;font-size:23px;cursor:pointer}

@@ -1,7 +1,7 @@
 /* R29 timeline: restore proven R27 geometry; only pin labels and refine lane guides. */
 function r19PunchClusters(a,range,width,fixedLane=null){
-  const span=Math.max(30,range.end-range.start),px=Math.max(240,width||800);
-  const mergeMinutes=Math.max(.45,span/Math.max(160,px-24)*11),maxGroupSpan=Math.max(.8,mergeMinutes*1.6),out=[];
+  const span=Math.max(1/6,range.end-range.start),px=Math.max(240,width||800);
+  const mergeMinutes=Math.max(1/600,span/Math.max(160,px-24)*11),maxGroupSpan=Math.max(1/300,mergeMinutes*1.6),out=[];
   for(const direction of ['进','出','未标注']){
     const rows=a.punches.filter(p=>(direction==='未标注'?!['进','出'].includes(p.direction):p.direction===direction)&&Number.isFinite(minutes(p.time))&&minutes(p.time)>=range.start&&minutes(p.time)<=range.end).sort((x,y)=>minutes(x.time)-minutes(y.time));
     let group=[];
@@ -172,23 +172,23 @@ function mountAttendanceTimeline(a){
       formatter:p=>{
         const d=p.data||{};
         if(d.records){
-          const head=d.count>1?minuteText(d.start)+'–'+minuteText(d.end)+' · '+d.count+' 条':d.records[0].time+' · '+d.direction;
+          const head=d.count>1?p109IntervalClock(d.start)+'–'+p109IntervalClock(d.end)+' · '+d.count+' 条':d.records[0].time+' · '+d.direction;
           return '<b>'+head+'</b>';
         }
         if(d.origin==='temporary')return '<b>'+safeTableText(d.title)+'</b><div>'+p109IntervalClock(d.value[0])+'–'+p109IntervalClock(d.value[1])+
           ' · 班内合计 '+p109IntervalDuration(d.minutes)+'</div><div>'+safeTableText(d.manualDecision?'人工改判；自动依据：'+d.reason:d.reason)+
           '</div>'+(d.note?'<div>'+safeTableText(d.note)+'</div>':'');
-        return '<b>'+(d.title||'区间')+'</b><div>'+minuteText(d.value?.[0]||0)+'–'+minuteText(d.value?.[1]||0)+'</div>';
+        return '<b>'+(d.title||'区间')+'</b><div>'+p109IntervalClock(d.value?.[0]||0)+'–'+p109IntervalClock(d.value?.[1]||0)+'</div>';
       }},
-    xAxis:{type:'value',min:0,max:1440,interval:240,axisLine:{show:false},axisTick:{show:false},
-      axisLabel:{fontSize:10,color:'#748a9c',margin:13,formatter:minuteText},
+    xAxis:{type:'value',min:0,max:1440,splitNumber:6,minInterval:1/60,axisLine:{show:false},axisTick:{show:false},
+      axisLabel:{fontSize:10,color:'#748a9c',margin:13,formatter:v=>p109TimelineClock(v,state.timelineRange?.end-state.timelineRange?.start)},
       splitLine:{show:true,lineStyle:{type:'dashed',color:'#e8eef3'}}},
     yAxis:{type:'category',inverse:true,data:model.tracks.map(t=>t.key),axisLine:{show:false},axisTick:{show:false},axisLabel:{show:false},
       splitLine:{show:false},splitArea:{show:false}},
     dataZoom:[
-      {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:15,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
+      {id:'inside',type:'inside',xAxisIndex:0,startValue:range.start,endValue:range.end,minValueSpan:1/6,filterMode:'none',zoomOnMouseWheel:true,moveOnMouseMove:true},
       {id:'slider',type:'slider',xAxisIndex:0,startValue:range.start,endValue:range.end,left:SIDE,right:SIDE,bottom:SLIDER_BOTTOM,height:SLIDER_HEIGHT,
-        minValueSpan:15,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
+        minValueSpan:1/6,filterMode:'none',showDetail:false,realtime:true,brushSelect:false,showDataShadow:false,
         backgroundColor:'#edf0f2',fillerColor:'#ffffff',borderColor:'#d9dfe4',
         handleSize:'100%',handleStyle:{color:'#8999a5',borderColor:'#718693',borderWidth:1},
         moveHandleStyle:{color:'#8999a5',opacity:.58}}
@@ -322,8 +322,8 @@ function mountAttendanceTimeline(a){
        btn.type='button';btn.className='overtime-review-btn'+(seg.accepted===accepted?' chosen':'');
        btn.innerHTML=p109IntervalIcon(icon);
        const label=seg.origin==='manual'?'补录加班':'自动加班';
-       btn.title=word+label+'：'+minuteText(from)+'–'+minuteText(to)+(seg.origin==='manual'?'（直接删除这次补录）':'（仅调整统计纳入，不代表审批）');
-       btn.setAttribute('aria-label',word+' '+minuteText(from)+'–'+minuteText(to)+' '+label);
+       btn.title=word+label+'：'+p109IntervalClock(from)+'–'+p109IntervalClock(to)+(seg.origin==='manual'?'（直接删除这次补录）':'（仅调整统计纳入，不代表审批）');
+       btn.setAttribute('aria-label',word+' '+p109IntervalClock(from)+'–'+p109IntervalClock(to)+' '+label);
        btn.setAttribute('aria-pressed',String(seg.accepted===accepted));
        btn.onclick=e=>{e.stopPropagation();setAutoOvertimeDecision(seg.segmentId,accepted)};
        box.appendChild(btn);
@@ -353,7 +353,7 @@ function mountAttendanceTimeline(a){
       for(const [status,icon,title] of [['red','circle','标为红色'],['green','circle','标为绿色'],['exclude','close',row.manual?'删除补录':'排除统计']]){
         const button=document.createElement('button');button.type='button';button.className=status;
         button.innerHTML=p109IntervalIcon(icon);button.disabled=status==='red'&&!!row.businessCovered;
-        button.title=button.disabled?'出差/外出报备完全覆盖，以报备为准':title+' '+minuteText(from)+'–'+minuteText(to)+' 临时外出';
+        button.title=button.disabled?'出差/外出报备完全覆盖，以报备为准':title+' '+p109IntervalClock(from)+'–'+p109IntervalClock(to)+' 临时外出';
         button.setAttribute('aria-label',button.title);button.setAttribute('aria-pressed',String(row.status===status));
         button.onclick=e=>{e.stopPropagation();p109SetTempDecision(row.segmentId,status)};box.appendChild(button);
       }
@@ -421,11 +421,12 @@ function mountAttendanceTimeline(a){
   chart.on('datazoom',e=>{
     const q=e.batch?.[0]||e;let start=q.startValue,end=q.endValue;
     if(start==null||end==null){if(q.start==null||q.end==null)return;start=q.start*14.4;end=q.end*14.4}
-    start=Math.max(0,Math.min(1440,+start));end=Math.max(start+15,Math.min(1440,+end));
+    const span=Math.max(1/6,Math.min(1440,+end-+start));start=Math.max(0,Math.min(1440-span,+start));end=start+span;
     state.timelineRange={key:range.key,start,end};
     model=r14TrackData(a,state.timelineRange,chart.getWidth());
     syncNavSelection();
     chart.setOption({
+      xAxis:{axisLabel:{formatter:v=>p109TimelineClock(v,end-start)}},
       series:[
         {id:'schedule',data:model.workWindows.map(x=>[x[0],x[1]])},
         {id:'work-boundaries',data:workBoundaries()},
@@ -440,4 +441,11 @@ function mountAttendanceTimeline(a){
     chart.dispatchAction({type:'dataZoom',startValue:initial.start,endValue:initial.end});
     reset.focus({preventScroll:true});
   };
+  for(const [id,factor] of [['p109TimelineZoomIn',.5],['p109TimelineZoomOut',2]]){
+   const button=document.getElementById(id);if(button)button.onclick=()=>{
+    const current=state.timelineRange||range,span=Math.max(1/6,Math.min(1440,(current.end-current.start)*factor)),
+     center=(current.start+current.end)/2,start=Math.max(0,Math.min(1440-span,center-span/2));
+    chart.dispatchAction({type:'dataZoom',startValue:start,endValue:start+span});button.focus({preventScroll:true});
+   };
+  }
 }

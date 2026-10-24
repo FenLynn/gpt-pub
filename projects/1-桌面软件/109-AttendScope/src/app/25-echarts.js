@@ -83,6 +83,7 @@ function minuteText(v){
   if(m===1440)return '24:00';
   return pad(Math.floor(m/60))+':'+pad(m%60);
 }
+function p109TimelineClock(value,span){return span<=10?attendanceClock(Math.max(0,Math.min(1440,value))):minuteText(value)}
 
 function p109InitialTimelineRange(a){
  const points=[...(a.punches||[]).map(p=>minutes(p.time)),...(a.pairs||[]).flatMap(([x,y])=>[minutes(x.time),minutes(y.time)]),

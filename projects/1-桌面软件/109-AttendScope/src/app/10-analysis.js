@@ -341,17 +341,17 @@ function attendanceDateIsWork(date){
  const context=other||state;
  return p109CalendarType(date,other?.calendarOverrides||state.calendarOverrides,!context.snapshotContext&&!context.activeBranch)==='work';
 }
-function attendanceVisitEligibleMinutes(visit){
+function attendanceVisitEligibleMinutes(visit,rules=RULES){
  let total=0;
  for(let cursor=Math.floor(visit.from/1440)*1440;cursor<visit.to;cursor+=1440){
   const date=attendanceDateFromMinute(cursor),a=Math.max(visit.from,cursor),
    z=Math.min(visit.to,cursor+1440),start=visit.from<cursor||!attendanceDateIsWork(date)?
-    cursor:cursor+minutes(RULES.pmEnd);
-  // Noon overtime needs a completed morning departure, not an uninterrupted full day.
-  if(attendanceDateIsWork(date)&&visit.from<cursor+minutes(RULES.amEnd)&&
-     visit.to<=cursor+minutes(RULES.pmStart))
-   total+=Math.max(0,Math.min(z,cursor+minutes(RULES.pmStart))-
-       Math.max(a,cursor+minutes(RULES.amEnd)));
+    cursor:cursor+minutes(rules.pmEnd);
+  // Historical policy: noon overtime needs a completed morning departure.
+  if(attendanceDateIsWork(date)&&visit.from<cursor+minutes(rules.amEnd)&&
+     visit.to<=cursor+minutes(rules.pmStart))
+   total+=Math.max(0,Math.min(z,cursor+minutes(rules.pmStart))-
+       Math.max(a,cursor+minutes(rules.amEnd)));
   total+=Math.max(0,z-Math.max(a,start));
  }
  return total;
@@ -407,22 +407,25 @@ function analysisUnionSegments(intervals){
  return merged;
 }
 function estimateOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
- const minMinutes=Number.isFinite(+RULES.overtimeMinMinutes)?Math.max(20,+RULES.overtimeMinMinutes):20;
+ return p109BufferedOvertimeCandidate(pairs,day,registered,pairingUncertain);
+}
+function p109LegacyOvertimeCandidate(pairs,day,registered,pairingUncertain=false,rules=RULES){
+ const minMinutes=Number.isFinite(+rules.overtimeMinMinutes)?Math.max(20,+rules.overtimeMinMinutes):20;
  if(pairingUncertain)return {minutes:0,rawMinutes:0,threshold:minMinutes,
   reason:'打卡进出配对待核',segments:[]};
- const windows=isWorkday(day)?[[minutes(RULES.amEnd),minutes(RULES.pmStart)],[minutes(RULES.pmEnd),1440]]:
+ const windows=isWorkday(day)?[[minutes(rules.amEnd),minutes(rules.pmStart)],[minutes(rules.pmEnd),1440]]:
    [[0,1440]];
  const eligible=[];
  for(const [enter,exit] of pairs){
   const a=minutes(enter.time),b=minutes(exit.time);
   const activeWindows=enter.sessionCarry?[[0,1440]]:windows;
   for(const [start,end] of activeWindows){
-   // A continuous visit extending into the afternoon is not a lunch OT session.
-   if(isWorkday(day)&&start===minutes(RULES.amEnd)&&
-      (a>=minutes(RULES.amEnd)||b>minutes(RULES.pmStart)))continue;
+   // Historical policy excludes an uninterrupted visit extending into the afternoon.
+   if(isWorkday(day)&&start===minutes(rules.amEnd)&&
+      (a>=minutes(rules.amEnd)||b>minutes(rules.pmStart)))continue;
    const from=Math.max(a,start),to=Math.min(b,end);
    if(to>from)eligible.push([from,to,enter.sessionId||null,
-     enter.sessionEligibleMinutes||0,enter.sessionFrom,enter.sessionTo]);
+     Number.isFinite(enter.sessionFrom)&&Number.isFinite(enter.sessionTo)?attendanceVisitEligibleMinutes({from:enter.sessionFrom,to:enter.sessionTo},rules):enter.sessionEligibleMinutes||0,enter.sessionFrom,enter.sessionTo]);
   }
  }
  // Preserve original visit identities across midnight and across dates.

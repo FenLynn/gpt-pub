@@ -94,7 +94,7 @@ module.exports=async({browser,out,root})=>{
   }
   await page.setViewportSize({width:1600,height:900});await page.evaluate(()=>render());
   // Move from real chart evidence across the small gap into the external toolbar.
-  for(const [minute,lane,selector] of [[610,4,'.p109-temp-actions[data-temp-id*="r91-1"] .red'],[1110,5,'.overtime-review-actions button[aria-pressed="false"]']]){
+  for(const [minute,lane,selector] of [[610,4,'.p109-temp-actions[data-temp-id*="r91-1"] .red'],[1110,5,'.overtime-review-actions button[aria-label*="18:00–19:00"][aria-pressed="false"]']]){
    await page.waitForFunction(()=>!!echarts.getInstanceByDom(document.getElementById('attendanceTimelineChart'))&&document.querySelector('.p109-temp-actions'));
    const point=await page.evaluate(({minute,lane})=>{const el=document.getElementById('attendanceTimelineChart'),c=echarts.getInstanceByDom(el),p=c.convertToPixel({xAxisIndex:0,yAxisIndex:0},[minute,lane]),r=el.getBoundingClientRect();return {x:r.left+p[0],y:r.top+p[1]-(lane===4?7:0)}},{minute,lane});
    await page.mouse.move(point.x,point.y);await page.waitForFunction(selector=>+getComputedStyle(document.querySelector(selector).parentElement).opacity>.95,selector);

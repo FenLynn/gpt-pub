@@ -255,7 +255,7 @@ async function p109InitializeProject(root){
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
   state.manualStatuses={};state.overtimeReview={};state.attendanceReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
-  state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.captureItems=[];
+  state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.overtimeRuleContexts={};state.captureItems=[];
   state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.filter='main';
   state.selectedGroup=null;state.statsConfig=null;state.statsPersonId='';state.statsGroup='';
   state.workspaceMode='all';state.analyticsPage='main';state.prefs={fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'};
@@ -294,17 +294,18 @@ async function p109ForkSnapshot(month,snapshotId){
   if(!snap?.working||snap.manifest?.snapshotId!==snapshotId||
     snap.manifest.year!==Number(yr)||snap.manifest.month!==Number(mo))
    throw Error('冻结来源不合法或已经损坏');
-  const normalized=normalizeSavedMonth(snap.working);
+  const normalized=normalizeSavedMonth(snap.working,true);
   if(!normalized)throw Error('快照数据结构不兼容，不能派生副本');
+  if(!normalized.rules)normalized.rules=p109NormalizeOvertimeRules(snap.config?.rules,true);
   const branches=await dir(m,'branches'),id='B'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
    ref={id,month,parentSnapshotId:snapshotId};
   const exists=await p109Child(branches,id);if(exists)throw Error('修订标识发生冲突，已中止');
   const branch=await dir(branches,id),work=await dir(branch,'working');
   const manifest={schemaVersion:1,...ref,createdAt:new Date().toISOString(),appVersion:P109_APP_VERSION};
   await writeFile(branch,'branch.json',JSON.stringify(manifest,null,2));
-  await writeFile(work,'state.json',JSON.stringify({...snap.working,context:'branch',branch:ref},null,2));
+  await writeFile(work,'state.json',JSON.stringify({...snap.working,...normalized,schemaVersion:P109_DATA_SCHEMA,snapshotContext:true,context:'branch',branch:ref},null,2));
   rememberMonth();
-  state.monthStores.set(month,{...normalized,activeBranch:ref,saved:true});
+  state.monthStores.set(month,{...normalized,snapshotContext:true,activeBranch:ref,saved:true});
   switchMonth(Number(yr),Number(mo),false,false,true);
   state.activeBranch=ref;
   await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
@@ -324,7 +325,7 @@ async function p109ReturnToMain(){
    main=normalizeSavedMonth(source);
   if(!main)throw Error('主 working 不完整，拒绝切换');
   rememberMonth();
-  state.monthStores.set(ref.month,{...main,activeBranch:null,saved:true});
+  state.monthStores.set(ref.month,{...main,activeBranch:null,saved:main.saved});
   switchMonth(Number(y),Number(m),false,false,true);
   state.activeBranch=null;
   await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));

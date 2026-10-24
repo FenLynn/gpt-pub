@@ -332,7 +332,7 @@ function r68RulesHtml(){
  ['上午打卡容差',RULES.graceAmStart+' / '+RULES.graceAmEnd+' 分钟'],
  ['下午打卡容差',RULES.gracePmStart+' / '+RULES.gracePmEnd+' 分钟'],
  ['重复打卡识别',RULES.dupSeconds+' 秒'],
- ['自动加班保护','晚 '+RULES.overtimeMinMinutes+' 分钟后才计整段'],
+ ['自动加班口径',RULES.overtimeRuleVersion===1?'历史口径：超过 '+RULES.overtimeMinMinutes+' 分钟计整段':'班后扣 '+RULES.overtimeAfterMinutes+' 分钟；班前门槛 '+RULES.overtimeBeforeMinutes+' 分钟；最低 '+RULES.overtimeMinMinutes+' 分钟'],
  ['临时外出短时限额',p109TempRules().limit+' 分钟'],
  ['临时外出冗余',p109TempRules().grace+' 分钟（报备起止各允许）'],
  ['手工修订',state.revisions.length+' 次'],
@@ -342,7 +342,7 @@ function r68RulesHtml(){
   '<button class="r68-btn" id="r68EditRules">编辑考勤规则</button>')+
   '<div class="r68-rule-grid">'+items.map(([title,value])=>
    '<div><span>'+r68Esc(title)+'</span><strong>'+r68Esc(value)+'</strong></div>').join('')+'</div>'+
-  '<div class="r68-note">自动加班：12:00 / 17:30（含）前离开不计；超过门槛后，从 11:40 / 17:10 起完整计时，不扣除 20 分钟。连续跨午休的工作不能当作午间加班。</div>'+
+  '<div class="r68-note">'+(RULES.overtimeRuleVersion===1?'历史冻结口径：严格超过门槛后计完整时段，连续跨午休不自动计午间加班。编辑规则并应用可将独立修订切换到新口径，原冻结不变。':'自动加班按上列三个参数核查：班后先扣不计时长；班前达到门槛后计完整提前时长；连续有效区间达到最低值才计入。连续在岗跨午休也计算，默认12:00–13:30共90分钟。跨午夜先判断完整区间，再按日分摊。')+'</div>'+
   '<button class="r68-btn" id="r68PinRules">固定本月规则为项目默认</button> '+
   '<button class="r68-btn" type="button" data-calendar-editor>打开工作日管理</button>';
 }

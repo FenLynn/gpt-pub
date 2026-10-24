@@ -109,9 +109,11 @@ async function ensureProjectSkeleton(){
     await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:{}},null,2));
   }
 }
-function normalizeSavedMonth(payload){
+function normalizeSavedMonth(payload,keepLegacyOvertime=false){
   const schema=payload?.schemaVersion==null?1:Number(payload.schemaVersion);
   if(!payload||!Array.isArray(payload.records)||!Number.isInteger(schema)||schema<1||schema>P109_DATA_SCHEMA)return null;
+  if(!p109ValidOvertimeRules(payload.rules))return null;
+  if(payload.overtimeRuleContexts!=null&&(typeof payload.overtimeRuleContexts!=='object'||Array.isArray(payload.overtimeRuleContexts)||Object.entries(payload.overtimeRuleContexts).some(([key,rules])=>!/^20\d{2}-(0[1-9]|1[0-2])$/.test(key)||!rules||typeof rules!=='object'||!p109ValidOvertimeRules(rules))))return null;
   for(const key of ['employees','leaves','trips','outings','overtimeEntries','imports','revisions','manualTempOutings','manualOvertime'])
     if(payload[key]!=null&&!Array.isArray(payload[key]))return null;
   if(payload.tempOutingReview!=null&&(typeof payload.tempOutingReview!=='object'||Array.isArray(payload.tempOutingReview)))return null;
@@ -128,13 +130,15 @@ function normalizeSavedMonth(payload){
   }
   payload=r62MigratePayload(structuredClone(payload));
   const prunedManual=p109PruneExcludedManual(payload);
+  const rules=payload.rules?p109NormalizeOvertimeRules(payload.rules,keepLegacyOvertime||payload.snapshotContext||payload.branch?.parentSnapshotId):null,
+    overtimeRulesMigrated=!!rules&&JSON.stringify(rules)!==JSON.stringify(payload.rules);
   const splitManual=p109SplitManualOutings(payload),calendar=p109CalendarValues(payload.calendarOverrides,payload.year,payload.month,schema<4),
     calendarChanged=JSON.stringify(calendar)!==JSON.stringify(payload.calendarOverrides??null);
   return {schemaVersion:P109_DATA_SCHEMA,records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     attendanceReview:payload.attendanceReview||{},tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
-    employees:payload.employees||null,groups:payload.groups||null,
+    employees:payload.employees||null,groups:payload.groups||null,overtimeRuleContexts:structuredClone(payload.overtimeRuleContexts||{}),
     fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:calendar,
-    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual&&!splitManual&&!calendarChanged,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules:payload.rules||null,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
+    revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual&&!splitManual&&!calendarChanged&&!overtimeRulesMigrated,overtimeRulesMigrated,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
 let p109ConnectionBusy=false;
 function p109CaptureSession(){
@@ -210,7 +214,7 @@ async function p109ReadProject(handle,project){
     const raw=await readJSON(folder,result.recovered?'state.previous.json':'state.json');
     if(raw.year!=null&&(Number(raw.year)!==Number(y)||Number(raw.month)!==Number(m)))throw Error(key+' 工作状态年月与目录不一致');
     if(!stored.employees)stored.employees=structuredClone(people);
-    if(!stored.rules)stored.rules={...rules};
+    if(!stored.rules){stored.rules=p109NormalizeOvertimeRules(rules,stored.snapshotContext);if(JSON.stringify(stored.rules)!==JSON.stringify(rules)){stored.saved=false;stored.overtimeRulesMigrated=true}}
     const beforeCalendar=JSON.stringify(stored.calendarOverrides);
     stored.calendarOverrides=p109CalendarValues(stored.calendarOverrides??calendar,y,m,Number(raw.schemaVersion||1)<4);
     if(beforeCalendar!==JSON.stringify(stored.calendarOverrides))stored.saved=false;
@@ -269,7 +273,8 @@ async function connectProjectDir(savedHandle=null,options={}){
     Object.assign(r68UI,{chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
     r68UI.projectSerial++;r68UI.treeSerial++;if(typeof p109CloseTransfer==='function')p109CloseTransfer();document.getElementById('p109ModeOverlay')?.remove();render();
-    const notice=typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'';
+    const notice=(typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'')+
+      ([...loaded.months.values()].some(m=>m.overtimeRulesMigrated)?'；旧加班规则已迁移为班后扣除、班前门槛、最低时长，请核查后保存':'');
     toast((loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目')+notice);
     return true;
   }catch(e){if(e.name!=='AbortError')p109ShowStorageFallback('目录连接失败：'+e.message);return false}
@@ -320,7 +325,7 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
-    appVersion:P109_APP_VERSION,analysisEngineVersion:P109_ENGINE_VERSION,snapshotContext:!!state.snapshotContext,branch:state.activeBranch||null};
+    appVersion:P109_APP_VERSION,analysisEngineVersion:P109_ENGINE_VERSION,snapshotContext:!!state.snapshotContext,overtimeRuleContexts:structuredClone(state.overtimeRuleContexts||{}),branch:state.activeBranch||null};
 }
 async function saveWorking(options={}){
   if(state.storageBusy||state.importCommitting||p109ConnectionBusy||(p109ProjectBusy&&!options.initializing)){toast('正在处理项目文件，请稍后保存',true);return false}
@@ -366,14 +371,14 @@ async function restoreWorkingFile(file){
  const yr=Number(working?.year),mo=Number(working?.month);
  if(!Number.isInteger(yr)||yr<2000||yr>2100||!Number.isInteger(mo)||mo<1||mo>12)
   throw new Error('工作文件缺少有效年月');
- const normalized=normalizeSavedMonth(working);
+ const normalized=normalizeSavedMonth(working,!!source?.working);
  if(!normalized)throw new Error('文件不是有效的考勤工作状态或冻结快照');
  const frozen=!!source?.working;
  if(frozen&&(Number(source.manifest?.year)!==yr||Number(source.manifest?.month)!==mo||
    Number(source.manifest?.schemaVersion)>P109_DATA_SCHEMA))throw Error('冻结元数据与工作状态不一致或版本不兼容');
  if(frozen){normalized.snapshotContext=true;
    if(normalized.calendarOverrides==null)normalized.calendarOverrides=p109CalendarValues(source.config?.calendarOverrides||{},yr,mo,Number(working.schemaVersion||1)<4);
-   if(!normalized.rules)normalized.rules={...(source.config?.rules||P109_DEFAULT_RULES)};
+   if(!normalized.rules)normalized.rules=p109NormalizeOvertimeRules(source.config?.rules,true);
  }
  if(normalized.calendarOverrides==null)normalized.calendarOverrides=p109CalendarValues({},yr,mo,Number(working.schemaVersion||1)<4);
  const isolated=!!state.projectDir&&(frozen||!!working.branch);
@@ -409,7 +414,7 @@ async function freezeSnapshot(){
     appVersion:P109_APP_VERSION,sourceImports:state.imports,parentSnapshot:state.activeBranch?.parentSnapshotId||null};
   const calendar=p109CalendarSnapshotValues(),snapshot={manifest:{...manifest,analysisEngineVersion:P109_ENGINE_VERSION,workingSchema:P109_DATA_SCHEMA},config:{
  employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)})),rules:{...RULES},calendarOverrides:calendar
- },working:{...workingPayload(),calendarOverrides:calendar}};
+ },working:{...workingPayload(),calendarOverrides:calendar,overtimeRuleContexts:p109OvertimeSnapshotRules()}};
   const txt=JSON.stringify(snapshot,null,2);
   if(state.projectDir){
     try{

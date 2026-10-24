@@ -10,5 +10,8 @@
   "gracePmStart": 5,
   "gracePmEnd": 0,
   "dupSeconds": 120,
-  "overtimeMinMinutes": 20
+  "overtimeRuleVersion": 2,
+  "overtimeAfterMinutes": 20,
+  "overtimeBeforeMinutes": 5,
+  "overtimeMinMinutes": 5
 }

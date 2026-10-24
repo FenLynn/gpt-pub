@@ -90,9 +90,9 @@ module.exports=async({browser,out,root})=>{
    const e=__r87Employee,checks={};__r87Seed([['08:25','进'],['19:00','出']]);
    state.manualOvertime=[{id:'manual-overtime:'+e.id+':test',employeeId:e.id,date:'2026-10-08',start:'18:00',end:'19:30'}];
    state.overtimeEntries=[{id:'reg1',employeeId:e.id,date:'2026-10-08',start:'18:15',end:'18:45'}];reanalyze();
-   let ledger=asStatLedger();checks.unionNoDouble=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-140/60)<1e-8;
+   let ledger=asStatLedger();checks.unionNoDouble=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-215/60)<1e-8;
    const id=state.manualOvertime[0].id;setAutoOvertimeDecision(id,false);ledger=asStatLedger();
-   checks.exclusionRestoresAuto=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-110/60)<1e-8;
+   checks.exclusionRestoresAuto=Math.abs(asStatValue(ledger,'overtime','hours',[e],[8])-185/60)<1e-8;
    __r87Seed([]);state.manualOvertime=[{id:'manual-overtime:'+e.id+':night',employeeId:e.id,date:'2026-10-08',start:'23:00',end:'02:00'}];reanalyze();
    checks.crossnight=activeAutoOvertimeSegments(state.analysis.get(e.id+'|8'))[0].minutes===60&&activeAutoOvertimeSegments(state.analysis.get(e.id+'|9'))[0].minutes===120;
    __r87Seed([['08:25','进'],['10:00','出'],['10:20','进'],['17:10','出']]);

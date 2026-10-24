@@ -9,7 +9,7 @@ state.groupCatalog.push('极端测试组');
 function p109ExtremeDemo(data){
  const people=EMPLOYEES.filter(e=>e.demoExtreme),ids=new Set(people.map(e=>e.id));
  for(const key of ['leaves','trips','outings','overtimeEntries'])data[key]=data[key].filter(r=>!ids.has(r.employeeId));
- const base=[['08:20:00','进'],['11:40:30','出'],['13:25:00','进'],['17:10:00','出']],cases=[];
+ const base=[['08:30:00','进'],['11:40:30','出'],['13:30:00','进'],['17:10:00','出']],cases=[];
  const set=(id,day,events,label)=>{cases.push({id,day,events,label})};
  const mid=enter=>[base[0],['10:00:00','出'],[enter,'进'],...base.slice(1)];
  set('E041',8,[...base,['21:00:00','进']],'隔夜连续：21:00–次日02:15');
@@ -17,7 +17,10 @@ function p109ExtremeDemo(data){
  set('E042',12,[...base,['21:30:00','进']],'登记隔夜与推算扣重');
  set('E042',13,[['02:10:00','出'],...base],'登记隔夜与推算扣重');
  data.overtimeEntries.push(overtimeEntry('E042',12,'22:00','02:00','极端测试','登记隔夜，与实际会话扣重'));
- for(const [day,time,label] of [[8,'17:30:00','加班恰好20分钟'],[9,'17:29:59','加班不足20分钟差1秒'],[12,'17:30:01','加班超过门槛1秒']])set('E043',day,[...base.slice(0,3),[time,'出']],label);
+ for(const [day,time,label] of [[8,'17:30:00','班后恰好20分钟，缓冲内'],[9,'17:29:59','班后缓冲未结束，差1秒'],[12,'17:30:01','班后缓冲后仅1秒，未达最低时长']])set('E043',day,[...base.slice(0,3),[time,'出']],label);
+ for(const [day,time,label] of [[13,'17:35:00','扣20分钟后恰好5分钟'],[14,'17:34:59','有效加班不足5分钟差1秒'],[15,'17:35:01','有效加班超过5分钟1秒']])set('E043',day,[...base.slice(0,3),[time,'出']],label);
+ set('E043',19,[...base,['18:18:00','进'],['18:27:00','出'],['18:35:00','进'],['19:16:00','出']],'独立9分钟与41分钟均纳入');
+ for(const [day,time] of [[20,'08:24:00'],[21,'08:26:00']])set('E043',day,[[time,'进'],...base.slice(1)],'班前6分钟达标，4分钟不达标');
  for(const [day,time,label] of [[8,'10:12:00','临时外出恰好12分钟'],[9,'10:12:01','临时外出超过12分钟1秒'],[12,'10:11:59','临时外出不足12分钟1秒']])set('E044',day,mid(time),label);
  set('E044',13,mid('10:20:00'),'20分钟临时外出由报备完整覆盖');
  data.outings.push(outing('E044',13,13,'09:55','10:25','极端测试报备','完整覆盖20分钟外出，以报备为准'));
@@ -35,6 +38,9 @@ function p109ExtremeDemo(data){
  set('E048',12,[base[0],['10:00:00','出'],['10:10:00','未标注'],['10:20:00','进'],...base.slice(1)],'未知方向打断临时外出配对');
  for(const [day,time] of [[8,'23:50:00'],[19,'23:50:01']]){
   set('E049',day,[...base,[time,'进']],'跨午夜20分钟秒级门槛');set('E049',day+1,[['00:10:00','出'],...base],'跨午夜会话下半段');
+ }
+ for(const [day,end] of [[22,'00:03:00'],[26,'00:02:00']]){
+  set('E049',day,[...base,['23:58:00','进']],'跨午夜最低5分钟边界');set('E049',day+1,[[end,'出'],...base],'跨午夜最低5分钟边界下半段');
  }
  set('E050',8,[base[0],...Array.from({length:120},(_,i)=>[attendanceClock(540+i/6),i%2?'进':'出']),...base.slice(1)],'120次交替打卡，60次10秒外出');
  set('E050',9,[['06:30:00','进'],...base.slice(1,3),['23:20:00','出']],'默认范围向两侧扩展');

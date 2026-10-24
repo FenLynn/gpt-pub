@@ -6,7 +6,7 @@ function rememberMonth(){
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,
     imports:state.imports,saved:state.saved,outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',
-    rules:{...RULES},prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
+    rules:{...RULES},overtimeRuleContexts:structuredClone(state.overtimeRuleContexts||{}),prefs:{...state.prefs},importProfile:structuredClone(r62ImportProfile()),
     attendanceReview:{...(state.attendanceReview||{})},tempOutingReview:{...(state.tempOutingReview||{})},manualTempOutings:structuredClone(state.manualTempOutings||[]),manualOvertime:structuredClone(state.manualOvertime||[]),
     calendarOverrides:{...(state.snapshotContext||state.activeBranch?state.calendarOverrides:{}),...p109CalendarMonthValues(YEAR,MONTH,state.calendarOverrides,!state.snapshotContext&&!state.activeBranch)},snapshotContext:!!state.snapshotContext,activeBranch:state.activeBranch?.month===monthKey()?{...state.activeBranch}:null
   });
@@ -50,10 +50,12 @@ function switchMonth(year,month,create=false,preserveCurrent=true,internal=false
   state.imports=next.imports;state.saved=next.saved;
   state.activeBranch=next.activeBranch||null;
   state.snapshotContext=!!next.snapshotContext;
+  state.overtimeRuleContexts=structuredClone(next.overtimeRuleContexts||{});
   state.attendanceReview={...(next.attendanceReview||{})};state.tempOutingReview={...(next.tempOutingReview||{})};state.manualTempOutings=structuredClone(next.manualTempOutings||[]);state.manualOvertime=structuredClone(next.manualOvertime||[]);
   state.outings=next.outings||[];state.overtimeEntries=next.overtimeEntries||[];state.manualStatuses={...(next.manualStatuses||{})};state.overtimeReview={...(next.overtimeReview||{})};state.judgmentMode=next.judgmentMode==='manual'&&hasManualStatuses()?'manual':'initial';
-  Object.assign(RULES,P109_DEFAULT_RULES,next.rules||{});
-  RULES.overtimeMinMinutes=Math.max(20,Number(RULES.overtimeMinMinutes)||20);
+  const overtimeRules=p109NormalizeOvertimeRules(next.rules||P109_DEFAULT_RULES,next.snapshotContext);
+  if(next.rules&&JSON.stringify(overtimeRules)!==JSON.stringify(next.rules))state.saved=false;
+  Object.assign(RULES,P109_DEFAULT_RULES,overtimeRules);
   if(next.rules&&next.rules.graceAmStart==null)RULES.graceAmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.gracePmStart==null)RULES.gracePmStart=Number(next.rules.grace??5);
   if(next.rules&&next.rules.graceAmEnd==null)RULES.graceAmEnd=0;

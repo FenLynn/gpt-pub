@@ -511,19 +511,41 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
   report.r88UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r88Working)&&fs.readFileSync(oldRawPath).equals(r88Raw);
   await open();report.r88Migration=await page.evaluate(()=>state.manualTempOutings.length===2&&state.manualTempOutings.every(row=>state.tempOutingReview[row.id]==='red')&&dayType(1)==='rest'&&dayType(10)==='work'&&!state.saved);
+  const r92Commit='fe04503b389c1fda805f9a1ed14289efcd35ed4c';
+  const installR92=()=>{
+   const listing=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r92Commit,'--',projectPath],{encoding:'utf8'});
+   if(listing.status!==0)throw Error('R92 source listing unavailable');
+   for(const file of listing.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+    const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r92Commit+':'+file],{maxBuffer:16*1024*1024});
+    if(source.status!==0)throw Error('Cannot read R92 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+   }
+  };
+  installR92();await open();
+  report.r92OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.18-preview'&&state.records.length===2&&!!state.projectDir);
+  await page.evaluate(async()=>{delete RULES.overtimeRuleVersion;delete RULES.overtimeAfterMinutes;delete RULES.overtimeBeforeMinutes;RULES.overtimeMinMinutes=20;state.saved=false;rememberMonth();await saveWorking();p109RememberProgram(null)});
+  const r92Working=fs.readFileSync(oldWorkingPath),r92Raw=fs.readFileSync(oldRawPath);
+  await page.locator('#importBtn').click();const r92Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await(await r92Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(v=>document.querySelector('#p109UpdateVersion')?.textContent.includes(v),currentVersion);
+  await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
+  report.r92UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r92Working)&&fs.readFileSync(oldRawPath).equals(r92Raw);
+  await open();report.r92Migration=await page.evaluate(()=>RULES.overtimeRuleVersion===2&&RULES.overtimeAfterMinutes===20&&RULES.overtimeBeforeMinutes===5&&RULES.overtimeMinMinutes===5&&state.manualTempOutings.length===2&&!state.saved);
   await page.evaluate(async()=>{
    state.manualOvertime=[{id:'manual-overtime:legacy-test',employeeId:EMPLOYEES[0].id,date:'2026-10-08',start:'18:00',end:'19:00'}];
    state.saved=false;rememberMonth();await saveWorking();
   });
-  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===4;
+  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===5;
   installR86();await open();
   report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
   installR88();await open();
   report.r88RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
+  installR92();await open();report.r92RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
 
   const requiredTrue=[
    'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasCurrentSchema','oldProgramRejectsNewSchema',
    'r88OldVersionBoot','r88UpgradePreservesBytes','r88Migration','r88RejectsNewSchema',
+   'r92OldVersionBoot','r92UpgradePreservesBytes','r92Migration','r92RejectsNewSchema',
    'r83OldVersionBoot','r83UpdatePreservesData','r83UpdateReload',
    'r77ImportedAttendanceFlags','r77OvertimeAndEarlyCoexist','r77ManualKeepsEvidence',
    'unzippedFileBoot','emptyNewMonth','singleRawImportCopy','snapshotStartsWithoutManualOverride',
