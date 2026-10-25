@@ -556,6 +556,23 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.saved=false;rememberMonth();await saveWorking();
   });
   report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===6;
+  const r94Commit='c16d468cf3f879599203c7ffbd244ae07c32f360';
+  const listingR94=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r94Commit,'--',projectPath],{encoding:'utf8'});
+  if(listingR94.status!==0)throw Error('R94 source listing unavailable');
+  for(const file of listingR94.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+   const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r94Commit+':'+file],{maxBuffer:16*1024*1024});
+   if(source.status!==0)throw Error('Cannot read R94 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+  }
+  await open();report.r94OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.20-preview'&&!!state.projectDir&&RULES.businessRuleVersion===2);
+  await page.evaluate(async()=>{state.saved=false;rememberMonth();await saveWorking();p109RememberProgram(null)});
+  const r94Working=fs.readFileSync(oldWorkingPath),r94Raw=fs.readFileSync(oldRawPath);
+  await page.locator('#importBtn').click();const r94Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await(await r94Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(v=>document.querySelector('#p109UpdateVersion')?.textContent.includes(v),currentVersion);
+  await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
+  report.r94UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r94Working)&&fs.readFileSync(oldRawPath).equals(r94Raw);
+  await open();report.r94ReopensWithoutMigration=await page.evaluate(v=>P109_APP_VERSION===v&&!!state.projectDir&&state.saved&&RULES.businessRuleVersion===2,currentVersion);
   installR86();await open();
   report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
   installR88();await open();
@@ -565,6 +582,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   installR93();await open();report.r93RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
 
   const requiredTrue=[
+   'r94OldVersionBoot','r94UpgradePreservesBytes','r94ReopensWithoutMigration',
    'r93OldVersionBoot','r93UpgradePreservesBytes','r93Migration','r93RejectsNewSchema',
    'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasCurrentSchema','oldProgramRejectsNewSchema',
    'r88OldVersionBoot','r88UpgradePreservesBytes','r88Migration','r88RejectsNewSchema',

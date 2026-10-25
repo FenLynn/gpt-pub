@@ -21,10 +21,10 @@ function downloadCurrentCSV(){
 }
 const P109_IMPORT_TEMPLATES={
  attendance:['考勤记录',['姓名','打卡时间','进出']],
- leave:['请假',['姓名','日期','开始时间','结束时间','类型','备注']],
+ leave:['请假',['姓名','开始日期','开始时间','结束日期','结束时间','类型','备注']],
  trip:['出差',['姓名','开始日期','结束日期','类型','地点','备注']],
  outing:['外出',['姓名','开始日期','结束日期','开始时间','结束时间','类型','地点','备注']],
- overtime:['登记加班',['姓名','日期','开始时间','结束时间','类型','备注']]
+ overtime:['登记加班',['姓名','开始日期','开始时间','结束日期','结束时间','类型','备注']]
 };
 function downloadBlankTemplate(kind){
  const template=P109_IMPORT_TEMPLATES[kind];if(!template)return;
@@ -39,17 +39,20 @@ function exportCurrentTable(){
  toast('已导出当前统计 XLSX');
 }
 function downloadAttendance(){downloadBlob(XLSX.writeXlsx(state.records.map(r=>({姓名:r.name,打卡时间:r.datetime,进出:r.direction})),'考勤'),'考勤_'+monthKey()+'.xlsx')}
-function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
+function downloadLeaves(){downloadBlob(XLSX.writeXlsx(state.leaves.map(r=>({姓名:r.name,开始日期:r.date,开始时间:r.start,结束日期:r.date,结束时间:r.end,类型:r.type,备注:r.note})),'请假'),'请假_'+monthKey()+'.xlsx')}
 function downloadTrips(){downloadBlob(XLSX.writeXlsx(state.trips.map(r=>({姓名:r.name,开始日期:r.startDate,结束日期:r.endDate,类型:r.type,地点:r.place,备注:r.note})),'出差'),'出差_'+monthKey()+'.xlsx')}
 function downloadOutings(){
- const rows=state.outings.map(r=>({姓名:r.name,开始日期:r.startDate||r.date,结束日期:r.endDate||r.date,
-  开始时间:r.start,结束时间:r.end,类型:r.type,地点:r.place,备注:r.note}));
+ const rows=state.outings.flatMap(r=>Array.from({length:monthDays()},(_,i)=>isoDate(i+1))
+  .filter(date=>date>=(r.startDate||r.date)&&date<=(r.endDate||r.date))
+  .map(date=>({姓名:r.name,开始日期:date,结束日期:date,开始时间:r.start,结束时间:r.end,类型:r.type,地点:r.place,备注:r.note})));
  if(!rows.length)rows.push({姓名:'',开始日期:'',结束日期:'',开始时间:'',结束时间:'',类型:'',地点:'',备注:''});
  downloadBlob(XLSX.writeXlsx(rows,'外出'),'外出_'+monthKey()+'.xlsx');
 }
 function downloadOvertimeEntries(){
- const rows=state.overtimeEntries.map(r=>({姓名:r.name,日期:r.date,开始时间:r.start,结束时间:r.end,类型:r.type,备注:r.note}));
- if(!rows.length)rows.push({姓名:'',日期:'',开始时间:'',结束时间:'',类型:'',备注:''});
+ const rows=state.overtimeEntries.map(r=>({姓名:r.name,开始日期:r.date,开始时间:r.start,
+  结束日期:attendanceDateFromMinute(attendanceUtcMinute(r.date,r.end)+(minutes(r.end)<minutes(r.start)?1440:0)),
+  结束时间:minutes(r.end)===1440?'00:00:00':r.end,类型:r.type,备注:r.note}));
+ if(!rows.length)rows.push({姓名:'',开始日期:'',开始时间:'',结束日期:'',结束时间:'',类型:'',备注:''});
  downloadBlob(XLSX.writeXlsx(rows,'加班'),'登记加班_'+monthKey()+'.xlsx');
 }
 function judgmentChinese(k){return ({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'})[k]||k}

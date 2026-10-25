@@ -63,7 +63,8 @@
     if(!rows.length)return {sheet:first.getAttribute('name')||'Sheet1',rows:[]};
     const headers=rows[0].map(x=>String(x??'').trim());
     const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;return obj;});
-    return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects,rawRows:rows.map(r=>({cells:Array.from(r),rowNumber:r.__rowNumber}))};
+    const date1904=['1','true'].includes(xmlElements(wbDoc,'workbookPr')[0]?.getAttribute('date1904'));
+    return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects,date1904,rawRows:rows.map(r=>({cells:Array.from(r),rowNumber:r.__rowNumber}))};
   }
   function parseCsvText(text){
     const rows=[]; let row=[], cur='', q=false;
@@ -107,7 +108,7 @@
     const name=file.name.toLowerCase();
     if(name.endsWith('.xlsx')){
       const table=await readXlsx(file);
-      return {sheet:table.sheet,rows:table.rawRows||[],encoding:'xlsx'};
+      return {sheet:table.sheet,rows:table.rawRows||[],date1904:!!table.date1904,encoding:'xlsx'};
     }
     if(!name.endsWith('.csv'))throw new Error('请选择 .xlsx 或 .csv 文件');
     const bytes=await file.arrayBuffer();let text='';

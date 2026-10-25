@@ -78,10 +78,10 @@ function p109ShowHelp(section,topic){
 function p109GuideSampleRows(kind){
  const {DATE,NEXTDATE}=p109GuideDates();
  if(kind==='attendance')return ['教程甲','教程乙'].flatMap((name,index)=>[[index?'09:05:00':'08:25:00','进'],['11:45:00','出'],['13:25:00','进'],['17:15:00','出']].map(([time,direction])=>({姓名:name,打卡时间:DATE+' '+time,进出:direction})));
- if(kind==='leave')return [{姓名:'教程乙',日期:DATE,开始时间:'08:30',结束时间:'11:40',类型:'事假',备注:'虚构教程数据'}];
+ if(kind==='leave')return [{姓名:'教程乙',开始日期:DATE,开始时间:'08:30',结束日期:NEXTDATE,结束时间:'11:40',类型:'事假',备注:'虚构教程数据'}];
  if(kind==='trip')return [{姓名:'教程甲',开始日期:DATE,结束日期:NEXTDATE,类型:'出差',地点:'示例地点',备注:'虚构教程数据'}];
  if(kind==='outing')return [{姓名:'教程乙',开始日期:DATE,结束日期:DATE,开始时间:'14:00',结束时间:'15:00',类型:'外出',地点:'示例地点',备注:'虚构教程数据'}];
- if(kind==='overtime')return [{姓名:'教程甲',日期:DATE,开始时间:'18:00',结束时间:'19:00',类型:'登记加班',备注:'虚构教程数据'}];
+ if(kind==='overtime')return [{姓名:'教程甲',开始日期:DATE,开始时间:'22:00',结束日期:NEXTDATE,结束时间:'02:00',类型:'登记加班',备注:'虚构教程数据'}];
  return [];
 }
 function p109GuideDownloadSample(kind){

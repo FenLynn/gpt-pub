@@ -44,7 +44,7 @@ module.exports=async({browser,out,root})=>{
     state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];
     state.overtimeReview={};state.monthStores=new Map();YEAR=2026;MONTH=10;
     const period=p109ImportPeriod('2026-10'),base={姓名:employee.name,日期:'2026-10-08',开始时间:'22:00',结束时间:'02:00'};
-    result.registeredParser=p109ParseBusinessRow('overtime',base,0,period).end==='02:00';
+    result.registeredParser=minutes(p109ParseBusinessRow('overtime',base,0,period).end)===120;
     for(const kind of ['leave','outing']){
      try{
       const row=kind==='outing'?{姓名:employee.name,开始日期:'2026-10-08',开始时间:'22:00',结束时间:'02:00'}:base;

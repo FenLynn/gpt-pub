@@ -32,7 +32,7 @@ module.exports=async({browser,out,root})=>{
   await page.locator('#r82GuideSearch').fill('跨日');
   check(await page.locator('[data-guide-link="topics|leave"]').count()>0&&await page.locator('[data-guide-link="topics|overtime"]').count()>0,'full-text search finds different cross-day business rules');
   await page.locator('[data-guide-link="topics|leave"]').click();
-  check((await page.locator('#r81HelpArticle').textContent()).includes('请假向导没有“开始日期、结束日期”两个字段'),'leave tutorial corrects the former unsupported start/end-date claim');
+  check((await page.locator('#r81HelpArticle').textContent()).includes('请假支持开始日期、结束日期，一行可登记连续多天'),'leave tutorial describes supported multi-day start/end fields');
   await page.locator('#r82GuideSearch').fill('<img src=x onerror="window.guideAttack=1">');
   check(await page.locator('#p109HelpOverlay [onerror]').count()===0&&await page.evaluate(()=>!window.guideAttack),'search text is inert rather than executable markup');
   await page.locator('[data-guide-clear]').first().click();await page.locator('[data-help-topic="storage"]').click();
@@ -45,7 +45,7 @@ module.exports=async({browser,out,root})=>{
   await page.locator('[data-help-topic="overtime"]').click();await page.locator('[data-help-section="start"]').click();await page.locator('[data-help-lesson="project"]').click();
   check(await contentSnapshot()===beforeRead,'reading and navigation do not mutate business records or rules');
   const manualEvent=page.waitForEvent('download');await page.locator('#r82GuideExport').click();const manual=await manualEvent,manualText=fs.readFileSync(await manual.path(),'utf8');
-  check(!/<script\b|<img\b|https?:\/\//i.test(manualText)&&manualText.includes('按症状处理')&&manualText.includes('单日与多日拆分')&&manualText.includes('manual-start-project'),'downloaded detailed manual is readable offline and includes both tutorial tracks');
+  check(!/<script\b|<img\b|https?:\/\//i.test(manualText)&&manualText.includes('按症状处理')&&manualText.includes('单日与多日范围')&&manualText.includes('manual-start-project'),'downloaded detailed manual is readable offline and includes both tutorial tracks');
   fs.writeFileSync(path.join(out,'R82-详细教程.html'),manualText);
   await page.keyboard.press('Escape');
   for(const [kind,count] of [['attendance',8],['leave',1],['trip',1],['outing',1],['overtime',1]]){
@@ -57,8 +57,8 @@ module.exports=async({browser,out,root})=>{
    check(g.ratio>.8&&g.ratio<.91&&g.bottom<=g.height+1&&g.button<=g.height,'import preview is wide and its commit action stays on screen: '+kind);
    await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   }
-  check(await page.evaluate(()=>EMPLOYEES.length===2&&!state.isDemo&&state.records.length===8&&state.leaves.length===1&&state.trips.length===1&&state.outings.length===1&&state.overtimeEntries.length===1&&state.imports.length===5),'all five tutorial downloads import as described into an empty Work session');
-  check(await page.evaluate(()=>{const d=p109GuideDates().DATE,p=p109ImportPeriod(),base={姓名:'教程甲',日期:d,开始时间:'22:00',结束时间:'02:00'};let leaveRejected=false,outingRejected=false;try{p109ParseBusinessRow('leave',base,0,p)}catch(_){leaveRejected=true}try{p109ParseBusinessRow('outing',{姓名:'教程甲',开始日期:d,开始时间:'22:00',结束时间:'02:00'},0,p)}catch(_){outingRejected=true}return leaveRejected&&outingRejected&&p109ParseBusinessRow('overtime',base,0,p).end==='02:00'}),'documented cross-night differences agree with the actual leave/outing/overtime parsers');
+  check(await page.evaluate(()=>EMPLOYEES.length===2&&!state.isDemo&&state.records.length===8&&state.leaves.length===2&&state.trips.length===1&&state.outings.length===1&&state.overtimeEntries.length===2&&state.imports.length===5),'all five tutorial downloads import as described, including multi-day leave and midnight overtime slices');
+  check(await page.evaluate(()=>{const d=p109GuideDates().DATE,p=p109ImportPeriod(),base={姓名:'教程甲',日期:d,开始时间:'22:00',结束时间:'02:00'};let leaveRejected=false,outingRejected=false;try{p109ParseBusinessRow('leave',base,0,p)}catch(_){leaveRejected=true}try{p109ParseBusinessRow('outing',{姓名:'教程甲',开始日期:d,开始时间:'22:00',结束时间:'02:00'},0,p)}catch(_){outingRejected=true}return leaveRejected&&outingRejected&&minutes(p109ParseBusinessRow('overtime',base,0,p).end)===120}),'documented cross-night differences agree with the actual leave/outing/overtime parsers');
   await page.evaluate(()=>r69NavigateData('storage'));await page.waitForSelector('.r82-storage-locations');
   check(await page.locator('#p109ProgramPath').isVisible(),'both path tools are available in data management storage');
   for(const section of ['overview','roster','records']){

@@ -95,6 +95,8 @@ function p109ImportPeriod(key=monthKey()){
   last:Date.UTC(year,month,1)/60000,end:key+'-'+pad(new Date(year,month,0).getDate())};
 }
 function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
+ if(r.__date1904){r={...r};for(const key of ['开始日期','起始日期','结束日期','截止日期','日期','请假日期','加班日期','startDate','endDate','date','开始日期时间','结束日期时间','startDatetime','endDatetime','打卡时间','datetime','DateTime'])
+  if(typeof r[key]==='number'&&r[key]>=1)r[key]+=1462;delete r.__date1904}
  const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
  if(!name)throw Error('姓名为空');
  const row=sourceRow(r,i),type=String(aliases(r,['类型','假别','事项','type'])||
@@ -110,33 +112,51 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
    throw Error('日期不属于 '+period.key+'（仅允许前后各一天的跨月配对记录）');
   return {name,datetime,time:datetime.slice(11,19),direction:direction||'未标注',row};
  }
- if(kind==='trip'||kind==='outing'){
+ if(kind==='trip'){
   const startDate=r62Date(aliases(r,['开始日期','起始日期','日期','startDate','date'])),
    endDate=r62Date(aliases(r,['结束日期','截止日期','endDate'])||startDate);
   if(!strictISODate(startDate)||!strictISODate(endDate))throw Error('起止日期格式错误');
   if(startDate>endDate)throw Error('结束日期早于开始日期');
   if(startDate>period.end||endDate<period.key+'-01')throw Error('日期范围与 '+period.key+' 无交集');
   const base={name,startDate,endDate,row,type,note,place:String(aliases(r,['地点','目的地','place'])||'')};
-  if(kind==='trip')return base;
-  const start=importClock(aliases(r,['开始时间','开始','start']),''),
-   end=importClock(aliases(r,['结束时间','结束','end']),'');
-  if(!start||!end)throw Error('请填写外出开始和结束时间');
-  if(minutes(end)<=minutes(start))throw Error('外出结束须晚于开始；跨日请拆分');
-  return {...base,start,end};
+  return base;
  }
- const date=r62Date(aliases(r,['日期','请假日期','加班日期','date']));
- if(!strictISODate(date))throw Error('日期格式错误');
- if(!date.startsWith(period.key+'-'))throw Error('日期不属于 '+period.key);
- const start=importClock(aliases(r,['开始时间','开始','start']),kind==='leave'?RULES.amStart:''),
-  end=importClock(aliases(r,['结束时间','结束','end']),kind==='leave'?RULES.pmEnd:'');
- if(!start||!end)throw Error('请填写开始和结束时间');
- if(kind==='leave'&&minutes(end)<=minutes(start))throw Error('请假结束须晚于开始');
- if(kind==='overtime'&&minutes(end)===minutes(start))throw Error('登记加班起止时间相同');
- return {name,date,row,start,end,type,note};
+ const startCombined=aliases(r,['开始日期时间','startDatetime']),endCombined=aliases(r,['结束日期时间','endDatetime']),
+  startValue=aliases(r,['开始日期','起始日期','日期','请假日期','加班日期','startDate','date']),
+  endValue=aliases(r,['结束日期','截止日期','endDate']),
+  startDate=r62Date(startCombined||startValue),endDate=r62Date(endCombined||endValue||startDate);
+ if(!startDate||!endDate)throw Error('起止日期无效或顺序不明确，请使用 YYYY-MM-DD');
+ const clock=(value,fallback,ending)=>{
+  if(value==null||String(value).trim()==='')return fallback;
+  const parsed=r62Time(value,ending);if(!parsed)throw Error('起止时间格式错误');return parsed;
+ };
+ const start=clock(startCombined||aliases(r,['开始时间','开始','start']),kind==='leave'?RULES.amStart:'',false),
+  end=clock(endCombined||aliases(r,['结束时间','结束','end']),kind==='leave'?RULES.pmEnd:'',true);
+ if(!start||!end)throw Error('请选择开始和结束时间列');
+ let from=attendanceUtcMinute(startDate,start),to=attendanceUtcMinute(endDate,end);
+ // Preserve old single-date overtime templates; explicit end dates never roll over silently.
+ if(kind==='overtime'&&!endCombined&&!endValue&&minutes(end)<minutes(start))to+=1440;
+ if(to<=from)throw Error('结束日期时间必须晚于开始日期时间');
+ if(to-from>366*1440)throw Error('单条时间范围超过 366 天，请拆分后导入');
+ if(from>=period.last||to<=period.first)throw Error('日期范围与 '+period.key+' 无交集');
+ return {name,row,type,note,place:String(aliases(r,['地点','目的地','place'])||''),
+  rangeStart:startDate+' '+start,rangeEnd:attendanceDateFromMinute(to)+' '+attendanceClock(to%1440),
+  date:startDate,start,end,importIntervalVersion:1};
+}
+function p109ImportDayRows(kind,row,period){
+ if(!row.importIntervalVersion)return [row];
+ const from=attendanceUtcMinute(row.rangeStart.slice(0,10),row.rangeStart.slice(11)),
+  to=attendanceUtcMinute(row.rangeEnd.slice(0,10),row.rangeEnd.slice(11)),parts=[];
+ for(let day=Math.max(Math.floor(from/1440)*1440,period.first);day<Math.min(to,period.last);day+=1440){
+  const date=attendanceDateFromMinute(day),start=attendanceClock(Math.max(from,day)-day),
+   end=attendanceClock(Math.min(to,day+1440)-day);
+  parts.push({...row,date,start,end,...(kind==='outing'?{startDate:date,endDate:date}:{})});
+ }
+ return parts;
 }
 function p109ParseImportTable(kind,table,period=p109ImportPeriod()){
  const rows=[],failed=[];
- table.rows.forEach((r,i)=>{try{rows.push(p109ParseBusinessRow(kind,r,i,period))}
+ table.rows.forEach((r,i)=>{try{rows.push(...p109ImportDayRows(kind,p109ParseBusinessRow(kind,table.date1904?{...r,__date1904:true}:r,i,period),period))}
   catch(e){failed.push({row:sourceRow(r,i),reason:e.message})}});
  return {rows,failed};
 }
@@ -181,7 +201,7 @@ async function p109ImportBusiness(kind,file,prepared=null){
   prefix={leave:'LI',trip:'TI',outing:'OI',overtime:'OTI'}[kind];
  const out=parsed.map(r=>{
   const employee=plan.byName.get(r.name),identity=kind==='attendance'?
-   {recordId:'import:'+importId+':'+r.row,scenario:'import'}:{id:prefix+'-'+importId+'-'+r.row};
+   {recordId:'import:'+importId+':'+r.row,scenario:'import'}:{id:prefix+'-'+importId+'-'+r.row+(r.importIntervalVersion?'-'+r.date:'')};
   return {...r,...identity,importId,employeeId:employee.id,name:employee.name,
    sourceName:r.name,source:file.name,sheet:table.sheet};
  });

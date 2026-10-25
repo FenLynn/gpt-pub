@@ -44,10 +44,10 @@ module.exports=async({browser,out,root})=>{
   await page.locator('#r62Cancel').click();
   check(await page.evaluate(()=>MONTH===9&&state.records.length===0&&state.imports.length===0),'cancel leaves live month and records intact');
   await upload();await page.locator('#r79UseFileMonth').click();
-  await page.locator('#r62Close').focus();await page.keyboard.press('Shift+Tab');
+  await page.locator('#r79ImportMonth').focus();await page.keyboard.press('Shift+Tab');
   check(await page.evaluate(()=>document.activeElement.id==='r62Commit'),'Shift+Tab stays inside import dialog');
   await page.keyboard.press('Tab');
-  check(await page.evaluate(()=>document.activeElement.id==='r62Close'),'Tab wraps to first import dialog control');
+  check(await page.evaluate(()=>document.activeElement.id==='r79ImportMonth'),'Tab wraps to first import dialog control');
   await page.screenshot({path:path.join(out,'r79-import-ready.png')});
   await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   check(await page.evaluate(async()=>{
