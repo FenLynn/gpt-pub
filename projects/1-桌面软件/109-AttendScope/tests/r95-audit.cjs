@@ -87,6 +87,7 @@ module.exports=async({browser,root,out})=>{
   await page.locator('[data-preview="parsed"]').click();await page.locator('#r62Cancel').click();
   await upload('outing','姓名,开始时间,结束日期,结束时间,地点\n测试甲,2026-10-23 18:00:00,2026-10-25,08:30,地点甲');
   check(await page.evaluate(()=>r62ImportDraft.startMode==='combined'&&r62ImportDraft.endMode==='split'&&r62ImportDraft.validated.rows.length===1),'mixed column layout inferred automatically');
+  check(await page.locator('[data-map="startDatetime"]').evaluate(el=>el.previousElementSibling.getBoundingClientRect().height<24),'combined endpoint label stays on one line in the narrow column');
   await page.screenshot({path:path.join(out,'r95-import-mixed.png')});await page.locator('#r62Cancel').click();
   await upload('overtime','姓名,开始时间,结束时间\n测试甲,2026-10-23 18:00:00,2026-10-24 02:00:00');
   check(await page.evaluate(()=>r62ImportDraft.startMode==='combined'&&r62ImportDraft.endMode==='combined'&&r62ImportDraft.validated.rows.length===1),'combined time headers inferred automatically');

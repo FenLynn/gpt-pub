@@ -229,12 +229,12 @@ function r62PreviewHtml(){
  const label=i=>r62ColumnLabel(i)+' · '+r62Esc(d.header?d.grid.rows[d.skip]?.cells[i]??'':'列 '+(i+1));
  const interval=['leave','outing','overtime'].includes(d.kind);
  const required=key=>['name','datetime','date','time','startDate','startDatetime','endDatetime'].includes(key)||(['start','end'].includes(key)&&['outing','overtime'].includes(d.kind));
- const select=(key,title)=>'<label class="r62-field"><span>'+title+(required(key)?' <b class="r80-required" title="必填">*</b>':'')+'</span><select aria-label="'+title+'" data-map="'+key+'"><option value="-1" '+(d.mapping[key]<0?'selected':'')+'>'+
+ const select=(key,title,display=title)=>'<label class="r62-field"><span>'+display+(required(key)?' <b class="r80-required" title="必填">*</b>':'')+'</span><select aria-label="'+title+'" data-map="'+key+'"><option value="-1" '+(d.mapping[key]<0?'selected':'')+'>'+
   (required(key)?'请选择':d.kind==='leave'&&['start','end'].includes(key)?'无（使用班次'+(key==='start'?'开始':'结束')+'）':key==='endDate'?'无（同开始日期）':'无')+'</option>'+
   cols.map(i=>'<option value="'+i+'" '+(d.mapping[key]===i?'selected':'')+'>'+label(i)+'</option>').join('')+'</select></label>';
  const fields=d.kind==='attendance'?[['name','姓名'],...(d.dateMode==='split'?[['date','日期'],['time','时间']]:[['datetime','打卡时间']]),['direction','进出']]:R62_FIELDS[d.kind];
  const endpoint=side=>'<section class="r95-endpoint"><div><h4>'+(side==='start'?'开始':'结束')+'</h4><select data-endpoint="'+side+'" aria-label="'+(side==='start'?'开始':'结束')+'格式"><option value="split" '+(d[side+'Mode']==='split'?'selected':'')+'>日期 / 时间分列</option><option value="combined" '+(d[side+'Mode']==='combined'?'selected':'')+'>日期时间同列</option></select></div><div class="r62-mapping">'+
-  (d[side+'Mode']==='combined'?select(side+'Datetime',(side==='start'?'开始':'结束')+'日期时间'):
+  (d[side+'Mode']==='combined'?select(side+'Datetime',(side==='start'?'开始':'结束')+'日期时间','日期时间'):
    select(side+'Date',(side==='start'?'开始':'结束')+'日期')+select(side,(side==='start'?'开始':'结束')+'时间'))+'</div></section>';
  const mapping=interval?'<div class="r62-mapping">'+select('name','姓名')+select('type','类型')+'</div>'+endpoint('start')+endpoint('end')+
   '<div class="r62-mapping">'+(d.kind==='outing'?select('place','地点'):'')+select('note','备注')+'</div>':
