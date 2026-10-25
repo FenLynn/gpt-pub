@@ -198,8 +198,8 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.locator('#attendanceInput').setInputFiles({name:'审核门禁.csv',mimeType:'text/csv',
    buffer:Buffer.from('姓名,日期,时间,进出\n测试甲,2026-10-08,08:20,进\n测试甲,2026-10-08,18:00,出')});
   await page.locator('#r79Advanced>summary').click();
-  await page.waitForSelector('#r65SaveTemplate');
-  await page.locator('#r65SaveTemplate').check();
+  await page.waitForSelector('#r96KeepImport');
+  await page.locator('#r96KeepImport').click();
   await page.locator('#r62Validate').click();await page.locator('#r62Commit').click();
   await page.waitForFunction(()=>state.records.length===2&&EMPLOYEES.length===1);
   await page.evaluate(()=>saveWorking());
@@ -573,6 +573,23 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
   report.r94UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r94Working)&&fs.readFileSync(oldRawPath).equals(r94Raw);
   await open();report.r94ReopensWithoutMigration=await page.evaluate(v=>P109_APP_VERSION===v&&!!state.projectDir&&state.saved&&RULES.businessRuleVersion===2,currentVersion);
+  const r95Commit='b35d0aa48fe1464ceb371f292abdf210502e307b';
+  const listingR95=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r95Commit,'--',projectPath],{encoding:'utf8'});
+  if(listingR95.status!==0)throw Error('R95 source listing unavailable');
+  for(const file of listingR95.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+   const dest=path.join(oldRoot,file.slice(projectPath.length)),source=cp.spawnSync('git',['-C',root,'show',r95Commit+':'+file],{maxBuffer:16*1024*1024});
+   if(source.status!==0)throw Error('Cannot read R95 source');fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,source.stdout);
+  }
+  await open();report.r95OldVersionBoot=await page.evaluate(()=>P109_APP_VERSION==='0.2.21-preview'&&!!state.projectDir);
+  await page.evaluate(async()=>{state.importProfile.templates={leave:{header:true,skip:0,mapping:{name:0,startDate:1,start:2,endDate:3,end:4,type:-1,note:-1},labels:['姓名','开始日期','开始时间','结束日期','结束时间'],startMode:'split',endMode:'split'}};state.saved=false;rememberMonth();await saveWorking();p109RememberProgram(null)});
+  const r95Working=fs.readFileSync(oldWorkingPath),r95Raw=fs.readFileSync(oldRawPath);
+  await page.locator('#importBtn').click();const r95Choice=page.waitForEvent('filechooser');await page.locator('#upgradeProjectBtn').click();
+  await(await r95Choice).setFiles({name:'P109-upgrade.zip',mimeType:'application/zip',buffer:fs.readFileSync(releaseZip)});
+  await page.waitForFunction(v=>document.querySelector('#p109UpdateVersion')?.textContent.includes(v),currentVersion);
+  await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>!document.getElementById('p109UpdateInstall').disabled);
+  await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
+  report.r95UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r95Working)&&fs.readFileSync(oldRawPath).equals(r95Raw);
+  await open();report.r95TemplateRestored=await page.evaluate(v=>P109_APP_VERSION===v&&state.saved&&r96SavedImportSettings('leave').mapping.type===-1&&r96SavedImportSettings('leave').startMode==='split',currentVersion);
   installR86();await open();
   report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
   installR88();await open();
@@ -582,6 +599,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   installR93();await open();report.r93RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
 
   const requiredTrue=[
+   'r95OldVersionBoot','r95UpgradePreservesBytes','r95TemplateRestored',
    'r94OldVersionBoot','r94UpgradePreservesBytes','r94ReopensWithoutMigration',
    'r93OldVersionBoot','r93UpgradePreservesBytes','r93Migration','r93RejectsNewSchema',
    'r86OldVersionBoot','r86UpdatePreservesData','r86UpgradeReload','newWorkingHasCurrentSchema','oldProgramRejectsNewSchema',

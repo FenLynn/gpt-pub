@@ -240,7 +240,7 @@ function layoutHtml(){
 }
 
 function importMenuRow(title,input,sample){
-  return `<div class="import-menu-row"><span>${title}</span><div><button type="button" data-open="${input}">导入</button><button type="button" id="${sample}">空白模板</button></div></div>`;
+  return `<div class="import-menu-row" data-drop-kind="${input.replace('Input','')}" title="可将本类 XLSX / CSV 拖到此行"><span>${title}</span><div><button type="button" data-open="${input}">导入</button><button type="button" id="${sample}">空白模板</button></div></div>`;
 }
 
 function bind(){
@@ -249,6 +249,16 @@ function bind(){
   document.getElementById('tripInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'trip'));
   document.getElementById('outingInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'outing'));
   document.getElementById('overtimeInput').onchange=e=>handleFile(e,files=>r80OpenImportFiles(files,'overtime'));
+  document.querySelectorAll('[data-drop-kind]').forEach(row=>{
+   row.ondragover=e=>{if(Array.from(e.dataTransfer?.types||[]).includes('Files')){e.preventDefault();e.dataTransfer.dropEffect='copy';row.classList.add('r96-drop-target')}};
+   row.ondragleave=()=>row.classList.remove('r96-drop-target');
+   row.ondrop=async e=>{
+    e.preventDefault();e.stopPropagation();row.classList.remove('r96-drop-target');const files=[...(e.dataTransfer?.files||[])];
+    if(!r96CheckDropFiles(files))return;
+    document.getElementById('importPopover').classList.remove('open');document.getElementById('importBtn').setAttribute('aria-expanded','false');
+    try{await r80OpenImportFiles(files,row.dataset.dropKind)}catch(err){toast(err.message,true)}
+   };
+  });
 
   const filter=document.getElementById('statusFilter');
   const filterButton=document.getElementById('statusFilterButton');

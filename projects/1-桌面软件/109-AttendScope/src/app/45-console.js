@@ -348,12 +348,12 @@ function r68RulesHtml(){
   '<button class="r68-btn" type="button" data-calendar-editor>打开工作日管理</button>';
 }
 function r68TemplatesHtml(){
- const profile=r62ImportProfile(),templates=profile.templates||{};
- return r68SidebarHeader('导入模板','同列名自动复用映射，不同结构重新识别并可人工指定。')+
+ const profile=r62ImportProfile();
+ return r68SidebarHeader('导入模板','各类独立记忆；列结构变化时重新核对。')+
   '<div class="r68-template-grid">'+[
    ['attendance','考勤打卡'],['leave','请假'],['trip','出差'],['outing','外出'],['overtime','登记加班']
   ].map(([key,title])=>{
-   const t=templates[key];
+   const t=r96SavedImportSettings(key);
    return '<div class="r68-template-row"><div><strong>'+title+'</strong><small>'+
     (t?'已保存列映射 · '+Object.keys(t.mapping||{}).length+' 个字段':'自动识别（尚未固定映射）')+
     '</small></div>'+r68Pill(t?'已配置':'默认',t?'healthy':'neutral')+'</div>';

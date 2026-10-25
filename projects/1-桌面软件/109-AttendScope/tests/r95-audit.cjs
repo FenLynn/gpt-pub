@@ -91,7 +91,7 @@ module.exports=async({browser,root,out})=>{
   await page.screenshot({path:path.join(out,'r95-import-mixed.png')});await page.locator('#r62Cancel').click();
   await upload('overtime','姓名,开始时间,结束时间\n测试甲,2026-10-23 18:00:00,2026-10-24 02:00:00');
   check(await page.evaluate(()=>r62ImportDraft.startMode==='combined'&&r62ImportDraft.endMode==='combined'&&r62ImportDraft.validated.rows.length===1),'combined time headers inferred automatically');
-  await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.locator('#r65SaveTemplate').check();await page.locator('#r62Cancel').click();
+  await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.locator('#r96KeepImport').click();await page.locator('#r62Cancel').click();
   check(await page.evaluate(()=>p109NewPortable()),'real empty portable project initialized');
   await upload('leave',source);await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   check(await page.evaluate(()=>state.leaves.length===5&&new Set(state.leaves.map(r=>r.id)).size===5&&state.leaves.every(r=>r.row===2||r.row===3)),'real import commits unique daily identities and original row provenance');
@@ -100,7 +100,7 @@ module.exports=async({browser,root,out})=>{
   await upload('leave','姓名,开始日期时间,结束日期时间\n测试丙,2026-10-28 09:00:00,2026-10-29 10:00:00');await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   check(await page.evaluate(before=>state.leaves.length===7&&JSON.stringify(state.leaves.slice(0,5))===before,first),'second file merges without changing previous leave rows');
   const night='姓名,开始日期时间,结束日期时间\n测试甲,2026-10-23 18:00:00,2026-10-24 02:00:00';
-  await upload('overtime',night);await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.locator('#r65SaveTemplate').check();await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
+  await upload('overtime',night);await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.locator('#r96KeepImport').click();await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   check(await page.evaluate(()=>{const id=personIdentity('测试甲');return state.overtimeEntries.length===2&&behaviorMinutes(state.analysis.get(id+'|23'),'overtime')===360&&behaviorMinutes(state.analysis.get(id+'|24'),'overtime')===120}),'cross-midnight registered overtime counts six plus two hours despite leave coverage');
   await upload('overtime',night);check(await page.evaluate(()=>r62ImportDraft.startMode==='combined'&&r62ImportDraft.endMode==='combined'&&r62ImportDraft.validated.rows.length===1&&state.overtimeEntries.length===2),'saved combined endpoint mapping reopens correctly without another commit');await page.locator('#r62Cancel').click();
   await upload('outing','姓名,开始日期时间,结束日期时间,地点\n测试甲,2026-10-23 23:00:00,2026-10-25 02:00:00,示例地点');await page.locator('#r62Commit').click();await page.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);

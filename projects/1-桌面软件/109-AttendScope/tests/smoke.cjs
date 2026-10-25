@@ -76,7 +76,7 @@ async function run(){
  await page.locator('#attendanceInput').setInputFiles({name:'新月份.csv',mimeType:'text/csv',
   buffer:Buffer.from('姓名,日期,时间,进出\n新员工甲,2026-12-08,08:25,进\n新员工甲,2026-12-08,11:45,出\n新员工甲,2026-12-08,13:25,进\n新员工甲,2026-12-08,17:25,出')});
  await page.waitForSelector('.r62-overlay',{timeout:30000});
- await check(page,()=>r62ImportDraft.rules.length===2&&!document.querySelector('#r63DirectionDetails').open&&
+ await check(page,()=>r62ImportDraft.rules.length===2&&!document.querySelector('#r96DirectionOverlay')&&document.querySelectorAll('.r96-rule-keywords button').length===2&&
   !document.querySelector('#r63ImportBusy')&&r62PreviewHtml().includes('新员工甲'),
   'R63 compact preview and minimal default rules');
  await page.screenshot({path:path.join(out,'r63-fresh-month-import.png')});
@@ -1974,11 +1974,12 @@ async function run(){
  await require('./r93-audit.cjs')({browser,out,root});
  await require('./r94-audit.cjs')({browser,out,root});
  await require('./r95-audit.cjs')({browser,out,root});
+ await require('./r96-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R95',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R96',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})
