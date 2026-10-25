@@ -34,6 +34,7 @@ module.exports=async({browser,root,out})=>{
    for(const format of ['2026-10-23','2026/10/23','2026.10.23','2026年10月23日','20261023','23/10/2026','10/23/2026'])result['date:'+format]=r62Date(format)==='2026-10-23';
    result.ambiguousRejected=r62Date('03/04/2026')===''&&r62Date('2026-10-230')==='';
    result.badClockRejected=!r62Time('08:60')&&!r62Time('25:00')&&!r62Time('junk 08:30')&&!r62Time('2026-10-23 18:00Z');
+   result.csvNumericMidnight=r62Time('0')==='00:00:00'&&r62Time('1',true)==='24:00:00'&&r62DateTime('46318')==='2026-10-23 00:00:00';
    result.meridians=r62Time('下午 6:00')==='18:00:00'&&r62Time('6:00 PM')==='18:00:00';
    result.legacyLeaveDefaults=parse('leave',{日期:'2026-10-23'}).rows[0]?.start===RULES.amStart+':00';
    result.legacyNightOvertime=parse('overtime',{日期:'2026-10-23',开始时间:'22:00',结束时间:'02:00'}).rows.length===2;

@@ -64,7 +64,7 @@ function r62Date(v){
 function r62Time(v,allowEnd=false){
  const raw=String(v??'').normalize('NFKC').trim();
  if(raw==='')return '';
- if((typeof v==='number'||/^\d*\.\d+$/.test(raw))&&Number.isFinite(+v)){
+ if((typeof v==='number'||/^(?:[01]|\d*\.\d+|\d{5})$/.test(raw))&&Number.isFinite(+v)){
   if(allowEnd&&+v===1)return '24:00:00';
   if(+v<0||(+v>=1&&+v<36526)||+v>=73051)return '';
   const frac=((+v%1)+1)%1,secs=Math.round(frac*86400)%86400;
