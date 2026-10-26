@@ -31,7 +31,7 @@ async function run(){
  await check(page,async()=>{
   const file=new File(['姓名,日期,时间,进出\n李  四,2026/10/20,08:30,进1\n李  四,2026/10/20,19:00,出2\n'],
     'import.csv',{type:'text/csv'});
-  const grid=await XLSX.readGrid(file);
+  const grid=await P109_TABLES.readGrid(file);
   const options=r62InferColumns({...grid,kind:'attendance'},true);
   const oldProfile=state.importProfile;
   const rule=[
@@ -57,8 +57,8 @@ async function run(){
     copy.records[0].employeeId!==copy.employees[0].id||
     copy.manualStatuses[personIdentity('李 四')+'|12']!=='normal')throw Error('R62 name-key migration failed');
   const excelNumber=(Date.UTC(2026,9,20)-Date.UTC(1899,11,30))/86400000;
-  const workbook=XLSX.writeXlsx([{姓名:'李四',日期:excelNumber}]);
-  const xlsx=await XLSX.readGrid(new File([workbook],'serial.xlsx'));
+  const workbook=P109_TABLES.writeXlsx([{姓名:'李四',日期:excelNumber}]);
+  const xlsx=await P109_TABLES.readGrid(new File([workbook],'serial.xlsx'));
   if(!xlsx.rows.length||r62Date(xlsx.rows[1].cells[1])!=='2026-10-20')throw Error('R62 XLSX serial date failed');
   state.importProfile=oldProfile;r62ImportDraft=null;
   const matrix=await captureCurrentImage('matrix');
@@ -87,7 +87,7 @@ async function run(){
  await check(page,()=>MONTH===12&&EMPLOYEES.length===1&&EMPLOYEES[0].name==='新员工甲'&&
   state.analysis.get(EMPLOYEES[0].id+'|8').punches.length===4,'R63 real December import');
  await page.evaluate(()=>switchMonth(2027,1,true));
- await page.evaluate(async()=>{const b=XLSX.writeXlsx([
+ await page.evaluate(async()=>{const b=P109_TABLES.writeXlsx([
   {姓名:'新员工乙',打卡时间:'2027-01-06 08:29:00',进出:'进'},
   {姓名:'新员工乙',打卡时间:'2027-01-06 17:25:00',进出:'出'}]);
   await r62OpenImport(new File([b],'新月份.xlsx'),'attendance');
@@ -1789,9 +1789,9 @@ async function run(){
  // R35: actual large XLSX bytes must round-trip, not just return matching preview fields.
  await check(page,async()=>{
    const rows=Array.from({length:6000},(_,i)=>({姓名:'测试'+i,打卡时间:'2026-10-09 08:31:04',进出:'进',备注:'测试数据'+i}));
-   const file=XLSX.writeXlsx(rows,'批量导出'),raw=await file.arrayBuffer();
+   const file=P109_TABLES.writeXlsx(rows,'批量导出'),raw=await file.arrayBuffer();
    if(raw.byteLength<200000)return false;
-   const parsed=await XLSX.readTable(new File([file],'batch.xlsx'));
+   const parsed=await P109_TABLES.readTable(new File([file],'batch.xlsx'));
    return parsed.rows.length===rows.length&&parsed.rows[5999].姓名==='测试5999'&&parsed.rows[5999].进出==='进';
  },'R35 large XLSX round-trip failed');
  await check(page,()=>{
@@ -1977,11 +1977,12 @@ async function run(){
  await require('./r96-audit.cjs')({browser,out,root});
  await require('./r97-audit.cjs')({browser,out,root});
  await require('./r98-audit.cjs')({browser,out,root});
+ await require('./r99-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R98',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R99',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

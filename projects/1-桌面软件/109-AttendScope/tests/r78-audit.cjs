@@ -132,7 +132,7 @@ module.exports=async function({browser,out,root}){
    if(!await page.locator('#importPopover').evaluate(el=>el.classList.contains('open')))await page.locator('#importBtn').click();
    const pending=page.waitForEvent('download');await page.locator('#'+id).click();const download=await pending;
    const bytes=fs.readFileSync(await download.path());
-   check(await page.evaluate(async({kind,bytes})=>{const grid=await XLSX.readGrid(new File([new Uint8Array(bytes)],'模板.xlsx'));
+   check(await page.evaluate(async({kind,bytes})=>{const grid=await P109_TABLES.readGrid(new File([new Uint8Array(bytes)],'模板.xlsx'));
     return JSON.stringify(grid.rows[0].cells)===JSON.stringify(P109_IMPORT_TEMPLATES[kind][1])&&grid.rows.slice(1).every(r=>r.cells.every(v=>v==null||v===''))}, {kind,bytes:[...bytes]}),'blank '+kind+' template has correct headers and no personnel');
   }
   await page.keyboard.press('Escape');

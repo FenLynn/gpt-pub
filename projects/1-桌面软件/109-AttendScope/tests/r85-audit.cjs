@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),http=require('http'),cp=require('chi
 module.exports=async({browser,out,root})=>{
  root=path.resolve(root);const report={revision:'R85',checks:[]},errors=[];
  const check=(ok,label)=>{assert(ok,label);report.checks.push(label)};
- const update=path.join(out,'r85-compatibility-upgrade.zip'),pack=cp.spawnSync('python3',[path.join(root,'tools/package-release.py'),root,update],{encoding:'utf8'});
+ const update=path.join(out,'r85-compatibility-upgrade.zip'),pack=cp.spawnSync(process.env.P109_PYTHON||'python3',[path.join(root,'tools/package-release.py'),root,update],{encoding:'utf8'});
  if(pack.status!==0)throw Error(pack.stderr);
  const server=http.createServer((req,res)=>{const p=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
   if(!p.startsWith(root+path.sep)){res.writeHead(403);res.end();return}try{res.setHeader('Content-Type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.svg':'image/svg+xml'})[path.extname(p)]||'application/octet-stream');res.end(fs.readFileSync(p))}catch(_){res.writeHead(404);res.end()}});
@@ -48,7 +48,7 @@ module.exports=async({browser,out,root})=>{
   await page.screenshot({path:path.join(out,'r85-portable-environment.png')});
   check(await page.evaluate(async bytes=>{
    const original=state.projectDir,rows=await p109ZipRead(new File([Uint8Array.from(bytes)],'good.zip'));rows.find(f=>f.name.endsWith('state.json')).data[0]^=1;
-   const ok=await p109OpenPortableFile(new File([XLSX.writeArchive(rows)],'corrupt.zip'));
+   const ok=await p109OpenPortableFile(new File([P109_TABLES.writeArchive(rows)],'corrupt.zip'));
    return !ok&&state.projectDir===original&&state.records.length===2;
   },[...fs.readFileSync(filePath)]),'a corrupt project ZIP is rejected without replacing the open project');
   await page.evaluate(async()=>{const parts=p109SourcePath(state.imports[0]),name=parts.pop();let h=state.projectDir;for(const part of parts)h=await existingDir(h,part);await writeFile(h,name,'corrupted original')});
@@ -71,8 +71,8 @@ module.exports=async({browser,out,root})=>{
   await page.evaluate(()=>{window.__objectUrl=URL.createObjectURL;URL.createObjectURL=undefined});
   check(await page.evaluate(()=>p109RescueDownload())===false&&await page.evaluate(()=>p109UnsavedMonths().length>0),'download API unavailable is explicit and never claims work was saved');
   await page.evaluate(()=>{URL.createObjectURL=__objectUrl;if(__subtle)Object.defineProperty(crypto,'subtle',__subtle);else delete crypto.subtle;p109CloseTransfer();window.DecompressionStream=undefined});
-  check(await page.evaluate(()=>!p109Environment().compressedXlsx),'missing XLSX decompression is detected');
-  await upload('10');check(await page.evaluate(()=>state.records.length===2&&state.imports.length===2),'CSV import remains usable without XLSX decompression');
+   check(await page.evaluate(()=>p109Environment().compressedXlsx&&p109Environment().excelImport),'bundled Excel parser remains available without browser decompression');
+   await upload('10');check(await page.evaluate(()=>state.records.length===2&&state.imports.length===2),'CSV import remains usable without browser decompression');
   check(!errors.length,'portable fallback has no runtime errors');
  }finally{await context.close()}
  const native=await browser.newContext({viewport:{width:1366,height:900}}),p=await native.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());

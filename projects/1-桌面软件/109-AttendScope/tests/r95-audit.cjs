@@ -54,16 +54,16 @@ module.exports=async({browser,root,out})=>{
     {name:'xl/_rels/workbook.xml.rels',data:'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'},
     {name:'xl/worksheets/sheet1.xml',data:'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">'+['姓名','开始日期','开始时间','结束日期','结束时间'].map((v,i)=>'<c r="'+String.fromCharCode(65+i)+'1" t="inlineStr"><is><t>'+v+'</t></is></c>').join('')+'</row><row r="2"><c r="A2" t="inlineStr"><is><t>测试日期基准</t></is></c><c r="B2"><v>'+serial+'</v></c><c r="C2"><v>0.75</v></c><c r="D2"><v>'+(serial+2)+'</v></c><c r="E2"><v>'+8.5/24+'</v></c></row></sheetData></worksheet>'}
    ];
-   const file=new File([XLSX.writeArchive(items)],'1904日期系统.xlsx');await r62OpenImport(file,'leave');
+   const file=new File([P109_TABLES.writeArchive(items)],'1904日期系统.xlsx');await r62OpenImport(file,'leave');
    const preview=r62ImportDraft.validated,grid=r62ImportDraft.grid,normalized=p109ParseImportTable('leave',{rows:preview.rows});
-   const direct=p109ParseImportTable('leave',await XLSX.readTable(file));
+   const direct=p109ParseImportTable('leave',await P109_TABLES.readTable(file));
    return {flag:grid.date1904,first:normalized.rows[0].rangeStart,last:normalized.rows.at(-1).rangeEnd,identical:JSON.stringify(normalized)===JSON.stringify(direct)};
   });
   check(epoch.flag&&epoch.first==='2026-10-23 18:00:00'&&epoch.last==='2026-10-25 08:30:00'&&epoch.identical,'1904 Excel workbook dates agree in preview and direct parser');
   await page.locator('#r62Cancel').click();
   const english=await page.evaluate(async()=>{
    const serial=(Date.UTC(2026,9,23)-Date.UTC(1899,11,30))/86400000;
-   await r62OpenImport(new File([XLSX.writeXlsx([{Name:'测试英文',StartDate:serial,StartTime:.75,EndDate:serial+2,EndTime:8.5/24}])],'english.xlsx'),'leave');
+   await r62OpenImport(new File([P109_TABLES.writeXlsx([{Name:'测试英文',StartDate:serial,StartTime:.75,EndDate:serial+2,EndTime:8.5/24}])],'english.xlsx'),'leave');
    const d=r62ImportDraft,parsed=p109ParseImportTable('leave',{rows:d.validated.rows});return d.startMode==='split'&&d.endMode==='split'&&parsed.rows[0]?.rangeStart==='2026-10-23 18:00:00'&&parsed.rows.at(-1)?.rangeEnd==='2026-10-25 08:30:00';
   });check(english,'English split date/time headers never confuse midnight date serials with combined endpoints');await page.locator('#r62Cancel').click();
   await upload('leave','姓名,日期,开始时间,结束时间\n测试甲,2026-10-23,08:30,11:40');
@@ -110,7 +110,7 @@ module.exports=async({browser,root,out})=>{
    const capture=page.waitForEvent('download');await page.evaluate(fn=>window[fn](),fn);const downloaded=await capture;const target=path.join(out,'r95-'+downloaded.suggestedFilename());await downloaded.saveAs(target);downloads.push({fn,target});
    const kind={downloadLeaves:'leave',downloadOutings:'outing',downloadOvertimeEntries:'overtime'}[fn];
    check(await page.evaluate(async({bytes,kind})=>{
-    const file=new File([Uint8Array.from(bytes)],'roundtrip.xlsx'),grid=await XLSX.readGrid(file),parsed=p109ParseImportTable(kind,await XLSX.readTable(file)),source={leave:state.leaves,outing:state.outings,overtime:state.overtimeEntries}[kind];
+    const file=new File([Uint8Array.from(bytes)],'roundtrip.xlsx'),grid=await P109_TABLES.readGrid(file),parsed=p109ParseImportTable(kind,await P109_TABLES.readTable(file)),source={leave:state.leaves,outing:state.outings,overtime:state.overtimeEntries}[kind];
     const signature=r=>JSON.stringify([r.name,r.date||r.startDate,minutes(r.start),minutes(r.end),r.type,r.note||'']);
     return grid.rows[0].cells.includes('开始日期')&&grid.rows[0].cells.includes('结束日期')&&!parsed.failed.length&&parsed.rows.length===source.length&&parsed.rows.every((r,i)=>signature(r)===signature(source[i]));
    },{bytes:[...fs.readFileSync(target)],kind}),'export with explicit dates reimports identical daily coverage '+fn);

@@ -460,7 +460,7 @@ async function p109ZipBuild(files){
  const manifest={schemaVersion:1,projectId:'P109-AttendScope',exportedAt:new Date().toISOString(),
   files:[]};
  for(const f of files)manifest.files.push({path:f.name,bytes:f.data.length,sha256:await p109Hash(f.data)});
- const body=XLSX.writeArchive([...files,{name:'p109-backup-manifest.json',data:JSON.stringify(manifest,null,2)}]);
+ const body=P109_TABLES.writeArchive([...files,{name:'p109-backup-manifest.json',data:JSON.stringify(manifest,null,2)}]);
  return {zip:new Blob([body],{type:'application/zip'}),manifest};
 }
 async function p109ZipRead(file){

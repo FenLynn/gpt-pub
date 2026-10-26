@@ -1,5 +1,6 @@
 (function(global){
   'use strict';
+  const SheetJS=global.XLSX;
   const TD = new TextDecoder('utf-8');
   const TE = new TextEncoder();
   function u16(v,o){return v[o]|(v[o+1]<<8)}
@@ -35,8 +36,12 @@
     return doc;
   }
   function colIndex(ref){let n=0; const m=String(ref||'').match(/^[A-Z]+/i); if(!m)return 0; for(const ch of m[0].toUpperCase())n=n*26+(ch.charCodeAt(0)-64); return n-1}
-  async function readXlsx(file){
-    const zip=await unzip(await file.arrayBuffer());
+  function blobArrayBuffer(blob){
+    if(blob&&typeof blob.arrayBuffer==='function')return blob.arrayBuffer();
+    return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error||new Error('文件读取失败'));reader.onload=()=>resolve(reader.result);reader.readAsArrayBuffer(blob)});
+  }
+  async function readXlsxLite(file){
+    const zip=await unzip(await blobArrayBuffer(file));
     const wb=zip['xl/workbook.xml']; if(!wb) throw new Error('缺少 workbook.xml。');
     let shared=[];
     if(zip['xl/sharedStrings.xml']){
@@ -65,6 +70,29 @@
     const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;return obj;});
     const date1904=['1','true'].includes(xmlElements(wbDoc,'workbookPr')[0]?.getAttribute('date1904'));
     return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects,date1904,rawRows:rows.map(r=>({cells:Array.from(r),rowNumber:r.__rowNumber}))};
+  }
+  async function readWorkbook(file){
+    if(!SheetJS||typeof SheetJS.read!=='function'||!SheetJS.utils?.sheet_to_json){
+      if(/\.xlsx$/i.test(file.name||''))return readXlsxLite(file);
+      throw new Error('当前程序缺少旧版 Excel 解析组件，请重新解压完整程序包。');
+    }
+    let workbook;
+    try{workbook=SheetJS.read(await blobArrayBuffer(file),{type:'array',raw:true,cellDates:false,cellFormula:false,cellHTML:false})}
+    catch(error){
+      if(/\.xlsx$/i.test(file.name||'')){try{return await readXlsxLite(file)}catch(_){} }
+      throw new Error('Excel 文件无法读取：'+(error?.message||'文件格式损坏或已加密'));
+    }
+    const sheetName=workbook.SheetNames?.[0]||'Sheet1',sheet=workbook.Sheets?.[sheetName];
+    if(!sheet)return {sheet:sheetName,headers:[],rows:[],date1904:false,rawRows:[]};
+    let startRow=0;
+    try{if(sheet['!ref'])startRow=SheetJS.utils.decode_range(sheet['!ref']).s.r}catch(_){}
+    const matrix=SheetJS.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
+    const rawRows=matrix.map((cells,index)=>({cells:Array.from(cells||[]),rowNumber:startRow+index+1}))
+      .filter(row=>row.cells.some(value=>value!==undefined&&value!==null&&value!==''));
+    if(!rawRows.length)return {sheet:sheetName,headers:[],rows:[],date1904:!!workbook.Workbook?.WBProps?.date1904,rawRows:[]};
+    const headers=rawRows[0].cells.map(value=>String(value??'').trim());
+    const rows=rawRows.slice(1).map(row=>{const object=Object.fromEntries(headers.map((header,index)=>[header,row.cells[index]??'']));object.__rowNumber=row.rowNumber;return object});
+    return {sheet:sheetName,headers,rows,date1904:!!workbook.Workbook?.WBProps?.date1904,rawRows};
   }
   function parseCsvText(text){
     const rows=[]; let row=[], cur='', q=false;
@@ -106,12 +134,12 @@
   }
   async function readGrid(file,encoding='auto'){
     const name=file.name.toLowerCase();
-    if(name.endsWith('.xlsx')){
-      const table=await readXlsx(file);
-      return {sheet:table.sheet,rows:table.rawRows||[],date1904:!!table.date1904,encoding:'xlsx'};
+    if(/\.xlsx?$/.test(name)){
+      const table=await readWorkbook(file);
+      return {sheet:table.sheet,rows:table.rawRows||[],date1904:!!table.date1904,encoding:name.endsWith('.xls')?'xls':'xlsx'};
     }
-    if(!name.endsWith('.csv'))throw new Error('请选择 .xlsx 或 .csv 文件');
-    const bytes=await file.arrayBuffer();let text='';
+    if(!name.endsWith('.csv'))throw new Error('请选择 .xls、.xlsx 或 .csv 文件');
+    const bytes=await blobArrayBuffer(file);let text='';
     try{text=new TextDecoder(encoding==='auto'?'utf-8':encoding,{fatal:true}).decode(bytes)}
     catch(e){if(encoding!=='auto')throw new Error('无法按指定编码解析 CSV：'+encoding);
       text=new TextDecoder('gb18030').decode(bytes);}
@@ -119,7 +147,7 @@
   }
   async function readTable(file){
     const name=file.name.toLowerCase(); if(name.endsWith('.csv')) {const g=await readGrid(file);const h=g.rows[0]?.cells.map(v=>String(v).trim())||[];return {sheet:'CSV',headers:h,rawRows:g.rows,rows:g.rows.slice(1).map(r=>({...Object.fromEntries(h.map((k,i)=>[k,r.cells[i]??''])),__rowNumber:r.rowNumber}))};}
-    if(name.endsWith('.xlsx')) return readXlsx(file); throw new Error('目前支持 .xlsx 和 .csv。');
+    if(/\.xlsx?$/.test(name)) return readWorkbook(file); throw new Error('目前支持 .xls、.xlsx 和 .csv。');
   }
   const crcTable=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xedb88320^(c>>>1)):(c>>>1);t[n]=c>>>0}return t})();
   function crc32(bytes){let c=0xffffffff;for(const b of bytes)c=crcTable[(c^b)&255]^(c>>>8);return (c^0xffffffff)>>>0}
@@ -141,5 +169,5 @@
       {name:'xl/worksheets/sheet1.xml',data:sheet}
     ]; return zipStore(files);
   }
-  global.AttendScopeXLSX={readTable,readGrid,writeXlsx,parseCsvText,parseDelimited,writeArchive:zipStore};
+  global.AttendScopeXLSX={readTable,readGrid,writeXlsx,parseCsvText,parseDelimited,writeArchive:zipStore,blobArrayBuffer};
 })(window);

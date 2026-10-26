@@ -3,10 +3,10 @@
 'use strict';
 function p109Environment(){
  const supports=fn=>{try{return !!fn()}catch(_){return false}};
- let compressedXlsx=false;try{new DecompressionStream('deflate-raw');compressedXlsx=true}catch(_){}
+ const excelImport=supports(()=>window.XLSX&&typeof window.XLSX.read==='function'&&typeof window.XLSX.utils?.sheet_to_json==='function');
  return {directory:supports(()=>typeof showDirectoryPicker==='function'),hash:typeof p109Digest==='function',nativeHash:supports(()=>globalThis.crypto?.subtle),
   download:supports(()=>typeof URL.createObjectURL==='function'&&'download' in document.createElement('a')),
-  compressedXlsx,clipboard:supports(()=>navigator.clipboard?.writeText),history:supports(()=>globalThis.indexedDB)};
+  excelImport,compressedXlsx:excelImport,clipboard:supports(()=>navigator.clipboard?.writeText),history:supports(()=>globalThis.indexedDB)};
 }
 async function p109PersistOutput(blob,name,parts){
  const root=state.projectDir;
@@ -173,7 +173,7 @@ async function p109NewPortable(){
  const ok=await p109InitializeProject(p109MemoryRoot());if(ok)document.getElementById('p109ModeOverlay')?.remove();return ok;
 }
 function p109EnvironmentHtml(){
- const e=p109Environment(),rows=[['本机缓存',state.projectDir?.cacheSavedAt?new Date(state.projectDir.cacheSavedAt).toLocaleString()+'；不等于独立磁盘备份':'尚未保存项目缓存'],['目录直接保存',e.directory?'支持；实际写入仍需授权':'不可用：保存到本机缓存，下载 ZIP 备份'],['文件下载',e.download?'支持检测；下载后须检查实际文件':'不可用：保留页面并恢复下载/目录权限'],['安全项目包校验',e.nativeHash?'支持原生 SHA-256':'使用兼容 SHA-256 校验'],['压缩 XLSX',e.compressedXlsx?'支持':'请将源表另存 CSV 后导入'],['项目历史',e.history?'支持检测；写入失败时改为手动打开':'请每次手动打开项目包/目录'],['路径复制',e.clipboard?'支持检测；失败后提供手动复制':'使用选中文本手动复制']];
+ const e=p109Environment(),rows=[['本机缓存',state.projectDir?.cacheSavedAt?new Date(state.projectDir.cacheSavedAt).toLocaleString()+'；不等于独立磁盘备份':'尚未保存项目缓存'],['目录直接保存',e.directory?'支持；实际写入仍需授权':'不可用：保存到本机缓存，下载 ZIP 备份'],['文件下载',e.download?'支持检测；下载后须检查实际文件':'不可用：保留页面并恢复下载/目录权限'],['安全项目包校验',e.nativeHash?'支持原生 SHA-256':'使用兼容 SHA-256 校验'],['Excel 导入',e.excelImport?'离线支持 XLS、XLSX，不依赖浏览器 deflate-raw':'表格解析组件缺失，请重新解压完整程序包'],['项目历史',e.history?'支持检测；写入失败时改为手动打开':'请每次手动打开项目包/目录'],['路径复制',e.clipboard?'支持检测；失败后提供手动复制':'使用选中文本手动复制']];
  return '<section class="r82-storage-locations p109-environment"><h3>环境与备用方案</h3><p>当前模式：'+(state.projectDir?.rescue?'救援工作区 · 缺少原件及未加载的冻结':state.projectDir?.__p109Portable?'便携项目 · 保存到本机缓存，下载 ZIP 另存备份':state.projectDir?'本地目录':'临时工作区')+'</p><table><tbody>'+rows.map(([a,b])=>'<tr><th>'+a+'</th><td>'+b+'</td></tr>').join('')+'</tbody></table><p class="p109-transfer-actions"><button id="p109EnvPortable">下载完整项目包</button> <button id="p109EnvOpen">打开项目 ZIP / JSON</button> <button id="p109EnvRescue">救援 JSON</button></p><p>清理浏览器缓存、换浏览器或程序位置后，缓存可能不可用；请定期下载带时间戳的项目 ZIP。升级不能写程序目录时，请将新版程序完整解压到可写的新目录，再打开项目包。</p></section>';
 }
 document.addEventListener('click',e=>{

@@ -52,6 +52,8 @@ jobs:
           test -f "$APP/src/vendor/tabulator.min.js"
           test -f "$APP/src/vendor/tabulator.min.css"
           test -f "$APP/src/vendor/TABULATOR-LICENSE.txt"
+          test -f "$APP/src/vendor/xlsx.full.min.js"
+          test -f "$APP/src/vendor/SHEETJS-LICENSE.txt"
           test -f "$APP/src/app/35-workbench.js"
           test -f "$APP/src/app/25-echarts.js"
           test -f "$APP/tests/smoke.cjs"
@@ -64,16 +66,22 @@ jobs:
           node --check "projects/1-桌面软件/109-AttendScope/src/core/xlsx-lite.js"
           node --check "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           node --check "projects/1-桌面软件/109-AttendScope/src/vendor/tabulator.min.js"
+          node --check "projects/1-桌面软件/109-AttendScope/src/vendor/xlsx.full.min.js"
           grep -q "Tabulator v6.3.1" "projects/1-桌面软件/109-AttendScope/src/vendor/tabulator.min.js"
           for f in projects/1-桌面软件/109-AttendScope/src/app/*.js; do node --check "$f"; done
           node --check "projects/1-桌面软件/109-AttendScope/tests/smoke.cjs"
           grep -q "./src/vendor/tabulator.min.js" "projects/1-桌面软件/109-AttendScope/index.html"
+          grep -q "./src/vendor/xlsx.full.min.js" "projects/1-桌面软件/109-AttendScope/index.html"
           node - <<'NODE'
           const e=require('./projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
           if(e.version!=='6.1.0'||typeof e.init!=='function')throw Error('Local ECharts invalid');
           NODE
           grep -q 'series.custom' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
           grep -q 'dataZoom.slider' "projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js"
+          node - <<'NODE'
+          const x=require('./projects/1-桌面软件/109-AttendScope/src/vendor/xlsx.full.min.js');
+          if(x.version!=='0.20.3'||typeof x.read!=='function'||typeof x.utils.sheet_to_json!=='function')throw Error('Local SheetJS invalid');
+          NODE
       - name: Install CJK fonts for accurate visual screenshots
         timeout-minutes: 5
         shell: bash

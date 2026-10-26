@@ -36,7 +36,7 @@ module.exports=async({browser,out,root})=>{
   check((await page.locator('#r80FileBody').textContent()).includes('project.json'),'header project link opens actual authorized directory contents');
   await page.locator('#r80FilesClose').click();
   const trip1=csv('出差1.csv','姓名,开始日期,地点\n测试甲,2026-10-08,地点甲\n'),
-   trip2={name:'出差2.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(await page.evaluate(async()=>[...new Uint8Array(await XLSX.writeXlsx([
+   trip2={name:'出差2.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(await page.evaluate(async()=>[...new Uint8Array(await P109_TABLES.writeXlsx([
     {姓名:'测试乙',开始日期:'2026-10-10',地点:'地点乙'},{姓名:'测试甲',开始日期:'2026-10-08',地点:'地点甲'}],'出差原件').arrayBuffer())]))};
   await upload('trip',[trip1,trip2]);
   check(await page.evaluate(()=>r62ImportDraft.mapping.endDate===-1&&r62ImportDraft.validated.rows.length===1&&

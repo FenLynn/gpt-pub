@@ -124,11 +124,11 @@ module.exports=async({browser,out,root})=>{
    'Excel serial seconds and explicit split-date/time inference preserve exact time');
   check(await page.evaluate(async()=>{
    const value=(Date.UTC(2026,9,27,19)-Date.UTC(1899,11,30))/86400000,
-    items=await p109ZipRead(new File([XLSX.writeXlsx([{姓名:'命名空间测试',打卡时间:value,进出:'进'}])],'source.xlsx'));
+    items=await p109ZipRead(new File([P109_TABLES.writeXlsx([{姓名:'命名空间测试',打卡时间:value,进出:'进'}])],'source.xlsx'));
    for(const item of items)if(item.name.endsWith('.xml')||item.name.endsWith('.rels')){
     item.data=new TextEncoder().encode(new TextDecoder().decode(item.data).replace('xmlns=','xmlns:x=').replace(/<(\/?)([A-Za-z][\w.-]*)(?=[\s>/])/g,'<$1x:$2'));
    }
-   await r62OpenImport(new File([XLSX.writeArchive(items)],'带命名空间前缀.xlsx'),'attendance');
+   await r62OpenImport(new File([P109_TABLES.writeArchive(items)],'带命名空间前缀.xlsx'),'attendance');
    const ok=r62ImportDraft.validated.rows.length===1&&r62ImportDraft.validated.rows[0]['打卡时间']==='2026-10-27 19:00:00';
    document.getElementById('r62Cancel').click();return ok;
   }),'prefixed workbook, relationships and worksheet XML import with exact numeric timestamp');
@@ -145,7 +145,7 @@ module.exports=async({browser,out,root})=>{
    return box.top>=0&&box.bottom<=innerHeight&&footer.bottom<=innerHeight&&!document.getElementById('r79Advanced').open;
   }),'compact import keeps primary action visible with advanced options collapsed');
   await page.screenshot({path:path.join(out,'r79-import-960.png')});await page.locator('#r62Cancel').click();
-  const zip=path.join(out,'r79-separated-update.zip'),pack=cp.spawnSync('python3',[path.join(root,'tools/package-release.py'),root,zip],{encoding:'utf8'});
+  const zip=path.join(out,'r79-separated-update.zip'),pack=cp.spawnSync(process.env.P109_PYTHON||'python3',[path.join(root,'tools/package-release.py'),root,zip],{encoding:'utf8'});
   if(pack.status!==0)throw Error('Cannot build update fixture: '+pack.stderr);
   check(await page.evaluate(()=>saveWorking()),'save all edited work before updating code');
   check(await page.evaluate(async({bytes,currentVersion})=>{

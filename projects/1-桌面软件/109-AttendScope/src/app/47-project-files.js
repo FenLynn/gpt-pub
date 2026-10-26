@@ -116,7 +116,7 @@ async function p109PreviewFile(panel,file){
  footer.querySelector('button').onclick=()=>downloadBlob(file,file.name);
  if(file.size>40*1024*1024){body.textContent='文件超过 40 MB，请下载后使用本机软件打开。';return}
  if(/\.(csv|xlsx)$/i.test(file.name)){
-  const grid=await XLSX.readGrid(file);if(!p109FilePanelActive(panel))return;
+  const grid=await P109_TABLES.readGrid(file);if(!p109FilePanelActive(panel))return;
   let current=0;const size=100;
   const paint=()=>{
    const rows=grid.rows.slice(current*size,(current+1)*size),width=Math.max(0,...rows.map(r=>r.cells.length));

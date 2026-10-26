@@ -1,9 +1,9 @@
 'use strict';
 const P109_DATA_SCHEMA=7;
-const P109_APP_VERSION='0.2.24-preview';
-const P109_APP_REVISION='R98';
+const P109_APP_VERSION='0.2.25-preview';
+const P109_APP_REVISION='R99';
 const P109_ENGINE_VERSION='R94';
-const XLSX=window.AttendScopeXLSX;
+const P109_TABLES=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;
 function attendTitle(){return String(state?.prefs?.appTitle||'考勤').trim().slice(0,28)||'考勤'}
 function monthKey(){return `${YEAR}-${pad(MONTH)}`}

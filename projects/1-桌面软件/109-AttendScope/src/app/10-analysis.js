@@ -189,7 +189,7 @@ function p109MergeImportRows(kind,previous,incoming){
  return {rows,added,merged};
 }
 async function p109ImportBusiness(kind,file,prepared=null){
- const table=prepared||await XLSX.readTable(file),result=p109ParseImportTable(kind,table);
+ const table=prepared||await P109_TABLES.readTable(file),result=p109ParseImportTable(kind,table);
  if(!result.rows.length)throw Error('没有可导入 '+monthKey()+' 的记录'+
   (result.failed[0]?'：'+result.failed[0].reason:''));
  const parsed=result.rows,plan=importRosterPlan(parsed.map(r=>r.name),kind),

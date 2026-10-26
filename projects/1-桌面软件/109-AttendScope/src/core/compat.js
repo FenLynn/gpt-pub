@@ -31,6 +31,12 @@ if(!Array.prototype.at)Object.defineProperty(Array.prototype,'at',{configurable:
  let i=Math.trunc(Number(index)||0);if(i<0)i+=this.length;return i<0||i>=this.length?undefined:this[i];
 }});
 if(!Object.hasOwn)Object.defineProperty(Object,'hasOwn',{configurable:true,writable:true,value:(object,key)=>Object.prototype.hasOwnProperty.call(object,key)});
+if(typeof Blob!=='undefined'&&!Blob.prototype.arrayBuffer)Object.defineProperty(Blob.prototype,'arrayBuffer',{configurable:true,writable:true,value:function(){
+ return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error||new Error('文件读取失败'));reader.onload=()=>resolve(reader.result);reader.readAsArrayBuffer(this)});
+}});
+if(typeof Blob!=='undefined'&&!Blob.prototype.text)Object.defineProperty(Blob.prototype,'text',{configurable:true,writable:true,value:function(){
+ return this.arrayBuffer().then(buffer=>new TextDecoder('utf-8').decode(buffer));
+}});
 function p109UniqueId(){
  if(globalThis.crypto&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
  return 'p109-'+p109DownloadStamp()+'-'+Math.random().toString(36).slice(2,12);

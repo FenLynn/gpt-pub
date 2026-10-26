@@ -6,7 +6,7 @@ module.exports=async({browser,out,root})=>{
  root=path.resolve(root);
  const report={revision:'R84',nativeStreams:true,externalPickerVerified:false,checks:[]},errors=[];
  const check=(v,label)=>{assert(v,label);report.checks.push(label)};
- const zip=path.join(out,'P109-R84-upgrade.zip'),pack=cp.spawnSync('python3',[path.join(root,'tools/package-release.py'),root,zip],{encoding:'utf8'});
+ const zip=path.join(out,'P109-R84-upgrade.zip'),pack=cp.spawnSync(process.env.P109_PYTHON||'python3',[path.join(root,'tools/package-release.py'),root,zip],{encoding:'utf8'});
  if(pack.status!==0)throw Error(pack.stderr);
  const previous='ef254f113a4e2e7a17b80b7daea6cbda4f402f5f';
  const old=cp.spawnSync('git',['-C',root,'show',previous+':projects/1-桌面软件/109-AttendScope/src/app/00-state.js'],{encoding:'utf8',maxBuffer:1024*1024});
@@ -39,7 +39,7 @@ module.exports=async({browser,out,root})=>{
   },{bytes:[...fs.readFileSync(zip)],old:old.stdout});
   const invalid=await page.evaluate(async()=>{
    const items=await p109ZipRead(__updateFile),td=new TextDecoder(),te=new TextEncoder();
-   const make=mutate=>{const rows=items.map(f=>({...f,data:f.data.slice()})),mf=rows.find(f=>f.name==='p109-release-manifest.json'),m=JSON.parse(td.decode(mf.data));mutate(rows,m);mf.data=te.encode(JSON.stringify(m));return new File([XLSX.writeArchive(rows)],'bad.zip')};
+   const make=mutate=>{const rows=items.map(f=>({...f,data:f.data.slice()})),mf=rows.find(f=>f.name==='p109-release-manifest.json'),m=JSON.parse(td.decode(mf.data));mutate(rows,m);mf.data=te.encode(JSON.stringify(m));return new File([P109_TABLES.writeArchive(rows)],'bad.zip')};
    const results={};
    const reject=async(name,file)=>{try{await p109InspectUpdate(file);results[name]=false}catch(_){results[name]=true}};
    await reject('downgrade',make((rows,m)=>m.appVersion='0.1.0'));

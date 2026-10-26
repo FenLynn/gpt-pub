@@ -63,13 +63,13 @@ module.exports=async({browser,root,out})=>{
   await upload('attendance',attendance.replace('文件导出说明','新的导出说明'),'新的文件名.csv');
   check(await page.evaluate(()=>r62ImportDraft.skip===1&&r62ImportDraft.encoding==='utf-8'&&r62ImportDraft.rules.length===4&&r62ImportDraft.validated.rows.length===2),'last settings restore without matching the old filename');await page.locator('#r62Cancel').click();
   await upload('attendance');await page.locator('#r79Advanced').evaluate(el=>el.open=true);
-  await page.evaluate(()=>{window.__r96ReadGrid=XLSX.readGrid;window.__r96Grid=r62ImportDraft.grid;XLSX.readGrid=()=>new Promise(resolve=>window.__r96ReleaseRead=resolve)});
+  await page.evaluate(()=>{window.__r96ReadGrid=P109_TABLES.readGrid;window.__r96Grid=r62ImportDraft.grid;P109_TABLES.readGrid=()=>new Promise(resolve=>window.__r96ReleaseRead=resolve)});
   await page.locator('#r62Encoding').selectOption('gb18030');
   check(await page.locator('#r62Commit').isDisabled()&&await page.locator('#r96KeepImport').isDisabled(),'pending decoding cannot commit or retain unparsed settings');
-  await page.locator('#r62Cancel').click();await page.evaluate(()=>{XLSX.readGrid=window.__r96ReadGrid;window.__r96ReleaseRead(window.__r96Grid)});await page.waitForFunction(()=>!r63ReadingImport);
+  await page.locator('#r62Cancel').click();await page.evaluate(()=>{P109_TABLES.readGrid=window.__r96ReadGrid;window.__r96ReleaseRead(window.__r96Grid)});await page.waitForFunction(()=>!r63ReadingImport);
   check(await page.locator('.r62-overlay').count()===0&&await page.evaluate(()=>!r62ImportDraft),'cancelled asynchronous decoding cannot reopen the import dialog');
-  await upload('attendance');await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.evaluate(()=>{XLSX.readGrid=async()=>{throw Error('decode failed')}});await page.locator('#r62Encoding').selectOption('gb18030');await page.waitForFunction(()=>!r63ReadingImport);
-  check(await page.evaluate(()=>r62ImportDraft.encoding==='utf-8'&&r62ImportDraft.validated.rows.length===2&&r62ImportDraft.error==='decode failed'),'failed decoding restores the previous encoding and usable preview');await page.evaluate(()=>{XLSX.readGrid=window.__r96ReadGrid});await page.locator('#r62Cancel').click();
+  await upload('attendance');await page.locator('#r79Advanced').evaluate(el=>el.open=true);await page.evaluate(()=>{P109_TABLES.readGrid=async()=>{throw Error('decode failed')}});await page.locator('#r62Encoding').selectOption('gb18030');await page.waitForFunction(()=>!r63ReadingImport);
+  check(await page.evaluate(()=>r62ImportDraft.encoding==='utf-8'&&r62ImportDraft.validated.rows.length===2&&r62ImportDraft.error==='decode failed'),'failed decoding restores the previous encoding and usable preview');await page.evaluate(()=>{P109_TABLES.readGrid=window.__r96ReadGrid});await page.locator('#r62Cancel').click();
   await page.reload();await page.evaluate(()=>p109RecentReady);await page.locator('#r80Demo').click();await upload('attendance');
   check(await page.evaluate(()=>r62ImportDraft.rules.length===4&&r62ImportDraft.skip===1&&r62ImportDraft.validated.rows.length===2),'browser reload preserves independent import preferences');await page.locator('#r62Cancel').click();
   await upload('attendance',attendance.split('\n').slice(1).join('\n'),'没有说明行.csv');

@@ -16,9 +16,9 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   fs.cpSync(path.join(root,name),path.join(staging,name),{recursive:true});
  const archive=path.join(out,'p109-audit-standalone.zip');
  const zipScript="import pathlib,sys,zipfile\nsrc=pathlib.Path(sys.argv[1]);dest=pathlib.Path(sys.argv[2]);\nwith zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED) as z:\n for f in src.rglob('*'):\n  if f.is_file(): z.write(f, '考勤/'+f.relative_to(src).as_posix())\n";
- const makeZip=cp.spawnSync('python3',['-c',zipScript,staging,archive],{encoding:'utf8'});
+ const makeZip=cp.spawnSync(process.env.P109_PYTHON||'python3',['-c',zipScript,staging,archive],{encoding:'utf8'});
  if(makeZip.status!==0)throw Error('R64 zip creation: '+makeZip.stderr);
- const unpack=cp.spawnSync('python3',['-m','zipfile','-e',archive,unzipped],{encoding:'utf8'});
+ const unpack=cp.spawnSync(process.env.P109_PYTHON||'python3',['-m','zipfile','-e',archive,unzipped],{encoding:'utf8'});
  if(unpack.status!==0)throw Error('R64 extraction: '+unpack.stderr);
  let diskRoot=path.join(unzipped,'考勤');
  const originalConfig=JSON.parse(fs.readFileSync(path.join(diskRoot,'config','work_rules.json'),'utf8'));
@@ -178,7 +178,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   for(const name of ['index.html','src','README.md'])
    fs.cpSync(path.join(root,name),path.join(freshRuntime,name),{recursive:true});
   const cleanZip=path.join(out,'P109-考勤-R65-首次初始化.zip');
-  const packed=cp.spawnSync('python3',['-c',zipScript,freshRuntime,cleanZip],{encoding:'utf8'});
+  const packed=cp.spawnSync(process.env.P109_PYTHON||'python3',['-c',zipScript,freshRuntime,cleanZip],{encoding:'utf8'});
   if(packed.status!==0)throw Error('R65 packaging '+packed.stderr);
   diskRoot=fresh;
   await page.goto(pathToFileURL(path.join(freshRuntime,'index.html')).href,{waitUntil:'load'});
@@ -334,7 +334,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   const download=page.waitForEvent('download',{timeout:60000});
   await page.locator('#backupProjectBtn').click();
   const outZip=path.join(tmp,'working-backup.zip');await (await download).saveAs(outZip);
-  report.backupZipValid=cp.spawnSync('python3',['-m','zipfile','-t',outZip],{encoding:'utf8'}).status===0;
+  report.backupZipValid=cp.spawnSync(process.env.P109_PYTHON||'python3',['-m','zipfile','-t',outZip],{encoding:'utf8'}).status===0;
   const restoreDir=path.join(tmp,'restored','考勤');fs.mkdirSync(restoreDir,{recursive:true});
   diskRoot=restoreDir;
   const choose=page.waitForEvent('filechooser',{timeout:30000});
@@ -349,7 +349,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
 
   // R67 update only program assets; verify data remains byte-for-byte intact.
   const releaseZip=path.join(out,'P109-考勤-'+currentRevision+'-可更新离线版.zip'),
-   pkg=cp.spawnSync('python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
+   pkg=cp.spawnSync(process.env.P109_PYTHON||'python3',[path.join(root,'tools','package-release.py'),root,releaseZip],{encoding:'utf8'});
   if(pkg.status!==0)throw Error('R67 package generation '+pkg.stderr);
   const beforeWorking=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')),
    beforeOriginal=fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv'));
@@ -365,7 +365,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.codeUpdateDataUntouched=fs.readFileSync(path.join(restoreDir,'data','2026','10','working','state.json')).equals(beforeWorking)&&
    fs.readFileSync(path.join(restoreDir,'data','2026','10','raw','attendance',impName,'审核门禁.csv')).equals(beforeOriginal);
   report.preUpdateBackup=fs.readdirSync(path.join(restoreDir,'backups')).some(x=>x.startsWith('pre-upgrade-')&&x.endsWith('.zip'));
-  const releaseCheck=cp.spawnSync('python3',['-c',
+  const releaseCheck=cp.spawnSync(process.env.P109_PYTHON||'python3',['-c',
     "import sys,zipfile;z=zipfile.ZipFile(sys.argv[1]);assert z.testzip() is None;assert all(p in ('index.html','README.md','p109-release-manifest.json') or p.startswith('src/') for p in z.namelist())",releaseZip],{encoding:'utf8'});
   report.releaseZipNoData=releaseCheck.status===0;
 

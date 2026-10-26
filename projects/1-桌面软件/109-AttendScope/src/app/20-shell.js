@@ -231,16 +231,16 @@ function layoutHtml(){
   </div>
 
   ${r14SettingsMarkup()}
-  <input class="hidden" id="attendanceInput" type="file" multiple accept=".xlsx,.csv">
-  <input class="hidden" id="leaveInput" type="file" multiple accept=".xlsx,.csv">
-  <input class="hidden" id="tripInput" type="file" multiple accept=".xlsx,.csv">
-  <input class="hidden" id="outingInput" type="file" multiple accept=".xlsx,.csv">
-  <input class="hidden" id="overtimeInput" type="file" multiple accept=".xlsx,.csv">
+  <input class="hidden" id="attendanceInput" type="file" multiple accept=".xls,.xlsx,.csv">
+  <input class="hidden" id="leaveInput" type="file" multiple accept=".xls,.xlsx,.csv">
+  <input class="hidden" id="tripInput" type="file" multiple accept=".xls,.xlsx,.csv">
+  <input class="hidden" id="outingInput" type="file" multiple accept=".xls,.xlsx,.csv">
+  <input class="hidden" id="overtimeInput" type="file" multiple accept=".xls,.xlsx,.csv">
   `;
 }
 
 function importMenuRow(title,input,sample){
-  return `<div class="import-menu-row" data-drop-kind="${input.replace('Input','')}" title="可将本类 XLSX / CSV 拖到此行"><span>${title}</span><div><button type="button" data-open="${input}">导入</button><button type="button" id="${sample}">空白模板</button></div></div>`;
+  return `<div class="import-menu-row" data-drop-kind="${input.replace('Input','')}" title="可将本类 XLS、XLSX 或 CSV 拖到此行"><span>${title}</span><div><button type="button" data-open="${input}">导入</button><button type="button" id="${sample}">空白模板</button></div></div>`;
 }
 
 function bind(){

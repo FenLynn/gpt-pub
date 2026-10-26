@@ -467,7 +467,7 @@ function r62WireImport(){
   const previous=r96SettingsFromDraft(d);d.encoding=e.target.value;r63ReadingImport=true;
   modal.querySelectorAll('select,input,#r62Commit,#r96KeepImport').forEach(el=>el.disabled=true);
   try{
-   const grid=await XLSX.readGrid(d.file,d.encoding),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
+   const grid=await P109_TABLES.readGrid(d.file,d.encoding),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
    if(r62ImportDraft!==d)return;
    d.grid=grid;d.mapping=restored.mapping;d.mappingChanged=restored.changed;rerender();
   }
@@ -527,7 +527,7 @@ let r63ReadingImport=false;
 let r80ImportQueue=null;
 function r96CheckDropFiles(files){
  if(!files.length)return false;
- if(files.some(f=>!(/\.(xlsx|csv)$/i.test(f.name)))){toast('请拖入 XLSX 或 CSV 业务文件',true);return false}
+ if(files.some(f=>!(/\.(xls|xlsx|csv)$/i.test(f.name)))){toast('请拖入 XLS、XLSX 或 CSV 业务文件',true);return false}
  if(p109ConnectionBusy||state.storageBusy||state.importCommitting||p109ProjectBusy){toast('请先完成当前项目文件操作',true);return false}
  return true;
 }
@@ -554,7 +554,7 @@ async function r62OpenImport(file,kind){
  // Allow Chrome to paint the busy state before XLSX/CSV parsing starts.
  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
  const profile=r62ImportProfile(),saved=r96SavedImportSettings(kind),encoding=saved?.encoding||'auto';
- const grid=await XLSX.readGrid(file,encoding);
+ const grid=await P109_TABLES.readGrid(file,encoding);
  if(!grid.rows.length)throw new Error('文件中没有可预览的数据');
  const header=saved?.header!==false;let skip=saved?.skip||0;
  if(header&&saved?.labels.length){

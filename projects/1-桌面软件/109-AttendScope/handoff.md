@@ -4,7 +4,7 @@
 > 仓库：`FenLynn/gpt-pub`  
 > 项目：`projects/1-桌面软件/109-AttendScope/`  
 > 日常开发分支：`p109-exp`  
-> 当前版本：0.2.24-preview / R98，schema 7；本机缓存保存、忽略人员与旧内核边界见 `docs/R98-缓存保存与忽略人员.md`。旧 R34 基线与截图说明是历史背景。
+> 当前版本：0.2.25-preview / R99，schema 7；Win7 表格兼容见 `docs/R99-Win7表格兼容.md`，本机缓存与忽略人员见 `docs/R98-缓存保存与忽略人员.md`。旧 R34 基线与截图说明是历史背景。
 > R34 功能基线：`94d2bb12c97957899615bee90d46c16f450176a1`（R29 历史基线：`b65717a99d54deae18c45142272d98e71e27c2be`）  
 > 对应 R34 P109 CI：#202，success（#193 为历史 R29）。  
 > 不要直接把 `p109-stable` / `main` 当开发分支。
@@ -351,9 +351,16 @@ R40 设计优先级高于旧 R39 关于“矩阵尽量横向铺满”“文字 K
 - Synthetic Chromium 案例覆盖：标准四次打卡、仅两次打卡跨午休、午休提前出/晚返、下午漏打卡、已登记加班、临界阈值、周末完整或不完整进出、请假覆盖午间晚返、三层候选统计、规则持久化。旧六轨时间轴和原始数据验证继续执行。
 
 
-## R98 最新接手要点
+## R99 最新接手要点
+
+- 程序离线携带 SheetJS CE 0.20.3 与 Apache-2.0 许可证，五类导入和原件浏览支持 XLS/XLSX/CSV。压缩 XLSX 不再依赖浏览器 `DecompressionStream('deflate-raw')`；旧 `.xls` 使用完整 CFB/BIFF 解析。
+- `xlsx-lite.js` 仍保留最小 XLSX 兼容兜底，用于历史测试中的极简工作簿；正常 XLS/XLSX 优先交给 SheetJS。应用适配器名为 `P109_TABLES`，`window.XLSX` 保留给第三方库，避免全局声明冲突。
+- 旧内核缺失 Blob.arrayBuffer/text 时走 FileReader。IE/Trident、加密工作簿、复杂公式重算和真实 Win7/360 仍不宣称支持或已验收；Win7 使用极速内核与便携 ZIP。
+- R99 专项在缺失 DecompressionStream 与 Blob 原生读取方法时验证压缩 XLSX、BIFF8 XLS、中文、实际向导提交和原件字节。数据 schema 仍为 7，分析引擎仍为 R94。
+
+## R98 接手要点
 
 - 便携顶部保存为完整项目 IndexedDB 缓存，包含原件；事务和读回 SHA-256 成功才清除未保存。项目菜单独立下载带本地毫秒时间戳 ZIP。缓存当前与前次有效版本可恢复，同缓存项目并发旧页拒绝覆盖。
-- 旧内核缺失 structuredClone / Array.at / Object.hasOwn / randomUUID / 原生 SHA-256 有兼容分支；IE 与不支持现代语法的内核未支持；无 deflate 解压时 XLSX 需转 CSV。未加入 BAT 助手，不宣称修复浏览器缺少的原生目录接口。
+- 旧内核缺失 structuredClone / Array.at / Object.hasOwn / randomUUID / 原生 SHA-256 有兼容分支；R98 当时无 deflate 解压需转 CSV，该限制已由 R99 取代。未加入 BAT 助手，不宣称修复浏览器缺少的原生目录接口。
 - 忽略人员在名册右侧标签管理，默认从首页及全员/分组统计排除，个人仍可看。统计可显式包含，导出沿用原 CSV 字段，在范围文字标明。schema 7 防止旧引擎无视忽略名单；冻结/修订保留独立名单，raw 不变。
 - 测试按当前实际日志确认；本机能力模拟不能冒充 Win7/360 实机验收。
