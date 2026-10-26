@@ -465,23 +465,64 @@ async function p109ZipBuild(files){
 }
 async function p109ZipRead(file){
  const data=new Uint8Array(await file.arrayBuffer()),view=new DataView(data.buffer);
- const td=new TextDecoder(),files=[],unique=new Set();let cursor=0;
+ const td=new TextDecoder(),files=[],unique=new Set();
  const u16=x=>view.getUint16(x,true),u32=x=>view.getUint32(x,true);
- while(cursor+4<data.length&&u32(cursor)===0x04034b50){
-  if(cursor+30>data.length)throw Error('ZIP 头部损坏');
-  const flags=u16(cursor+6),method=u16(cursor+8),compressed=u32(cursor+18),
-   namelen=u16(cursor+26),extra=u16(cursor+28),size=u32(cursor+22);
-  if(method!==0||(flags&8)||size!==compressed)throw Error('仅接受本软件生成的无压缩完整项目备份');
-  const begin=cursor+30+namelen+extra;
-  if(begin>data.length||begin+size>data.length)throw Error('ZIP 文件长度异常');
-  const name=td.decode(data.subarray(cursor+30,cursor+30+namelen));
+ let eocd=-1;
+ for(let i=Math.max(0,data.length-65557);i<=data.length-22;i++)if(u32(i)===0x06054b50)eocd=i;
+ if(eocd<0)throw Error('没有识别到完整 ZIP 目录');
+ const count=u16(eocd+10),centralSize=u32(eocd+12),centralOffset=u32(eocd+16);
+ if(u16(eocd+4)||u16(eocd+6)||u16(eocd+8)!==count)throw Error('不支持分卷 ZIP');
+ if(count>5000||centralOffset+centralSize>eocd||centralOffset+centralSize>data.length)throw Error('ZIP 目录数量或长度异常');
+ const entries=[];let cursor=centralOffset,total=0;
+ for(let index=0;index<count;index++){
+  if(cursor+46>data.length||u32(cursor)!==0x02014b50)throw Error('ZIP 中央目录损坏');
+  const flags=u16(cursor+8),method=u16(cursor+10),crc=u32(cursor+16),compressed=u32(cursor+20),size=u32(cursor+24),
+   namelen=u16(cursor+28),extra=u16(cursor+30),comment=u16(cursor+32),local=u32(cursor+42),end=cursor+46+namelen+extra+comment;
+  if(end>data.length||[compressed,size,local].includes(0xffffffff))throw Error('暂不支持 ZIP64 或异常目录');
+  const name=td.decode(data.subarray(cursor+46,cursor+46+namelen));
+  cursor=end;
+  if(name.endsWith('/'))continue;
   if(!name||name.startsWith('/')||name.includes('\\')||name.split('/').some(x=>!x||x==='.'||x==='..')||/^[A-Za-z]:/.test(name))throw Error('ZIP 包含不安全路径');
+  if(flags&1)throw Error('不支持加密 ZIP');
+  if(![0,8].includes(method))throw Error('ZIP 使用了不支持的压缩方法：'+method);
   if(unique.has(name))throw Error('ZIP 内存在重复文件路径：'+name);
-  unique.add(name);
-  if(files.length>=5000)throw Error('超过恢复文件数上限');
-  files.push({name,data:data.slice(begin,begin+size)});
-  cursor=begin+size;
+  if(local+30>data.length||u32(local)!==0x04034b50)throw Error('ZIP 本地文件头损坏');
+  const begin=local+30+u16(local+26)+u16(local+28);
+  if(begin>data.length||begin+compressed>data.length)throw Error('ZIP 文件长度异常');
+  total+=size;if(total>180*1024*1024)throw Error('ZIP 解压后超过 180 MB 安全上限');
+  unique.add(name);entries.push({name,method,crc,compressed,size,begin});
  }
- if(!files.length)throw Error('没有识别到备份文件');
+ if(!entries.length)throw Error('没有识别到备份文件');
+ let archive=null;
+ if(entries.some(entry=>entry.method===8)){
+  if(!window.XLSX?.CFB?.read)throw Error('压缩 ZIP 解析组件缺失，请重新解压完整程序包');
+  try{archive=window.XLSX.CFB.read(data,{type:'buffer'})}catch(e){throw Error('压缩 ZIP 解压失败：'+(e?.message||'文件损坏'))}
+ }
+ for(const entry of entries){
+  let bytes;
+  if(entry.method===0)bytes=data.slice(entry.begin,entry.begin+entry.size);
+  else{
+    const target=entry.name.replace(/^\/+/,''),paths=archive?.FullPaths||[],items=archive?.FileIndex||[];
+    let item=window.XLSX.CFB.find(archive,target)||window.XLSX.CFB.find(archive,'/'+target);
+    if(item?.content==null){const matches=[];for(let i=0;i<paths.length;i++){
+     const normalized=String(paths[i]||'').replace(/\\/g,'/').replace(/^\/+/, '').replace(/^(?:Root Entry|root)\//i,'');
+     let utf8=normalized;try{utf8=new TextDecoder().decode(Uint8Array.from(normalized,ch=>ch.charCodeAt(0)&255))}catch(_){}
+     if(normalized===target||utf8===target)matches.push(items[i]);
+    }if(matches.length===1)item=matches[0]}
+    const content=item?.content;
+    if(content==null)throw Error('ZIP 解压后缺少文件：'+entry.name);
+   bytes=content instanceof Uint8Array?new Uint8Array(content):Uint8Array.from(content);
+  }
+  if(bytes.byteLength!==entry.size||P109_TABLES.crc32(bytes)!==entry.crc)throw Error('ZIP 文件校验失败：'+entry.name);
+  files.push({name:entry.name,data:bytes});
+ }
+ const manifestNames=['p109-backup-manifest.json','p109-release-manifest.json'];
+ if(!files.some(file=>manifestNames.includes(file.name))){
+  const roots=new Set(files.map(file=>file.name.split('/')[0]));
+  if(roots.size===1){const prefix=[...roots][0]+'/';
+   if(files.every(file=>file.name.startsWith(prefix))&&files.some(file=>manifestNames.includes(file.name.slice(prefix.length))))
+    for(const file of files)file.name=file.name.slice(prefix.length);
+  }
+ }
  return files;
 }

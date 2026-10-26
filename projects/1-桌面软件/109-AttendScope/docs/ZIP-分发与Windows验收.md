@@ -1,6 +1,6 @@
 # ZIP 分发与 Windows 验收
 
-自 R96 起只交付普通程序 ZIP，用于初装、离线使用和程序内升级；不再生成或分发 Python 包装、密码加密包。下文包装解压部分是 R94 的历史验收记录，当前分发仅执行普通 ZIP 的权限、CRC、清单和原生解压检查。
+自 R96 起只交付普通程序 ZIP，用于初装、离线使用和程序内升级；不再生成或分发 Python 包装、密码加密包。当前分发只执行普通 ZIP 的权限、CRC、清单和原生解压检查。
 
 ## 已复现的问题
 
@@ -10,7 +10,7 @@ Windows 资源管理器报告“拒绝访问压缩(zipped)文件夹”，原因�
 
 ## 分发步骤
 
-普通程序 ZIP 仍由原打包器生成；包装 ZIP 仍由原包装工具生成。如果在私有目录中暂存，验收通过后用以下命令交付两个文件：
+普通程序 ZIP 由 `tools/package-release.py` 生成。如果在私有目录中暂存，验收通过后用以下命令交付：
 
 ```text
 python tools/package-release.py --publish STAGED.zip OUTPUT.zip
@@ -22,20 +22,19 @@ python tools/package-release.py --publish STAGED.zip OUTPUT.zip
 
 ## Windows 验收
 
-分发与包装测试：
+分发测试：
 
 ```text
 python tests/package-audit.py
 ```
 
-Linux CI 执行通用分发测试；Windows 继续执行 CNG 包装、失败隔离和真实 Python 还原测试。Windows 原生解压必须在实际接收用户身份下额外检查，不能用 Linux CI 或生成账户的 Python 解压替代：
+Linux CI 执行通用分发测试。Windows 原生解压必须在实际接收用户身份下额外检查，不能用 Linux CI 或生成账户的 Python 解压替代：
 
 1. 接收用户能打开并读取交付 ZIP。
 2. 使用资源管理器“全部解压”或 Windows Shell 压缩文件夹组件，解压到全新可写目录。
 3. 验证普通包的完整性清单、全部文件哈希及 CRC，覆盖中文与空格路径。
-4. 包装版原生解压后，在 Windows Python 3.8+ 标准库环境运行 `lib/init.py`；输出正常 ZIP 的文件名和字节必须与普通包相同，再用原生组件解压。
-5. 普通包用于初装或右上角导入升级；包装 ZIP 需先还原成普通 ZIP。
+4. 普通包可直接用于初装，也可从程序右上角导入完成升级。
 
-本次 0.2.20-preview / R94 在实际桌面账户下完成普通版 71 文件、包装版 81 文件、还原版 71 文件的 Windows Shell 原生解压，所有文件哈希一致；中文与空格目标目录通过。49 项 Windows 分发/包装审计通过。普通 ZIP 与包装 ZIP 的既有字节不变，程序继续使用 R94 的业务与升级验收。
+R94 曾在实际桌面账户下完成普通 ZIP 的 Windows Shell 原生解压、文件哈希以及中文与空格目标目录检查。R101 继续生成 STORE 普通 ZIP，既供 Windows 直接解压，也供程序内升级；项目数据 ZIP 读取另兼容外部工具产生的 Deflate。
 
 目标目录只读、磁盘空间不足或系统安全策略拦截仍需由目标环境解决；本次不据此声称所有 Windows 配置均已测试。

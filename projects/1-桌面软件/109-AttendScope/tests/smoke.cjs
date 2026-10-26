@@ -13,6 +13,10 @@ async function check(page,expression,argOrDescription,maybeDescription){
 }
 async function run(){
  browser=await chromium.launch({headless:true,...(process.env.CHROME_BIN?{executablePath:process.env.CHROME_BIN}:{channel:'chrome'})});
+ const rawNewContext=browser.newContext.bind(browser),rawNewPage=browser.newPage.bind(browser),authorize=target=>target.addInitScript(record=>localStorage.setItem('p109-access-v1',JSON.stringify(record)),{v:1,verified:true,activatedAt:Date.now(),refreshedAt:Date.now(),expiresAt:Date.now()+365*86400000});
+ browser.__p109RawNewContext=rawNewContext;
+ browser.newContext=async options=>{const created=await rawNewContext(options);await authorize(created);return created};
+ browser.newPage=async options=>{const created=await rawNewPage(options);await authorize(created);return created};
  const context=await browser.newContext({viewport:{width:1920,height:1080},deviceScaleFactor:1,acceptDownloads:true});
  const page=await context.newPage();
  // Baseline audits explicitly select Demo; R80 separately tests the first-use entry.
@@ -633,7 +637,7 @@ async function run(){
    if(!early.issues.includes('上午早退')||!early.attendanceFlags.some(f=>f.label==='上午早退'))return false;
    if(check([['08:25','进'],['11:30','出'],['11:36','进'],['11:46','出'],
     ['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
-   if(!check([['08:25','进'],['11:30','出'],['11:42','进'],['12:05','出'],
+   if(!check([['08:25','进'],['11:30','出'],['11:43','进'],['12:05','出'],
     ['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
    if(check([['08:25','进'],['11:40','出'],['13:25','进'],['17:10','出']]).issues.includes('上午早退'))return false;
    const late=check([['08:36','进'],['11:40','出'],['13:25','进'],['17:10','出']]);
@@ -1979,11 +1983,12 @@ async function run(){
  await require('./r98-audit.cjs')({browser,out,root});
  await require('./r99-audit.cjs')({browser,out,root});
  await require('./r100-audit.cjs')({browser,out,root});
+ await require('./r101-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R100',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R101',remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

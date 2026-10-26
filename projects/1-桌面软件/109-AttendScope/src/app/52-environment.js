@@ -110,19 +110,30 @@ async function p109ExportPortable({adopt=false}={}){
   link.click();return true;
  }catch(e){p109ShowStorageFallback(e.message);return false}finally{p109ProjectBusy=false}
 }
-function p109RescueDownload(){
- if(!p109Environment().download){toast('浏览器不允许文件下载，当前工作仍在页面中，请勿关闭；需要更换允许下载的运行环境',true);return false}
- rememberMonth();const data={schemaVersion:1,projectId:'P109-AttendScope',context:'rescue',appVersion:P109_APP_VERSION,
+function p109RescuePayload(){
+ rememberMonth();return {schemaVersion:1,projectId:'P109-AttendScope',context:'rescue',appVersion:P109_APP_VERSION,
   exportedAt:new Date().toISOString(),project:projectPayload(),months:[...state.monthStores],profile:state.projectProfile||null,
   warning:'工作状态救援包，不包含原始文件字节、未加载的冻结或修订。请继续保留原项目目录和原始文件。'};
+}
+function p109ShowRescueText(data=p109RescuePayload()){
+ const text=JSON.stringify(data,null,2),node=p109TransferDialog('工作状态救援文本','<p>下载和目录均不可用时，可全选复制下面的 JSON，保存为 .json 文件后再导入。它不包含原始文件字节或未加载的冻结。</p><textarea class="p109-rescue-text" id="p109RescueText" readonly></textarea><p class="p109-transfer-actions"><button id="p109RescueSelect">全选文本</button><button id="p109RescueCopy">复制</button></p><p id="p109RescueTextStatus" role="status"></p>');
+ const area=node.querySelector('#p109RescueText'),status=node.querySelector('#p109RescueTextStatus');area.value=text;
+ node.querySelector('#p109RescueSelect').onclick=()=>{area.focus();area.select();status.textContent='已全选，请按 Ctrl+C 复制'};
+ node.querySelector('#p109RescueCopy').onclick=async()=>{try{await navigator.clipboard.writeText(text);status.textContent='已复制'}catch(_){area.focus();area.select();status.textContent='浏览器未允许自动复制，请按 Ctrl+C'}};
+ return true;
+}
+function p109RescueDownload(){
+ const data=p109RescuePayload();
+ if(!p109Environment().download)return p109ShowRescueText(data);
  downloadBlob(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),r63FileStem()+'_工作状态救援_'+p109DownloadStamp()+'.json');
  toast('已发起救援 JSON 下载；未确认落盘，未保存提醒继续保留');
+ return true;
 }
 function p109ShowStorageFallback(reason='当前环境不支持目录写入'){
- const node=p109TransferDialog('保存与环境备用方案','<p id="p109FallbackReason"></p><p>当前工作保留在页面中。完整项目包可在不支持目录写入的环境继续使用；救援 JSON 只保留工作状态，不含原件。</p><p><button id="p109FallbackRetry">重新选择或授权目录</button> <button id="p109FallbackPortable">转为便携模式并下载完整包</button></p><p><button id="p109FallbackOpen">打开已有项目 ZIP / JSON</button> <button id="p109FallbackNew">新建便携项目</button></p><p><button id="p109FallbackRescue">下载工作状态救援 JSON</button></p>');
+ const node=p109TransferDialog('保存与环境备用方案','<p id="p109FallbackReason"></p><p>当前工作保留在页面中。完整项目包可在不支持目录写入的环境继续使用；救援 JSON 只保留工作状态，不含原件。</p><p><button id="p109FallbackRetry">重新选择或授权目录</button> <button id="p109FallbackPortable">转为便携模式并下载完整包</button></p><p><button id="p109FallbackOpen">打开已有项目 ZIP / JSON</button> <button id="p109FallbackNew">新建便携项目</button></p><p><button id="p109FallbackRescue">下载工作状态救援 JSON</button> <button id="p109FallbackRescueText">显示救援文本</button></p>');
  node.querySelector('#p109FallbackReason').textContent=reason;
  node.querySelector('#p109FallbackRetry').onclick=async()=>{p109CloseTransfer();await connectProjectDir()};
- node.querySelector('#p109FallbackPortable').onclick=()=>p109ExportPortable({adopt:true});node.querySelector('#p109FallbackRescue').onclick=p109RescueDownload;
+ node.querySelector('#p109FallbackPortable').onclick=()=>p109ExportPortable({adopt:true});node.querySelector('#p109FallbackRescue').onclick=p109RescueDownload;node.querySelector('#p109FallbackRescueText').onclick=()=>p109ShowRescueText();
 }
 async function p109OpenPortableFile(file,{fromCache=false}={}){
  if(p109ProjectBusy||state.storageBusy||state.importCommitting||p109ConnectionBusy||r62ImportDraft)return false;
@@ -174,11 +185,12 @@ async function p109NewPortable(){
 }
 function p109EnvironmentHtml(){
  const e=p109Environment(),rows=[['本机缓存',state.projectDir?.cacheSavedAt?new Date(state.projectDir.cacheSavedAt).toLocaleString()+'；不等于独立磁盘备份':'尚未保存项目缓存'],['目录直接保存',e.directory?'支持；实际写入仍需授权':'不可用：保存到本机缓存，下载 ZIP 备份'],['文件下载',e.download?'支持检测；下载后须检查实际文件':'不可用：保留页面并恢复下载/目录权限'],['安全项目包校验',e.nativeHash?'支持原生 SHA-256':'使用兼容 SHA-256 校验'],['Excel 导入',e.excelImport?'离线支持 XLS、XLSX，不依赖浏览器 deflate-raw':'表格解析组件缺失，请重新解压完整程序包'],['项目历史',e.history?'支持检测；写入失败时改为手动打开':'请每次手动打开项目包/目录'],['路径复制',e.clipboard?'支持检测；失败后提供手动复制':'使用选中文本手动复制']];
- return '<section class="r82-storage-locations p109-environment"><h3>环境与备用方案</h3><p>当前模式：'+(state.projectDir?.rescue?'救援工作区 · 缺少原件及未加载的冻结':state.projectDir?.__p109Portable?'便携项目 · 保存到本机缓存，下载 ZIP 另存备份':state.projectDir?'本地目录':'临时工作区')+'</p><table><tbody>'+rows.map(([a,b])=>'<tr><th>'+a+'</th><td>'+b+'</td></tr>').join('')+'</tbody></table><p class="p109-transfer-actions"><button id="p109EnvPortable">下载完整项目包</button> <button id="p109EnvOpen">打开项目 ZIP / JSON</button> <button id="p109EnvRescue">救援 JSON</button></p><p>清理浏览器缓存、换浏览器或程序位置后，缓存可能不可用；请定期下载带时间戳的项目 ZIP。升级不能写程序目录时，请将新版程序完整解压到可写的新目录，再打开项目包。</p></section>';
+ return '<section class="r82-storage-locations p109-environment"><h3>环境与备用方案</h3><p>当前模式：'+(state.projectDir?.rescue?'救援工作区 · 缺少原件及未加载的冻结':state.projectDir?.__p109Portable?'便携项目 · 保存到本机缓存，下载 ZIP 另存备份':state.projectDir?'本地目录':'临时工作区')+'</p><table><tbody>'+rows.map(([a,b])=>'<tr><th>'+a+'</th><td>'+b+'</td></tr>').join('')+'</tbody></table><p class="p109-transfer-actions"><button id="p109EnvPortable">下载完整项目包</button> <button id="p109EnvOpen">打开项目 ZIP / JSON</button> <button id="p109EnvRescue">救援 JSON</button> <button id="p109EnvRescueText">救援文本</button></p><p>清理浏览器缓存、换浏览器或程序位置后，缓存可能不可用；请定期下载带时间戳的项目 ZIP。升级不能写程序目录时，请将新版程序完整解压到可写的新目录，再打开项目包。</p></section>';
 }
 document.addEventListener('click',e=>{
  if(e.target.closest?.('#p109PortableOpen,#p109EnvOpen,#r85OpenPortable,#p109FallbackOpen'))p109PickPortable();
  if(e.target.closest?.('#p109PortableExport,#p109EnvPortable'))p109ExportPortable();
  if(e.target.closest?.('#p109PortableNew,#r85NewPortable,#p109FallbackNew'))p109NewPortable();
  if(e.target.closest?.('#p109EnvRescue'))p109RescueDownload();
+ if(e.target.closest?.('#p109EnvRescueText'))p109ShowRescueText();
 });

@@ -4,7 +4,7 @@
 > 仓库：`FenLynn/gpt-pub`  
 > 项目：`projects/1-桌面软件/109-AttendScope/`  
 > 日常开发分支：`p109-exp`  
-> 当前版本：0.2.26-preview / R100，schema 7；多 Sheet 与便携续开见 `docs/R100-多Sheet与便携续开.md`，Win7 表格兼容见 `docs/R99-Win7表格兼容.md`，本机缓存与忽略人员见 `docs/R98-缓存保存与忽略人员.md`。旧 R34 基线与截图说明是历史背景。
+> 当前版本：0.2.27-preview / R101，schema 7；ZIP 兼容、班末容差与周期使用门槛见 `docs/R101-ZIP兼容与周期使用门槛.md`，多 Sheet 与便携续开见 `docs/R100-多Sheet与便携续开.md`，Win7 表格兼容见 `docs/R99-Win7表格兼容.md`。旧 R34 基线与截图说明是历史背景。
 > R34 功能基线：`94d2bb12c97957899615bee90d46c16f450176a1`（R29 历史基线：`b65717a99d54deae18c45142272d98e71e27c2be`）  
 > 对应 R34 P109 CI：#202，success（#193 为历史 R29）。  
 > 不要直接把 `p109-stable` / `main` 当开发分支。

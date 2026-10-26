@@ -116,7 +116,7 @@ module.exports=async({browser,root,out})=>{
   await page.reload();await page.evaluate(()=>p109RecentReady);
   check(await page.evaluate(()=>state.projectDir?.pending&&!state.saved&&state.records.length===4),'corrupt latest cache recovers previous version and requires saving');
   check(await page.evaluate(()=>saveWorking()),'recovered cache can be saved over corrupt current while retaining previous valid copy');
-  const blocked=await legacy(true),b=await blocked.newPage();watch(b);b.on('dialog',d=>d.accept());await b.goto(url);await b.evaluate(()=>p109RecentReady);
+   const blocked=await legacy(true),b=await blocked.newPage();watch(b);b.on('dialog',d=>d.accept());await b.goto(url);await b.evaluate(()=>p109RecentReady);await b.evaluate(()=>p109AccessRefresh());
   await b.locator('#r80Work').click();await b.locator('#r85NewPortable').click();await b.waitForFunction(()=>state.projectDir?.__p109Portable&&!p109ProjectBusy);await upload(b,csv);
   check(await b.evaluate(()=>saveWorking())===false&&await b.evaluate(()=>!state.saved&&p109UnsavedMonths().length>0),'blocked browser storage never claims successful cache save');
   const fallback=b.waitForEvent('download');check(await b.evaluate(()=>p109ExportPortable()),'download remains usable when all browser storage is blocked');await (await fallback).saveAs(path.join(out,'r98-blocked-storage.zip'));

@@ -18,7 +18,7 @@ module.exports=async({browser,out,root})=>{
    Object.defineProperty(window,'indexedDB',{configurable:true,value:undefined});
    Object.defineProperty(window,'localStorage',{configurable:true,get(){throw new DOMException('blocked','SecurityError')}});
   });
-  await page.goto(url);await page.evaluate(()=>p109RecentReady);await page.locator('#r80Work').click();await page.locator('#r85NewPortable').click();
+  await page.goto(url);await page.evaluate(()=>p109RecentReady);await page.evaluate(()=>p109AccessRefresh());await page.locator('#r80Work').click();await page.locator('#r85NewPortable').click();
   await page.waitForFunction(()=>!!state.projectDir?.__p109Portable&&!p109ProjectBusy);
   check(await page.evaluate(()=>!p109Environment().directory&&!p109Environment().history&&!state.isDemo&&EMPLOYEES.length===0&&p109UnsavedMonths().length>0),'portable work starts with directory APIs, IndexedDB and localStorage all unavailable');
   await upload('10');const source=await page.evaluate(()=>state.imports[0].id);
@@ -34,7 +34,7 @@ module.exports=async({browser,out,root})=>{
   const fresh=page.waitForEvent('download');await page.evaluate(()=>p109ExportPortable());await (await fresh).saveAs(filePath);
   await page.locator('#p109ConfirmDownload').click();check(await page.evaluate(()=>!state.projectDir.pending&&!p109UnsavedMonths().length),'only explicit download confirmation clears portable pending state');
   await page.locator('#p109TransferClose').click();
-  await page.reload();await page.evaluate(()=>p109RecentReady);await page.locator('#r80Work').click();
+  await page.reload();await page.evaluate(()=>p109RecentReady);await page.evaluate(()=>p109AccessRefresh());await page.locator('#r80Work').click();
   const choose=page.waitForEvent('filechooser');await page.locator('#r85OpenPortable').click();await (await choose).setFiles(filePath);await page.waitForFunction(()=>!!state.projectDir?.__p109Portable&&!p109ProjectBusy);
   check(await page.evaluate(()=>state.monthStores.has('2026-10')&&state.monthStores.has('2026-11')&&state.records.length===2&&p109UnsavedMonths().length===0),'a complete project package reopens after page closure without browser storage');
   await page.evaluate(()=>switchMonth(2026,10));
@@ -69,7 +69,7 @@ module.exports=async({browser,out,root})=>{
   const noHashRescue=page.waitForEvent('download');await page.locator('#p109FallbackRescue').click();await (await noHashRescue).saveAs(path.join(out,'r85-no-hash-rescue.json'));
   check(await page.evaluate(()=>p109UnsavedMonths().length>0),'rescue download retains unsaved protection');
   await page.evaluate(()=>{window.__objectUrl=URL.createObjectURL;URL.createObjectURL=undefined});
-  check(await page.evaluate(()=>p109RescueDownload())===false&&await page.evaluate(()=>p109UnsavedMonths().length>0),'download API unavailable is explicit and never claims work was saved');
+  check(await page.evaluate(()=>p109RescueDownload())===true&&await page.locator('#p109RescueText').count()===1&&await page.evaluate(()=>p109UnsavedMonths().length>0),'download API unavailable opens copyable rescue text and never claims work was saved');
   await page.evaluate(()=>{URL.createObjectURL=__objectUrl;if(__subtle)Object.defineProperty(crypto,'subtle',__subtle);else delete crypto.subtle;p109CloseTransfer();window.DecompressionStream=undefined});
    check(await page.evaluate(()=>p109Environment().compressedXlsx&&p109Environment().excelImport),'bundled Excel parser remains available without browser decompression');
    await upload('10');check(await page.evaluate(()=>state.records.length===2&&state.imports.length===2),'CSV import remains usable without browser decompression');

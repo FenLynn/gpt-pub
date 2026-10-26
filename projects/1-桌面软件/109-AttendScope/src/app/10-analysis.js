@@ -561,16 +561,19 @@ function analyzeDay(emp,d){
  const morningLeave=businessCovers(RULES.amStart,RULES.amEnd),afternoonLeave=businessCovers(RULES.pmStart,RULES.pmEnd),fullExcused=morningLeave&&afternoonLeave;
  const lunchStart=minutes(RULES.amEnd),lunchEnd=minutes(RULES.pmStart);
  const attendanceFlags=[];
- // A shift-end exit is proven early only if no subsequent check-in
- // on or before the boundary could establish a continued on-duty interval.
+ // A brief out -> in around a shift boundary is one temporary outing, even
+ // when the return lands just after the boundary. A longer absence still
+ // anchors early departure at the original exit.
  const earlyDeparture=(start,end,grace)=>{
-  const limit=minutes(end)-Math.max(0,Number(grace)||0);
+  const limit=minutes(end)-Math.max(0,Number(grace)||0),temporary=p109TempRules(),shortGap=temporary.limit+temporary.grace;
   const possibilities=pairs.filter(([x,y])=>minutes(x.time)<limit&&
-   minutes(y.time)>=minutes(start)&&minutes(y.time)<limit);
+   minutes(y.time)>=minutes(start)&&minutes(y.time)<limit).filter(([,exit])=>{
+    const left=minutes(exit.time);
+     const returned=punches.find(row=>row.direction==='进'&&minutes(row.time)>left),right=returned?minutes(returned.time):null;
+     return right==null||right-left>shortGap+1e-8&&!businessCovers(left,right);
+   });
   if(!possibilities.length)return null;
   const last=possibilities.reduce((a,b)=>minutes(a[1].time)>minutes(b[1].time)?a:b);
-  if(punches.some(r=>r.direction==='进'&&minutes(r.time)>minutes(last[1].time)&&
-    minutes(r.time)<=limit))return null;
   return last[1];
  };
  const workMinutes=analysisPairMinutes(pairs,RULES.amStart,RULES.amEnd)+
@@ -637,13 +640,13 @@ function analyzeDay(emp,d){
     suspect('上午缺少完整出勤证据（待核）');
    }
   }
+  const afternoonExit=!afternoonLeave?earlyDeparture(RULES.pmStart,RULES.pmEnd,afternoonEndGrace):null;
   if(lastOut&&!afternoonLeave){
-   const lastMinute=minutes(lastOut.time);
-   // Without any complete afternoon exit, a lunchtime "出" cannot
-   // establish a definite early departure.
-   if(afternoonEvidence&&!pending&&lastMinute<minutes(RULES.pmEnd)-afternoonEndGrace&&!businessCovers(lastMinute,RULES.pmEnd)){
+   // Without any complete afternoon exit, a lunchtime "出" cannot establish
+   // a definite early departure. Brief boundary outings are handled above.
+   if(afternoonEvidence&&!pending&&afternoonExit&&!businessCovers(minutes(afternoonExit.time),minutes(RULES.pmEnd))){
     severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
-    attendanceFlags.push({kind:'early',label:'早退',time:lastOut.time});
+    attendanceFlags.push({kind:'early',label:'早退',time:afternoonExit.time});
    }else if(!afternoonEvidence||pending){
     suspect('下午进出记录不完整（待核）');
    }

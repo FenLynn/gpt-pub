@@ -78,7 +78,7 @@ function settingsContent(section){
    '<p class="r14-setting-note">复杂演示打卡包含同向重复、连续短间隔进出和晚间返岗。演示数据仅属于 2026 年 10 月。</p>');
  default:return sectionCard('本地运行','所有核心脚本和绘图库均本地提供，当前为实验预览版本。',
    '<div class="r14-readonly"><strong>应用</strong><span>'+escapeNameChar(attendTitle())+' · P109</span></div>'+
-   '<div class="r14-readonly"><strong>版本</strong><span>'+P109_APP_REVISION+' · v'+P109_APP_VERSION+'</span></div>'+
+   '<div class="r14-readonly"><strong>版本</strong><button type="button" class="r101-version" data-p109-access-version>'+P109_APP_REVISION+' · v'+P109_APP_VERSION+'</button></div>'+
    '<div class="r14-readonly"><strong>存储</strong><span>当前月份 working / snapshots</span></div>');
  }
 }
@@ -114,6 +114,7 @@ function bindSettings(){
    set('settingArrows',p.arrowsTowardLine!==false);
    for(const k of Object.keys(p.timelineTracks||{}))set('settingTrack_'+k,p.timelineTracks[k]);
   }
+  if(section==='advanced')p109BindAccessVersion(content.querySelector('[data-p109-access-version]'));
   if(section==='rules'){
    if(d.rules.overtimeRuleVersion===1)d.rules=p109NormalizeOvertimeRules({...d.rules,overtimeRuleVersion:null});
    for(const k of ['amStart','amEnd','pmStart','pmEnd'])set('r14Rule_'+k,d.rules[k]);
