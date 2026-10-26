@@ -323,7 +323,8 @@ function r79SourcePeriod(){
  const field=d.kind==='attendance'?(d.mapping.datetime>=0?'datetime':'date'):
   d.startMode==='combined'?'startDatetime':d.mapping.startDate>=0?'startDate':'date';
  const col=d.mapping[field];
- if(col>=0)for(const row of d.grid.rows.slice(d.skip+(d.header?1:0))){
+ const first=d.skip+(d.header?1:0);
+ if(col>=0)for(const row of d.grid.rows.filter(row=>(row.sourceIndex??d.grid.rows.indexOf(row))>=first)){
   const date=r62Date(r95ImportValue(d,row.cells,field));if(!strictISODate(date))continue;
   dates.push(date);const key=date.slice(0,7);counts.set(key,(counts.get(key)||0)+1);
   const endField=d.endMode==='combined'?'endDatetime':'endDate',end=r62Date(r95ImportValue(d,row.cells,endField));
@@ -351,15 +352,18 @@ function r62PreviewHtml(){
  const mapping=interval?'<div class="r62-mapping">'+select('name','姓名')+select('type','类型')+'</div>'+endpoint('start')+endpoint('end')+
   '<div class="r62-mapping">'+(d.kind==='outing'?select('place','地点'):'')+select('note','备注')+'</div>':
   '<div class="r62-mapping">'+fields.map(([key,title])=>select(key,title)).join('')+'</div>';
- const preview=d.grid.rows.slice(0,25).map((r,i)=>{
-  const hidden=i<dataStart,head=d.header&&i===d.skip;
-  return '<tr class="'+(hidden?'r62-skipped ':'')+(head?'r62-header':'')+'"><th>'+r.rowNumber+(head?' · 表头':hidden?' · 跳过':'')+'</th>'+
+ const manySheets=(d.grid.selectedSheets||[]).length>1;
+ const rowAt=r=>manySheets?r.sheet+'!'+r.rowNumber:r.rowNumber;
+ const preview=d.grid.rows.slice(0,25).map(r=>{
+  const index=r.sourceIndex??d.grid.rows.indexOf(r),hidden=index<dataStart,head=d.header&&index===d.skip;
+  return '<tr class="'+(hidden?'r62-skipped ':'')+(head?'r62-header':'')+'"><th>'+r62Esc(rowAt(r))+(head?' · 表头':hidden?' · 跳过':'')+'</th>'+
    cols.map(c=>'<td title="'+r62Esc(r.cells[c])+'">'+r62Esc(r.cells[c])+'</td>').join('')+'</tr>';
  }).join('');
  const title={attendance:'考勤记录',leave:'请假',trip:'出差',outing:'外出',overtime:'登记加班'}[d.kind];
  return '<section class="r62-overlay" role="dialog" aria-modal="true" aria-labelledby="r62Title"><div class="r62-dialog r95-dialog">'+
   '<header><div class="r95-import-heading"><strong id="r62Title">导入'+title+'</strong><p class="r79-import-file" title="'+r62Esc(d.file.name)+'">'+r62Esc(d.file.name)+'</p></div>'+
   '<div class="r79-import-context"><label>导入月份<input id="r79ImportMonth" aria-label="导入月份" type="month" min="2000-01" max="2099-12" value="'+d.targetMonth+'"></label>'+
+  (d.grid.sheets?.length>1?'<label>工作表<select id="r100Sheet" aria-label="工作表">'+d.grid.sheets.map(sheet=>'<option value="'+r62Esc(sheet.name)+'" '+(d.grid.sheetChoice===sheet.name?'selected':'')+' '+(sheet.empty?'disabled':'')+'>'+r62Esc(sheet.name)+(sheet.empty?' · 空表':' · '+sheet.rows+' 行')+'</option>').join('')+(d.grid.sheets.filter(sheet=>!sheet.empty).length>1?'<option value="__all__" '+(d.grid.sheetChoice==='__all__'?'selected':'')+'>合并全部非空表</option>':'')+'</select></label>':'')+
   '<div class="r79-source-period">文件日期<b>'+r62Esc(source.first?(source.first===source.last?source.first:source.first+' 至 '+source.last):'待识别')+'</b></div>'+
   (source.main&&source.main!==d.targetMonth?'<button type="button" id="r79UseFileMonth" data-month="'+source.main+'">改为 '+source.main+'</button>':'')+'</div><div class="r96-import-actions"><button type="button" id="r96KeepImport" title="本类设置自动记忆；也可立即保留，不导入数据">保留导入设置</button><button id="r62Close" aria-label="关闭导入">×</button></div></header>'+
   (r80ImportQueue?'<div class="r80-import-queue">文件 '+(r80ImportQueue.index+1)+' / '+r80ImportQueue.files.length+' · 逐个核对并合并<button id="r80SkipFile" type="button">跳过此文件</button></div>':'')+
@@ -384,10 +388,16 @@ function r62BuildCanonical(){
  r95ImportModes(d);
  let period;try{period=p109ImportPeriod(d.targetMonth||monthKey())}catch(e){return {rows:[],failed:[{row:'—',reason:e.message}],scanned:0}};
  const val=(cells,key)=>r95ImportValue(d,cells,key);
- for(let i=first;i<rows.length;i++){
+ const selected=d.grid.selectedSheets||[d.grid.sheet],primary=selected[0],headerFor=sheet=>rows.find(row=>row.sheet===sheet&&(row.sourceIndex??0)===d.skip)?.cells.map(value=>String(value??'').trim())||[];
+ const expected=d.header?headerFor(primary):[],compatible=new Set(selected);
+ if(d.header)for(const sheet of selected.slice(1))if(JSON.stringify(headerFor(sheet))!==JSON.stringify(expected)){
+  compatible.delete(sheet);fail.push({row:sheet,reason:'表头与 '+primary+' 不一致，请单独选择此工作表导入'});
+ }
+ for(let i=0;i<rows.length;i++){
   const r=rows[i],c=r.cells,name=normalizedPerson(val(c,'name'));
+  if(!compatible.has(r.sheet||primary)||(r.sourceIndex??i)<first)continue;
   if(!c.some(x=>String(x??'').trim()!==''))continue;
-  const base={姓名:name,__rowNumber:r.rowNumber};
+  const base={姓名:name,__rowNumber:r.rowNumber,__sheet:r.sheet||primary};
   let reason='';
   if(!name)reason='姓名为空';
   if(d.kind==='attendance'){
@@ -407,9 +417,9 @@ function r62BuildCanonical(){
   }
   if(d.kind!=='attendance')Object.assign(base,{类型:String(val(c,'type')||''),地点:String(val(c,'place')||''),备注:String(val(c,'note')||'')});
   if(!reason)try{p109ParseBusinessRow(d.kind,base,i,period)}catch(e){reason=e.message}
-  if(reason)fail.push({row:r.rowNumber,reason});else mapped.push(base);
+  if(reason)fail.push({row:(selected.length>1?(r.sheet+'!'):'')+r.rowNumber,reason});else mapped.push(base);
  }
- return {rows:mapped,failed:fail,scanned:rows.length-first};
+ return {rows:mapped,failed:fail,scanned:rows.filter(row=>compatible.has(row.sheet||primary)&&(row.sourceIndex??0)>=first).length};
 }
 function r79ValidateImport(){
  const d=r62ImportDraft,modal=document.querySelector('.r62-overlay');if(!d||!modal)return;
@@ -418,7 +428,7 @@ function r79ValidateImport(){
  const headings=d.kind==='attendance'?['姓名','打卡时间','进出']:d.kind==='trip'?['姓名','开始日期','结束日期','类型']:['姓名','开始日期时间','结束日期时间','类型'];
  const previewRows=result.rows.slice(0,25).map((row,index)=>{
   const item=p109ParseBusinessRow(d.kind,row,index,p109ImportPeriod(d.targetMonth||monthKey())),values=d.kind==='attendance'?[item.name,item.datetime,item.direction]:d.kind==='trip'?[item.name,item.startDate,item.endDate,item.type]:[item.name,item.rangeStart,item.rangeEnd,item.type];
-  return '<tr><th>'+r62Esc(row.__rowNumber)+'</th>'+values.map(v=>'<td title="'+r62Esc(v)+'">'+r62Esc(v)+'</td>').join('')+'</tr>';
+  return '<tr><th>'+r62Esc((d.grid.selectedSheets||[]).length>1?row.__sheet+'!'+row.__rowNumber:row.__rowNumber)+'</th>'+values.map(v=>'<td title="'+r62Esc(v)+'">'+r62Esc(v)+'</td>').join('')+'</tr>';
  }).join('');
  modal.querySelector('#r95ParsedPreview').innerHTML='<table><thead><tr><th>行号</th>'+headings.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+previewRows+'</tbody></table>'+
   (!result.rows.length?'<p class="r95-preview-empty">请先完成字段对应，识别结果将在这里显示。</p>':'');
@@ -458,6 +468,16 @@ function r62WireImport(){
  modal.querySelector('#r62Skip').onchange=e=>{d.skip=Math.max(0,Math.min(100,Number(e.target.value)||0));d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);d.startMode=d.endMode=null;d.dateMode=d.mapping.datetime>=0?'combined':'split';rerender()};
  modal.querySelector('#r79ImportMonth').onchange=e=>{d.targetMonth=e.target.value;rerender(false)};
  modal.querySelector('#r79UseFileMonth')?.addEventListener('click',e=>{d.targetMonth=e.currentTarget.dataset.month;rerender(false)});
+ modal.querySelector('#r100Sheet')?.addEventListener('change',async e=>{
+  const previous=r96SettingsFromDraft(d),choice=e.target.value;r63ReadingImport=true;
+  modal.querySelectorAll('select,input,button').forEach(el=>el.disabled=true);
+  try{
+   const grid=await P109_TABLES.readGrid(d.file,d.encoding,choice),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
+   if(r62ImportDraft!==d)return;
+   d.grid=grid;d.mapping=restored.mapping;d.mappingChanged=restored.changed;d.validated=null;rerender(false);
+  }catch(err){if(r62ImportDraft===d){d.error=err.message;r62ShowImport()}}
+  finally{r63ReadingImport=false}
+ });
  modal.querySelector('#r79DateMode')?.addEventListener('change',e=>{
   d.dateMode=e.target.value;const inferred=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);
   if(d.dateMode==='split'){d.mapping.datetime=-1;d.mapping.date=inferred.date;d.mapping.time=inferred.time}
@@ -467,7 +487,7 @@ function r62WireImport(){
   const previous=r96SettingsFromDraft(d);d.encoding=e.target.value;r63ReadingImport=true;
   modal.querySelectorAll('select,input,#r62Commit,#r96KeepImport').forEach(el=>el.disabled=true);
   try{
-   const grid=await P109_TABLES.readGrid(d.file,d.encoding),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
+   const grid=await P109_TABLES.readGrid(d.file,d.encoding,d.grid.sheetChoice),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
    if(r62ImportDraft!==d)return;
    d.grid=grid;d.mapping=restored.mapping;d.mappingChanged=restored.changed;rerender();
   }
@@ -500,7 +520,7 @@ function r62WireImport(){
     if(!switchMonth(y,m,true,true,true))throw Error('无法打开所选导入月份');
    }
    const converter={attendance:importAttendance,leave:importLeaves,trip:importTrips,outing:importOutings,overtime:importOvertime}[d.kind];
-   const oldProfile=r62ImportProfile();await converter(d.file,{sheet:d.grid.sheet,rows:data.rows,headers:Object.keys(data.rows[0]),importMode:d.importMode});
+   const oldProfile=r62ImportProfile();await converter(d.file,{sheet:d.grid.sheet,selectedSheets:d.grid.selectedSheets,rows:data.rows,headers:Object.keys(data.rows[0]),importMode:d.importMode});
    const settings=r96RememberImport(d),nextProfile={...oldProfile,templates:{...(oldProfile.templates||{}),[d.kind]:settings}};
    if(d.kind==='attendance')nextProfile.rules=d.rules.map(r=>({...r}));
    state.importProfile=nextProfile;state.saved=false;rememberMonth();state.importCommitting=false;close(true);render();await r80NextImportFile();

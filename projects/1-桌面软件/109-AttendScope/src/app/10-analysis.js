@@ -97,7 +97,7 @@ function p109ImportPeriod(key=monthKey()){
 function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
  if(r.__date1904){r={...r};for(const key of ['开始日期','起始日期','结束日期','截止日期','日期','请假日期','加班日期','startDate','endDate','date','开始日期时间','结束日期时间','startDatetime','endDatetime','打卡时间','datetime','DateTime'])
   if(typeof r[key]==='number'&&r[key]>=1)r[key]+=1462;delete r.__date1904}
- const name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
+ const sourceSheet=String(r.__sheet||''),name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
  if(!name)throw Error('姓名为空');
  const row=sourceRow(r,i),type=String(aliases(r,['类型','假别','事项','type'])||
   ({leave:'请假',trip:'出差',outing:'外出',overtime:'登记加班'}[kind])||''),
@@ -110,7 +110,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
   const stamp=attendanceUtcMinute(datetime.slice(0,10),datetime.slice(11));
   if(stamp<period.first-1440||stamp>=period.last+1440)
    throw Error('日期不属于 '+period.key+'（仅允许前后各一天的跨月配对记录）');
-  return {name,datetime,time:datetime.slice(11,19),direction:direction||'未标注',row};
+  return {name,datetime,time:datetime.slice(11,19),direction:direction||'未标注',row,sheet:sourceSheet};
  }
  if(kind==='trip'){
   const startDate=r62Date(aliases(r,['开始日期','起始日期','日期','startDate','date'])),
@@ -118,7 +118,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
   if(!strictISODate(startDate)||!strictISODate(endDate))throw Error('起止日期格式错误');
   if(startDate>endDate)throw Error('结束日期早于开始日期');
   if(startDate>period.end||endDate<period.key+'-01')throw Error('日期范围与 '+period.key+' 无交集');
-  const base={name,startDate,endDate,row,type,note,place:String(aliases(r,['地点','目的地','place'])||'')};
+  const base={name,startDate,endDate,row,type,note,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||'')};
   return base;
  }
  const startCombined=aliases(r,['开始日期时间','startDatetime']),endCombined=aliases(r,['结束日期时间','endDatetime']),
@@ -139,7 +139,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
  if(to<=from)throw Error('结束日期时间必须晚于开始日期时间');
  if(to-from>366*1440)throw Error('单条时间范围超过 366 天，请拆分后导入');
  if(from>=period.last||to<=period.first)throw Error('日期范围与 '+period.key+' 无交集');
- return {name,row,type,note,place:String(aliases(r,['地点','目的地','place'])||''),
+ return {name,row,type,note,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||''),
   rangeStart:startDate+' '+start,rangeEnd:attendanceDateFromMinute(to)+' '+attendanceClock(to%1440),
   date:startDate,start,end,importIntervalVersion:1};
 }
@@ -199,11 +199,11 @@ async function p109ImportBusiness(kind,file,prepared=null){
   throw new DOMException('已取消替换','AbortError');
  const importId='I'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
   prefix={leave:'LI',trip:'TI',outing:'OI',overtime:'OTI'}[kind];
- const out=parsed.map(r=>{
+ const out=parsed.map((r,index)=>{
   const employee=plan.byName.get(r.name),identity=kind==='attendance'?
-   {recordId:'import:'+importId+':'+r.row,scenario:'import'}:{id:prefix+'-'+importId+'-'+r.row+(r.importIntervalVersion?'-'+r.date:'')};
+   {recordId:'import:'+importId+':'+index+':'+r.row,scenario:'import'}:{id:prefix+'-'+importId+'-'+index+'-'+r.row+(r.importIntervalVersion?'-'+r.date:'')};
   return {...r,...identity,importId,employeeId:employee.id,name:employee.name,
-   sourceName:r.name,source:file.name,sheet:table.sheet};
+   sourceName:r.name,source:file.name,sheet:r.sheet||table.sheet};
  });
  const translation=new Map(EMPLOYEES.map(e=>[e.id,personIdentity(e.name)])),
   previous=state[field].map(r=>({...r,employeeId:translation.get(r.employeeId)||r.employeeId}));

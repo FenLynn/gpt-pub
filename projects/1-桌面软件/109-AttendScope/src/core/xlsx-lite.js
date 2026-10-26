@@ -66,12 +66,27 @@
       rows.push(arr);
     }
     if(!rows.length)return {sheet:first.getAttribute('name')||'Sheet1',rows:[]};
-    const headers=rows[0].map(x=>String(x??'').trim());
-    const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;return obj;});
+    const sheetName=first.getAttribute('name')||'Sheet1',headers=rows[0].map(x=>String(x??'').trim());
+    const objects=rows.slice(1).filter(r=>r.some(v=>v!==undefined&&v!=='')).map(r=>{const obj=Object.fromEntries(headers.map((h,i)=>[h,r[i]??'']));obj.__rowNumber=r.__rowNumber;obj.__sheet=sheetName;return obj;});
     const date1904=['1','true'].includes(xmlElements(wbDoc,'workbookPr')[0]?.getAttribute('date1904'));
-    return {sheet:first.getAttribute('name')||'Sheet1',headers,rows:objects,date1904,rawRows:rows.map(r=>({cells:Array.from(r),rowNumber:r.__rowNumber}))};
+    const rawRows=rows.map((r,index)=>({cells:Array.from(r),rowNumber:r.__rowNumber,sourceIndex:index,sheet:sheetName}));
+    return {sheet:sheetName,sheetChoice:sheetName,selectedSheets:[sheetName],sheets:[{name:sheetName,rows:rawRows.length,empty:false}],headers,rows:objects,date1904,rawRows};
   }
-  async function readWorkbook(file){
+  function sheetTable(workbook,sheetName){
+    const sheet=workbook.Sheets?.[sheetName];
+    if(!sheet)return {sheet:sheetName,headers:[],rows:[],rawRows:[]};
+    let startRow=0;
+    try{if(sheet['!ref'])startRow=SheetJS.utils.decode_range(sheet['!ref']).s.r}catch(_){}
+    const matrix=SheetJS.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
+    const rawRows=matrix.map((cells,index)=>({cells:Array.from(cells||[]),rowNumber:startRow+index+1,sheet:sheetName}))
+      .filter(row=>row.cells.some(value=>value!==undefined&&value!==null&&value!==''))
+      .map((row,index)=>({...row,sourceIndex:index}));
+    if(!rawRows.length)return {sheet:sheetName,headers:[],rows:[],rawRows:[]};
+    const headers=rawRows[0].cells.map(value=>String(value??'').trim());
+    const rows=rawRows.slice(1).map(row=>{const object=Object.fromEntries(headers.map((header,index)=>[header,row.cells[index]??'']));object.__rowNumber=row.rowNumber;object.__sheet=sheetName;return object});
+    return {sheet:sheetName,headers,rows,rawRows};
+  }
+  async function readWorkbook(file,sheetChoice){
     if(!SheetJS||typeof SheetJS.read!=='function'||!SheetJS.utils?.sheet_to_json){
       if(/\.xlsx$/i.test(file.name||''))return readXlsxLite(file);
       throw new Error('当前程序缺少旧版 Excel 解析组件，请重新解压完整程序包。');
@@ -82,17 +97,16 @@
       if(/\.xlsx$/i.test(file.name||'')){try{return await readXlsxLite(file)}catch(_){} }
       throw new Error('Excel 文件无法读取：'+(error?.message||'文件格式损坏或已加密'));
     }
-    const sheetName=workbook.SheetNames?.[0]||'Sheet1',sheet=workbook.Sheets?.[sheetName];
-    if(!sheet)return {sheet:sheetName,headers:[],rows:[],date1904:false,rawRows:[]};
-    let startRow=0;
-    try{if(sheet['!ref'])startRow=SheetJS.utils.decode_range(sheet['!ref']).s.r}catch(_){}
-    const matrix=SheetJS.utils.sheet_to_json(sheet,{header:1,raw:true,defval:'',blankrows:true});
-    const rawRows=matrix.map((cells,index)=>({cells:Array.from(cells||[]),rowNumber:startRow+index+1}))
-      .filter(row=>row.cells.some(value=>value!==undefined&&value!==null&&value!==''));
-    if(!rawRows.length)return {sheet:sheetName,headers:[],rows:[],date1904:!!workbook.Workbook?.WBProps?.date1904,rawRows:[]};
-    const headers=rawRows[0].cells.map(value=>String(value??'').trim());
-    const rows=rawRows.slice(1).map(row=>{const object=Object.fromEntries(headers.map((header,index)=>[header,row.cells[index]??'']));object.__rowNumber=row.rowNumber;return object});
-    return {sheet:sheetName,headers,rows,date1904:!!workbook.Workbook?.WBProps?.date1904,rawRows};
+    const tables=(workbook.SheetNames||[]).map(name=>sheetTable(workbook,name)),nonempty=tables.filter(table=>table.rawRows.length);
+    const sheets=tables.map(table=>({name:table.sheet,rows:table.rawRows.length,empty:!table.rawRows.length}));
+    const selected=sheetChoice==='__all__'?nonempty:(tables.find(table=>table.sheet===sheetChoice)||nonempty[0]||tables[0]);
+    if(!selected)return {sheet:'Sheet1',headers:[],rows:[],date1904:false,rawRows:[],sheets:[]};
+    if(Array.isArray(selected)){
+      const rawRows=selected.flatMap(table=>table.rawRows),headers=selected[0]?.headers||[];
+      return {sheet:selected.map(table=>table.sheet).join('、'),sheetChoice:'__all__',selectedSheets:selected.map(table=>table.sheet),headers,rows:[],
+        date1904:!!workbook.Workbook?.WBProps?.date1904,rawRows,sheets};
+    }
+    return {...selected,sheetChoice:selected.sheet,selectedSheets:[selected.sheet],date1904:!!workbook.Workbook?.WBProps?.date1904,sheets};
   }
   function parseCsvText(text){
     const rows=[]; let row=[], cur='', q=false;
@@ -132,11 +146,11 @@
     row.push(field);if(row.some(x=>x.trim()!==''))rows.push(row);
     return rows.map((cells,i)=>({cells,rowNumber:i+1}));
   }
-  async function readGrid(file,encoding='auto'){
+  async function readGrid(file,encoding='auto',sheetChoice){
     const name=file.name.toLowerCase();
     if(/\.xlsx?$/.test(name)){
-      const table=await readWorkbook(file);
-      return {sheet:table.sheet,rows:table.rawRows||[],date1904:!!table.date1904,encoding:name.endsWith('.xls')?'xls':'xlsx'};
+      const table=await readWorkbook(file,sheetChoice);
+      return {sheet:table.sheet,sheetChoice:table.sheetChoice,selectedSheets:table.selectedSheets||[table.sheet],sheets:table.sheets||[],rows:table.rawRows||[],date1904:!!table.date1904,encoding:name.endsWith('.xls')?'xls':'xlsx'};
     }
     if(!name.endsWith('.csv'))throw new Error('请选择 .xls、.xlsx 或 .csv 文件');
     const bytes=await blobArrayBuffer(file);let text='';
