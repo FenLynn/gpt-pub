@@ -1,0 +1,15 @@
+/* R97 · Stable import-dialog height and unobscured operation feedback. */
+.r62-dialog.r95-dialog{
+ height:80dvh;
+ max-height:80dvh;
+ box-sizing:border-box;
+}
+.r62-dialog.r95-dialog>.r62-body{
+ min-height:0;
+ overflow:auto;
+ overscroll-behavior:contain;
+}
+.toast{
+ z-index:12050;
+ pointer-events:none;
+}

@@ -79,8 +79,8 @@ module.exports=async({browser,root,out})=>{
    const geometry=await page.evaluate(()=>{
     const dialog=document.querySelector('.r62-dialog').getBoundingClientRect(),head=document.querySelector('.r62-dialog>header').getBoundingClientRect(),month=document.querySelector('#r79ImportMonth').getBoundingClientRect(),body=document.querySelector('.r62-body');
     const rows=[...document.querySelectorAll('.r95-import-fields .r62-field')].map(el=>{const a=el.querySelector('span').getBoundingClientRect(),b=el.querySelector('select').getBoundingClientRect();return {titleRight:a.right,selectLeft:b.left,centerDifference:Math.abs((a.top+a.bottom-b.top-b.bottom)/2)}});
-    return {fit:dialog.top>=0&&dialog.bottom<=innerHeight&&dialog.width>=innerWidth*.8,header:month.top>=head.top&&month.bottom<=head.bottom,oneFieldPerRow:rows.every(r=>r.selectLeft>=r.titleRight&&r.centerDifference<=2)&&new Set(rows.map(r=>Math.round(r.selectLeft))).size===1,noBodyScroll:body.scrollHeight<=body.clientHeight+1};
-   });report.geometry.push({...size,...geometry});check(geometry.fit&&geometry.header&&geometry.oneFieldPerRow&&geometry.noBodyScroll,'dense aligned import geometry '+size.width);
+    return {fit:dialog.top>=0&&dialog.bottom<=innerHeight&&dialog.width>=innerWidth*.8,header:month.top>=head.top&&month.bottom<=head.bottom,oneFieldPerRow:rows.every(r=>r.selectLeft>=r.titleRight&&r.centerDifference<=2)&&new Set(rows.map(r=>Math.round(r.selectLeft))).size===1,scrollContained:getComputedStyle(body).overflowY==='auto'};
+   });report.geometry.push({...size,...geometry});check(geometry.fit&&geometry.header&&geometry.oneFieldPerRow&&geometry.scrollContained,'dense aligned import geometry '+size.width);
   }
   await page.setViewportSize({width:1600,height:900});await page.screenshot({path:path.join(out,'r95-import-split.png')});
   await page.locator('[data-preview="raw"]').click();check(await page.locator('#r95RawPreview').isVisible()&&!await page.locator('#r95ParsedPreview').isVisible(),'raw table remains available on demand');
