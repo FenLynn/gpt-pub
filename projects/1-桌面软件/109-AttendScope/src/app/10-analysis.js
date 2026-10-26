@@ -711,4 +711,4 @@ function reanalyze(){
  }finally{r63AnalysisIndex=null}
 }
 function statsFor(items){const total=items.length,problems=items.filter(x=>x.severity==='problem').length,suspects=items.filter(x=>x.severity==='suspect').length,normal=items.filter(x=>x.severity==='normal').length,rest=items.filter(x=>x.severity==='rest').length,excused=items.filter(x=>x.severity==='excused').length;return {total,problems,suspects,normal,rest,excused}}
-function workAnalyses(){return [...state.analysis.values()].filter(x=>isWorkday(x.day))}
+function workAnalyses(){return [...state.analysis.values()].filter(x=>isWorkday(x.day)&&!p109Ignored(x.employee.id))}

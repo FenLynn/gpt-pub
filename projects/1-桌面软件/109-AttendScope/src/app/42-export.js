@@ -58,7 +58,7 @@ function r63Compose(kind,visual){
   height=Math.max(690,visual.height+top+25,infoHeight);
  const [c,g]=captureCanvas(width,height);
  captureLabel(g,r63Title()+' · '+({matrix:'月度考勤矩阵',stats:'统计分析',timeline:'个人考勤时间轴'}[kind]),26,43,25,'#284766');
- captureLabel(g,kind==='matrix'?periodText()+' · '+(state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup).length:EMPLOYEES.length)+' 人':d.heading,26,75,16);
+ captureLabel(g,kind==='matrix'?periodText()+' · '+scopeVisibleEmployees().length+' 人':d.heading,26,75,16);
  r63Legend(g,kind,26,108);g.drawImage(visual,25,top);
  if(sidebar){
   const x=Math.max(1060,visual.width)+46;g.strokeStyle='#e3eaf1';g.beginPath();g.moveTo(x-15,150);g.lineTo(x-15,height-22);g.stroke();
@@ -76,7 +76,7 @@ function r63Compose(kind,visual){
 }
 
 function captureMatrixCanvas(){
- const people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
+ const people=scopeVisibleEmployees();
  const w=Math.max(1260,165+monthDays()*32),h=Math.max(315,55+people.length*25);
  const [canvas,g]=captureCanvas(w,h);
  for(let d=1;d<=monthDays();d++)captureLabel(g,pad(d),166+(d-1)*32,28,12);

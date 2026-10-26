@@ -14,10 +14,10 @@ function p109ClearTransientFiles(){
 }
 function p109ActivateWorkSession(){p109WriteMode('work');p109ClearTransientFiles();document.getElementById('p109ModeOverlay')?.remove()}
 function p109BlankWork(){
- const base=structuredClone(p109DemoSession);p109RestoreSession(base);
+ const base=p109Clone(p109DemoSession);p109RestoreSession(base);
  EMPLOYEES=[];Object.assign(state,{projectDir:null,isDemo:false,records:[],leaves:[],trips:[],outings:[],overtimeEntries:[],
   imports:[],revisions:[],revisionSeq:0,manualStatuses:{},overtimeReview:{},attendanceReview:{},groups:{},groupCatalog:[],fixedPeople:[],nameAliases:{},
-  monthStores:new Map(),projectProfile:null,activeBranch:null,snapshotContext:false,overtimeRuleContexts:{},saved:true,calendarOverrides:{},
+  monthStores:new Map(),projectProfile:null,activeBranch:null,snapshotContext:false,overtimeRuleContexts:{},saved:true,calendarOverrides:{},ignoredPeople:[],statsIncludeIgnored:false,
   importProfile:{rules:R62_DEFAULT_DIRECTIONS.map(r=>({...r})),templates:{}},workspaceMode:'data',dataSection:'overview',selection:{type:'overall'}});
  Object.assign(RULES,P109_DEFAULT_RULES);p109ClearTransientFiles();rememberMonth();reanalyze();render();
 }
@@ -35,7 +35,7 @@ function p109ShowModeChooser(first=false){
  node.querySelector('#r82EntryHelp').onclick=()=>p109ShowHelp('start','overview');
  node.querySelector('#r80Demo').onclick=()=>{
   if(!first&&!p109ConfirmProjectSwitch())return;
-  p109ClearTransientFiles();p109RestoreSession(structuredClone(p109DemoSession));p109WriteMode('demo');
+  p109ClearTransientFiles();p109RestoreSession(p109Clone(p109DemoSession));p109WriteMode('demo');
   node.remove();reanalyze();render();
  };
  node.querySelector('#r80Work').onclick=async()=>{
@@ -53,9 +53,9 @@ function p109ShowWorkHome(){
  const node=document.createElement('section');node.id='p109ModeOverlay';node.className='p109-recent-overlay r80-mode-overlay';
  node.setAttribute('role','dialog');node.setAttribute('aria-modal','true');node.setAttribute('aria-labelledby','r80WorkTitle');
  node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80WorkTitle">工作项目</h2><p>程序与项目数据分别存放，可随时切换项目</p></div><button id="r80ModeClose" aria-label="关闭工作入口">×</button></header>'+
-  '<div class="r80-work-actions"><button id="r80NewProject"><strong>新建空白项目</strong><span>选择一个独立的空数据文件夹</span></button>'+
+  '<div class="r80-work-actions" '+(p109Environment().directory?'':'hidden')+'><button id="r80NewProject"><strong>新建空白项目</strong><span>选择一个独立的空数据文件夹</span></button>'+
   '<button id="r80ConnectProject"><strong>连接已有项目</strong><span>选择包含 project.json 的数据文件夹</span></button></div>'+
-  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>不需目录授权，下载项目 ZIP 保存</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button></div>'+
+  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>保存到本机缓存，可下载 ZIP 备份</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button></div>'+
   '<footer><button id="r80ChooseAgain">切换 Demo / Work</button><button id="r80MemoryWork">先在空白工作区导入</button></footer></div>';
  document.body.appendChild(node);node.addEventListener('keydown',e=>p109TrapDialogFocus(e,node));
  node.querySelector('#r80ModeClose').onclick=()=>node.remove();
@@ -66,8 +66,8 @@ function p109ShowWorkHome(){
  node.querySelector('#r80NewProject').onclick=()=>open(()=>p109InitializeProject());
  node.querySelector('#r80ConnectProject').onclick=()=>open(()=>connectProjectDir());
  node.querySelector('#r80ChooseAgain').onclick=()=>p109ShowModeChooser();
- node.querySelector('#r80MemoryWork').onclick=()=>{node.remove();toast('当前为临时工作区；关闭前点保存，下载并确认完整项目 ZIP。')};
- node.querySelector('#r80NewProject').focus();
+ node.querySelector('#r80MemoryWork').onclick=()=>{node.remove();toast('当前为临时工作区；保存写入本机缓存，下载项目包可另存备份。')};
+ node.querySelector(p109Environment().directory?'#r80NewProject':'#r85NewPortable').focus();
 }
 function p109CurrentProjectName(){
  if(!state.projectDir)return state.isDemo?'演示项目':'未连接项目';

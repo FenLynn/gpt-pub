@@ -54,7 +54,7 @@ module.exports=async({browser,root,out})=>{
    a=seed(base,[['10:00','11:00']],[[date,date]],[['19:00','22:00']]);result.reportDoesNotEraseEveningRegistration=hours()===180;
    a=seed(base,[],[],[['10:00','11:00']]);RULES.businessRuleVersion=1;reanalyze();result.historicalRegistrationUnchanged=hours()===60;
    const old={schemaVersion:5,year:2026,month:10,records:[],rules:{...P109_DEFAULT_RULES,businessRuleVersion:undefined},calendarOverrides:p109CalendarMonthValues(2026,10,{},false)};
-   const live=normalizeSavedMonth(old),frozen=normalizeSavedMonth(old,true);result.migration=live.rules.businessRuleVersion===2&&!live.saved&&live.schemaVersion===6&&frozen.rules.businessRuleVersion===1;
+   const live=normalizeSavedMonth(old),frozen=normalizeSavedMonth(old,true);result.migration=live.rules.businessRuleVersion===2&&!live.saved&&live.schemaVersion===7&&frozen.rules.businessRuleVersion===1;
    result.invalidPolicyRejected=normalizeSavedMonth({...old,rules:{...P109_DEFAULT_RULES,businessRuleVersion:3}})===null;
    seed(gap('09:45','11:15'),[['10:00','11:00']],[],[['16:30','18:00']],[['18:00','18:30']]);
    Object.assign(state,{workspaceMode:'person',selection:{type:'cell',employeeId:'r94',day:8},chartDay:8,chartTab:'timeline',timelineRange:null});render();

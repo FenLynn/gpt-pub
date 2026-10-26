@@ -3,7 +3,7 @@
 'use strict';
 const R68_SECTIONS={records:'原始记录',calendar:'工作日管理',roster:'名册与分组',rules:'工作规则',
  templates:'导入模板',imports:'导入历史',freezes:'冻结与修订'};
-const r68UI={chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',targetGroup:'未分组',recordsView:'files',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
+const r68UI={chosen:new Set(),fixedChosen:new Set(),rosterTab:'fixed',search:'',fixedSearch:'',groupFilter:'all',targetGroup:'未分组',recordsView:'files',groupEditorOpen:false,projectSerial:0,treeSerial:0,rankMode:'issue'};
 function r68Esc(s){return escapeNameChar(String(s??''))}
 function r68HumanBytes(bytes){return bytes<1024?bytes+' B':bytes<1048576?(bytes/1024).toFixed(1)+' KB':(bytes/1048576).toFixed(2)+' MB'}
 function r68Pill(text,kind='neutral'){return '<span class="r68-pill '+kind+'">'+r68Esc(text)+'</span>'}
@@ -125,13 +125,13 @@ function r73GroupEditorHtml(){
   '</section></div>';
 }
 function r68RosterHtml(){
- const monthly=r68RosterRows(),fixed=r73FixedRoster(),fixedIds=new Set(state.fixedPeople||[]),
+ const ignoredTab=r68UI.rosterTab==='ignored',monthly=r68RosterRows(),fixed=ignoredTab?p109IgnoredRoster():r73FixedRoster(),fixedIds=new Set(ignoredTab?state.ignoredPeople||[]:state.fixedPeople||[]),
   selected=[...r68UI.chosen].filter(id=>EMPLOYEES.some(e=>e.id===id)),
   selectedFixed=[...r68UI.fixedChosen].filter(id=>fixedIds.has(id)),
   groups=workspaceGroups().filter(g=>g!=='未分组'),catalog=state.groupCatalog||[],
   fixedShown=fixed.filter(e=>!r68UI.fixedSearch||e.name.toLocaleLowerCase().includes(r68UI.fixedSearch.toLocaleLowerCase())),
   choices=['未分组',...groups].map(g=>'<option value="'+r68Esc(g)+'" '+(r68UI.targetGroup===g?'selected':'')+'>'+r68Esc(g)+'</option>').join('');
- return '<div class="r74-roster-header">'+r68SidebarHeader('人员与分组','当月人员不因取消固定而删除；右侧固定名单会带入以后新建的月份。')+
+ return '<div class="r74-roster-header">'+r68SidebarHeader('人员与分组','长期固定人员供新建月份复用；忽略人员默认不在首页和统计中出现，原始数据保留。')+
   '<div class="r73-roster-top">'+
    '<div class="r73-roster-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
    '<input id="r68RosterSearch" aria-label="搜索当月姓名" placeholder="搜索当月姓名" value="'+r68Esc(r68UI.search)+'"></div>'+
@@ -154,29 +154,31 @@ function r68RosterHtml(){
        '<input type="checkbox" data-r68-person="'+r68Esc(e.id)+'" aria-label="选择 '+r68Esc(e.name)+'" '+(r68UI.chosen.has(e.id)?'checked':'')+'>'+
        '<strong>'+r68Esc(e.name)+'</strong>'+
        '<span class="r73-group-tag">'+r68Esc(currentGroup)+'</span>'+
-       (fixedIds.has(e.id)?'<span class="r73-pinned-mark" '+ 'data-r73-tip="已加入长期固定人员">✓</span>':'')+
+       (!ignoredTab&&fixedIds.has(e.id)?'<span class="r73-pinned-mark" '+ 'data-r73-tip="已加入长期固定人员">✓</span>':'')+
        '<button class="r73-rename" type="button" data-r72-rename="'+r68Esc(e.id)+'" aria-label="修改 '+r68Esc(e.name)+'的姓名">改名</button></div>';
      }).join(''):'<div class="r73-list-empty">当前筛选没有人员</div>')+'</div>'+
    '</section>'+
    '<nav class="r73-transfer-controls" aria-label="固定名单操作">'+
     '<button type="button" class="r73-transfer-add" id="r72FixSelected" '+(!selected.some(id=>!fixedIds.has(id))?'disabled':'')+
-       ' data-r73-tip="将左侧选中的人员添加到长期固定名单"><span aria-hidden="true">→</span><small>添加</small></button>'+
+       ' data-r73-tip="'+(ignoredTab?'不加入全员，原始数据保留':'将左侧选中的人员添加到长期固定名单')+'"><span aria-hidden="true">→</span><small>'+(ignoredTab?'忽略':'添加')+'</small></button>'+
     '<button type="button" class="r73-transfer-remove" id="r72UnfixSelected" '+(!selectedFixed.length?'disabled':'')+
-       ' data-r73-tip="从长期固定名单移除右侧选中的人员，不删除当月人员或打卡"><span aria-hidden="true">←</span><small>移除</small></button>'+
+       ' data-r73-tip="'+(ignoredTab?'加入全员，恢复首页显示和默认统计':'从长期固定名单移除右侧选中的人员，不删除当月人员或打卡')+'"><span aria-hidden="true">←</span><small>'+(ignoredTab?'加入全员':'移除')+'</small></button>'+
    '</nav>'+
-   '<section class="r73-roster-pane r73-fixed-pane" aria-label="长期固定人员">'+
-    '<header class="r73-pane-title"><div><strong>长期固定人员</strong><span>'+fixed.length+' 人</span></div>'+
+   '<section class="r73-roster-pane r73-fixed-pane" aria-label="'+(ignoredTab?'忽略人员':'长期固定人员')+'">'+
+    '<nav class="p109-roster-tabs" aria-label="人员名单">'+[['fixed','长期固定人员'],['ignored','忽略人员名单']].map(([id,label])=>'<button type="button" data-roster-tab="'+id+'" aria-pressed="'+(r68UI.rosterTab===id)+'">'+label+'</button>').join('')+'</nav>'+
+    '<header class="r73-pane-title"><div><strong>'+(ignoredTab?'忽略人员':'长期固定人员')+'</strong><span>'+fixed.length+' 人</span></div>'+
      '<label><input id="r73SelectFixed" type="checkbox" '+(fixedShown.length&&fixedShown.every(e=>r68UI.fixedChosen.has(e.id))?'checked':'')+'>全选</label></header>'+
     '<div class="r73-fixed-filter"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>'+
-     '<input id="r73FixedSearch" aria-label="搜索固定人员" placeholder="搜索固定姓名" value="'+r68Esc(r68UI.fixedSearch)+'"></div>'+
-    '<div class="r73-roster-scroll" id="r73FixedList" role="table" aria-label="长期固定人员名单">'+
+     '<input id="r73FixedSearch" aria-label="'+(ignoredTab?'搜索忽略人员':'搜索固定人员')+'" placeholder="'+(ignoredTab?'搜索忽略姓名':'搜索固定姓名')+'" value="'+r68Esc(r68UI.fixedSearch)+'"></div>'+
+    '<div class="r73-roster-scroll" id="r73FixedList" role="table" aria-label="'+(ignoredTab?'忽略人员名单':'长期固定人员名单')+'">'+
      (fixedShown.length?fixedShown.map(e=>{
        const exists=EMPLOYEES.some(p=>p.id===e.id),
          group=state.groups?.[e.id]||state.projectProfile?.groups?.[e.id]||'未分组';
        return '<div class="r73-person-row r73-fixed-row" role="row">'+
-        '<input type="checkbox" data-r73-fixed-person="'+r68Esc(e.id)+'" aria-label="选择固定人员 '+r68Esc(e.name)+'" '+(r68UI.fixedChosen.has(e.id)?'checked':'')+'>'+
+        '<input type="checkbox" data-r73-fixed-person="'+r68Esc(e.id)+'" aria-label="选择'+(ignoredTab?'忽略人员 ':'固定人员 ')+r68Esc(e.name)+'" '+(r68UI.fixedChosen.has(e.id)?'checked':'')+'>'+
         '<strong>'+r68Esc(e.name)+'</strong><span class="r73-group-tag">'+r68Esc(group)+'</span>'+
-        (!exists?'<span class="r73-other-month" data-r73-tip="该人员不在当前月份，但仍属于长期固定名单">跨月</span>':'')+
+        (!exists?'<span class="r73-other-month">跨月</span>':'')+
+        (ignoredTab&&exists?'<button type="button" class="r73-rename" data-ignored-view="'+r68Esc(e.id)+'">查看</button>':'')+
         '</div>';
      }).join(''):'<div class="r73-list-empty">'+(fixed.length?'未找到匹配人员':'选择左侧人员，点击“添加 →”')+'</div>')+
     '</div>'+
@@ -199,7 +201,7 @@ async function r72PersistRoster(){
   return [e.id,(state.groupCatalog||[]).includes(g)?g:'未分组'];
  }));
  const next={...(state.projectProfile||{}),schemaVersion:1,pinRoster:true,
-  employees:people,fixedPeople:people.map(e=>e.id),groups,
+  employees:people,fixedPeople:people.map(e=>e.id),groups,ignoredPeople:[...(state.ignoredPeople||[])],ignoredEmployees:p109IgnoredRoster(),
   groupCatalog:[...(state.groupCatalog||[])],nameAliases:{...(state.nameAliases||{})},
   savedAt:new Date().toISOString()};
  if(!state.projectDir){state.projectProfile=next;return}
@@ -264,6 +266,8 @@ function r72RenamePerson(id){
  employee.id=newId;employee.name=name;
  state.groups[newId]=state.groups[id]||'未分组';if(id!==newId)delete state.groups[id];
  state.fixedPeople=(state.fixedPeople||[]).map(x=>x===id?newId:x);
+ state.ignoredPeople=(state.ignoredPeople||[]).map(x=>x===id?newId:x);
+ if(state.projectProfile?.ignoredPeople){state.projectProfile.ignoredPeople=state.projectProfile.ignoredPeople.map(x=>x===id?newId:x);state.projectProfile.ignoredEmployees=p109IgnoredRoster()}
  state.manualStatuses=Object.fromEntries(Object.entries(state.manualStatuses||{}).map(([key,v])=>
   [key.startsWith(id+'|')?newId+key.slice(id.length):key,v]));
  state.overtimeReview=Object.fromEntries(Object.entries(state.overtimeReview||{}).map(([key,v])=>
@@ -530,7 +534,7 @@ function renderDataWorkspace(){
  });
  root.querySelector('#r73SelectFixed')?.addEventListener('change',e=>{
   const term=r68UI.fixedSearch.toLocaleLowerCase();
-  r73FixedRoster().filter(p=>!term||p.name.toLocaleLowerCase().includes(term)).forEach(p=>
+  (r68UI.rosterTab==='ignored'?p109IgnoredRoster():r73FixedRoster()).filter(p=>!term||p.name.toLocaleLowerCase().includes(term)).forEach(p=>
    e.target.checked?r68UI.fixedChosen.add(p.id):r68UI.fixedChosen.delete(p.id));
   r68RefreshDataContent()
  });
@@ -547,8 +551,10 @@ function renderDataWorkspace(){
  });
  root.querySelector('#r72AddPerson')?.addEventListener('click',r72AddPerson);
  root.querySelectorAll('[data-r72-rename]').forEach(b=>b.onclick=()=>r72RenamePerson(b.dataset.r72Rename));
- root.querySelector('#r72FixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.chosen],true));
- root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>r72FixedPeople([...r68UI.fixedChosen],false));
+ root.querySelectorAll('[data-roster-tab]').forEach(b=>b.onclick=()=>{r68UI.rosterTab=b.dataset.rosterTab;r68UI.fixedChosen.clear();r68UI.fixedSearch='';r68RefreshDataContent()});
+ root.querySelectorAll('[data-ignored-view]').forEach(b=>b.onclick=()=>{state.selection={type:'person',employeeId:b.dataset.ignoredView};navigateWorkspace('person')});
+ root.querySelector('#r72FixSelected')?.addEventListener('click',()=>r68UI.rosterTab==='ignored'?p109SetIgnored([...r68UI.chosen],true):r72FixedPeople([...r68UI.chosen],true));
+ root.querySelector('#r72UnfixSelected')?.addEventListener('click',()=>r68UI.rosterTab==='ignored'?p109SetIgnored([...r68UI.fixedChosen],false):r72FixedPeople([...r68UI.fixedChosen],false));
  root.querySelector('#r73EditGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(true));
  root.querySelector('#r73CloseGroups')?.addEventListener('click',()=>r73ToggleGroupEditor(false));
  root.querySelector('#r73GroupBackdrop')?.addEventListener('click',e=>{

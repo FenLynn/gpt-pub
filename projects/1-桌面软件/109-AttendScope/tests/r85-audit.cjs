@@ -26,12 +26,12 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(()=>freezeSnapshot()),'portable mode creates an immutable snapshot');
   const frozen=await page.evaluate(async()=>{const snaps=await (await (await (await state.projectDir.getDirectoryHandle('data')).getDirectoryHandle('2026')).getDirectoryHandle('10')).getDirectoryHandle('snapshots');for await(const [name,h] of snaps.entries())return {name,text:await (await h.getFileHandle('snapshot.json')).getFile().then(f=>f.text())}});
   await page.evaluate(()=>{state.manualStatuses[EMPLOYEES[0].id+'|8']='normal';state.saved=false;rememberMonth();switchMonth(2026,11,true)});await upload('11');
-  const download=page.waitForEvent('download');await page.locator('#saveBtn').click();const file=await download,filePath=path.join(out,'r85-portable-project.zip');await file.saveAs(filePath);
+  const download=page.waitForEvent('download');await page.evaluate(()=>p109ExportPortable());const file=await download,filePath=path.join(out,'r85-portable-project.zip');await file.saveAs(filePath);
   check(await page.evaluate(()=>state.projectDir.pending&&p109UnsavedMonths().length>0),'starting a download never falsely clears unsaved protection');
   await page.evaluate(()=>{state.groups[EMPLOYEES[0].id]='下载后新增';state.saved=false});await page.locator('#p109ConfirmDownload').click();
   check(await page.evaluate(()=>state.projectDir.pending)&&/发生变化/.test(await page.locator('#p109TransferState').textContent()),'download confirmation cannot clear edits made after packaging');
   await page.evaluate(()=>{delete state.groups[EMPLOYEES[0].id];state.groups[EMPLOYEES[0].id]='未分组'});
-  const fresh=page.waitForEvent('download');await page.evaluate(()=>saveWorking());await (await fresh).saveAs(filePath);
+  const fresh=page.waitForEvent('download');await page.evaluate(()=>p109ExportPortable());await (await fresh).saveAs(filePath);
   await page.locator('#p109ConfirmDownload').click();check(await page.evaluate(()=>!state.projectDir.pending&&!p109UnsavedMonths().length),'only explicit download confirmation clears portable pending state');
   await page.locator('#p109TransferClose').click();
   await page.reload();await page.evaluate(()=>p109RecentReady);await page.locator('#r80Work').click();
@@ -64,8 +64,8 @@ module.exports=async({browser,out,root})=>{
   check(await page.evaluate(async bytes=>p109OpenPortableFile(new File([Uint8Array.from(bytes)],'rescue.json')),[...fs.readFileSync(rescuePath)]),'rescue JSON can be reopened to continue working');
   check(await page.evaluate(()=>state.projectDir.rescue&&state.monthStores.size===2),'rescue workspace is explicitly distinguished from a complete project');
   await page.evaluate(()=>{window.__subtle=Object.getOwnPropertyDescriptor(crypto,'subtle');Object.defineProperty(crypto,'subtle',{configurable:true,value:undefined});state.saved=false});
-  check(await page.evaluate(()=>!p109Environment().hash),'missing hash support is detected');
-  check(await page.evaluate(()=>p109ExportPortable())===false&&/安全项目包/.test(await page.locator('#p109FallbackReason').textContent()),'missing hash support refuses unsafe archives and offers rescue JSON');
+  check(await page.evaluate(()=>!p109Environment().nativeHash&&p109Environment().hash),'missing native hash uses the verified compatibility implementation');
+  check(await page.evaluate(()=>p109ExportPortable())===false&&/缺少/.test(await page.locator('#p109FallbackReason').textContent()),'compatibility hash never bypasses missing-original validation');
   const noHashRescue=page.waitForEvent('download');await page.locator('#p109FallbackRescue').click();await (await noHashRescue).saveAs(path.join(out,'r85-no-hash-rescue.json'));
   check(await page.evaluate(()=>p109UnsavedMonths().length>0),'rescue download retains unsaved protection');
   await page.evaluate(()=>{window.__objectUrl=URL.createObjectURL;URL.createObjectURL=undefined});
@@ -99,7 +99,7 @@ module.exports=async({browser,out,root})=>{
   await p.locator('#r85ImportFallback').click();await p.waitForFunction(()=>state.projectDir.__p109Portable&&!!r62ImportDraft&&!p109ProjectBusy);
   await p.locator('#r62Commit').click();await p.waitForFunction(()=>!r62ImportDraft&&!state.importCommitting);
   check(await p.evaluate(async()=>{const imp=state.imports.find(x=>x.name==='retry.csv');let h=state.projectDir;const parts=p109SourcePath(imp),name=parts.pop();for(const part of parts)h=await existingDir(h,part);return state.imports.length===2&&state.records.length===2&&(await (await h.getFileHandle(name)).getFile()).size>0}),'the same draft retries in portable mode, preserving earlier records and new original bytes');
-  const retrySaved=p.waitForEvent('download');await p.evaluate(()=>saveWorking());await (await retrySaved).saveAs(path.join(out,'r85-import-retry.zip'));await p.locator('#p109ConfirmDownload').click();await p.locator('#p109TransferClose').click();
+  const retrySaved=p.waitForEvent('download');await p.evaluate(()=>p109ExportPortable());await (await retrySaved).saveAs(path.join(out,'r85-import-retry.zip'));await p.locator('#p109ConfirmDownload').click();await p.locator('#p109TransferClose').click();
   check(await p.evaluate(async bytes=>{
    writeFile=__normalWrite;const runtime=await (await navigator.storage.getDirectory()).getDirectoryHandle('r85-program-'+crypto.randomUUID(),{create:true}),app=await dir(await dir(runtime,'src'),'app');
    await writeFile(runtime,'index.html','<!doctype html><title>P109 program</title>');await writeFile(app,'00-state.js',"const P109_APP_VERSION='0.2.10-preview';");await writeFile(app,'43-project-control.js','// P109');

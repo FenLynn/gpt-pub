@@ -7,7 +7,7 @@ function asNavSnapshot(){
   selection:{...(state.selection||{type:'overall'})},chartDay:state.chartDay||null,
   chartTab:state.chartTab||'overview',dataSection:state.dataSection||'records',
   rawDataTab:state.rawDataTab||'attendance',insightTab:state.insightTab||'summary',
-  statsScope:state.statsScope||'all',statsGroup:state.statsGroup||'',
+  statsScope:state.statsScope||'all',statsGroup:state.statsGroup||'',statsIncludeIgnored:!!state.statsIncludeIgnored,
   statsPersonId:state.statsPersonId||'',statsExpandedKey:state.statsExpandedKey||'',
   filter:state.filter||'main',statsConfig:state.statsConfig?{...state.statsConfig}:null};
 }
@@ -51,7 +51,7 @@ function asNavGo(direction){
   state.dataSection=target.dataSection;
   state.rawDataTab=target.rawDataTab;
   state.insightTab=target.insightTab;
-  state.statsScope=target.statsScope;
+  state.statsScope=target.statsScope;state.statsIncludeIgnored=!!target.statsIncludeIgnored;
   state.statsGroup=target.statsGroup;
   state.statsPersonId=target.statsPersonId;
   state.statsExpandedKey=target.statsExpandedKey;
@@ -130,11 +130,11 @@ function layoutHtml(){
       <div class="system-menu-anchor">
         <button class="text-btn" id="projectMenuButton" data-system-menu="projectMenu" aria-expanded="false" aria-controls="projectMenu" aria-haspopup="menu">项目</button>
         <div class="system-menu" id="projectMenu" role="menu" aria-label="项目操作" hidden>
-          <button id="connectDir" role="menuitem">连接 / 切换项目目录</button>
-          <button id="initializeProject" role="menuitem">新建空白项目</button>
+          <button id="connectDir" role="menuitem" ${typeof showDirectoryPicker==='function'?'':'hidden'}>连接 / 切换项目目录</button>
+          <button id="initializeProject" role="menuitem" ${typeof showDirectoryPicker==='function'?'':'hidden'}>新建空白项目</button>
           <button id="p109PortableNew" role="menuitem">新建便携项目</button>
           <button id="p109PortableOpen" role="menuitem">打开项目 ZIP / 救援 JSON</button>
-          <button id="p109PortableExport" role="menuitem">下载完整便携项目 ZIP</button>
+          <button id="p109PortableExport" role="menuitem">下载项目包 ZIP（独立备份）</button>
           <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
           <div id="p109RecentList">${typeof p109RecentMenuHtml==='function'?p109RecentMenuHtml():''}</div>
           <div class="system-menu-divider"></div>
@@ -145,7 +145,7 @@ function layoutHtml(){
         </div>
       </div>
       <button class="text-btn" id="p109Help" aria-haspopup="dialog">帮助</button>
-      <button class="primary-btn r83-save-primary ${state.saved?'is-saved':'is-dirty'}" id="saveBtn" title="保存当前月">保存</button>
+      <button class="primary-btn r83-save-primary ${state.saved?'is-saved':'is-dirty'}" id="saveBtn" title="${state.projectDir&&!state.projectDir.__p109Portable?'保存当前月到项目目录':state.projectDir?.cacheSavedAt&&state.saved&&!state.projectDir.pending?'已存本机缓存 · '+new Date(state.projectDir.cacheSavedAt).toLocaleString():'保存整个项目到本机浏览器缓存'}">保存</button>
       <input id="restoreInput" type="file" accept=".json,application/json" hidden>
     </div>
     </div>
@@ -554,7 +554,7 @@ function analysisContext(){
     const a=state.analysis.get(e.id+'|'+sel.day);
     return {type:'cell',title:isoDate(sel.day)+' '+groupOf(e)+' '+e.name,employee:e,day:sel.day,analysis:a,items:[a]};
   }
-  if(sel.type==='date')return {type:'date',title:isoDate(sel.day),day:sel.day,items:EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+sel.day))};
+  if(sel.type==='date')return {type:'date',title:isoDate(sel.day),day:sel.day,items:p109ActivePeople().map(e=>state.analysis.get(e.id+'|'+sel.day))};
   return {type:'overall',title:period+' 全月总览',items:workAnalyses()};
 }
 

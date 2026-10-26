@@ -72,7 +72,7 @@ async function p109ApplyCodeUpdate(file,options={}){
   const {zip}=await p109ZipBuild(files);
   const archive=new Uint8Array(await zip.arrayBuffer()),backupHash=await p109Hash(archive),
    backupFolder=await dir(backupRoot,'backups'),
-   backupName='pre-upgrade-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+crypto.randomUUID().slice(0,8)+'.zip';
+   backupName='pre-upgrade-'+new Date().toISOString().replace(/[:.]/g,'-')+'-'+p109UniqueId().slice(-8)+'.zip';
   if(await p109File(backupFolder,backupName))throw Error('备份文件已存在，禁止覆盖');
   await writeFile(backupFolder,backupName,archive);
   const persisted=await p109File(backupFolder,backupName);

@@ -255,7 +255,7 @@ async function p109InitializeProject(root){
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
   state.manualStatuses={};state.overtimeReview={};state.attendanceReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
-  state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.overtimeRuleContexts={};state.captureItems=[];
+  state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.overtimeRuleContexts={};state.captureItems=[];state.ignoredPeople=[];state.statsIncludeIgnored=false;
   state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.filter='main';
   state.selectedGroup=null;state.statsConfig=null;state.statsPersonId='';state.statsGroup='';
   state.workspaceMode='all';state.analyticsPage='main';state.prefs={fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'};
@@ -274,7 +274,7 @@ async function p109InitializeProject(root){
   r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
   p109ActivateWorkSession();
   if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle());
-  render();p109Status(root.__p109Portable?'已新建便携项目。可开始导入，关闭前须下载完整项目包':'空白项目已初始化并保存，可以开始导入'+
+  render();p109Status(root.__p109Portable?'已新建便携项目。可开始导入，保存到本机缓存，下载项目包另存备份':'空白项目已初始化并保存，可以开始导入'+
    (typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':''));return true;
  }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109ShowStorageFallback('初始化失败，请检查目录权限：'+e.message);return false}
  finally{p109ProjectBusy=false}
@@ -352,7 +352,7 @@ async function p109PinDefaults(kind){
    profile.pinRules=true;profile.workRules={...RULES};
   }else{
    profile.pinImport=true;
-   profile.importProfile=structuredClone(r62ImportProfile());
+   profile.importProfile=p109Clone(r62ImportProfile());
   }
   profile.savedAt=new Date().toISOString();
   await writeFile(config,'project-profile.json',JSON.stringify(profile,null,2));
@@ -407,7 +407,7 @@ async function p109BackupProject(){
   const files=[],limits={count:0,bytes:0};
   await p109ArchiveWalk(state.projectDir,'',files,limits);
   const {zip,manifest}=await p109ZipBuild(files);
-  downloadBlob(zip,r63FileStem()+'_项目备份_'+new Date().toISOString().slice(0,10)+'.zip');
+  downloadBlob(zip,r63FileStem()+'_项目备份_'+p109DownloadStamp()+'.zip');
   p109Status('已导出完整项目备份：'+limits.count+' 个文件（包含代码时可直接迁移）');
   return manifest;
  }catch(e){p109ShowStorageFallback('目录备份失败：'+e.message)}
@@ -454,9 +454,7 @@ async function p109RestoreArchive(){
  chooser.click();
 }
 async function p109Hash(bytes){
- if(!crypto?.subtle)throw Error('当前浏览器不支持 SHA-256，无法安全备份或还原');
- const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
- return [...hash].map(x=>x.toString(16).padStart(2,'0')).join('');
+ return p109Digest(bytes);
 }
 async function p109ZipBuild(files){
  const manifest={schemaVersion:1,projectId:'P109-AttendScope',exportedAt:new Date().toISOString(),

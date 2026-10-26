@@ -429,7 +429,7 @@ function mountIssueChart(ctx){
   }else{
     for(let d=1;d<=monthDays();d++){
       if(!isWorkday(d))continue;
-      const set=EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+d));
+      const set=p109ActivePeople().map(e=>state.analysis.get(e.id+'|'+d));
       names.push(pad(d));bad.push(set.filter(a=>attendanceJudgment(a)==='absent').length);sus.push(set.filter(a=>attendanceJudgment(a)==='anomaly').length);
     }
   }

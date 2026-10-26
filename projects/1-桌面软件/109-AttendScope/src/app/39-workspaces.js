@@ -19,7 +19,8 @@ function workspaceNavHtml(){
 /* Modern pages reuse one data model and route page-scoped controls into the sidebar. */
 function scopeVisibleEmployees(){
  const query=String(state.scopeSearch||'').trim().toLocaleLowerCase();
- let people=state.workspaceMode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):EMPLOYEES;
+ const pool=state.workspaceMode==='person'?EMPLOYEES:p109ActivePeople();
+ let people=state.workspaceMode==='group'?pool.filter(e=>groupOf(e)===state.selectedGroup):pool;
  if(query)people=people.filter(e=>(e.name+' '+e.id+' '+e.department+' '+groupOf(e)).toLocaleLowerCase().includes(query));
  if(state.attentionOnly)people=people.filter(e=>[...state.analysis.values()].some(a=>a.employee.id===e.id&&isWorkday(a.day)&&['anomaly','absent'].includes(attendanceJudgment(a))));
  return people;
@@ -77,8 +78,8 @@ function workspaceSidebarHtml(){
   statisticsSidebarControlsHtml()+
   '</div><div class="side-hidden-filters">'+sidebarFilterHtml()+'</div>';
  const group=mode==='group'?state.selectedGroup:mode==='person'?groupOf(EMPLOYEES.find(e=>e.id===state.selection.employeeId)||EMPLOYEES[0]):'';
- const candidates=mode==='group'?EMPLOYEES.filter(e=>groupOf(e)===state.selectedGroup):
-   mode==='person'?EMPLOYEES.filter(e=>groupOf(e)===group):EMPLOYEES;
+ const candidates=mode==='group'?p109ActivePeople().filter(e=>groupOf(e)===state.selectedGroup):
+   mode==='person'?EMPLOYEES.filter(e=>groupOf(e)===group):p109ActivePeople();
  const groupControl=mode==='data'||mode==='project'?'':'<div class="side-inline"><label for="'+
   (mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">组别</label>'+
   '<select class="side-select" id="'+(mode==='all'?'workspaceScopeGroup':mode==='group'?'workspaceGroup':'workspacePersonGroup')+'">'+
@@ -87,7 +88,7 @@ function workspaceSidebarHtml(){
  const personControl=mode==='data'||mode==='project'?'':'<div class="side-inline"><label for="workspacePerson">人员</label>'+
   '<select class="side-select" id="workspacePerson">'+(mode==='person'?'':'<option value="">全部</option>')+
   candidates.map(e=>'<option value="'+escapeNameChar(e.id)+'" '+(e.id===state.selection.employeeId?'selected':'')+'>'+
-    escapeNameChar(e.name)+'</option>').join('')+'</select></div>';
+    escapeNameChar(e.name)+(p109Ignored(e.id)?'（忽略）':'')+'</option>').join('')+'</select></div>';
  // Statistical metrics live in one top-level workspace, not three sidebar clones.
  const sub=mode==='data'?'<div class="side-subnav r69-data-nav">'+
   '<div class="r69-nav-category">项目状态</div>'+

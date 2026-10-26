@@ -122,7 +122,7 @@ function mountOverallStats(ctx){
   const sub=initAttendChart(document.getElementById('statsChartSecondary'));
   if(main){
     const data=Array.from({length:monthDays()},(_,i)=>{
-      const d=i+1,arr=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${d}`));
+      const d=i+1,arr=p109ActivePeople().map(e=>state.analysis.get(`${e.id}|${d}`));
       return [String(d),arr.filter(x=>x.severity==='problem'||x.severity==='suspect').length,isWorkday(d)];
     }).filter(x=>x[2]);
     main.setOption({
@@ -140,7 +140,7 @@ function mountOverallStats(ctx){
     main.on('click',p=>{const d=+p.name;if(d)selectDate(d,true)});
   }
   if(sub){
-    const rows=EMPLOYEES.map(e=>({
+    const rows=p109ActivePeople().map(e=>({
       name:e.name,value:Array.from({length:monthDays()},(_,i)=>state.analysis.get(`${e.id}|${i+1}`)).filter(x=>x.severity==='problem'||x.severity==='suspect').length,id:e.id
     })).sort((a,b)=>b.value-a.value).slice(0,8).reverse();
     sub.setOption({
@@ -346,7 +346,7 @@ function mountOverviewTrend(){
   if(!chart)return;
   const rows=Array.from({length:monthDays()},(_,i)=>{
     const day=i+1;
-    const list=EMPLOYEES.map(e=>state.analysis.get(`${e.id}|${day}`));
+    const list=p109ActivePeople().map(e=>state.analysis.get(`${e.id}|${day}`));
     return {day,anomaly:list.filter(a=>attendanceJudgment(a)==='anomaly').length,absent:list.filter(a=>attendanceJudgment(a)==='absent').length};
   }).filter(x=>isWorkday(x.day));
   chart.setOption({
@@ -422,7 +422,7 @@ function mountFilteredOverview(ctx){
   const person=ctx.employee||null;
   const rows=Array.from({length:monthDays()},(_,i)=>{
     const day=i+1;
-    const list=person?[state.analysis.get(person.id+'|'+day)]:EMPLOYEES.map(e=>state.analysis.get(e.id+'|'+day));
+    const list=person?[state.analysis.get(person.id+'|'+day)]:p109ActivePeople().map(e=>state.analysis.get(e.id+'|'+day));
     const value=list.filter(a=>state.filter==='main'?true:analysisViewItems({items:[a]}).length>0).length;
     return {day,value};
   }).filter(x=>isWorkday(x.day)||behaviorFilterActive()||state.filter==='lateEarly');

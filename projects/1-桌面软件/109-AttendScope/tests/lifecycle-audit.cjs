@@ -555,7 +555,18 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.manualOvertime=[{id:'manual-overtime:legacy-test',employeeId:EMPLOYEES[0].id,date:'2026-10-08',start:'18:00',end:'19:00'}];
    state.saved=false;rememberMonth();await saveWorking();
   });
-  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===6;
+  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===7;
+  // Build an explicitly legacy, synthetic fixture before asking R94 to read it.
+  // A real schema-7 project must never be offered to an old reader as schema 6.
+  const prepareLegacyPopulation=()=>{
+   const working=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8'));
+   if(working.ignoredPeople?.length)throw Error('Cannot represent ignored staff in a legacy fixture');
+   delete working.ignoredPeople;working.schemaVersion=6;
+   fs.writeFileSync(oldWorkingPath,JSON.stringify(working,null,2));
+   const target=path.join(oldRoot,'project.json'),project=JSON.parse(fs.readFileSync(target,'utf8'));
+   project.schemaVersion=6;fs.writeFileSync(target,JSON.stringify(project,null,2));
+  };
+  prepareLegacyPopulation();
   const r94Commit='c16d468cf3f879599203c7ffbd244ae07c32f360';
   const listingR94=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r94Commit,'--',projectPath],{encoding:'utf8'});
   if(listingR94.status!==0)throw Error('R94 source listing unavailable');
@@ -574,6 +585,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   report.r94UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r94Working)&&fs.readFileSync(oldRawPath).equals(r94Raw);
   await open();report.r94ReopensWithoutMigration=await page.evaluate(v=>P109_APP_VERSION===v&&!!state.projectDir&&state.saved&&RULES.businessRuleVersion===2,currentVersion);
   const r95Commit='b35d0aa48fe1464ceb371f292abdf210502e307b';
+  prepareLegacyPopulation();
   const listingR95=cp.spawnSync('git',['-C',root,'-c','core.quotepath=false','ls-tree','--full-tree','-r','--name-only',r95Commit,'--',projectPath],{encoding:'utf8'});
   if(listingR95.status!==0)throw Error('R95 source listing unavailable');
   for(const file of listingR95.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
@@ -590,6 +602,15 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   await page.locator('#p109UpdateInstall').click();await page.waitForFunction(()=>document.getElementById('p109UpdateInstall')?.dataset.reload==='1',null,{timeout:60000});
   report.r95UpgradePreservesBytes=fs.readFileSync(oldWorkingPath).equals(r95Working)&&fs.readFileSync(oldRawPath).equals(r95Raw);
   await open();report.r95TemplateRestored=await page.evaluate(v=>P109_APP_VERSION===v&&state.saved&&r96SavedImportSettings('leave').mapping.type===-1&&r96SavedImportSettings('leave').startMode==='split',currentVersion);
+  await page.evaluate(()=>saveWorking());
+  for(const [label,listing] of [['r94',listingR94],['r95',listingR95]]){
+   for(const file of listing.stdout.trim().split(/\r?\n/).filter(f=>{const rel=f.slice(projectPath.length);return rel==='index.html'||rel==='README.md'||rel.startsWith('src/')})){
+    const source=cp.spawnSync('git',['-C',root,'show',(label==='r94'?r94Commit:r95Commit)+':'+file],{maxBuffer:16*1024*1024});
+    if(source.status!==0)throw Error('Cannot read historical schema guard source');
+    const target=path.join(oldRoot,file.slice(projectPath.length));fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,source.stdout);
+   }
+   await open();report[label+'RejectsNewSchema']=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
+  }
   installR86();await open();
   report.oldProgramRejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
   installR88();await open();
@@ -599,6 +620,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
   installR93();await open();report.r93RejectsNewSchema=await page.evaluate(()=>!state.projectDir&&document.body.textContent.includes('更新的数据版本'));
 
   const requiredTrue=[
+   'r94RejectsNewSchema','r95RejectsNewSchema',
    'r95OldVersionBoot','r95UpgradePreservesBytes','r95TemplateRestored',
    'r94OldVersionBoot','r94UpgradePreservesBytes','r94ReopensWithoutMigration',
    'r93OldVersionBoot','r93UpgradePreservesBytes','r93Migration','r93RejectsNewSchema',

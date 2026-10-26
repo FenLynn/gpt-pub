@@ -1,0 +1,5 @@
+.p109-roster-tabs{display:flex;gap:8px;flex:none;padding:4px 0 10px;border-bottom:1px solid #e2eaf0}
+.p109-roster-tabs button{border:1px solid transparent;border-radius:5px;background:transparent;color:#617c92;padding:7px 10px;cursor:pointer;font-size:13px}
+.p109-roster-tabs button[aria-pressed=true]{border-color:#bfd7e9;background:#edf5fc;color:#236b9e;font-weight:600}
+.r80-work-actions[hidden],#projectMenu button[hidden]{display:none!important}
+.r62-dialog.r95-dialog{height:80vh;max-height:80vh;height:80dvh;max-height:80dvh}

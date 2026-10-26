@@ -45,7 +45,7 @@ async function p109RememberProject(handle,projectName=''){
  for(const item of p109RecentState.items){
   try{if(item.handle===handle||await handle.isSameEntry?.(item.handle)){existing=item;break}}catch(_){}
  }
- const item={...existing,id:existing?.id||crypto.randomUUID(),handle,name:handle.name,
+ const item={...existing,id:existing?.id||p109UniqueId(),handle,name:handle.name,
   projectName:String(projectName||attendTitle()).slice(0,80),openedAt:Date.now()};
  p109RecentState.items=p109RecentState.items.filter(x=>x.id!==item.id).concat(item);p109RecentState.lastId=item.id;
  try{await p109RecentWrite(item,item.id);p109RecentState.available=true;p109RecentState.error=''}
@@ -126,6 +126,7 @@ async function p109RestoreLastProject({startup=true}={}){
   if(serial!==p109RecentState.serial)return;
   p109RecentState.items=data.items.filter(x=>x.handle?.kind==='directory'&&typeof x.handle.getDirectoryHandle==='function');p109RecentState.lastId=data.lastId;p109RefreshRecentMenu();
   const item=p109RecentState.items.find(x=>x.id===data.lastId);
+  if(!item&&await p109RestoreLocalCache(()=>serial===p109RecentState.serial&&!p109RecentState.interacted))return;
   let portable=false;try{portable=localStorage.getItem('p109-last-work-mode')==='portable'}catch(_){}
   if(portable&&!state.projectDir&&!p109RecentState.interacted){if(startup)p109ShowModeChooser(true);else{p109BlankWork();p109ShowWorkHome()}return}
   if(startup&&!item&&!state.projectDir&&!p109RecentState.interacted){p109ShowModeChooser(true);return}
@@ -139,13 +140,16 @@ async function p109RestoreLastProject({startup=true}={}){
    if(!ok)p109ShowRecentProjects('上次项目未能载入，请重新授权或选择目录。');
   }else p109ShowRecentProjects('上次项目：'+p109RecentName(item)+'。点击“继续打开”重新授权，无需再次寻找目录。');
  }catch(e){p109RecentState.available=false;p109RecentState.error='无法读取项目历史：'+e.message;p109RefreshRecentMenu();
+  if(await p109RestoreLocalCache(()=>serial===p109RecentState.serial&&!p109RecentState.interacted))return;
   if(!state.projectDir&&!p109RecentState.interacted){if(startup)p109ShowModeChooser(true);else p109ShowWorkHome()}}
  finally{document.removeEventListener('pointerdown',mark,true);document.removeEventListener('keydown',mark,true)}
 }
 p109RefreshRecentMenu();
 const p109RecentReady=(async()=>{
- await p109LoadFixedCalendar();
- p109DemoSession=structuredClone(p109CaptureSession());
- if(p109ReadMode()==='work')p109BlankWork();
- await p109RestoreLastProject();
+ try{
+  await p109LoadFixedCalendar();
+  p109DemoSession=p109Clone(p109CaptureSession());
+  if(p109ReadMode()==='work')p109BlankWork();
+  await p109RestoreLastProject();
+ }catch(e){p109ShowModeChooser(true);toast('启动未完成：'+e.message,true)}
 })();

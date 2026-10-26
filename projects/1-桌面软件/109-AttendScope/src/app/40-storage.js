@@ -58,7 +58,7 @@ function downloadOvertimeEntries(){
 function judgmentChinese(k){return ({normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'})[k]||k}
 function traditionalRows(){
   const rows=[];
-  for(const e of EMPLOYEES)for(let d=1;d<=monthDays();d++){
+  for(const e of (state.workspaceMode==='stats'&&state.statsIncludeIgnored?EMPLOYEES:p109ActivePeople()))for(let d=1;d<=monthDays();d++){
     const a=state.analysis.get(e.id+'|'+d);
     rows.push({姓名:e.name,部门:e.department,组别:groupOf(e),日期:a.date,星期:'周'+weekdayLabel(d),
       日期性质:a.dayType==='work'?'工作日':'休息日',
@@ -116,6 +116,7 @@ function normalizeSavedMonth(payload,keepLegacyOvertime=false){
   const schema=payload?.schemaVersion==null?1:Number(payload.schemaVersion);
   if(!payload||!Array.isArray(payload.records)||!Number.isInteger(schema)||schema<1||schema>P109_DATA_SCHEMA)return null;
   if(!p109ValidOvertimeRules(payload.rules))return null;
+  if(payload.ignoredPeople!=null&&(!Array.isArray(payload.ignoredPeople)||payload.ignoredPeople.some(id=>typeof id!=='string'||!id)||new Set(payload.ignoredPeople).size!==payload.ignoredPeople.length))return null;
   if(payload.overtimeRuleContexts!=null&&(typeof payload.overtimeRuleContexts!=='object'||Array.isArray(payload.overtimeRuleContexts)||Object.entries(payload.overtimeRuleContexts).some(([key,rules])=>!/^20\d{2}-(0[1-9]|1[0-2])$/.test(key)||!rules||typeof rules!=='object'||!p109ValidOvertimeRules(rules))))return null;
   for(const key of ['employees','leaves','trips','outings','overtimeEntries','imports','revisions','manualTempOutings','manualOvertime'])
     if(payload[key]!=null&&!Array.isArray(payload[key]))return null;
@@ -131,15 +132,15 @@ function normalizeSavedMonth(payload,keepLegacyOvertime=false){
       ids.add(row.id);
     }
   }
-  payload=r62MigratePayload(structuredClone(payload));
+  payload=r62MigratePayload(p109Clone(payload));
   const prunedManual=p109PruneExcludedManual(payload);
   const rules=payload.rules?p109NormalizeOvertimeRules(payload.rules,keepLegacyOvertime||payload.snapshotContext||payload.branch?.parentSnapshotId):null,
     overtimeRulesMigrated=!!rules&&JSON.stringify(rules)!==JSON.stringify(payload.rules);
   const splitManual=p109SplitManualOutings(payload),calendar=p109CalendarValues(payload.calendarOverrides,payload.year,payload.month,schema<4),
     calendarChanged=JSON.stringify(calendar)!==JSON.stringify(payload.calendarOverrides??null);
-  return {schemaVersion:P109_DATA_SCHEMA,records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
+  return {schemaVersion:P109_DATA_SCHEMA,ignoredPeople:[...(payload.ignoredPeople||[])],records:payload.records,leaves:payload.leaves||[],trips:payload.trips||[],
     attendanceReview:payload.attendanceReview||{},tempOutingReview:payload.tempOutingReview||{},manualTempOutings:payload.manualTempOutings||[],manualOvertime:payload.manualOvertime||[],
-    employees:payload.employees||null,groups:payload.groups||null,overtimeRuleContexts:structuredClone(payload.overtimeRuleContexts||{}),
+    employees:payload.employees||null,groups:payload.groups||null,overtimeRuleContexts:p109Clone(payload.overtimeRuleContexts||{}),
     fixedPeople:payload.fixedPeople??null,nameAliases:payload.nameAliases||{},groupCatalog:payload.groupCatalog||null,snapshotContext:!!payload.snapshotContext,isDemo:typeof payload.isDemo==='boolean'?payload.isDemo:payload.records.some(r=>String(r.recordId||'').startsWith('demo:')),calendarOverrides:calendar,
     revisions:payload.revisions||[],revisionSeq:payload.revisionSeq||0,imports:payload.imports||[],saved:!prunedManual&&!splitManual&&!calendarChanged&&!overtimeRulesMigrated,overtimeRulesMigrated,outings:payload.outings||[],overtimeEntries:payload.overtimeEntries||[],manualStatuses:payload.manualStatuses||{},overtimeReview:payload.overtimeReview||{},judgmentMode:payload.judgmentMode||'initial',rules,prefs:payload.prefs||null,importProfile:payload.importProfile||null};
 }
@@ -194,6 +195,8 @@ async function p109ReadProject(handle,project){
   if(!Array.isArray(people))throw Error('项目人员配置无效');
   const profile=conf?await readJSON(conf,'project-profile.json'):null;
   if(profile&&profile.schemaVersion!==1)throw Error('项目默认配置版本不兼容');
+  if(profile?.ignoredPeople!=null&&(!Array.isArray(profile.ignoredPeople)||profile.ignoredPeople.some(id=>typeof id!=='string'||!id)||new Set(profile.ignoredPeople).size!==profile.ignoredPeople.length))throw Error('项目忽略人员名单无效');
+  if(profile?.ignoredEmployees!=null&&(!Array.isArray(profile.ignoredEmployees)||profile.ignoredEmployees.some(e=>!e||typeof e.id!=='string'||typeof e.name!=='string')))throw Error('项目忽略人员资料无效');
   const calendar={},months=new Map(),keys=new Set([...(project.months||[]),...monthBranches.keys()]),recovered=[];
   const data=await p109OptionalDirectory(handle,'data');
   if(data)for(const year of await p109Entries(data)){
@@ -216,7 +219,7 @@ async function p109ReadProject(handle,project){
     const result=await p109ReadWorking(folder,key),stored=result.normalized;
     const raw=await readJSON(folder,result.recovered?'state.previous.json':'state.json');
     if(raw.year!=null&&(Number(raw.year)!==Number(y)||Number(raw.month)!==Number(m)))throw Error(key+' 工作状态年月与目录不一致');
-    if(!stored.employees)stored.employees=structuredClone(people);
+    if(!stored.employees)stored.employees=p109Clone(people);
     if(!stored.rules){stored.rules=p109NormalizeOvertimeRules(rules,stored.snapshotContext);if(JSON.stringify(stored.rules)!==JSON.stringify(rules)){stored.saved=false;stored.overtimeRulesMigrated=true}}
     const beforeCalendar=JSON.stringify(stored.calendarOverrides);
     stored.calendarOverrides=p109CalendarValues(stored.calendarOverrides??calendar,y,m,Number(raw.schemaVersion||1)<4);
@@ -293,11 +296,7 @@ async function p109RequireWriteAccess(handle,request=true){
 }
 async function persistImportedFile(file,type,count,importId){
   const bytes=await file.arrayBuffer();
-  let sha256=null;
-  if(globalThis.crypto?.subtle){
-    const digest=await crypto.subtle.digest('SHA-256',bytes);
-    sha256=[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');
-  }
+  const sha256=await p109Digest(bytes);
   const meta={id:importId,type,name:file.name,count,sha256,importedAt:new Date().toISOString()};
   if(state.projectDir){
     const m=await monthDirectory(),raw=await dir(m,'raw'),sub=await dir(raw,type);
@@ -321,6 +320,7 @@ function projectPayload(){
 }
 function workingPayload(){
   return {schemaVersion:P109_DATA_SCHEMA,context:'working',year:YEAR,month:MONTH,savedAt:new Date().toISOString(),
+    ignoredPeople:[...(state.ignoredPeople||[])],
     employees:EMPLOYEES.map(e=>({...e})),isDemo:!!state.isDemo,calendarOverrides:{...(state.snapshotContext||state.activeBranch?state.calendarOverrides:{}),...p109CalendarMonthValues(YEAR,MONTH,state.calendarOverrides,!state.snapshotContext&&!state.activeBranch)},importProfile:r62ImportProfile(),
     records:state.records,leaves:state.leaves,trips:state.trips,
     revisions:state.revisions,revisionSeq:state.revisionSeq,imports:state.imports,
@@ -328,12 +328,11 @@ function workingPayload(){
     outings:state.outings||[],overtimeEntries:state.overtimeEntries||[],manualStatuses:{...(state.manualStatuses||{})},overtimeReview:{...(state.overtimeReview||{})},judgmentMode:state.judgmentMode||'initial',rules:{...RULES},prefs:{...state.prefs},
     groups:state.groups,fixedPeople:[...(state.fixedPeople||[])],nameAliases:{...(state.nameAliases||{})},groupCatalog:[...(state.groupCatalog||[])],
     // All derived analyses are recalculated from raw facts and manual decisions.
-    appVersion:P109_APP_VERSION,analysisEngineVersion:P109_ENGINE_VERSION,snapshotContext:!!state.snapshotContext,overtimeRuleContexts:structuredClone(state.overtimeRuleContexts||{}),branch:state.activeBranch||null};
+    appVersion:P109_APP_VERSION,analysisEngineVersion:P109_ENGINE_VERSION,snapshotContext:!!state.snapshotContext,overtimeRuleContexts:p109Clone(state.overtimeRuleContexts||{}),branch:state.activeBranch||null};
 }
 async function saveWorking(options={}){
   if(state.storageBusy||state.importCommitting||p109ConnectionBusy||(p109ProjectBusy&&!options.initializing)){toast('正在处理项目文件，请稍后保存',true);return false}
-  if(state.projectDir?.__p109Portable&&!options.initializing)return p109ExportPortable();
-  if(!state.projectDir&&!state.isDemo&&!options.initializing)return p109ExportPortable({adopt:true});
+  if((state.projectDir?.__p109Portable||!state.projectDir&&!state.isDemo)&&!options.initializing)return p109SaveLocalCache();
   state.storageBusy=true;
   try{
   const payload=JSON.stringify(workingPayload(),null,2);
@@ -355,6 +354,7 @@ async function saveWorking(options={}){
        throw new Error('写入校验失败，保留上一有效版本');
       // Working is authoritative; config files are optional legacy defaults.
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
+      if(state.projectProfile)await writeFile(await dir(state.projectDir,'config'),'project-profile.json',JSON.stringify(state.projectProfile,null,2));
       const current=workingPayload(),written=JSON.parse(payload);delete current.savedAt;delete written.savedAt;
       state.saved=JSON.stringify(current)===JSON.stringify(written);rememberMonth();
       if(typeof p109CloseTransfer==='function')p109CloseTransfer();render();toast(state.saved?'已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'):'已保存，操作期间的新修改仍需再次保存');return true;

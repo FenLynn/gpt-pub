@@ -45,9 +45,9 @@ function asStatScopeGroup(){
  return state.workspaceMode==='stats'?(state.statsGroup||workspaceGroups()[0]||''):state.selectedGroup;
 }
 function asStatScopePerson(){
- return state.workspaceMode==='stats'?(state.statsPersonId||
-  EMPLOYEES.find(e=>groupOf(e)===asStatScopeGroup())?.id||EMPLOYEES[0]?.id):
-  state.selection.employeeId;
+ if(state.workspaceMode!=='stats')return state.selection.employeeId;
+ const people=p109StatPeople();
+ return people.find(e=>e.id===state.statsPersonId)?.id||people.find(e=>groupOf(e)===asStatScopeGroup())?.id||people[0]?.id;
 }
 function asStatDefaultCompare(mode){return mode==='person'?'days':mode==='group'?'people':'groups'}
 function asStatVisibleMetrics(family,compare,mode){
@@ -79,9 +79,9 @@ function asStatPrefs(){
 function asStatMetric(){const c=asStatPrefs();return asStatFamily(c.family)[2].find(m=>m[0]===c.metric)}
 function asStatSelectedPeople(){
  const m=asStatScopeMode();
- if(m==='person')return EMPLOYEES.filter(e=>e.id===(asStatScopePerson()||EMPLOYEES[0]?.id));
- if(m==='group')return EMPLOYEES.filter(e=>groupOf(e)===asStatScopeGroup());
- return EMPLOYEES;
+ if(m==='person')return p109StatPeople().filter(e=>e.id===(asStatScopePerson()||p109StatPeople()[0]?.id));
+ if(m==='group')return p109StatPeople().filter(e=>groupOf(e)===asStatScopeGroup());
+ return p109StatPeople();
 }
 function asStatWorkMinutes(){return Math.max(0,minutes(RULES.amEnd)-minutes(RULES.amStart))+
  Math.max(0,minutes(RULES.pmEnd)-minutes(RULES.pmStart))}
@@ -300,7 +300,7 @@ function asStatRows(){
  const days=all,ledger=asStatLedger(),groups=workspaceGroups();
  let compare=c.compare;
  if(asStatScopeMode()==='person')compare='days';
- const entries=compare==='groups'?groups.map(name=>({label:name,key:name,type:'group',people:EMPLOYEES.filter(e=>groupOf(e)===name),days})):
+ const entries=compare==='groups'?groups.map(name=>({label:name,key:name,type:'group',people:p109StatPeople().filter(e=>groupOf(e)===name),days})):
   compare==='people'?people.map(e=>({label:people.filter(x=>x.name===e.name).length>1?e.name+' · '+e.id:e.name,key:e.id,type:'person',people:[e],days})):
    days.map(d=>({label:pad(d)+' 日',key:String(d),type:'day',people,days:[d]}));
  const counted=entries.map(e=>{
@@ -373,8 +373,8 @@ function asStatSidebarFiltersHtml(){
 }
 function statisticsSidebarControlsHtml(){
  const mode=asStatScopeMode(),groups=workspaceGroups(),group=asStatScopeGroup()||groups[0]||'';
- const people=EMPLOYEES.filter(e=>groupOf(e)===group);
- const personId=asStatScopePerson()||people[0]?.id||EMPLOYEES[0]?.id||'';
+ const people=p109StatPeople().filter(e=>groupOf(e)===group);
+ const personId=asStatScopePerson()||people[0]?.id||p109StatPeople()[0]?.id||'';
  const groupControl=mode!=='all'?'<label class="stats-side-field">组别<select id="asStatsGroup">'+
    asStatOptions(groups.map(g=>[g,g]),group)+'</select></label>':'';
  const personControl=mode==='person'?'<label class="stats-side-field">人员<select id="asStatsPerson">'+
@@ -384,13 +384,14 @@ function statisticsSidebarControlsHtml(){
   '<label class="stats-side-field">范围<select id="asStatsScope">'+
   asStatOptions([['all','全员'],['group','组别'],['person','个人']],mode)+
   '</select></label>'+groupControl+personControl+
+  '<label class="stats-side-field">忽略人员<select id="asStatsIgnored">'+asStatOptions([['exclude','不统计'],['include','包含统计']],state.statsIncludeIgnored?'include':'exclude')+'</select></label>'+
   asStatSidebarFiltersHtml();
 }
 function statisticsWorkspaceHtml(){
  const c=asStatPrefs(),met=asStatMetric(),mode=asStatScopeMode();
  const groups=workspaceGroups(),scopeGroup=asStatScopeGroup()||groups[0]||'';
- const scopePeople=EMPLOYEES.filter(e=>groupOf(e)===scopeGroup);
- const chosenPerson=asStatScopePerson()||scopePeople[0]?.id||EMPLOYEES[0]?.id||'';
+ const scopePeople=p109StatPeople().filter(e=>groupOf(e)===scopeGroup);
+ const chosenPerson=asStatScopePerson()||scopePeople[0]?.id||p109StatPeople()[0]?.id||'';
  const comparisons=mode==='person'?[['days','每日趋势']]:
   mode==='group'?[['people','组内人员'],['days','每日趋势']]:
    [['groups','各组对比'],['people','全员排名'],['days','每日趋势']];
@@ -412,7 +413,7 @@ function statisticsWorkspaceHtml(){
  const scopedTitle=mode==='all'?'全员（'+selected.people.length+'人）':
   mode==='group'?scopeGroup+'（'+selected.people.length+'人）':
    (selected.people[0]?.name||'个人')+
-    (selected.people[0]&&EMPLOYEES.filter(e=>e.name===selected.people[0].name).length>1?
+    (selected.people[0]&&p109StatPeople().filter(e=>e.name===selected.people[0].name).length>1?
       ' · '+selected.people[0].id:'');
  const overtimeStack=c.family==='overtime'&&c.metric==='hours'&&c.chart==='bar';
  const ranking=selected.rankRows.length?selected.rankRows.map((r,i)=>{
@@ -454,13 +455,13 @@ function asStatDrill(key){
  state.statsExpandedKey='';
  if(row.type==='group'){
   state.statsScope='group';state.statsGroup=row.key;
-  state.statsPersonId=EMPLOYEES.find(e=>groupOf(e)===row.key)?.id||'';
+  state.statsPersonId=p109StatPeople().find(e=>groupOf(e)===row.key)?.id||'';
   state.statsConfig.compare='people';state.statsConfig.chart='bar';
   render();return;
  }
  if(row.type==='person'){
   state.statsScope='person';state.statsPersonId=row.key;
-  state.statsGroup=groupOf(EMPLOYEES.find(e=>e.id===row.key));
+  state.statsGroup=groupOf(p109StatPeople().find(e=>e.id===row.key));
   state.statsConfig.compare='days';state.statsConfig.chart='line';
   state.statsConfig.aggregate='total';render();return;
  }
@@ -489,7 +490,7 @@ function asStatCSVCell(value){
 function asStatExportRows(){
  const data=asStatRows(),c=asStatPrefs(),metric=asStatMetric();
  const scope=asStatScopeMode()==='all'?'全员':asStatScopeMode()==='group'?asStatScopeGroup():data.people[0]?.name||'个人';
- return data.rows.map(r=>({月份:monthKey(),统计范围:scope,对象:r.label,业务:asStatFamily(c.family)[1],
+ return data.rows.map(r=>({月份:monthKey(),统计范围:scope+(state.statsIncludeIgnored?'（包含忽略人员）':''),对象:r.label,业务:asStatFamily(c.family)[1],
   指标:metric[1],统计方式:{total:'总量',perPerson:'人均',per100:'每百应出勤人日'}[c.aggregate]||c.aggregate,
   数值:r.value,单位:data.effectiveUnit,员工数:r.peopleCount,应出勤人日:r.scheduled}));
 }
@@ -508,12 +509,14 @@ function renderStatisticsWorkspace(){
  const aside=document.getElementById('statsSidebarControls');
  if(aside)aside.innerHTML=statisticsSidebarControlsHtml();
  node.innerHTML=statisticsWorkspaceHtml();
+ const ignored=document.getElementById('asStatsIgnored');
+ if(ignored)ignored.onchange=e=>{state.statsIncludeIgnored=e.target.value==='include';state.statsExpandedKey='';renderStatisticsWorkspace()};
  const scope=document.getElementById('asStatsScope');
  if(scope)scope.onchange=e=>{
   state.statsScope=e.target.value;
   state.statsGroup=asStatScopeGroup();
   if(state.statsScope==='person')state.statsPersonId=
-    EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||EMPLOYEES[0]?.id||'';
+    p109StatPeople().find(p=>groupOf(p)===state.statsGroup)?.id||p109StatPeople()[0]?.id||'';
   c.compare=asStatDefaultCompare(state.statsScope);
   c.chart=state.statsScope==='person'?'line':'bar';
   state.statsExpandedKey='';
@@ -522,7 +525,7 @@ function renderStatisticsWorkspace(){
  const groupSelect=document.getElementById('asStatsGroup');
  if(groupSelect)groupSelect.onchange=e=>{
   state.statsGroup=e.target.value;
-  state.statsPersonId=EMPLOYEES.find(p=>groupOf(p)===state.statsGroup)?.id||'';
+  state.statsPersonId=p109StatPeople().find(p=>groupOf(p)===state.statsGroup)?.id||'';
   state.statsExpandedKey='';
   asNavTrack();renderStatisticsWorkspace();
  };

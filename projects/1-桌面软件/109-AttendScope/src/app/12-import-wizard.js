@@ -432,8 +432,8 @@ function r79ValidateImport(){
  button.textContent=result.rows.length?'导入 '+result.rows.length+' 条':'确认导入';
 }
 function r79ImportCapture(){
- const before=p109CaptureSession();before.employees=structuredClone(EMPLOYEES);
- Object.assign(before.values,structuredClone({records:state.records,leaves:state.leaves,trips:state.trips,
+ const before=p109CaptureSession();before.employees=p109Clone(EMPLOYEES);
+ Object.assign(before.values,p109Clone({records:state.records,leaves:state.leaves,trips:state.trips,
   outings:state.outings,overtimeEntries:state.overtimeEntries,imports:state.imports,
   attendanceReview:state.attendanceReview,tempOutingReview:state.tempOutingReview,manualTempOutings:state.manualTempOutings,manualOvertime:state.manualOvertime,
   monthStores:state.monthStores,groups:state.groups,manualStatuses:state.manualStatuses,overtimeReview:state.overtimeReview}));

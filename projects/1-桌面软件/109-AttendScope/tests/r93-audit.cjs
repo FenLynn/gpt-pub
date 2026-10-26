@@ -58,12 +58,12 @@ module.exports=async({browser,out,root})=>{
     seed([['2026-10-08','18:00:00','进'],['2026-10-08','18:03:00','未标注'],['2026-10-08','18:20:00','出']]);result.unknownDoesNotInvent=value(8)===0;
     const legacy={schemaVersion:4,year:2026,month:10,employees:[e],records:[],rules:{...P109_DEFAULT_RULES,overtimeRuleVersion:undefined,overtimeAfterMinutes:undefined,overtimeBeforeMinutes:undefined,overtimeMinMinutes:30},calendarOverrides:p109CalendarMonthValues(2026,10,{},false)};
     const upgraded=normalizeSavedMonth(legacy),historical=normalizeSavedMonth(legacy,true);
-    result.migration=upgraded.schemaVersion===6&&upgraded.rules.overtimeRuleVersion===2&&upgraded.rules.overtimeAfterMinutes===30&&upgraded.rules.overtimeBeforeMinutes===5&&upgraded.rules.overtimeMinMinutes===5&&!upgraded.saved;
+    result.migration=upgraded.schemaVersion===7&&upgraded.rules.overtimeRuleVersion===2&&upgraded.rules.overtimeAfterMinutes===30&&upgraded.rules.overtimeBeforeMinutes===5&&upgraded.rules.overtimeMinMinutes===5&&!upgraded.saved;
     result.historicalKeepsPolicy=historical.rules.overtimeRuleVersion===1&&historical.rules.overtimeMinMinutes===30;
     seed(pair('08:30:00','17:36:00'),[],{overtimeRuleVersion:1,overtimeMinMinutes:20});result.legacyFormulaStillAvailable=approx(value(8),26);
     seed([['2026-10-08','08:30:00','进'],['2026-10-08','17:10:00','出']],[],{overtimeRuleVersion:1,overtimeMinMinutes:20});result.legacyContinuousLunchUnchanged=value(8)===0;
     result.invalidNewRules=normalizeSavedMonth({...legacy,rules:{...P109_DEFAULT_RULES,overtimeAfterMinutes:-1}})===null&&normalizeSavedMonth({...legacy,rules:{...P109_DEFAULT_RULES,overtimeMinMinutes:0}})===null;
-    result.schemaProtection=normalizeSavedMonth({...legacy,schemaVersion:7})===null;
+    result.schemaProtection=normalizeSavedMonth({...legacy,schemaVersion:P109_DATA_SCHEMA+1})===null;
     return result;
    }finally{YEAR=saved.year;MONTH=saved.month;Object.assign(state,{records:saved.records,leaves:saved.leaves,trips:saved.trips,outings:saved.outings,overtimeEntries:saved.overtimeEntries,monthStores:saved.monthStores,manualOvertime:saved.manualOvertime,overtimeReview:saved.overtimeReview,snapshotContext:saved.snapshotContext,overtimeRuleContexts:saved.overtimeRuleContexts,revisions:saved.revisions,revisionSeq:saved.revisionSeq,saved:saved.saved});Object.assign(RULES,saved.rules);reanalyze();render()}
   });report.cases=cases;for(const [name,value] of Object.entries(cases))check(value,'buffered overtime: '+name);
