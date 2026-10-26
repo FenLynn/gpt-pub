@@ -96,7 +96,7 @@ async function p109ExportPortable({adopt=false}={}){
   if(!p109Environment().download||!p109Environment().hash)throw Error('当前环境无法生成安全项目包，请下载工作状态救援 JSON，或用本地新版浏览器打开');
   const fingerprint=p109SessionFingerprint(),origin=state.projectDir,cached=!!origin?.cacheSavedAt&&!p109UnsavedMonths().length,root=await p109PortableFromSession(),files=await p109PortableCollect(root);
   const {zip}=await p109ZipBuild(files),name=r63FileStem()+'_完整便携项目_'+p109DownloadStamp()+'.zip';
-  if(adopt||origin?.__p109Portable){state.projectDir=root;root.pending=!cached;root.revision++;r68UI.latestRoot=null;await p109RememberProject(root);render()}
+  if(adopt||origin?.__p109Portable){state.projectDir=root;root.pending=!cached;root.revision++;r68UI.latestRoot=null;await p109RememberProject(root,'',{explicit:adopt&&!origin?.__p109Portable});render()}
   const node=p109TransferDialog('下载完整项目包','<p>包含所有工作月份、导入原件、规则、人工处理，以及可读取的冻结和修订。浏览器不能确认文件是否真正落盘。</p><p><a id="p109PortableDownload">点击下载项目 ZIP</a></p><p id="p109TransferState" role="status">下载并检查文件后，再确认。关闭本窗口仍保留未保存提醒。</p><button id="p109ConfirmDownload">我已确认文件下载完成</button>');
   p109PortableUrl=URL.createObjectURL(zip);const link=node.querySelector('a');link.href=p109PortableUrl;link.download=name;
   link.onclick=()=>node.querySelector('#p109TransferState').textContent='已发起下载；请检查下载目录中的文件。';
@@ -147,7 +147,7 @@ async function p109OpenPortableFile(file,{fromCache=false}={}){
   for(const f of payload){const ref=m.files.find(x=>x.path===f.name);if(!ref||ref.bytes!==f.data.byteLength||ref.sha256!==await p109Hash(f.data))throw Error('项目包校验失败：'+f.name)}
   const root=p109MemoryRoot(file.name.replace(/\.zip$/i,''));for(const f of payload)await p109PortablePut(root,f.name,f.data);
   const project=await readJSON(root,'project.json');if(!project)throw Error('包中缺少项目配置');await p109ReadProject(root,project);
-  p109ProjectBusy=false;const ok=await connectProjectDir(root);if(ok){root.pending=false;render();p109CloseTransfer();if(!fromCache)toast('已打开便携项目；保存到本机缓存，下载项目包可另存备份')};return ok;
+  p109ProjectBusy=false;const ok=await connectProjectDir(root,{automatic:fromCache});if(ok){root.pending=false;render();p109CloseTransfer();if(!fromCache)toast('已打开便携项目；保存到本机缓存，下载项目包可另存备份')};return ok;
  }catch(e){toast('项目包未打开：'+e.message,true);return false}finally{p109ProjectBusy=false}
 }
 function p109PickPortable(){
@@ -176,7 +176,7 @@ async function p109OpenRescueFile(file){
 async function p109UsePortable(){
  if(p109ProjectBusy||state.storageBusy||state.importCommitting||p109ConnectionBusy||r62ImportDraft)return false;
  p109ProjectBusy=true;
- try{const root=await p109PortableFromSession();state.projectDir=root;root.pending=true;r68UI.latestRoot=null;await p109RememberProject(root);render();toast('已转为便携模式；修改后请下载完整项目包');return true}
+ try{const root=await p109PortableFromSession();state.projectDir=root;root.pending=true;r68UI.latestRoot=null;await p109RememberProject(root,'',{explicit:true});render();toast('已转为便携模式；修改后请下载完整项目包');return true}
  catch(e){p109ShowStorageFallback(e.message);return false}finally{p109ProjectBusy=false}
 }
 async function p109NewPortable(){

@@ -55,7 +55,7 @@ function p109ShowWorkHome(){
  node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80WorkTitle">工作项目</h2><p>程序与项目数据分别存放，可随时切换项目</p></div><button id="r80ModeClose" aria-label="关闭工作入口">×</button></header>'+
   '<div class="r80-work-actions" '+(p109Environment().directory?'':'hidden')+'><button id="r80NewProject"><strong>新建空白项目</strong><span>选择一个独立的空数据文件夹</span></button>'+
   '<button id="r80ConnectProject"><strong>连接已有项目</strong><span>选择包含 project.json 的数据文件夹</span></button></div>'+
-  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>保存到本机缓存，可下载 ZIP 备份</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button></div>'+
+  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>保存到本机缓存，可下载 ZIP 备份</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button><button id="r102RestoreCache"><strong>恢复上次本机缓存</strong><span>仅手动恢复，不重新选择项目包</span></button></div>'+
   '<footer><button id="r80ChooseAgain">切换 Demo / Work</button><button id="r80MemoryWork">先在空白工作区导入</button></footer></div>';
  document.body.appendChild(node);node.addEventListener('keydown',e=>p109TrapDialogFocus(e,node));
  node.querySelector('#r80ModeClose').onclick=()=>node.remove();
@@ -65,6 +65,7 @@ function p109ShowWorkHome(){
  };
  node.querySelector('#r80NewProject').onclick=()=>open(()=>p109InitializeProject());
  node.querySelector('#r80ConnectProject').onclick=()=>open(()=>connectProjectDir());
+ node.querySelector('#r102RestoreCache').onclick=()=>open(()=>p109RestoreLocalCacheManually());
  node.querySelector('#r80ChooseAgain').onclick=()=>p109ShowModeChooser();
  node.querySelector('#r80MemoryWork').onclick=()=>{node.remove();toast('当前为临时工作区；保存写入本机缓存，下载项目包可另存备份。')};
  node.querySelector(p109Environment().directory?'#r80NewProject':'#r85NewPortable').focus();

@@ -170,7 +170,7 @@ function bindSettings(){
   document.querySelectorAll('[data-settings-section]').forEach(b=>b.classList.toggle('active',b.dataset.settingsSection===id));
   writeCurrentSection();
  }
- const close=()=>{overlay.classList.add('hidden');r14SettingsDraft=null;document.getElementById('settingsBtn')?.focus()};
+ const close=()=>{overlay.classList.add('hidden');r14SettingsDraft=null;window.p109AccessSettingsClosed?.();document.getElementById('settingsBtn')?.focus()};
  document.getElementById('settingsBtn').onclick=()=>{
   const p=r14Prefs();r14SettingsDraft={prefs:JSON.parse(JSON.stringify(p)),rules:{...RULES},tableKind:state.rawDataTab||'attendance'};
   section='appearance';overlay.classList.remove('hidden');
@@ -180,7 +180,7 @@ function bindSettings(){
  document.querySelectorAll('[data-settings-section]').forEach(b=>b.onclick=()=>choose(b.dataset.settingsSection));
  document.getElementById('settingsClose').onclick=close;
  document.getElementById('settingsCancel').onclick=close;
- overlay.onclick=e=>{if(e.target===overlay)close()};
+ overlay.onclick=e=>{if(e.target!==overlay)return;if(overlay.classList.contains('r101-access-recovery')){e.preventDefault();e.stopPropagation();return}close()};
  document.getElementById('settingsApply').onclick=()=>{
   captureDraft();
   const d=r14SettingsDraft;

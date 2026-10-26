@@ -1,6 +1,14 @@
 /* Authorized directory handles only. Business data remains in its own directory. */
 'use strict';
-const p109RecentState={items:[],lastId:null,available:true,error:'',interacted:false,serial:0};
+const P109_AUTO_OPEN_STORAGE='p109-project-auto-open-v1';
+const p109RecentState={items:[],lastId:null,available:true,error:'',interacted:false,serial:0,detachedCurrent:false,autoOpen:null};
+function p109AutoOpenAllowed(){if(typeof p109RecentState.autoOpen==='boolean')return p109RecentState.autoOpen;try{return localStorage.getItem(P109_AUTO_OPEN_STORAGE)!=='off'}catch(_){return true}}
+function p109SetAutoOpenAllowed(enabled){
+ p109RecentState.autoOpen=!!enabled;
+ try{if(enabled)localStorage.removeItem(P109_AUTO_OPEN_STORAGE);else localStorage.setItem(P109_AUTO_OPEN_STORAGE,'off')}catch(_){}
+ if(enabled)p109RecentState.detachedCurrent=false;
+ return p109RecentAutoWrite(!!enabled).catch(()=>false);
+}
 function p109RecentOpenDb(){
  return new Promise((resolve,reject)=>{
   if(!globalThis.indexedDB){reject(Error('当前浏览器无法保存项目历史'));return}
@@ -15,9 +23,14 @@ function p109RecentOpenDb(){
 async function p109RecentRead(){
  const db=await p109RecentOpenDb();
  try{return await new Promise((resolve,reject)=>{
-  const tx=db.transaction(['projects','settings'],'readonly'),items=tx.objectStore('projects').getAll(),last=tx.objectStore('settings').get('lastId');
-  tx.oncomplete=()=>resolve({items:items.result,lastId:last.result||null});tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+  const tx=db.transaction(['projects','settings'],'readonly'),items=tx.objectStore('projects').getAll(),settings=tx.objectStore('settings'),last=settings.get('lastId'),auto=settings.get('autoOpen');
+  tx.oncomplete=()=>resolve({items:items.result,lastId:last.result||null,autoOpen:typeof auto.result==='boolean'?auto.result:null});tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
  })}finally{db.close()}
+}
+async function p109RecentAutoWrite(enabled){
+ const db=await p109RecentOpenDb();
+ try{await new Promise((resolve,reject)=>{const tx=db.transaction('settings','readwrite');tx.objectStore('settings').put(!!enabled,'autoOpen');tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(tx.error)})}finally{db.close()}
+ return true;
 }
 async function p109RecentWrite(item,lastId,removeId=null){
  const db=await p109RecentOpenDb();
@@ -30,7 +43,8 @@ async function p109RecentWrite(item,lastId,removeId=null){
  })}finally{db.close()}
 }
 function p109RecentSorted(){return [...p109RecentState.items].sort((a,b)=>b.openedAt-a.openedAt)}
-async function p109RememberProject(handle,projectName=''){
+async function p109RememberProject(handle,projectName='',options={}){
+ if(options.explicit){await p109SetAutoOpenAllowed(true);p109RecentState.detachedCurrent=false}
  if(handle?.__p109Portable){
   p109RecentState.serial++;p109RecentState.lastId=null;
   try{localStorage.setItem('p109-last-work-mode','portable')}catch(_){}
@@ -87,19 +101,31 @@ function p109ShowRecentProjects(message=''){
  document.getElementById('p109RecentOverlay')?.remove();
  const panel=document.createElement('section');panel.id='p109RecentOverlay';panel.className='p109-recent-overlay';
  panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','p109RecentTitle');
- const items=p109RecentSorted(),duplicates=name=>items.filter(x=>p109RecentName(x)===name).length>1;
+ const items=p109RecentSorted(),duplicates=name=>items.filter(x=>p109RecentName(x)===name).length>1,
+  detached=!!state.projectDir&&(!p109AutoOpenAllowed()||p109RecentState.detachedCurrent),
+  portableCurrent=!!state.projectDir?.__p109Portable,
+  detachedHtml=detached?'<div class="p109-recent-row p109-current-detached"><div><strong>'+p109Escape(p109CurrentProjectName())+'</strong><p>当前页面继续使用 · 下次打开不自动载入</p></div><div class="p109-recent-actions"><button id="p109RecentRestoreAuto">恢复自动载入</button></div></div>':
+   portableCurrent?'<div class="p109-recent-row"><div><strong>'+p109Escape(p109CurrentProjectName())+'</strong><p>当前便携项目 · 已保存内容仍保留在本机缓存</p></div><div class="p109-recent-actions"><button id="p109RecentDetachCurrent">移除</button></div></div>':'';
  panel.innerHTML='<div class="p109-recent-panel"><header><div><h2 id="p109RecentTitle">最近项目</h2><p>一套程序，切换独立的数据目录</p></div><button id="p109RecentClose" aria-label="关闭项目列表">×</button></header>'+
   '<div class="p109-recent-body"><p id="p109RecentStatus" role="status">'+p109Escape(message||p109RecentState.error||'选择项目继续工作。移除记录不会删除目录或数据。')+'</p>'+
-  '<div class="p109-recent-list">'+(items.length?items.map(x=>'<div class="p109-recent-row"><div><strong>'+p109Escape(p109RecentName(x))+'</strong>'+
+  '<div class="p109-recent-list">'+detachedHtml+(items.length?items.map(x=>'<div class="p109-recent-row"><div><strong>'+p109Escape(p109RecentName(x))+'</strong>'+
    '<p>'+p109Escape(x.projectName+' · '+x.name)+(duplicates(p109RecentName(x))?' · '+p109Escape(x.id.slice(-6)):'')+'</p><time>'+p109Escape(new Date(x.openedAt).toLocaleString('zh-CN'))+'</time></div>'+
    '<div class="p109-recent-actions"><button data-recent-open="'+p109Escape(x.id)+'">'+(x.id===p109RecentState.lastId?'继续打开':'打开')+'</button>'+
-   '<button data-recent-rename="'+p109Escape(x.id)+'">改名</button><button data-recent-remove="'+p109Escape(x.id)+'">移除</button></div></div>').join(''):'<p class="p109-recent-empty">首次连接项目后，这里会自动记录。</p>')+'</div></div>'+
+   '<button data-recent-rename="'+p109Escape(x.id)+'">改名</button><button data-recent-remove="'+p109Escape(x.id)+'">移除</button></div></div>').join(''):'<p class="p109-recent-empty">'+(detachedHtml?'没有其他最近项目。':'首次连接项目后，这里会自动记录。')+'</p>')+'</div></div>'+
   '<footer><button id="p109RecentPick">选择其他项目目录</button><button id="p109RecentNew">新建空白项目</button></footer></div>';
  document.body.appendChild(panel);
  const close=()=>{panel.remove();document.getElementById('projectMenuButton')?.focus()};
  panel.querySelector('#p109RecentClose').onclick=close;
  panel.querySelector('#p109RecentPick').onclick=async()=>{close();await connectProjectDir()};
  panel.querySelector('#p109RecentNew').onclick=async()=>{close();await p109InitializeProject()};
+ panel.querySelector('#p109RecentRestoreAuto')?.addEventListener('click',async()=>{
+  try{await p109SetAutoOpenAllowed(true);if(state.projectDir)await p109RememberProject(state.projectDir,attendTitle(),{explicit:true});p109RefreshRecentMenu();p109ShowRecentProjects('已恢复当前项目的自动载入。')}
+  catch(e){panel.querySelector('#p109RecentStatus').textContent='自动载入未能恢复：'+e.message}
+ });
+ panel.querySelector('#p109RecentDetachCurrent')?.addEventListener('click',async()=>{
+  await p109SetAutoOpenAllowed(false);p109RecentState.detachedCurrent=true;p109RefreshRecentMenu();
+  p109ShowRecentProjects('已移除项目记录；当前页面继续使用，下次打开不会自动载入。');
+ });
  panel.querySelectorAll('[data-recent-open]').forEach(b=>b.onclick=()=>p109OpenRecentProject(b.dataset.recentOpen));
  panel.querySelectorAll('[data-recent-rename]').forEach(b=>b.onclick=async()=>{
   const item=p109RecentState.items.find(x=>x.id===b.dataset.recentRename);if(!item)return;
@@ -109,8 +135,12 @@ function p109ShowRecentProjects(message=''){
   catch(e){panel.querySelector('#p109RecentStatus').textContent='名称未能保存：'+e.message}
  });
  panel.querySelectorAll('[data-recent-remove]').forEach(b=>b.onclick=async()=>{
-  const id=b.dataset.recentRemove,last=p109RecentState.lastId===id?null:p109RecentState.lastId;
-  try{await p109RecentWrite(null,last,id);p109RecentState.items=p109RecentState.items.filter(x=>x.id!==id);p109RecentState.lastId=last;p109RefreshRecentMenu();p109ShowRecentProjects()}
+  const id=b.dataset.recentRemove,item=p109RecentState.items.find(x=>x.id===id),last=p109RecentState.lastId===id?null:p109RecentState.lastId;
+  let current=false;
+  try{current=!!item&&!!state.projectDir&&(item.handle===state.projectDir||await item.handle?.isSameEntry?.(state.projectDir))}catch(_){}
+  try{await p109RecentWrite(null,last,id);p109RecentState.items=p109RecentState.items.filter(x=>x.id!==id);p109RecentState.lastId=last;
+   if(current){await p109SetAutoOpenAllowed(false);p109RecentState.detachedCurrent=true}
+   p109RefreshRecentMenu();p109ShowRecentProjects(current?'已移除项目记录；当前页面继续使用，下次打开不会自动载入。':'项目记录已移除；当前工作不受影响。')}
   catch(e){panel.querySelector('#p109RecentStatus').textContent='记录未能移除：'+e.message}
  });
  panel.addEventListener('click',e=>{if(e.target===panel)close()});
@@ -124,7 +154,12 @@ async function p109RestoreLastProject({startup=true}={}){
  try{
   const data=await p109RecentRead();
   if(serial!==p109RecentState.serial)return;
-  p109RecentState.items=data.items.filter(x=>x.handle?.kind==='directory'&&typeof x.handle.getDirectoryHandle==='function');p109RecentState.lastId=data.lastId;p109RefreshRecentMenu();
+  p109RecentState.items=data.items.filter(x=>x.handle?.kind==='directory'&&typeof x.handle.getDirectoryHandle==='function');p109RecentState.lastId=data.lastId;
+  if(typeof data.autoOpen==='boolean')p109RecentState.autoOpen=data.autoOpen;p109RefreshRecentMenu();
+  if(!p109AutoOpenAllowed()){
+   if(!state.projectDir&&!p109RecentState.interacted){if(startup)p109ShowModeChooser(true);else p109ShowWorkHome()}
+   return;
+  }
   const item=p109RecentState.items.find(x=>x.id===data.lastId);
   if(!item&&await p109RestoreLocalCache(()=>serial===p109RecentState.serial&&!p109RecentState.interacted))return;
   let portable=false;try{portable=localStorage.getItem('p109-last-work-mode')==='portable'}catch(_){}
@@ -140,7 +175,7 @@ async function p109RestoreLastProject({startup=true}={}){
    if(!ok)p109ShowRecentProjects('上次项目未能载入，请重新授权或选择目录。');
   }else p109ShowRecentProjects('上次项目：'+p109RecentName(item)+'。点击“继续打开”重新授权，无需再次寻找目录。');
  }catch(e){p109RecentState.available=false;p109RecentState.error='无法读取项目历史：'+e.message;p109RefreshRecentMenu();
-  if(await p109RestoreLocalCache(()=>serial===p109RecentState.serial&&!p109RecentState.interacted))return;
+  if(p109AutoOpenAllowed()&&await p109RestoreLocalCache(()=>serial===p109RecentState.serial&&!p109RecentState.interacted))return;
   if(!state.projectDir&&!p109RecentState.interacted){if(startup)p109ShowModeChooser(true);else p109ShowWorkHome()}}
  finally{document.removeEventListener('pointerdown',mark,true);document.removeEventListener('keydown',mark,true)}
 }

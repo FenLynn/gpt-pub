@@ -274,7 +274,7 @@ async function connectProjectDir(savedHandle=null,options={}){
       p109RestoreSession(before);throw e;
     }
     p109PendingDirectory=null;p109Audit=null;p109ActivateWorkSession();
-    if(typeof p109RememberProject==='function')await p109RememberProject(handle,project.projectName);
+    if(typeof p109RememberProject==='function')await p109RememberProject(handle,project.projectName,{explicit:!options.automatic});
     Object.assign(asNavHistory,{back:[],forward:[],current:null,restoring:false});
     Object.assign(r68UI,{chosen:new Set(),fixedChosen:new Set(),search:'',fixedSearch:'',groupFilter:'all',
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});

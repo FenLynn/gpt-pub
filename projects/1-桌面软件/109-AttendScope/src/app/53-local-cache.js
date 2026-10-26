@@ -49,6 +49,7 @@ async function p109SaveLocalCache(){
   if(state.projectDir!==origin||origin&&origin.revision!==revision||p109SessionFingerprint()!==fingerprint){toast('已保存刚才的内容；后续修改请再次保存',true);return false}
   root.cacheId=record.id;root.cacheToken=record.token;root.cacheSavedAt=savedAt;root.pending=false;
   state.projectDir=root;for(const store of state.monthStores.values())store.saved=true;state.saved=true;rememberMonth();
+  if(!origin||!origin.__p109Portable)await p109SetAutoOpenAllowed(true);
   await p109RememberProject(root);p109WriteMode('work');render();
   toast('仅写入本机浏览器缓存，需下载项目包写入磁盘');return true;
  }catch(e){toast('本机缓存保存失败：'+e.message+'。请用“项目 → 下载项目包”备份',true);return false}
@@ -71,4 +72,10 @@ async function p109RestoreLocalCache(active=()=>true){
   if(recovered){state.projectDir.pending=true;state.saved=false;rememberMonth()}
   render();toast(recovered?'最近缓存校验失败，已恢复上一份有效缓存；请核对并下载备份':'已恢复本机缓存 '+new Date(candidate.savedAt).toLocaleString());return true;
  }catch(_){return false}
+}
+async function p109RestoreLocalCacheManually(){
+ const previous=p109AutoOpenAllowed();await p109SetAutoOpenAllowed(true);
+ const ok=await p109RestoreLocalCache();
+ if(!ok){await p109SetAutoOpenAllowed(previous);toast('没有可恢复的有效本机缓存',true)}
+ return ok;
 }

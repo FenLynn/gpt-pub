@@ -273,7 +273,7 @@ async function p109InitializeProject(root){
   r68UI.latestRoot=null;r68UI.latestReport=null;r68UI.latestTree=null;r68UI.latestScanAt=0;
   r68UI.chosen.clear();r68UI.fixedChosen.clear();r68UI.treeSerial++;r68UI.projectSerial++;
   p109ActivateWorkSession();
-  if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle());
+  if(typeof p109RememberProject==='function')await p109RememberProject(root,attendTitle(),{explicit:true});
   render();p109Status(root.__p109Portable?'已新建便携项目。可开始导入，保存到本机缓存，下载项目包另存备份':'空白项目已初始化并保存，可以开始导入'+
    (typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':''));return true;
  }catch(e){if(previous)p109RestoreSession(previous);if(e.name!=='AbortError')p109ShowStorageFallback('初始化失败，请检查目录权限：'+e.message);return false}
