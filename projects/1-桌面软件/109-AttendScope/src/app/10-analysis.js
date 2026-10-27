@@ -568,9 +568,16 @@ function analyzeDay(emp,d){
   const limit=minutes(end)-Math.max(0,Number(grace)||0),temporary=p109TempRules(),shortGap=temporary.limit+temporary.grace;
   const possibilities=pairs.filter(([x,y])=>minutes(x.time)<limit&&
    minutes(y.time)>=minutes(start)&&minutes(y.time)<limit).filter(([,exit])=>{
-    const left=minutes(exit.time);
-     const returned=punches.find(row=>row.direction==='进'&&minutes(row.time)>left),right=returned?minutes(returned.time):null;
-     return right==null||right-left>shortGap+1e-8&&!businessCovers(left,right);
+    const left=minutes(exit.time),shiftEnd=minutes(end),
+     returned=punches.find(row=>row.direction==='进'&&minutes(row.time)>left),right=returned?minutes(returned.time):null;
+    // An out followed by an in before this shift ends is an internal outing,
+    // even when it exceeds the temporary-outing limit. It must never become
+    // an early-departure marker merely because the gap is long. The outing
+    // review retains its own red/green decision and statistics.
+    if(right!=null&&right<=shiftEnd+1e-8)return false;
+    // A very short boundary crossing is also one temporary outing (for
+    // example 11:38 out -> 11:42 in), not a definite early departure.
+    return right==null||right-left>shortGap+1e-8&&!businessCovers(left,right);
    });
   if(!possibilities.length)return null;
   const last=possibilities.reduce((a,b)=>minutes(a[1].time)>minutes(b[1].time)?a:b);
