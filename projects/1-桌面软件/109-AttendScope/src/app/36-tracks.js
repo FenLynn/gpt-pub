@@ -25,11 +25,14 @@ function r19PunchClusters(a,range,width,fixedLane=null){
   }
   return out.sort((x,y)=>x.value[0]-y.value[0]);
 }
+function r104TrackLabel(record){
+  return [...new Set((record?.labelParts||[]).map(value=>String(value??'').trim()).filter(Boolean))].join(' · ');
+}
 function r23BehaviorSegments(a,key){
-  if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',sourceIds:[p.id]}));
-  if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',sourceIds:[p.id]}));
+  if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',label:r104TrackLabel(p),sourceIds:[p.id]}));
+  if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',label:r104TrackLabel(p),sourceIds:[p.id]}));
   if(key==='outing')return [
-   ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',origin:'registered',sourceIds:[p.id]})),
+   ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',label:r104TrackLabel(p),origin:'registered',sourceIds:[p.id]})),
    ...(a.temporaryOutings||[]).flatMap(p=>p.parts.map(([from,to])=>({from,to,
     title:(p.origin==='manual'?'补录':'自动')+'临时外出 · '+({green:'绿色',red:'红色',exclude:'已排除'}[p.status]),
     origin:'temporary',manual:p.origin==='manual',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
@@ -59,7 +62,7 @@ function r14TrackData(a,range=timelineRange(a),width=800){
     for(const seg of (state.prefs?.timelineTracks?.[key]===false?[]:r23BehaviorSegments(a,key))){
       const from=Math.max(0,Math.min(1440,+seg.from)),to=Math.max(0,Math.min(1440,+seg.to));
       if(to>from)bars.push({value:[from,to,lane],color:track.color,title:seg.title||track.title,track:key,
-        sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
+        label:seg.label||'',sourceIds:seg.sourceIds||null,origin:seg.origin||'registered',
         accepted:seg.accepted!==false,segmentId:seg.segmentId||null});
       if(to>from)Object.assign(bars[bars.length-1],{status:seg.status,reason:seg.reason,minutes:seg.minutes,note:seg.note,manual:seg.manual,manualDecision:seg.manualDecision,businessCovered:seg.businessCovered});
     }
@@ -105,11 +108,18 @@ function mountAttendanceTimeline(a){
         ]),stroke:'rgba(163,84,99,.18)',lineWidth:.45}
       };
     }
-    const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'];
-    return {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
-      style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[
-        {offset:0,color:colors[0]},{offset:1,color:colors[1]}
-      ]),stroke:'transparent',lineWidth:0}};
+    const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'],children=[
+      {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
+       style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:colors[0]},{offset:1,color:colors[1]}]),stroke:'transparent',lineWidth:0}}
+    ];
+    if(d.label){
+      const inside=w>=54,labelX=inside?x+5:x+w+6,maxWidth=Math.max(24,Math.min(180,chart.getWidth()-SIDE-54-labelX));
+      children.push({type:'text',silent:false,style:{x:labelX,y:p[1],text:d.label,width:inside?Math.max(24,w-10):maxWidth,
+       overflow:'truncate',ellipsis:'…',fill:'#244c65',font:'600 11px "Segoe UI Variable", sans-serif',opacity:.46,
+       align:'left',verticalAlign:'middle',textShadowColor:'rgba(255,255,255,.82)',textShadowBlur:2},
+       emphasis:{style:{opacity:1,fontWeight:700}}});
+    }
+    return {type:'group',children};
   };
   const eventRender=(params,api)=>{
     const d=model.events[params.dataIndex];if(!d)return null;
@@ -178,7 +188,8 @@ function mountAttendanceTimeline(a){
         if(d.origin==='temporary')return '<b>'+safeTableText(d.title)+'</b><div>'+p109IntervalClock(d.value[0])+'–'+p109IntervalClock(d.value[1])+
           ' · 班内合计 '+p109IntervalDuration(d.minutes)+'</div><div>'+safeTableText(d.manualDecision?'人工改判；自动依据：'+d.reason:d.reason)+
           '</div>'+(d.note?'<div>'+safeTableText(d.note)+'</div>':'');
-        return '<b>'+(d.title||'区间')+'</b><div>'+p109IntervalClock(d.value?.[0]||0)+'–'+p109IntervalClock(d.value?.[1]||0)+'</div>';
+        return '<b>'+(d.title||'区间')+'</b><div>'+p109IntervalClock(d.value?.[0]||0)+'–'+p109IntervalClock(d.value?.[1]||0)+'</div>'+
+         (d.label?'<div>'+safeTableText(d.label)+'</div>':'');
       }},
     xAxis:{type:'value',min:0,max:1440,splitNumber:6,minInterval:1/60,axisLine:{show:false},axisTick:{show:false},
       axisLabel:{fontSize:10,color:'#748a9c',margin:13,formatter:v=>p109TimelineClock(v,state.timelineRange?.end-state.timelineRange?.start)},
@@ -200,7 +211,7 @@ function mountAttendanceTimeline(a){
         data:[2,3,4,5].map(i=>[0,1440,i]),renderItem:railRender,z:2},
       {id:'work-boundaries',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
         data:workBoundaries(),renderItem:workBoundaryRender,z:3},
-      {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:true,data:model.bars,renderItem:bandRender,z:4},
+      {id:'bands',type:'custom',coordinateSystem:'cartesian2d',animation:false,clip:false,data:model.bars,renderItem:bandRender,z:4},
       {id:'event-baseline',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:true,
         data:[[0,1440]],renderItem:baselineRender,z:5},
       {id:'behavior-labels',type:'custom',coordinateSystem:'cartesian2d',silent:true,animation:false,clip:false,

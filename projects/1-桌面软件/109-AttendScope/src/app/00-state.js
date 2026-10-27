@@ -1,7 +1,7 @@
 'use strict';
 const P109_DATA_SCHEMA=7;
-const P109_APP_VERSION='0.2.29-preview';
-const P109_APP_REVISION='R103';
+const P109_APP_VERSION='0.2.30-preview';
+const P109_APP_REVISION='R104';
 const P109_ENGINE_VERSION='R94';
 const P109_TABLES=window.AttendScopeXLSX;
 let YEAR=2026, MONTH=10;

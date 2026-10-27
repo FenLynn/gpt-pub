@@ -97,7 +97,8 @@ function p109ImportPeriod(key=monthKey()){
 function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
  if(r.__date1904){r={...r};for(const key of ['开始日期','起始日期','结束日期','截止日期','日期','请假日期','加班日期','startDate','endDate','date','开始日期时间','结束日期时间','startDatetime','endDatetime','打卡时间','datetime','DateTime'])
   if(typeof r[key]==='number'&&r[key]>=1)r[key]+=1462;delete r.__date1904}
- const sourceSheet=String(r.__sheet||''),name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name']));
+ const sourceSheet=String(r.__sheet||''),name=normalizedPerson(aliases(r,['姓名','人员','员工姓名','name'])),
+  labelParts=Array.isArray(r.__labelParts)?r.__labelParts.map(value=>String(value??'').normalize('NFKC').trim().slice(0,240)).filter(Boolean).slice(0,12):[];
  if(!name)throw Error('姓名为空');
  const row=sourceRow(r,i),type=String(aliases(r,['类型','假别','事项','type'])||
   ({leave:'请假',trip:'出差',outing:'外出',overtime:'登记加班'}[kind])||''),
@@ -118,7 +119,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
   if(!strictISODate(startDate)||!strictISODate(endDate))throw Error('起止日期格式错误');
   if(startDate>endDate)throw Error('结束日期早于开始日期');
   if(startDate>period.end||endDate<period.key+'-01')throw Error('日期范围与 '+period.key+' 无交集');
-  const base={name,startDate,endDate,row,type,note,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||'')};
+  const base={name,startDate,endDate,row,type,note,labelParts,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||'')};
   return base;
  }
  const startCombined=aliases(r,['开始日期时间','startDatetime']),endCombined=aliases(r,['结束日期时间','endDatetime']),
@@ -139,7 +140,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
  if(to<=from)throw Error('结束日期时间必须晚于开始日期时间');
  if(to-from>366*1440)throw Error('单条时间范围超过 366 天，请拆分后导入');
  if(from>=period.last||to<=period.first)throw Error('日期范围与 '+period.key+' 无交集');
- return {name,row,type,note,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||''),
+ return {name,row,type,note,labelParts,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||''),
   rangeStart:startDate+' '+start,rangeEnd:attendanceDateFromMinute(to)+' '+attendanceClock(to%1440),
   date:startDate,start,end,importIntervalVersion:1};
 }
@@ -183,7 +184,7 @@ function p109MergeImportRows(kind,previous,incoming){
   const indices=slots.get(p109ImportSignature(kind,row));
   if(indices?.length){
    const index=indices.shift(),old=rows[index];
-   rows[index]={...old,sources:[...(old.sources||[p109SourceReference(old)]),p109SourceReference(row)]};merged++;
+   rows[index]={...old,labelParts:[...new Set([...(old.labelParts||[]),...(row.labelParts||[])])],sources:[...(old.sources||[p109SourceReference(old)]),p109SourceReference(row)]};merged++;
   }else{rows.push(row);added++}
  }
  return {rows,added,merged};

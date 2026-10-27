@@ -20,3 +20,8 @@
 .r101-access-meta{display:grid;grid-template-columns:90px 1fr;gap:8px 14px;margin:18px 0;font-size:13px}.r101-access-meta span{color:#7890a1}
 .r101-access-actions{display:flex;justify-content:flex-end;gap:8px}.r101-access-actions button{min-height:36px;border:1px solid #c8d8e3;border-radius:5px;background:#fff;color:#31546c;padding:0 14px}.r101-access-actions .primary{border-color:#2d83ba;background:#2d83ba;color:#fff}
 .p109-rescue-text{width:100%;height:min(48vh,440px);box-sizing:border-box;resize:vertical;border:1px solid #cbd9e3;border-radius:5px;padding:10px;font:12px/1.45 Consolas,monospace}
+.r104-range-fields{padding-bottom:8px}.r104-label-config{margin-top:12px;padding-top:11px;border-top:1px solid #e2eaf0}
+.r104-label-head{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:8px}.r104-label-head strong{font-size:13px;color:#31536b}
+.r104-label-head select{width:100%;min-width:0;height:34px;border:1px solid #cfdae3;border-radius:6px;background:#fff;color:#38566b;padding:0 8px}
+.r104-label-list{display:grid;gap:5px;margin-top:7px}.r104-label-list>div{display:grid;grid-template-columns:minmax(0,1fr) 28px 28px 28px;align-items:center;gap:3px;min-height:31px;padding:0 3px 0 9px;border:1px solid #e0e8ee;border-radius:6px;background:#f8fafb}
+.r104-label-list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#526d80}.r104-label-list button{width:26px;height:25px;border:0;border-radius:4px;background:transparent;color:#668398;padding:0}.r104-label-list button:hover:not(:disabled){background:#e8f2f8;color:#1876ae}.r104-label-list button:disabled{opacity:.25}.r104-label-list p{margin:2px 0 0;color:#94a5b1;font-size:12px}
