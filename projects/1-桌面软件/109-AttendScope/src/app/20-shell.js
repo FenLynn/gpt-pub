@@ -135,6 +135,9 @@ function layoutHtml(){
           <button id="p109PortableNew" role="menuitem">新建便携项目</button>
           <button id="p109PortableOpen" role="menuitem">打开项目 ZIP / 救援 JSON</button>
           <button id="p109PortableExport" role="menuitem">下载项目包 ZIP（独立备份）</button>
+          <button id="p109ConfigExport" role="menuitem" ${state.isDemo?'disabled':''}>导出全部项目配置</button>
+          <button id="p109ConfigImport" role="menuitem">从配置创建新项目</button>
+          <button id="p109ProjectRollover" role="menuitem" ${!state.projectDir||state.isDemo?'disabled':''}>封存并创建续用项目</button>
           <button id="p109ProjectControl" role="menuitem">项目管理与修订</button>
           <div id="p109RecentList">${typeof p109RecentMenuHtml==='function'?p109RecentMenuHtml():''}</div>
           <div class="system-menu-divider"></div>

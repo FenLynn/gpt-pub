@@ -254,7 +254,7 @@ async function p109InitializeProject(root){
   state.projectDir=root; p109PendingDirectory=null;
   EMPLOYEES=[];state.records=[];state.leaves=[];state.trips=[];state.outings=[];
   state.overtimeEntries=[];state.imports=[];state.revisions=[];state.revisionSeq=0;
-  state.manualStatuses={};state.overtimeReview={};state.attendanceReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.isDemo=false;
+  state.manualStatuses={};state.overtimeReview={};state.attendanceReview={};state.tempOutingReview={};state.manualTempOutings=[];state.manualOvertime=[];state.groups={};state.fixedPeople=[];state.nameAliases={};state.groupCatalog=[];state.projectProfile=null;state.projectIdentity={projectInstanceId:p109UniqueId(),createdAt:new Date().toISOString(),lineage:null};state.isDemo=false;
   state.monthStores=new Map();state.saved=false;state.activeBranch=null;state.snapshotContext=false;state.overtimeRuleContexts={};state.captureItems=[];state.ignoredPeople=[];state.statsIncludeIgnored=false;
   state.chartDay=null;state.chartTab='overview';state.timelineRange=null;state.filter='main';
   state.selectedGroup=null;state.statsConfig=null;state.statsPersonId='';state.statsGroup='';
@@ -391,7 +391,6 @@ async function p109ArchiveWalk(folder,prefix,files,limits){
    await p109ArchiveWalk(item.handle,prefix+item.name+'/',files,limits);continue
   }
   const file=await item.handle.getFile();limits.bytes+=file.size;limits.count++;
-  if(limits.count>5000||limits.bytes>160*1024*1024)throw Error('项目过大（上限 5000 文件或 160 MB），请通过系统文件管理器整体压缩');
   files.push({name:prefix+item.name,data:new Uint8Array(await file.arrayBuffer())});
  }
 }
@@ -426,7 +425,6 @@ async function p109RestoreArchive(){
   if(p109ProjectBusy||p109ConnectionBusy||state.storageBusy||state.importCommitting){p109Status('请等待当前项目文件操作完成',true);return}
   p109ProjectBusy=true;
   try{
-   if(file.size>180*1024*1024)throw Error('备份包过大，请先通过系统文件管理器处理');
    const unpacked=await p109ZipRead(file);
    const manifest=unpacked.find(x=>x.name==='p109-backup-manifest.json');
    if(!manifest)throw Error('缺少 P109 完整备份清单，拒绝恢复普通 ZIP');
@@ -472,7 +470,7 @@ async function p109ZipRead(file){
  if(eocd<0)throw Error('没有识别到完整 ZIP 目录');
  const count=u16(eocd+10),centralSize=u32(eocd+12),centralOffset=u32(eocd+16);
  if(u16(eocd+4)||u16(eocd+6)||u16(eocd+8)!==count)throw Error('不支持分卷 ZIP');
- if(count>5000||centralOffset+centralSize>eocd||centralOffset+centralSize>data.length)throw Error('ZIP 目录数量或长度异常');
+ if(centralOffset+centralSize>eocd||centralOffset+centralSize>data.length)throw Error('ZIP 目录数量或长度异常');
  const entries=[];let cursor=centralOffset,total=0;
  for(let index=0;index<count;index++){
   if(cursor+46>data.length||u32(cursor)!==0x02014b50)throw Error('ZIP 中央目录损坏');
@@ -489,10 +487,11 @@ async function p109ZipRead(file){
   if(local+30>data.length||u32(local)!==0x04034b50)throw Error('ZIP 本地文件头损坏');
   const begin=local+30+u16(local+26)+u16(local+28);
   if(begin>data.length||begin+compressed>data.length)throw Error('ZIP 文件长度异常');
-  total+=size;if(total>180*1024*1024)throw Error('ZIP 解压后超过 180 MB 安全上限');
+  total+=size;
   unique.add(name);entries.push({name,method,crc,compressed,size,begin});
  }
  if(!entries.length)throw Error('没有识别到备份文件');
+ if(typeof p109MaybeWarnProjectSize==='function')p109MaybeWarnProjectSize(total);
  let archive=null;
  if(entries.some(entry=>entry.method===8)){
   if(!window.XLSX?.CFB?.read)throw Error('压缩 ZIP 解析组件缺失，请重新解压完整程序包');

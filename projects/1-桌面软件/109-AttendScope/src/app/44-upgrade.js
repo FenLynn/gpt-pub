@@ -64,7 +64,6 @@ async function p109ApplyCodeUpdate(file,options={}){
     const h=await p109File(programRoot,name);if(!h)continue;
     const data=new Uint8Array(await (await h.getFile()).arrayBuffer());
     limits.count++;limits.bytes+=data.byteLength;
-    if(limits.count>5000||limits.bytes>160*1024*1024)throw Error('升级前备份超过文件数量或大小上限');
     files.push({name:'program/'+name,data});
    }
    await p109ArchiveWalk(src,'program/src/',files,limits);

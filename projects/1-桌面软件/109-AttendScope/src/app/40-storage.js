@@ -107,6 +107,7 @@ async function ensureProjectSkeleton(){
   if(!await readJSON(state.projectDir,'project.json'))await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
   if(!await readJSON(config,'employees.json'))await writeFile(config,'employees.json',JSON.stringify({schemaVersion:2,employees:EMPLOYEES.map(e=>({...e,group:groupOf(e)}))},null,2));
   if(!await readJSON(config,'work_rules.json'))await writeFile(config,'work_rules.json',JSON.stringify({schemaVersion:1,...RULES},null,2));
+  if(!await readJSON(config,'fixed-calendar.json'))await writeFile(config,'fixed-calendar.json',JSON.stringify(p109FixedCalendar,null,2));
   const calendarFile=String(YEAR)+'.json';
   if(!await readJSON(calendar,calendarFile)){
     await writeFile(calendar,calendarFile,JSON.stringify({schemaVersion:1,year:YEAR,overrides:{}},null,2));
@@ -194,9 +195,11 @@ async function p109ReadProject(handle,project){
   const people=(conf?await readJSON(conf,'employees.json'):null)?.employees||[];
   if(!Array.isArray(people))throw Error('项目人员配置无效');
   const profile=conf?await readJSON(conf,'project-profile.json'):null;
+  const fixedCalendar=conf?await readJSON(conf,'fixed-calendar.json'):null;
   if(profile&&profile.schemaVersion!==1)throw Error('项目默认配置版本不兼容');
   if(profile?.ignoredPeople!=null&&(!Array.isArray(profile.ignoredPeople)||profile.ignoredPeople.some(id=>typeof id!=='string'||!id)||new Set(profile.ignoredPeople).size!==profile.ignoredPeople.length))throw Error('项目忽略人员名单无效');
   if(profile?.ignoredEmployees!=null&&(!Array.isArray(profile.ignoredEmployees)||profile.ignoredEmployees.some(e=>!e||typeof e.id!=='string'||typeof e.name!=='string')))throw Error('项目忽略人员资料无效');
+  const validatedFixedCalendar=fixedCalendar?p109ValidateCalendarBook(fixedCalendar):null;
   const calendar={},months=new Map(),keys=new Set([...(project.months||[]),...monthBranches.keys()]),recovered=[];
   const data=await p109OptionalDirectory(handle,'data');
   if(data)for(const year of await p109Entries(data)){
@@ -245,7 +248,7 @@ async function p109ReadProject(handle,project){
     if(result.recovered)recovered.push(branch.month+' 修订');
   }
   if(project.activeBranch)current=project.activeBranch.month;
-  return {months,current,profile,calendar,rules,recovered};
+  return {months,current,profile,calendar,rules,recovered,project,fixedCalendar:validatedFixedCalendar};
 }
 async function connectProjectDir(savedHandle=null,options={}){
   if(savedHandle?.kind!=='directory')savedHandle=null;
@@ -262,7 +265,12 @@ async function connectProjectDir(savedHandle=null,options={}){
     if(r62ImportDraft||r63ReadingImport)throw Error('请先完成或取消当前导入');
     const before=p109CaptureSession();
     try{
+      if(loaded.fixedCalendar){
+        const merged={...p109FixedCalendar,updatedAt:Math.max(Date.now(),p109FixedCalendar.updatedAt+1),months:{...p109FixedCalendar.months,...loaded.fixedCalendar.months}};
+        await p109StoreFixedCalendar(merged);
+      }
       Object.assign(state,{projectDir:handle,monthStores:loaded.months,projectProfile:loaded.profile,
+        projectIdentity:{projectInstanceId:loaded.project.projectInstanceId||p109UniqueId(),createdAt:loaded.project.createdAt||new Date().toISOString(),lineage:loaded.project.lineage||null},
         calendarOverrides:{},groups:{},fixedPeople:[],nameAliases:{},groupCatalog:[],activeBranch:null,
         prefs:{fontScale:1,motion:true,arrowsTowardLine:true,appTitle:'考勤'},captureItems:[],
         selectedGroup:null,statsGroup:'',statsPersonId:'',statsConfig:null,statsExpandedKey:'',
@@ -312,7 +320,9 @@ async function persistImportedFile(file,type,count,importId){
 }
 function projectPayload(){
   rememberMonth();
-  return {schemaVersion:P109_DATA_SCHEMA,projectId:'P109-AttendScope',projectName:attendTitle(),appVersion:P109_APP_VERSION,
+  if(!state.projectIdentity)state.projectIdentity={projectInstanceId:p109UniqueId(),createdAt:new Date().toISOString(),lineage:null};
+  return {schemaVersion:P109_DATA_SCHEMA,projectId:'P109-AttendScope',projectInstanceId:state.projectIdentity.projectInstanceId,
+    projectName:attendTitle(),createdAt:state.projectIdentity.createdAt,lineage:state.projectIdentity.lineage||null,appVersion:P109_APP_VERSION,
     analysisEngineVersion:P109_ENGINE_VERSION,current:{year:YEAR,month:MONTH},
     months:[...state.monthStores.keys()].sort(),activeBranch:state.activeBranch||null,
     monthBranches:Object.fromEntries([...state.monthStores].filter(([,m])=>m.activeBranch).map(([key,m])=>[key,m.activeBranch])),
@@ -354,7 +364,9 @@ async function saveWorking(options={}){
        throw new Error('写入校验失败，保留上一有效版本');
       // Working is authoritative; config files are optional legacy defaults.
       await writeFile(state.projectDir,'project.json',JSON.stringify(projectPayload(),null,2));
-      if(state.projectProfile)await writeFile(await dir(state.projectDir,'config'),'project-profile.json',JSON.stringify(state.projectProfile,null,2));
+      const config=await dir(state.projectDir,'config');
+      if(state.projectProfile)await writeFile(config,'project-profile.json',JSON.stringify(state.projectProfile,null,2));
+      await writeFile(config,'fixed-calendar.json',JSON.stringify(p109FixedCalendar,null,2));
       const current=workingPayload(),written=JSON.parse(payload);delete current.savedAt;delete written.savedAt;
       state.saved=JSON.stringify(current)===JSON.stringify(written);rememberMonth();
       if(typeof p109CloseTransfer==='function')p109CloseTransfer();render();toast(state.saved?'已保存 '+monthKey()+(state.activeBranch?' 的独立修订副本':' 的工作状态'):'已保存，操作期间的新修改仍需再次保存');return true;

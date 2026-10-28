@@ -725,6 +725,7 @@ async function r68RenderProject(){
  }else try{
   const [report,tree]=await Promise.all([p109AuditProject(),r68PhysicalTree(state.projectDir)]);
   if(token!==r68UI.projectSerial||!node.isConnected||state.projectDir!==sourceRoot)return;
+  if(typeof p109MaybeWarnProjectSize==='function')p109MaybeWarnProjectSize(tree.totalBytes);
   r68UI.latestRoot=sourceRoot;r68UI.latestReport=report;r68UI.latestTree=tree;r68UI.latestScanAt=Date.now();
   node.innerHTML=r68ProjectMarkup(report,tree);
  }catch(e){

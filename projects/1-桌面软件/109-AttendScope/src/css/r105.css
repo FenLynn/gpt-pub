@@ -1,0 +1,11 @@
+.p109-config-intro{display:grid;gap:14px}.p109-config-intro>p{margin:0;color:#526b82;line-height:1.65}
+.p109-config-summary{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:10px}
+.p109-config-summary>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #dce7f0;border-radius:8px;background:#f8fbfd}
+.p109-config-summary span{color:#71879a;font-size:12px}.p109-config-summary strong{color:#193c5b;font-size:14px}
+.p109-config-form{display:grid;grid-template-columns:minmax(210px,1.5fr) minmax(120px,.65fr) minmax(120px,.65fr);gap:12px;margin-top:20px;padding-top:18px;border-top:1px solid #dfe8ef}
+.p109-config-form label{display:grid;gap:7px;color:#536b80;font-size:12px}.p109-config-form input,.p109-config-form select{height:38px;box-sizing:border-box;padding:0 11px;border:1px solid #cad9e5;border-radius:7px;background:#fff;color:#173c5c;font:inherit}
+.p109-config-form .p109-config-check{display:flex;align-items:center;gap:8px;min-height:34px;color:#304f68}.p109-config-check input{width:16px;height:16px;padding:0}
+.p109-config-hash{display:grid;gap:7px}.p109-config-hash code{display:block;overflow-wrap:anywhere;padding:10px;border-radius:7px;background:#f3f7fa;color:#355873;font-size:12px}
+#p109ConfigStatus,#p109ArchiveStatus,#p109SuccessorStatus{min-height:20px;margin:14px 0 0;color:#557087}
+.p109-update-body a[id^="p109"]{display:inline-flex;align-items:center;min-height:38px;padding:0 15px;border-radius:7px;background:#e8f3fb;color:#116fad;font-weight:700;text-decoration:none}
+@media(max-width:800px){.p109-config-summary,.p109-config-form{grid-template-columns:1fr}.p109-config-form{gap:10px}}

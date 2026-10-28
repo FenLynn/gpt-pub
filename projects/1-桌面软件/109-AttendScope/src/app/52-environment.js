@@ -48,7 +48,7 @@ function p109MemoryRoot(name='便携项目'){
 async function p109PortablePut(root,path,data){
  const parts=p109ValidatePath(path.split('/')),name=parts.pop();let target=root;for(const part of parts)target=await dir(target,part);await writeFile(target,name,data);
 }
-async function p109PortableCollect(root){const files=[];await p109ArchiveWalk(root,'',files,{count:0,bytes:0});return files}
+async function p109PortableCollect(root){const files=[],limits={count:0,bytes:0};await p109ArchiveWalk(root,'',files,limits);if(typeof p109MaybeWarnProjectSize==='function')p109MaybeWarnProjectSize(limits.bytes);return files}
 async function p109PortableFromSession(){
  rememberMonth();const source=state.projectDir,root=p109MemoryRoot(source?.name||attendTitle()+'便携项目');
  if(source?.__p109Portable)for(const key of ['cacheId','cacheToken','cacheSavedAt'])if(source[key])root[key]=source[key];
@@ -75,6 +75,7 @@ async function p109PortableFromSession(){
  }
  await p109PortablePut(root,'project.json',JSON.stringify(projectPayload(),null,2));
  if(state.projectProfile)await p109PortablePut(root,'config/project-profile.json',JSON.stringify(state.projectProfile,null,2));
+ await p109PortablePut(root,'config/fixed-calendar.json',JSON.stringify(p109FixedCalendar,null,2));
  if(root.missing.length)throw Error('缺少 '+root.missing.length+' 个导入原件，不能生成完整项目包。请重新选择原件或下载救援 JSON。');
  return root;
 }
@@ -82,7 +83,7 @@ function p109SessionFingerprint(){
  rememberMonth();return JSON.stringify([...state.monthStores].map(([key,m])=>[key,{...m,saved:undefined}]));
 }
 let p109PortableUrl=null;
-function p109CloseTransfer(){document.getElementById('p109TransferOverlay')?.remove();if(p109PortableUrl){URL.revokeObjectURL(p109PortableUrl);p109PortableUrl=null}}
+function p109CloseTransfer(){document.getElementById('p109TransferOverlay')?.remove();if(p109PortableUrl){URL.revokeObjectURL(p109PortableUrl);p109PortableUrl=null}if(typeof p109CloseRolloverUrls==='function')p109CloseRolloverUrls()}
 function p109TransferDialog(title,content){
  p109CloseTransfer();const node=document.createElement('section');node.id='p109TransferOverlay';node.className='p109-recent-overlay';node.setAttribute('role','dialog');node.setAttribute('aria-modal','true');node.setAttribute('aria-label',title);
  node.innerHTML='<div class="p109-update-panel"><header><h2>'+p109Escape(title)+'</h2><button id="p109TransferClose" aria-label="关闭">×</button></header><div class="p109-update-body">'+content+'</div></div>';
@@ -139,7 +140,6 @@ async function p109OpenPortableFile(file,{fromCache=false}={}){
  if(p109ProjectBusy||state.storageBusy||state.importCommitting||p109ConnectionBusy||r62ImportDraft)return false;
  p109ProjectBusy=true;
  try{
-  if(file.size>180*1024*1024)throw Error('项目包超过 180 MB 上限');
   if(/\.json$/i.test(file.name))return await p109OpenRescueFile(file);
   const items=await p109ZipRead(file),mf=items.find(f=>f.name==='p109-backup-manifest.json');if(!mf)throw Error('请选择完整项目 ZIP，不是程序升级包');
   const m=JSON.parse(new TextDecoder().decode(mf.data)),payload=items.filter(f=>f!==mf);

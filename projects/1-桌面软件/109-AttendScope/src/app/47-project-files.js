@@ -15,7 +15,7 @@ function p109ClearTransientFiles(){
 function p109ActivateWorkSession(){p109WriteMode('work');p109ClearTransientFiles();document.getElementById('p109ModeOverlay')?.remove()}
 function p109BlankWork(){
  const base=p109Clone(p109DemoSession);p109RestoreSession(base);
- EMPLOYEES=[];Object.assign(state,{projectDir:null,isDemo:false,records:[],leaves:[],trips:[],outings:[],overtimeEntries:[],
+ EMPLOYEES=[];Object.assign(state,{projectDir:null,projectIdentity:null,isDemo:false,records:[],leaves:[],trips:[],outings:[],overtimeEntries:[],
   imports:[],revisions:[],revisionSeq:0,manualStatuses:{},overtimeReview:{},attendanceReview:{},groups:{},groupCatalog:[],fixedPeople:[],nameAliases:{},
   monthStores:new Map(),projectProfile:null,activeBranch:null,snapshotContext:false,overtimeRuleContexts:{},saved:true,calendarOverrides:{},ignoredPeople:[],statsIncludeIgnored:false,
   importProfile:{rules:R62_DEFAULT_DIRECTIONS.map(r=>({...r})),templates:{}},workspaceMode:'data',dataSection:'overview',selection:{type:'overall'}});
@@ -55,7 +55,7 @@ function p109ShowWorkHome(){
  node.innerHTML='<div class="r80-mode-panel"><header><div><h2 id="r80WorkTitle">工作项目</h2><p>程序与项目数据分别存放，可随时切换项目</p></div><button id="r80ModeClose" aria-label="关闭工作入口">×</button></header>'+
   '<div class="r80-work-actions" '+(p109Environment().directory?'':'hidden')+'><button id="r80NewProject"><strong>新建空白项目</strong><span>选择一个独立的空数据文件夹</span></button>'+
   '<button id="r80ConnectProject"><strong>连接已有项目</strong><span>选择包含 project.json 的数据文件夹</span></button></div>'+
-  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>保存到本机缓存，可下载 ZIP 备份</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button><button id="r102RestoreCache"><strong>恢复上次本机缓存</strong><span>仅手动恢复，不重新选择项目包</span></button></div>'+
+  '<div class="r80-work-actions"><button id="r85NewPortable"><strong>新建便携项目</strong><span>保存到本机缓存，可下载 ZIP 备份</span></button><button id="r85OpenPortable"><strong>打开项目 ZIP / 救援 JSON</strong><span>本地读取，在当前页面继续工作</span></button><button id="r105ConfigProject"><strong>从配置创建新项目</strong><span>继承名册、规则、模板、日历和界面偏好</span></button><button id="r102RestoreCache"><strong>恢复上次本机缓存</strong><span>仅手动恢复，不重新选择项目包</span></button></div>'+
   '<footer><button id="r80ChooseAgain">切换 Demo / Work</button><button id="r80MemoryWork">先在空白工作区导入</button></footer></div>';
  document.body.appendChild(node);node.addEventListener('keydown',e=>p109TrapDialogFocus(e,node));
  node.querySelector('#r80ModeClose').onclick=()=>node.remove();
