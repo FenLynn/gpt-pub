@@ -555,7 +555,7 @@ module.exports=async function runLifecycleAudit({browser,out,root}){
    state.manualOvertime=[{id:'manual-overtime:legacy-test',employeeId:EMPLOYEES[0].id,date:'2026-10-08',start:'18:00',end:'19:00'}];
    state.saved=false;rememberMonth();await saveWorking();
   });
-  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===7;
+  report.newWorkingHasCurrentSchema=JSON.parse(fs.readFileSync(oldWorkingPath,'utf8')).schemaVersion===await page.evaluate(()=>P109_DATA_SCHEMA);
   // Build an explicitly legacy, synthetic fixture before asking R94 to read it.
   // A real schema-7 project must never be offered to an old reader as schema 6.
   const prepareLegacyPopulation=()=>{

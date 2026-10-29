@@ -42,7 +42,8 @@ function r23BehaviorSegments(a,key){
    ...p109RegisteredOvertime(a).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
     title:'登记加班',origin:'registered',sourceIds:[p.id]})),
    ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
-    title:(p.origin==='manual'?'补录加班':'自动加班')+(p.accepted!==false?' · 已勾选':' · 已取消'),
+    title:(p.origin==='manual'?'补录加班':p.inference==='midnight'?'午夜推算加班':'自动加班')+(p.requiresConfirmation&&p.accepted===false?' · 超长待确认':p.accepted!==false?' · 已勾选':' · 已取消'),
+    reason:p.inference==='midnight'?'当天首张为凌晨出卡，缺少进入证据，按 00:00 推算；原始记录未补造':p.requiresConfirmation?'连续在岗超过待核时长，检查漏卡后使用右侧 ✓ 确认纳入':'依据完整进出区间推算',
     origin:p.origin||'auto',accepted:p.accepted!==false,segmentId:p.id,sourceIds:null}))
   ];
   return [];
@@ -189,6 +190,7 @@ function mountAttendanceTimeline(a){
           ' · 班内合计 '+p109IntervalDuration(d.minutes)+'</div><div>'+safeTableText(d.manualDecision?'人工改判；自动依据：'+d.reason:d.reason)+
           '</div>'+(d.note?'<div>'+safeTableText(d.note)+'</div>':'');
         return '<b>'+(d.title||'区间')+'</b><div>'+p109IntervalClock(d.value?.[0]||0)+'–'+p109IntervalClock(d.value?.[1]||0)+'</div>'+
+         (d.reason?'<div>'+safeTableText(d.reason)+'</div>':'')+
          (d.label?'<div>'+safeTableText(d.label)+'</div>':'');
       }},
     xAxis:{type:'value',min:0,max:1440,splitNumber:6,minInterval:1/60,axisLine:{show:false},axisTick:{show:false},

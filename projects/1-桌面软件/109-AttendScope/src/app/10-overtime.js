@@ -1,7 +1,9 @@
 'use strict';
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
- const r={...(rules||{}),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2)},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
+ const r={...(rules||{}),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
+  punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
+  midnightCutoffMinutes:rules?.midnightCutoffMinutes??360,maxVisitHours:rules?.maxVisitHours??16},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
   return {...r,overtimeRuleVersion:1,overtimeMinMinutes:number(r.overtimeMinMinutes,20,20)};
  const modern=r.overtimeRuleVersion===2;
@@ -11,6 +13,10 @@ function p109NormalizeOvertimeRules(rules,keepLegacy=false){
 function p109ValidOvertimeRules(rules){
  if(rules==null)return true;
  if(typeof rules!=='object'||Array.isArray(rules))return false;
+ if(rules.punchRuleVersion!=null&&![1,2].includes(rules.punchRuleVersion))return false;
+ if(rules.midnightInference!=null&&typeof rules.midnightInference!=='boolean')return false;
+ if(rules.midnightCutoffMinutes!=null&&(!Number.isInteger(rules.midnightCutoffMinutes)||rules.midnightCutoffMinutes<0||rules.midnightCutoffMinutes>720))return false;
+ if(rules.maxVisitHours!=null&&(!Number.isFinite(rules.maxVisitHours)||rules.maxVisitHours<1||rules.maxVisitHours>36))return false;
  if(rules.businessRuleVersion!=null&&![1,2].includes(rules.businessRuleVersion))return false;
  if(rules.overtimeRuleVersion==null)return true;
  if(rules.overtimeRuleVersion===1)return Number.isInteger(rules.overtimeMinMinutes)&&rules.overtimeMinMinutes>=20&&rules.overtimeMinMinutes<=240;
@@ -20,13 +26,13 @@ function p109ValidOvertimeRules(rules){
 function p109OvertimeSessionRules(visit){
  const key=attendanceDateFromMinute(visit.from).slice(0,7);
  const source=key===monthKey()?RULES:(state.snapshotContext?state.overtimeRuleContexts?.[key]:state.monthStores.get(key)?.rules);
- return {...P109_DEFAULT_RULES,...p109NormalizeOvertimeRules(source||RULES)};
+ return {...P109_DEFAULT_RULES,...p109NormalizeOvertimeRules(source||RULES,!!(state.snapshotContext||state.activeBranch))};
 }
 function p109OvertimeSnapshotRules(){
  const {previous,next}=attendanceNeighborDates(),contexts={};
  for(const key of [previous.slice(0,7),next.slice(0,7)]){
   const rules=state.snapshotContext?state.overtimeRuleContexts?.[key]:state.monthStores.get(key)?.rules;
-  if(rules)contexts[key]={...P109_DEFAULT_RULES,...p109NormalizeOvertimeRules(rules)};
+  if(rules)contexts[key]={...P109_DEFAULT_RULES,...p109NormalizeOvertimeRules(rules,!!(state.snapshotContext||state.activeBranch))};
  }
  contexts[monthKey()]={...RULES};return contexts;
 }
@@ -83,17 +89,38 @@ function p109SubtractOvertime(parts,registered){
   [[a,Math.min(x,b)],[Math.max(y,a),b]].filter(([p,q])=>q>p));
  return result;
 }
-function p109BufferedOvertimeCandidate(pairs,day,registered,pairingUncertain=false){
+function p109ModernPunches(rules=RULES){return rules.punchRuleVersion===2||rules.punchRuleVersion==null&&!state.snapshotContext&&!state.activeBranch}
+function p109MidnightOvertimePair(employeeId,date){
+ if(!p109ModernPunches()||RULES.midnightInference===false)return [];
+ const start=attendanceUtcMinute(date),rows=attendanceEmployeeRows(employeeId),
+  first=rows.find(r=>r.datetime.slice(0,10)===date);
+ if(!first||first.direction!=='出'||minutes(first.time)<=0||minutes(first.time)>(RULES.midnightCutoffMinutes??360))return [];
+ if(attendanceVisitEvents(employeeId).some(v=>v.exit===first||v.exit.recordId&&v.exit.recordId===first.recordId))return [];
+ const previous=rows.filter(r=>r.datetime.slice(0,10)<date).at(-1);
+ if(previous){
+  if(previous.direction!=='出')return [];
+  const gap=start+minutes(first.time)-attendanceUtcMinute(previous.datetime.slice(0,10),previous.time);
+  if(gap<=Math.max(RULES.dupSeconds/60,p109TempRules().limit+p109TempRules().grace)+1e-8)return [];
+ }
+ const id='auto-midnight:'+employeeId+':'+(first.recordId||first.datetime),to=start+minutes(first.time);
+ return [[{time:'00:00:00',sessionFrom:start,sessionTo:to,sessionId:id,inference:'midnight'},first]];
+}
+function p109OvertimeAccepted(id,fallback=true){
+ const values=[state.overtimeReview?.[id],...[...state.monthStores.values()].map(s=>s.overtimeReview?.[id])];
+ return values.includes(false)?false:values.includes(true)?true:fallback;
+}
+function p109BufferedOvertimeCandidate(pairs,day,registered,pairingUncertain=false,employeeId=null){
  const rules=p109NormalizeOvertimeRules(RULES),min=rules.overtimeMinMinutes,
   empty={minutes:0,rawMinutes:0,threshold:min,ruleVersion:rules.overtimeRuleVersion,segments:[]};
- if(pairingUncertain)return {...empty,reason:'打卡进出配对待核'};
+ if(pairingUncertain&&(!p109ModernPunches()||rules.overtimeRuleVersion===1))return {...empty,reason:'打卡进出配对待核'};
  const date=isoDate(day),dayStart=attendanceUtcMinute(date),raw=[],segments=[],policies=new Set(),
   registrations=registered.map(r=>[minutes(r.start),minutes(r.end)]);
  let legacyRaw=0;
- for(const [enter,exit] of pairs){
+ for(const [enter,exit] of [...pairs,...(employeeId?p109MidnightOvertimePair(employeeId,date):[])]){
   const visit={from:enter.sessionFrom??dayStart+minutes(enter.time),to:enter.sessionTo??dayStart+minutes(exit.time)};
   if(!Number.isFinite(visit.from)||!Number.isFinite(visit.to)||visit.to<=visit.from)continue;
   const sessionRules=p109OvertimeSessionRules(visit);
+  const requiresConfirmation=p109ModernPunches(sessionRules)&&visit.to-visit.from>(sessionRules.maxVisitHours??16)*60+1e-8;
   if(sessionRules.overtimeRuleVersion===1){
    const legacy=p109LegacyOvertimeCandidate([[enter,exit]],day,registered,false,sessionRules);
    legacyRaw+=legacy.rawMinutes;segments.push(...legacy.segments);policies.add('开始月份保留历史门槛 '+sessionRules.overtimeMinMinutes+' 分钟');continue;
@@ -104,7 +131,8 @@ function p109BufferedOvertimeCandidate(pairs,day,registered,pairingUncertain=fal
    if(to<=from)continue;
    const pieces=p109SubtractOvertime([[from,to]],registrations);raw.push(...pieces);
    if(b-a+1e-7<sessionRules.overtimeMinMinutes)continue;
-   for(const [x,y] of pieces)segments.push({from:x,to:y,minutes:y-x,sessionFrom:visit.from,sessionTo:visit.to,sessionId:enter.sessionId||null});
+   for(const [x,y] of pieces)segments.push({from:x,to:y,minutes:y-x,sessionFrom:visit.from,sessionTo:visit.to,sessionId:enter.sessionId||null,
+    inference:enter.inference||null,requiresConfirmation,accepted:!requiresConfirmation});
   }
  }
  return {...empty,minutes:analysisUnionMinutes(segments.map(s=>[s.from,s.to])),rawMinutes:analysisUnionMinutes(raw)+legacyRaw,segments,

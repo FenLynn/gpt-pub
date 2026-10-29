@@ -137,8 +137,8 @@ module.exports=async({browser,out,root})=>{
     ['2026-10-15','08:25','进'],['2026-10-15','11:45','出'],['2026-10-15','13:25','进'],['2026-10-15','17:15','出']];
    state.records=rows.map(([date,time,direction],i)=>({recordId:'missing-'+i,employeeId:e.id,name:e.name,datetime:date+' '+time,time,direction}));
    state.leaves=[];state.trips=[];state.outings=[];state.overtimeEntries=[];state.monthStores.clear();reanalyze();
-   const a=state.analysis.get(e.id+'|14');return a.severity==='suspect'&&activeAutoOvertimeSegments(a).length===0&&!a.attendanceFlags.length;
-  }),'missing evening exit followed by next-day entry cannot create fabricated overnight overtime or definite early departure');
+   const a=state.analysis.get(e.id+'|14'),segments=activeAutoOvertimeSegments(a);return a.severity==='suspect'&&segments.reduce((sum,s)=>sum+s.minutes,0)===5&&segments.every(s=>s.to<=minutes('11:45'))&&!a.attendanceFlags.length;
+  }),'missing evening exit preserves the complete five-minute early arrival but cannot fabricate overnight overtime or definite early departure');
   await page.setViewportSize({width:960,height:720});await upload();
   check(await page.evaluate(()=>{
    const box=document.querySelector('.r62-dialog').getBoundingClientRect(),footer=document.querySelector('.r62-dialog>footer').getBoundingClientRect();

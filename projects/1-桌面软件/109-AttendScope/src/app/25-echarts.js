@@ -18,6 +18,7 @@ const AS_CHART_COLORS={
 };
 
 let __attendCharts=[];
+let p109VisualFrame=0;
 
 function registerAttendTheme(){
   if(!window.echarts||window.__attendThemeRegistered)return;
@@ -63,6 +64,7 @@ function rememberAttendChart(chart,el){
 }
 
 function disposeAttendCharts(){
+  p109VisualFrame++;
   for(const item of __attendCharts){
     try{item.ro?.disconnect()}catch(_){}
     try{if(item.chart&&!item.chart.isDisposed())item.chart.dispose()}catch(_){}
@@ -438,7 +440,9 @@ function mountFilteredOverview(ctx){
 
 function mountAnalysisVisuals(ctx){
   if(!window.echarts)return;
+  const frame=++p109VisualFrame;
   requestAnimationFrame(()=>{
+    if(frame!==p109VisualFrame)return;
     const tab=state.chartTab||'overview';
     if(tab==='timeline'){
       const day=plotAnalysis(ctx);

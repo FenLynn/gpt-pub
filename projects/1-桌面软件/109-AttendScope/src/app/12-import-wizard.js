@@ -129,7 +129,7 @@ function r62MigratePayload(data){
  const reviews={};for(const [key,value] of Object.entries(data.overtimeReview||{})){
   let next=key;
   for(const [oldId,newId] of translation){
-   if(oldId!==newId)next=next.replace('auto-visit:'+oldId+':','auto-visit:'+newId+':')
+   if(oldId!==newId)next=next.replace('auto-visit:'+oldId+':','auto-visit:'+newId+':').replace('auto-midnight:'+oldId+':','auto-midnight:'+newId+':')
     .replace('auto:'+oldId+':','auto:'+newId+':');
   }reviews[next]=value;
  }data.overtimeReview=reviews;

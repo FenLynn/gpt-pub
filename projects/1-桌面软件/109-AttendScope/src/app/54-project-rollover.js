@@ -42,7 +42,7 @@ function p109ConfigurationRoster(){
 function p109ConfigurationPayload(){
  const roster=p109ConfigurationRoster();
  return {schemaVersion:P109_CONFIG_SCHEMA,kind:P109_CONFIG_KIND,exportedAt:new Date().toISOString(),appVersion:P109_APP_VERSION,
-  minimumAppVersion:'0.2.31-preview',source:{projectInstanceId:state.projectIdentity?.projectInstanceId||null,
+  minimumAppVersion:'0.2.32-preview',source:{projectInstanceId:state.projectIdentity?.projectInstanceId||null,
    projectName:attendTitle(),currentMonth:monthKey(),createdAt:state.projectIdentity?.createdAt||null},
   roster,rules:p109Clone(RULES),importProfile:p109Clone(r62ImportProfile()),prefs:p109Clone(state.prefs||{}),
   calendar:p109Clone(p109FixedCalendar)};

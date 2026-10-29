@@ -85,7 +85,7 @@ module.exports=async({browser,root,out})=>{
   check(await page.evaluate(()=>p109DownloadStamp()!==p109DownloadStamp()),'two immediate downloads receive distinct timestamp identifiers');
   const other=await legacy(),p=await other.newPage();watch(p);p.on('dialog',d=>d.accept());await p.goto(url);await p.evaluate(()=>p109RecentReady);await p.locator('#r80Work').click();
   check(await p.evaluate(async bytes=>p109OpenPortableFile(new File([Uint8Array.from(bytes)],'imported.zip')),[...fs.readFileSync(filename)]),'complete ZIP opens without native clone or native hash');
-  check(await p.evaluate(id=>p109Ignored(id)&&state.records.length===4&&P109_DATA_SCHEMA===7,id),'ZIP carries ignored population and current schema');
+  check(await p.evaluate(id=>p109Ignored(id)&&state.records.length===4&&state.monthStores.get(monthKey())?.schemaVersion===P109_DATA_SCHEMA,id),'ZIP carries ignored population and current schema');
   await p.evaluate(()=>{state.dataSection='roster';navigateWorkspace('data')});await p.locator('[data-roster-tab="ignored"]').click();
   await p.locator('[data-r73-fixed-person="'+id+'"]').check();await p.locator('#r72UnfixSelected').click();
   check(await p.evaluate(id=>!p109Ignored(id)&&p109ActivePeople().length===2&&state.records.length===4,id),'restore to all staff re-includes person without changing original data');
@@ -110,7 +110,7 @@ module.exports=async({browser,root,out})=>{
    const dir=await (await navigator.storage.getDirectory()).getDirectoryHandle('r98-native-'+p109UniqueId(),{create:true});window.__r98Disk=dir;return p109InitializeProject(dir);
   }),'native project remains available through the shared filesystem adapter');
   await upload(p,csv,'native.csv');
-  check(await p.evaluate(async id=>{p109SetIgnored([id],true);if(!await saveWorking())return false;const payload=await readJSON(await existingDir(await monthDirectory(),'working'),'state.json'),profile=await readJSON(await existingDir(state.projectDir,'config'),'project-profile.json');return payload.ignoredPeople.includes(id)&&profile.ignoredPeople.includes(id)&&payload.schemaVersion===7},id),'native save persists ignored roster into working and project defaults');
+  check(await p.evaluate(async id=>{p109SetIgnored([id],true);if(!await saveWorking())return false;const payload=await readJSON(await existingDir(await monthDirectory(),'working'),'state.json'),profile=await readJSON(await existingDir(state.projectDir,'config'),'project-profile.json');return payload.ignoredPeople.includes(id)&&profile.ignoredPeople.includes(id)&&payload.schemaVersion===P109_DATA_SCHEMA},id),'native save persists ignored roster into working and project defaults');
   check(await p.evaluate(async id=>{p109BlankWork();return await connectProjectDir(__r98Disk)&&p109Ignored(id)&&p109ActivePeople().length===1},id),'native project reopen retains the same default population');
   await page.evaluate(async()=>{const db=await p109CacheOpen();await new Promise((resolve,reject)=>{const tx=db.transaction('snapshots','readwrite'),s=tx.objectStore('snapshots'),r=s.get('current');r.onsuccess=()=>s.put({...r.result,bytes:new ArrayBuffer(4)},'current');tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error)});db.close()});
   await page.reload();await page.evaluate(()=>p109RecentReady);

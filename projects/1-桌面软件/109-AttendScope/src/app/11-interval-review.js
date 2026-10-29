@@ -119,6 +119,7 @@ function activeTemporaryOutings(a){return (a?.temporaryOutings||[]).filter(row=>
 function p109RenameIntervalState(data,oldId,newId){
  if(oldId===newId)return;
  const change=key=>String(key).replace('temp:'+oldId+':','temp:'+newId+':')
+  .replace('auto-midnight:'+oldId+':','auto-midnight:'+newId+':')
   .replace('manual-temp:'+oldId+':','manual-temp:'+newId+':')
   .replace('manual-overtime:'+oldId+':','manual-overtime:'+newId+':').replace('attendance:'+oldId+':','attendance:'+newId+':');
  for(const field of ['manualTempOutings','manualOvertime'])for(const row of data[field]||[]){
@@ -245,9 +246,9 @@ function p109CompleteOvertime(candidate,employeeId,date,registered){
  }
  for(const row of candidate.segments){
   for(const [from,to] of p109CountedOvertimeParts(date,row.from,row.to))
-   segments.push(...subtract({...row,from,to,id:row.sessionId,origin:'auto',accepted:!excluded(row.sessionId)},taken));
+   segments.push(...subtract({...row,from,to,id:row.sessionId,origin:'auto',accepted:p109OvertimeAccepted(row.sessionId,row.accepted!==false)},taken));
  }
- return {...candidate,segments,minutes:segments.reduce((sum,s)=>sum+s.minutes,0),
+ return {...candidate,segments,minutes:analysisUnionMinutes(segments.filter(s=>s.accepted!==false).map(s=>[s.from,s.to])),
   reason:manual.length?'自动推算与手工补录共用统计；登记、补录与自动区间不重复计时':candidate.reason};
 }
 function p109OpenIntervalEditor(kind,employeeId,date){
