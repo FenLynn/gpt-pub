@@ -657,7 +657,8 @@ function analyzeDay(emp,d){
   const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
   const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
   if(firstIn&&!morningLeave){
-   if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart&&!businessCovers(RULES.amStart,firstMinute)){
+   if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart&&!businessCovers(RULES.amStart,firstMinute)&&
+     !p109LeaveReturnOnly(emp.id,date,RULES.amStart,firstMinute)){
     severity='problem';issues.push('迟到');status='迟到';
     attendanceFlags.push({kind:'late',label:'迟到',time:firstIn.time});
    }else if(!morningEvidence&&firstMinute>lunchStart){
@@ -686,7 +687,7 @@ function analyzeDay(emp,d){
   if(morningPair&&lunchReturn&&!afternoonLeave){
    const returnMinute=minutes(lunchReturn[0].time);
    const covered=businessCovers(lunchEnd,returnMinute);
-   if(returnMinute>lunchEnd+afternoonGrace&&!covered){
+   if(returnMinute>lunchEnd+afternoonGrace&&!covered&&!p109LeaveReturnOnly(emp.id,date,RULES.pmStart,returnMinute)){
     // Completed afternoon evidence permits a definite late check; missing
     // afternoon punches remain an uncertainty, never a fabricated absence.
     if(afternoonEvidence&&!pairingUncertain){

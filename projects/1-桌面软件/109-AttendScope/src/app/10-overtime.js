@@ -2,7 +2,7 @@
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
  const r={...(rules||{}),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
-  punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
+  punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),leaveReturnRuleVersion:rules?.leaveReturnRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
   midnightCutoffMinutes:rules?.midnightCutoffMinutes??360,maxVisitHours:rules?.maxVisitHours??16},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
   return {...r,overtimeRuleVersion:1,overtimeMinMinutes:number(r.overtimeMinMinutes,20,20)};
@@ -14,6 +14,7 @@ function p109ValidOvertimeRules(rules){
  if(rules==null)return true;
  if(typeof rules!=='object'||Array.isArray(rules))return false;
  if(rules.punchRuleVersion!=null&&![1,2].includes(rules.punchRuleVersion))return false;
+ if(rules.leaveReturnRuleVersion!=null&&![1,2].includes(rules.leaveReturnRuleVersion))return false;
  if(rules.midnightInference!=null&&typeof rules.midnightInference!=='boolean')return false;
  if(rules.midnightCutoffMinutes!=null&&(!Number.isInteger(rules.midnightCutoffMinutes)||rules.midnightCutoffMinutes<0||rules.midnightCutoffMinutes>720))return false;
  if(rules.maxVisitHours!=null&&(!Number.isFinite(rules.maxVisitHours)||rules.maxVisitHours<1||rules.maxVisitHours>36))return false;
@@ -37,6 +38,12 @@ function p109OvertimeSnapshotRules(){
  contexts[monthKey()]={...RULES};return contexts;
 }
 function p109BusinessPriority(rules=RULES){return rules.businessRuleVersion===2}
+function p109LeaveReturnOnly(employeeId,date,shiftStart,returned){
+ if(RULES.leaveReturnRuleVersion!==2||!p109BusinessPriority())return false;
+ const start=minutes(shiftStart),time=typeof returned==='number'?returned:minutes(returned),
+  leaves=analysisUnionSegments(leaveFor(employeeId,date).map(r=>[minutes(r.start||RULES.amStart),minutes(r.end||RULES.pmEnd)]));
+ return leaves.some(([a,b])=>a<=start+1e-8&&b>=start-1e-8&&time>=b-1e-8);
+}
 function p109PriorityAbsences(employeeId,date){
  if(!p109BusinessPriority())return [];
  if(state.snapshotContext&&date.slice(0,7)!==monthKey())return [];

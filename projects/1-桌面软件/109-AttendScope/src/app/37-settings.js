@@ -72,7 +72,7 @@ function settingsContent(section){
    '<label class="r14-setting-row"><span>连续在岗待核时长（小时）<small>超过后保留候选，点击加班色块右侧 ✓ 确认才计入；默认 16 小时</small></span><input id="r106MaxVisit" type="number" min="1" max="36" step="0.5"></label>'+
    '<label class="r14-setting-row"><span>临时外出短时限额（分钟）</span><input id="r87TempLimit" type="number" min="0" max="240" step="1"></label>'+
    '<label class="r14-setting-row"><span>临时外出冗余（分钟）<small>短时限额额外放宽；报备起止各允许此误差；错位时长比较也使用此值</small></span><input id="r87TempGrace" type="number" min="0" max="60" step="1"></label>'+
-   '<p class="r14-setting-note">默认临时外出 10 + 2 分钟内为绿。班末短时往返，以及首次出卡后在同一窗口内再次出卡跨过下班点，均不判早退；超时离岗仍保留早退，原始卡全部保留。临时外出只计算工作日班次内部分；红绿可人工调整，× 排除。补录临时外出不等于报备。</p>'+
+   '<p class="r14-setting-note">默认临时外出 10 + 2 分钟内为绿。班次开始由请假覆盖时，假后晚返只计临时外出：12分钟以内绿，超过红，不叠加迟到。班末短时往返及同一窗口跨班末的重复出卡不判早退；超时离岗仍保留早退。原始卡保留，临时外出只计算班内部分，红绿可人工调整，× 排除。</p>'+
    '<p class="r14-setting-note">默认班后扣20分钟、班前门槛5分钟、最低5分钟。12:10下班计10分钟，17:36计6分钟，08:24上班计6分钟，08:26不计。连续在岗跨午休也计入，默认12:00–13:30共90分钟。独立完整区间分别判断最低时长，不拼凑多段短时；登记和补录保持明确时段，仅扣重。出差/请假覆盖的缺岗先扣除；所有加班先排除班内，班外并集去重。历史冻结保留旧口径，应用本页可将独立修订切换到新口径，原冻结不变。</p>');
  case 'data':return sectionCard('数据与模拟','全部数据在本地浏览器解析与计算，不上传服务端。',
    '<div class="r14-readonly"><strong>当前工作空间</strong><span>'+monthKey()+'</span></div>'+
@@ -160,7 +160,7 @@ function bindSettings(){
    d.rules.grace=d.rules.graceAmStart;d.rules.dupSeconds=Number(v('r14Dup'));
    d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'));
    d.rules.businessRuleVersion=2;d.rules.overtimeRuleVersion=2;d.rules.overtimeAfterMinutes=Number(v('r93OvertimeAfter'));d.rules.overtimeBeforeMinutes=Number(v('r93OvertimeBefore'));
-   d.rules.punchRuleVersion=2;d.rules.midnightInference=!!ch('r106MidnightInference');d.rules.midnightCutoffMinutes=minutes(v('r106MidnightCutoff'));d.rules.maxVisitHours=Number(v('r106MaxVisit'));
+   d.rules.punchRuleVersion=2;d.rules.leaveReturnRuleVersion=2;d.rules.midnightInference=!!ch('r106MidnightInference');d.rules.midnightCutoffMinutes=minutes(v('r106MidnightCutoff'));d.rules.maxVisitHours=Number(v('r106MaxVisit'));
    d.rules.tempOutingMinutes=Number(v('r87TempLimit'));d.rules.tempOutingGraceMinutes=Number(v('r87TempGrace'))}
   if(section==='table'){
    const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};
