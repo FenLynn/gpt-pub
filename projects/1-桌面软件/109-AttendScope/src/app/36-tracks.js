@@ -48,7 +48,7 @@ function p111BandLabelLayout(bars,project,left,right,rowHeight){
    const finish=Math.min(right,x-6);
    if(!others.some(r=>r.x<finish&&r.end>finish)){
     const previous=Math.max(left,...others.filter(r=>r.end<=finish).map(r=>r.end+6)),width=Math.min(180,finish-previous);
-    if(width>=54)candidates.push({x:finish-width,width});
+    if(width>=54)candidates.push({x:finish-width,width,beforeEnd:finish});
    }
   }
   let chosen=null;
@@ -56,9 +56,10 @@ function p111BandLabelLayout(bars,project,left,right,rowHeight){
    const width=Math.min(candidate.width,measure.measureText(bar.label).width+8);
    for(const offset of slots){
     if(Math.abs(offset)+10>rowHeight/2)continue;
-    const box={left:candidate.x,right:candidate.x+width,top:y+offset-10,bottom:y+offset+10,lane};
+    const labelX=candidate.beforeEnd==null?candidate.x:candidate.beforeEnd-width,
+     box={left:labelX,right:labelX+width,top:y+offset-10,bottom:y+offset+10,lane};
     if(boxes.some(b=>b.lane===lane&&box.left<b.right+4&&box.right>b.left-4&&box.top<b.bottom&&box.bottom>b.top))continue;
-    chosen={x:candidate.x,y:y+offset,width:Math.max(1,width-8),font,box};boxes.push(box);break;
+    chosen={x:labelX,y:y+offset,width:Math.max(1,width-8),font,box};boxes.push(box);break;
    }
    if(chosen)break;
   }

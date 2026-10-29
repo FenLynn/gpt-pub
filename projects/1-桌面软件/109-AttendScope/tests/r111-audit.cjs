@@ -69,13 +69,15 @@ module.exports=async({browser,root,out})=>{
     const x=labels[i][1].box,y=labels[j][1].box;if(x.lane===y.lane&&x.left<y.right&&y.left<x.right&&x.top<y.bottom&&y.top<x.bottom)collisions.push([i,j]);
    }
    const rendered=chart.getZr().storage.getDisplayList().filter(node=>node.type==='tspan'&&node.style?.font?.includes('13px'));
-   return {width:innerWidth,chartWidth:chart.getWidth(),labels,collisions,rendered:rendered.map(node=>({text:node.style.text,fill:node.style.fill,font:node.style.font,opacity:node.style.opacity})),tooltipFont:chart.getOption().tooltip[0].textStyle.fontSize};
+   const detachedBefore=labels.filter(([index,label])=>{const from=chart.convertToPixel({xAxisIndex:0,yAxisIndex:0},[bars[index].value[0],bars[index].value[2]])[0];return from<=chart.getWidth()-88&&label.box.right<=from&&from-label.box.right>7});
+   return {width:innerWidth,chartWidth:chart.getWidth(),labels,collisions,detachedBefore,rendered:rendered.map(node=>({text:node.style.text,fill:node.style.fill,font:node.style.font,opacity:node.style.opacity})),tooltipFont:chart.getOption().tooltip[0].textStyle.fontSize};
   });
   const geometry=[];
   for(const width of [1280,1366,1440,1920]){
    await page.setViewportSize({width,height:900});await page.waitForTimeout(220);const g=await inspect();geometry.push(g);
    check(g.labels.length>=4,'readable labels survive at '+width);
    check(g.collisions.length===0,'no text collisions at '+width);
+   check(g.detachedBefore.length===0,'short before-labels stay beside their own blocks at '+width);
    check(g.labels.every(([,r])=>r.box.left>=14&&r.box.right<=g.chartWidth-88+.01),'labels stay clear of track names at '+width);
    check(g.rendered.some(n=>n.fill==='#18394c')&&g.tooltipFont===15,'dark 13px labels and 15px tooltip at '+width);
    await page.screenshot({path:path.join(out,'r111-durations-'+width+'.png')});
