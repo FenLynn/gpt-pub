@@ -899,7 +899,8 @@ async function run(){
   // Overnight slices and registration residuals still describe one physical session.
   const inferredSessions=new Set([...state.analysis.values()].flatMap(activeAutoOvertimeSegments).map(s=>s.id)).size;
   return counts('punch')===eligible&&asStatValue(ledger,'punch','people',people,days)===distinctPunchPeople&&counts('leave')===state.leaves.length&&
-    counts('trip')===state.trips.length&&counts('outing')===[...state.analysis.values()].reduce((sum,a)=>sum+activeTemporaryOutings(a).length,0)&&
+    counts('trip')===state.trips.length&&counts('outing')===state.outings.length&&
+    counts('tempOuting')===[...state.analysis.values()].reduce((sum,a)=>sum+activeTemporaryOutings(a).length,0)&&
     counts('overtime')===state.overtimeEntries.length+inferredSessions&&
     asStatValue(ledger,'trip','days',people,days)>=counts('trip')&&
     asStatValue(ledger,'trip','estimatedHours',people,days)>0;
@@ -1414,8 +1415,9 @@ async function run(){
  await check(page,()=>{
    const analyses=[...state.analysis.values()],all=new Set(analyses.flatMap(attendanceBehaviors));
    return ['trip','leave','outing','overtime'].every(k=>all.has(k))&&state.outings.length>=8&&state.overtimeEntries.length>=8&&
-     analyses.every(a=>attendanceBehaviors(a).includes('outing')===(activeTemporaryOutings(a).length>0));
- },'Demo behavior coverage or actual-outing evidence inconsistent');
+     analyses.every(a=>attendanceBehaviors(a).includes('outing')===(a.outings.length>0)&&
+       attendanceBehaviors(a).includes('tempOuting')===(activeTemporaryOutings(a).length>0));
+ },'Demo report-outing and actual-temporary-outing evidence inconsistent');
  // Row focus is a single violet outline, no colored row fill.
  await page.locator('.m-name[data-emp="E001"]').click();
  await check(page,()=>{
@@ -1996,11 +1998,12 @@ async function run(){
  await require('./shift-end-stress.cjs')({browser,out,root});
  await require('./r109-audit.cjs')({browser,out,root});
  await require('./r110-audit.cjs')({browser,out,root});
+ await require('./r111-audit.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
  if(errors.length)throw Error('Browser errors '+JSON.stringify(errors));
- console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:'R110',remote:remote.length,errors:errors.length,layout}));
+ console.log('P109_BROWSER_SMOKE_PASS '+JSON.stringify({r:await page.evaluate(()=>P109_APP_REVISION),remote:remote.length,errors:errors.length,layout}));
  await context.close();
 }
 run().catch(e=>{console.error('P109_BROWSER_SMOKE_FAIL',e.stack||e);process.exitCode=1})

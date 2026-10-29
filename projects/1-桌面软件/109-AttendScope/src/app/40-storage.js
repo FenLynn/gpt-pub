@@ -74,6 +74,7 @@ function traditionalRows(){
        .reduce((sum,seg)=>sum+seg.minutes,0)),
       午休证据:a.lunchEvidence||'',加班候选说明:a.autoOvertime?.reason||'',
       登记加班记录数:a.overtime?.length||0,
+      报备外出记录数:a.outings?.length||0,报备外出分钟:analysisUnionMinutes((a.outings||[]).map(r=>[minutes(r.start),minutes(r.end)])),
       临时外出次数:activeTemporaryOutings(a).length,临时外出红色次数:activeTemporaryOutings(a).filter(r=>r.status==='red').length,
       临时外出绿色次数:activeTemporaryOutings(a).filter(r=>r.status==='green').length,临时外出班内分钟:behaviorMinutes(a,'tempOuting'),
       手工补录加班分钟:activeAutoOvertimeSegments(a).filter(r=>r.origin==='manual').reduce((sum,r)=>sum+r.minutes,0),
@@ -289,7 +290,7 @@ async function connectProjectDir(savedHandle=null,options={}){
       latestRoot:null,latestReport:null,latestTree:null,latestScanAt:0});
     r68UI.projectSerial++;r68UI.treeSerial++;if(typeof p109CloseTransfer==='function')p109CloseTransfer();document.getElementById('p109ModeOverlay')?.remove();render();
     const notice=(typeof p109RecentState!=='undefined'&&!p109RecentState.available?'；浏览器未能保存项目历史，下次需重新选择目录':'')+
-      ([...loaded.months.values()].some(m=>m.overtimeRulesMigrated)?'；旧规则已更新：出差/请假优先，自动加班按三参数核查，请核查后保存':'');
+      ([...loaded.months.values()].some(m=>m.overtimeRulesMigrated)?'；旧规则已更新，报备外出与实际临时外出分开统计，请核查后保存':'');
     toast((loaded.recovered.length?'已连接，使用上一有效版本：'+loaded.recovered.join('、')+'；请检查后保存':'已连接并载入项目')+notice);
     return true;
   }catch(e){if(e.name!=='AbortError')p109ShowStorageFallback('目录连接失败：'+e.message);return false}

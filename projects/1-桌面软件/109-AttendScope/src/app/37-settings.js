@@ -160,7 +160,7 @@ function bindSettings(){
    d.rules.grace=d.rules.graceAmStart;d.rules.dupSeconds=Number(v('r14Dup'));
    d.rules.overtimeMinMinutes=Number(v('r14OvertimeMin'));
    d.rules.businessRuleVersion=2;d.rules.overtimeRuleVersion=2;d.rules.overtimeAfterMinutes=Number(v('r93OvertimeAfter'));d.rules.overtimeBeforeMinutes=Number(v('r93OvertimeBefore'));
-   d.rules.punchRuleVersion=2;d.rules.leaveReturnRuleVersion=2;d.rules.statisticsRuleVersion=2;d.rules.earlyDepartureRuleVersion=2;d.rules.midnightInference=!!ch('r106MidnightInference');d.rules.midnightCutoffMinutes=minutes(v('r106MidnightCutoff'));d.rules.maxVisitHours=Number(v('r106MaxVisit'));
+   d.rules.punchRuleVersion=2;d.rules.leaveReturnRuleVersion=2;d.rules.statisticsRuleVersion=2;d.rules.outingStatisticsRuleVersion=2;d.rules.earlyDepartureRuleVersion=2;d.rules.midnightInference=!!ch('r106MidnightInference');d.rules.midnightCutoffMinutes=minutes(v('r106MidnightCutoff'));d.rules.maxVisitHours=Number(v('r106MaxVisit'));
    d.rules.tempOutingMinutes=Number(v('r87TempLimit'));d.rules.tempOutingGraceMinutes=Number(v('r87TempGrace'))}
   if(section==='table'){
    const kind=d.tableKind||'attendance';p.tableColumns[kind]??={};

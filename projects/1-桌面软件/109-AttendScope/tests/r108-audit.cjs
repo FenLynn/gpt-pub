@@ -11,7 +11,7 @@ module.exports=async({browser,root,out})=>{
    const person={id:personIdentity('最终统计核查'),name:'最终统计核查'},date='2026-10-08';EMPLOYEES=[person];
    const cases={},near=(a,b)=>Math.abs(a-b)<1e-7,events=[['08:40','进'],['10:00','出'],['10:20','进'],['11:40','出'],['13:30','进'],['16:50','出'],['19:00','进'],['20:00','出']];
    const seed=(reports=[],registered=[])=>{
-    Object.assign(RULES,P109_DEFAULT_RULES);Object.assign(state,{records:events.map(([time,direction],i)=>({recordId:'r108:'+i,employeeId:person.id,name:person.name,datetime:date+' '+time,time,direction})),
+    Object.assign(RULES,P109_DEFAULT_RULES,{outingStatisticsRuleVersion:1});Object.assign(state,{records:events.map(([time,direction],i)=>({recordId:'r108:'+i,employeeId:person.id,name:person.name,datetime:date+' '+time,time,direction})),
      leaves:[],trips:[],outings:reports.map(([start,end],i)=>({id:'report:'+i,employeeId:person.id,startDate:date,endDate:date,start,end})),
      overtimeEntries:registered.map(([start,end],i)=>({id:'registered:'+i,employeeId:person.id,date,start,end})),manualOvertime:[],manualTempOutings:[],manualStatuses:{},attendanceReview:{},overtimeReview:{},tempOutingReview:{},monthStores:new Map(),calendarOverrides:{[date]:'work'},snapshotContext:false,activeBranch:null,
      revisions:[],revisionSeq:0,imports:[],saved:false,isDemo:false,workspaceMode:'person',selection:{type:'cell',employeeId:person.id,day:8},chartDay:8,chartTab:'timeline',timelineRange:null});reanalyze();

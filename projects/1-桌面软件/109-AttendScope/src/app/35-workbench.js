@@ -1,7 +1,7 @@
 /* P109 right-hand analysis: filter-aware charting, compact insight and linked raw evidence. */
 let rawTabulator=null,rawDialog=null,rawDialogOrigin=null,rawMove=null,pendingRawHighlight=null;
 const CHART_TABS=[['overview','总览'],['timeline','时间轴'],['stats','统计'],['issues','异常']];
-const FILTER_LABELS={main:'常规',normal:'正常',anomaly:'异常',absent:'缺勤',lateEarly:'迟到早退',trip:'出差',leave:'请假',outing:'外出',overtime:'加班',tempOuting:'临时外出'};
+const FILTER_LABELS={main:'常规',normal:'正常',anomaly:'异常',absent:'缺勤',lateEarly:'迟到早退',trip:'出差',leave:'请假',get outing(){return p109ActualOutingFamily()?'实际外出（历史）':'报备外出'},overtime:'加班',tempOuting:'实际临时外出'};
 const JUDGMENT_LABELS={normal:'正常',anomaly:'异常',absent:'缺勤',rest:'休息'};
 function safeTableText(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function insightMetric(label,value,tone=''){return '<div class="insight-row"><span>'+label+'</span><strong class="'+tone+'">'+safeTableText(value)+'</strong></div>'}
@@ -103,7 +103,7 @@ function attendPlotHtml(ctx){
   return top+'<div id="overviewTrendChart" class="overview-trend-chart plot-chart"></div>';
 }
 function timelineBehaviorRows(item,key){
-  if(key==='outing'&&p109FinalStatistics())return activeTemporaryOutings(item).map(row=>({...row,start:attendanceClock(row.from),end:attendanceClock(row.to)}));
+  if(key==='outing'&&p109ActualOutingFamily())return activeTemporaryOutings(item).map(row=>({...row,start:attendanceClock(row.from),end:attendanceClock(row.to)}));
   return ({trip:item.trips||[],leave:item.leaves||[],outing:item.outings||[],overtime:p109RegisteredOvertime(item)})[key]||[];
 }
 function timelineBehaviorClock(row,key,edge){
@@ -135,7 +135,7 @@ function timelineBehaviorSummaryRow(item,key){
  const excluded=(item.autoOvertime?.segments?.length||0)-included.length,
   total=analysisUnionMinutes([...rows.map(r=>[minutes(r.start),minutes(r.end)]),...included.map(r=>[r.from,r.to])]),
   value=key==='overtime'?fmtMinutes(total):recorded,
-  tip=key==='overtime'?'登记 '+recorded+'；推算/补录纳入 '+fmtMinutes(acceptedMinutes)+'；排除 '+excluded+' 段。'+(item.overtimeConflictMinutes>0?'原登记/补录含班内 '+p109IntervalDuration(item.overtimeConflictMinutes)+'，已从加班扣除，原始记录保留。':'')+'纳入统计不代表审批。':FILTER_LABELS[key]+'：'+recorded;
+  tip=key==='overtime'?'登记 '+recorded+'；推算/补录纳入 '+fmtMinutes(acceptedMinutes)+'；排除 '+excluded+' 段。'+(item.overtimeConflictMinutes>0?'原登记/补录含班内 '+p109IntervalDuration(item.overtimeConflictMinutes)+'，已从加班扣除，原始记录保留。':'')+'纳入统计不代表审批。':FILTER_LABELS[key]+'：'+recorded+(key==='outing'&&p111ReportedOutingStatistics()?'；只统计报备，时长按区间并集，不与实际临时外出相加':'');
   return '<div tabindex="0" data-r73-tip="'+safeTableText(tip)+'" class="insight-behavior-row '+key+(active?' active':'')+'"><span><i></i>'+FILTER_LABELS[key]+(key==='overtime'&&item.overtimeConflictMinutes>0?' <small class="p109-overtime-conflict" aria-label="登记或补录含班内时段，已扣除">!</small>':'')+'</span><strong>'+value+'</strong></div>';
 }
 function timelineFullInsightHtml(item){

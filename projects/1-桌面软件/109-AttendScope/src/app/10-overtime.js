@@ -1,7 +1,7 @@
 'use strict';
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
- const r={...(rules||{}),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
+ const r={...(rules||{}),outingStatisticsRuleVersion:rules?.outingStatisticsRuleVersion??(keepLegacy?1:2),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
   punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),leaveReturnRuleVersion:rules?.leaveReturnRuleVersion??(keepLegacy?1:2),statisticsRuleVersion:rules?.statisticsRuleVersion??(keepLegacy?1:2),earlyDepartureRuleVersion:rules?.earlyDepartureRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
   midnightCutoffMinutes:rules?.midnightCutoffMinutes??360,maxVisitHours:rules?.maxVisitHours??16},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
@@ -16,6 +16,7 @@ function p109ValidOvertimeRules(rules){
  if(rules.punchRuleVersion!=null&&![1,2].includes(rules.punchRuleVersion))return false;
  if(rules.leaveReturnRuleVersion!=null&&![1,2].includes(rules.leaveReturnRuleVersion))return false;
  if(rules.statisticsRuleVersion!=null&&![1,2].includes(rules.statisticsRuleVersion))return false;
+ if(rules.outingStatisticsRuleVersion!=null&&![1,2].includes(rules.outingStatisticsRuleVersion))return false;
  if(rules.earlyDepartureRuleVersion!=null&&![1,2].includes(rules.earlyDepartureRuleVersion))return false;
  if(rules.midnightInference!=null&&typeof rules.midnightInference!=='boolean')return false;
  if(rules.midnightCutoffMinutes!=null&&(!Number.isInteger(rules.midnightCutoffMinutes)||rules.midnightCutoffMinutes<0||rules.midnightCutoffMinutes>720))return false;
@@ -41,6 +42,8 @@ function p109OvertimeSnapshotRules(){
 }
 function p109BusinessPriority(rules=RULES){return rules.businessRuleVersion===2}
 function p109FinalStatistics(){return RULES.statisticsRuleVersion===2}
+function p111ReportedOutingStatistics(){return RULES.outingStatisticsRuleVersion===2}
+function p109ActualOutingFamily(){return p109FinalStatistics()&&!p111ReportedOutingStatistics()}
 function p109LeaveReturnOnly(employeeId,date,shiftStart,returned){
  if(RULES.leaveReturnRuleVersion!==2||!p109BusinessPriority())return false;
  const start=minutes(shiftStart),time=typeof returned==='number'?returned:minutes(returned),

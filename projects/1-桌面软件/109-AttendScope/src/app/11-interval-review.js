@@ -132,12 +132,12 @@ function p109RenameIntervalState(data,oldId,newId){
 function p109TempSummary(items){
  const days=items.filter(Boolean),rows=days.flatMap(activeTemporaryOutings);
  return {count:rows.length,green:rows.filter(r=>r.status==='green').length,
-  red:rows.filter(r=>r.status==='red').length,minutes:p109FinalStatistics()?days.reduce((sum,a)=>sum+behaviorMinutes(a,'outing'),0):rows.reduce((sum,r)=>sum+r.minutes,0)};
+  red:rows.filter(r=>r.status==='red').length,minutes:p109FinalStatistics()?days.reduce((sum,a)=>sum+behaviorMinutes(a,'tempOuting'),0):rows.reduce((sum,r)=>sum+r.minutes,0)};
 }
 function p109TempSummaryHtml(items,compact=false){
  const total=p109TempSummary(items),{limit,grace}=p109TempRules();
  return '<section tabindex="0" data-r73-tip="班次内统计；短时限额 '+limit+' 分钟，冗余 '+grace+' 分钟。自动 × 排除留痕，手工 × 删除本段；跨午休分别统计。" class="p109-temp-summary'+(compact?' compact':'')+'" aria-label="临时外出统计">'+
-  '<header><strong>临时外出</strong><span>'+total.count+' 次</span></header>'+
+  '<header><strong>实际临时外出</strong><span>'+total.count+' 次</span></header>'+
   '<div><span class="temp-green">绿色 <b>'+total.green+'</b></span><span class="temp-red">红色 <b>'+total.red+'</b></span><span>'+p109IntervalDuration(total.minutes)+'</span></div>'+
   '</section>';
 }
