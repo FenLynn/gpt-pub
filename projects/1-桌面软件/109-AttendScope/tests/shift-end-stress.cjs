@@ -38,8 +38,7 @@ module.exports=async({browser,root,out})=>{
     add('no chained duplicate extension',[[e-1800,'出'],[e-1200,'出'],[e-600,'出'],[e,'出']],1,{allowSuspect:true});
     add('same-second out in with proper terminal exit',[[e-1200,'出'],[e-1200,'进'],[e,'出']],0);
     add('same-second in out with proper terminal exit',[[e-1200,'进'],[e-1200,'出'],[e,'出']],0);
-    // Keep independently failing diagnostics in the report, separate from the
-    // accepted short-window contract. They are tracked issues, not passing fixes.
+    // Regressions for the remote-orphan failures captured in the R108 audit.
     add('true early and unrelated night exit',[[e-1200,'出'],[82800,'出']],1);
     add('true early and unrelated night entry',[[e-1200,'出'],[79200,'进']],1);
     add('unknown is not a valid terminal clock',[[e-120,'出'],[e+30,'未标注']],1,{allowSuspect:true});
@@ -98,12 +97,12 @@ module.exports=async({browser,root,out})=>{
     return JSON.stringify(flags)===JSON.stringify(direct.early)&&JSON.stringify(state.records)===before;
    }));
   });
-  const knownCases=targeted.filter(r=>r.label.includes('unrelated night')),contractCases=targeted.filter(r=>!r.label.includes('unrelated night')),
+  const knownCases=targeted.filter(r=>r.label.includes('unrelated night')),
    report={version:await page.evaluate(()=>P109_APP_REVISION),targeted,groups,sweeps,indexed,knownFailures:knownCases.filter(r=>!r.pass),errors};
   fs.writeFileSync(path.join(out,'shift-end-stress.json'),JSON.stringify(report,null,2));
-  assert(contractCases.every(r=>r.pass),'targeted shift-end contract');assert(Object.values(groups).every(g=>g.failed===0&&g.rawMutations===0&&g.maxPunches<=50),'random shift-end contract');
+  assert(targeted.every(r=>r.pass),'targeted shift-end contract including remote-orphan regressions');assert(Object.values(groups).every(g=>g.failed===0&&g.rawMutations===0&&g.maxPunches<=50),'random shift-end contract');
   assert(sweeps.failed===0,'second-resolution configurable boundary');assert(indexed,'full reanalysis agrees with direct day analysis');assert(!errors.length,'runtime errors');
-  console.log('P109_SHIFT_END_STRESS_PASS '+JSON.stringify({random:6000,seconds:sweeps.cases,targeted:contractCases.length,maxPunches:Math.max(...Object.values(groups).map(g=>g.maxPunches)),knownDiagnosticFailures:report.knownFailures.length}));
+  console.log('P109_SHIFT_END_STRESS_PASS '+JSON.stringify({random:6000,seconds:sweeps.cases,targeted:targeted.length,maxPunches:Math.max(...Object.values(groups).map(g=>g.maxPunches)),knownDiagnosticFailures:report.knownFailures.length}));
   if(report.knownFailures.length)console.log('P109_SHIFT_END_KNOWN_ISSUES '+JSON.stringify(report.knownFailures.map(r=>({case:r.label,shift:r.part,expectedEarly:r.expected,actualEarly:r.actual.early.length,severity:r.actual.severity}))));
  }finally{await context.close()}
 };

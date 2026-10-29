@@ -539,6 +539,7 @@ function analyzeDay(emp,d){
  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
    overtime=overtimeFor(emp.id,date),countedOvertime=p109OvertimeDaySources(overtime,date),typ=dayType(d);
  let severity='normal',status='正常',issues=[],pairs=completePairs,pending=null,pairingUncertain=false;
+ const uncertainPunchTimes=[],unclosedEntryTimes=[],markUncertain=p=>{pairingUncertain=true;uncertainPunchTimes.push(minutes(p.time))};
  const suspect=message=>{
   if(!issues.includes(message))issues.push(message);
   if(severity!=='problem')severity='suspect';
@@ -550,12 +551,12 @@ function analyzeDay(emp,d){
  for(let i=0;i<punches.length;i++){
   const p=punches[i],prev=punches[i-1],covered=coveredWorkPunch(minutes(p.time)),
    note=message=>{if(covered){if(!issues.includes(message+'（报备覆盖）'))issues.push(message+'（报备覆盖）')}else suspect(message)};
-  if(!['进','出'].includes(p.direction)){note('未提供进出方向（待核）');if(!covered)pairingUncertain=true;continue}
+  if(!['进','出'].includes(p.direction)){note('未提供进出方向（待核）');if(!covered)markUncertain(p);continue}
   if(prev&&prev.direction===p.direction){
    const diff=Math.abs(minutes(p.time)-minutes(prev.time));
    note(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:
     '连续'+p.direction+(p.direction==='进'?'（无离开记录，按连续在岗计算）':''));
-   if(p.direction==='出'&&!covered)pairingUncertain=true;
+   if(p.direction==='出'&&!covered)markUncertain(p);
   }
   const stamp=attendanceUtcMinute(date,p.time);
   const matched=wholeVisits.some(v=>p.direction==='进'?
@@ -563,9 +564,9 @@ function analyzeDay(emp,d){
     stamp===v.to&&(v.exit.recordId===p.recordId||
       (!p.recordId&&v.exit.datetime===p.datetime)));
   if(matched)continue;
-  if(p.direction==='进'){note('存在未闭合进入记录');if(!covered)pending=p}
+  if(p.direction==='进'){note('存在未闭合进入记录');if(!covered){pending=p;unclosedEntryTimes.push(minutes(p.time))}}
   else note('缺少对应进入记录');
-  if(!covered)pairingUncertain=true;
+  if(!covered)markUncertain(p);
  }
  if(p109ModernPunches()&&completePairs.some(([enter])=>enter.sessionTo-enter.sessionFrom>(p109OvertimeSessionRules({from:enter.sessionFrom}).maxVisitHours??16)*60+1e-8))
   suspect('连续在岗超过待核时长，推算加班需逐段确认');
@@ -573,6 +574,11 @@ function analyzeDay(emp,d){
  const businessCovers=(start,end)=>{const a=typeof start==='number'?start:minutes(start),b=typeof end==='number'?end:minutes(end);return b<=a||business.some(([x,y])=>x<=a+1e-8&&y>=b-1e-8)};
  const morningLeave=businessCovers(RULES.amStart,RULES.amEnd),afternoonLeave=businessCovers(RULES.pmStart,RULES.pmEnd),fullExcused=morningLeave&&afternoonLeave;
  const lunchStart=minutes(RULES.amEnd),lunchEnd=minutes(RULES.pmStart);
+ // A remote orphan must not erase a completed shift's departure evidence.
+ // Keep uncertainty inside that shift and its adjustable return window local.
+ const nearShift=(time,start,end)=>time>=minutes(start)&&time<=minutes(end)+p109TempRules().limit+p109TempRules().grace+1e-8,
+  morningUncertain=RULES.earlyDepartureRuleVersion===2?uncertainPunchTimes.some(time=>nearShift(time,RULES.amStart,RULES.amEnd)):pairingUncertain,
+  afternoonPending=RULES.earlyDepartureRuleVersion===2?unclosedEntryTimes.some(time=>time>=minutes(RULES.pmStart)&&time<=minutes(RULES.pmEnd)):!!pending;
  const attendanceFlags=[];
  // A brief out -> in around a shift boundary is one temporary outing, even
  // when the return lands just after the boundary. A longer absence still
@@ -671,16 +677,16 @@ function analyzeDay(emp,d){
   if(lastOut&&!afternoonLeave){
    // Without any complete afternoon exit, a lunchtime "出" cannot establish
    // a definite early departure. Brief boundary outings are handled above.
-   if(afternoonEvidence&&!pending&&afternoonExit&&!businessCovers(minutes(afternoonExit.time),minutes(RULES.pmEnd))){
+   if(afternoonEvidence&&!afternoonPending&&afternoonExit&&!businessCovers(minutes(afternoonExit.time),minutes(RULES.pmEnd))){
     severity='problem';issues.push('早退');status=status==='迟到'?'迟到/早退':'早退';
     attendanceFlags.push({kind:'early',label:'早退',time:afternoonExit.time});
-   }else if(!afternoonEvidence||pending){
+   }else if(!afternoonEvidence||afternoonPending){
     suspect('下午进出记录不完整（待核）');
    }
   }
   const morningExit=!morningLeave?earlyDeparture(RULES.amStart,RULES.amEnd,morningEndGrace):null;
   if(morningExit&&!businessCovers(minutes(morningExit.time),lunchStart)){
-   if(!pairingUncertain){
+   if(!morningUncertain){
     if(!issues.includes('上午早退'))issues.push('上午早退');
     attendanceFlags.push({kind:'early',label:'上午早退',time:morningExit.time});
     severity='problem';status=status.includes('迟到')?'迟到/早退':'早退';
