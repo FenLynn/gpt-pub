@@ -57,7 +57,10 @@ module.exports=async({browser,root,out})=>{
    const file=new File([P109_TABLES.writeArchive(items)],'1904日期系统.xlsx');await r62OpenImport(file,'leave');
    const preview=r62ImportDraft.validated,grid=r62ImportDraft.grid,normalized=p109ParseImportTable('leave',{rows:preview.rows});
    const direct=p109ParseImportTable('leave',await P109_TABLES.readTable(file));
-   return {flag:grid.date1904,first:normalized.rows[0].rangeStart,last:normalized.rows.at(-1).rangeEnd,identical:JSON.stringify(normalized)===JSON.stringify(direct)};
+   // Display-only source cells are retained by the preview; compare the full
+   // business facts independently of that additional, non-calculating payload.
+   const facts=value=>({...value,rows:value.rows.map(({labelData,...row})=>row)});
+   return {flag:grid.date1904,first:normalized.rows[0].rangeStart,last:normalized.rows.at(-1).rangeEnd,identical:JSON.stringify(facts(normalized))===JSON.stringify(facts(direct))};
   });
   check(epoch.flag&&epoch.first==='2026-10-23 18:00:00'&&epoch.last==='2026-10-25 08:30:00'&&epoch.identical,'1904 Excel workbook dates agree in preview and direct parser');
   await page.locator('#r62Cancel').click();

@@ -119,7 +119,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
   if(!strictISODate(startDate)||!strictISODate(endDate))throw Error('起止日期格式错误');
   if(startDate>endDate)throw Error('结束日期早于开始日期');
   if(startDate>period.end||endDate<period.key+'-01')throw Error('日期范围与 '+period.key+' 无交集');
-  const base={name,startDate,endDate,row,type,note,labelParts,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||'')};
+  const base={name,startDate,endDate,row,type,note,labelParts,labelData:p110CleanData(r.__labelData),sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||'')};
   return base;
  }
  const startCombined=aliases(r,['开始日期时间','startDatetime']),endCombined=aliases(r,['结束日期时间','endDatetime']),
@@ -140,7 +140,7 @@ function p109ParseBusinessRow(kind,r,i,period=p109ImportPeriod()){
  if(to<=from)throw Error('结束日期时间必须晚于开始日期时间');
  if(to-from>366*1440)throw Error('单条时间范围超过 366 天，请拆分后导入');
  if(from>=period.last||to<=period.first)throw Error('日期范围与 '+period.key+' 无交集');
- return {name,row,type,note,labelParts,sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||''),
+ return {name,row,type,note,labelParts,labelData:p110CleanData(r.__labelData),sheet:sourceSheet,place:String(aliases(r,['地点','目的地','place'])||''),
   rangeStart:startDate+' '+start,rangeEnd:attendanceDateFromMinute(to)+' '+attendanceClock(to%1440),
   date:startDate,start,end,importIntervalVersion:1};
 }
@@ -184,7 +184,7 @@ function p109MergeImportRows(kind,previous,incoming){
   const indices=slots.get(p109ImportSignature(kind,row));
   if(indices?.length){
    const index=indices.shift(),old=rows[index];
-   rows[index]={...old,labelParts:[...new Set([...(old.labelParts||[]),...(row.labelParts||[])])],sources:[...(old.sources||[p109SourceReference(old)]),p109SourceReference(row)]};merged++;
+   rows[index]={...old,labelParts:[...new Set([...(old.labelParts||[]),...(row.labelParts||[])])],labelData:[...(old.labelData||[]),...(row.labelData||[])].filter((v,i,all)=>all.findIndex(x=>x.key===v.key&&x.value===v.value)===i),sources:[...(old.sources||[p109SourceReference(old)]),p109SourceReference(row)]};merged++;
   }else{rows.push(row);added++}
  }
  return {rows,added,merged};
@@ -210,7 +210,7 @@ async function p109ImportBusiness(kind,file,prepared=null){
   previous=state[field].map(r=>({...r,employeeId:translation.get(r.employeeId)||r.employeeId}));
  const combined=mode==='merge'&&!plan.resetDemo?p109MergeImportRows(kind,previous,out):{rows:out,added:out.length,merged:0};
  // Persist an immutable copy before changing the roster or live dataset.
- const meta={...await persistImportedFile(file,kind,out.length,importId),mode,addedCount:combined.added,mergedCount:combined.merged};
+ const meta={...await persistImportedFile(file,kind,out.length,importId),mode,addedCount:combined.added,mergedCount:combined.merged,...(prepared?.labelImportSettings?{labelImportSettings:prepared.labelImportSettings}:{})};
  applyImportRoster(plan,meta);if(!state.isDemo)p109WriteMode('work');acceptImportedRows(kind,combined.rows,plan,result.failed.length);
  if(typeof p109SourceCache!=='undefined')p109SourceCache.set(importId,file);
  toast('已'+(mode==='replace'?'替换':'合并')+'：新增 '+combined.added+' 条'+(combined.merged?'，重合 '+combined.merged+' 条（保留来源）':''));

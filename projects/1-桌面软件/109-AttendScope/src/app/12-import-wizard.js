@@ -164,6 +164,7 @@ function r96CleanSettings(kind,value){
  const result={header:value.header!==false,skip:Math.min(100,Math.max(0,Math.floor(+value.skip)||0)),mapping,
   labels:Array.isArray(value.labels)?value.labels.slice(0,512).map(v=>String(v??'').trim().slice(0,200)):[],
   labelColumns:Array.isArray(value.labelColumns)?[...new Set(value.labelColumns.filter(Number.isInteger).filter(i=>i>=0&&i<=4095))].slice(0,12):[],
+  labelTitles:Object.fromEntries(Object.entries(value.labelTitles||{}).filter(([key])=>/^\d+$/.test(key)).map(([key,title])=>[key,String(title??'').slice(0,40)])),
   columnCount:Number.isInteger(value.columnCount)?value.columnCount:0,
   encoding:['auto','utf-8','gb18030'].includes(value.encoding)?value.encoding:'auto',
   importMode:value.importMode==='replace'?'replace':'merge',
@@ -202,7 +203,7 @@ function r96RememberImport(d,notify=false){
   localStorage.setItem(R96_IMPORT_SETTINGS_KEY,JSON.stringify({schemaVersion:1,templates}));durable=true;
  }catch(_){}
  d.settingsRetained=true;d.settingsDurable=durable;
- if(notify)toast(durable?'已保留本类导入设置，下次自动使用':'设置仅在当前页面保留；浏览器禁止记忆，导入后请保存项目',!durable);
+ if(notify){p110ApplyDraft(d);toast(durable?(!P110_LABEL_KINDS[d.kind]?'已保留本类导入设置，下次自动使用':d.targetMonth===monthKey()?'已保留本类导入设置及当月文字设置；请保存项目':'已保留本类导入设置；文字在确认导入后存入目标月份'):'设置仅在当前页面保留；浏览器禁止记忆，导入后请保存项目',!durable)}
  return value;
 }
 function r96RestoreMapping(saved,grid,kind,header,skip){
@@ -224,7 +225,7 @@ function r96RestoreMapping(saved,grid,kind,header,skip){
  return {mapping,changed:true,reused:false};
 }
 function r104DefaultLabelColumns(kind,mapping){
- if(!['leave','trip','outing'].includes(kind))return [];
+ if(!['leave','trip','outing','overtime'].includes(kind))return [];
  return [...new Set(['type','place','note'].map(key=>mapping[key]).filter(index=>Number.isInteger(index)&&index>=0))];
 }
 function r104RestoreLabelColumns(saved,grid,kind,header,skip,mapping){
@@ -403,12 +404,7 @@ function r62PreviewHtml(){
   outingRange?'<section class="r95-endpoint r104-range-fields"><div><h4>时间范围</h4></div><div class="r62-mapping">'+select('dateRange','起止日期')+select('timeRange','起止时间')+'</div></section>':endpoint('start')+endpoint('end'))+
   '<div class="r62-mapping">'+(d.kind==='outing'?select('place','地点'):'')+select('note','备注')+'</div>':
   '<div class="r62-mapping">'+fields.map(([key,title])=>select(key,title)).join('')+'</div>';
- const labelConfig=['leave','trip','outing'].includes(d.kind)?(()=>{
-  const chosen=d.labelColumns||[],available=cols.filter(i=>!chosen.includes(i));
-  return '<section class="r104-label-config"><div class="r104-label-head"><strong>轨道标签</strong><select id="r104LabelAdd" aria-label="添加轨道标签列"><option value="">添加字段…</option>'+available.map(i=>'<option value="'+i+'">'+label(i)+'</option>').join('')+'</select></div><div class="r104-label-list">'+
-   (chosen.length?chosen.map((i,pos)=>'<div><span title="'+label(i)+'">'+label(i)+'</span><button type="button" data-label-move="up" data-label-pos="'+pos+'" '+(!pos?'disabled':'')+' aria-label="上移">↑</button><button type="button" data-label-move="down" data-label-pos="'+pos+'" '+(pos===chosen.length-1?'disabled':'')+' aria-label="下移">↓</button><button type="button" data-label-remove="'+pos+'" aria-label="移除">×</button></div>').join(''):'<p>不显示文字标签</p>')+
-   '</div></section>';
- })():'';
+ const labelConfig=p110ImportLabelsHtml(d,cols,label);
  const manySheets=(d.grid.selectedSheets||[]).length>1;
  const rowAt=r=>manySheets?r.sheet+'!'+r.rowNumber:r.rowNumber;
  const preview=d.grid.rows.slice(0,25).map(r=>{
@@ -478,6 +474,7 @@ function r62BuildCanonical(){
    }
   }
   if(d.kind!=='attendance')Object.assign(base,{类型:String(val(c,'type')||''),地点:String(val(c,'place')||''),备注:String(val(c,'note')||''),
+   __labelData:p110DraftData(d,c),
    __labelParts:(d.labelColumns||[]).map(index=>String(c[index]??'').normalize('NFKC').trim()).filter(Boolean).slice(0,12)});
   if(!reason)try{p109ParseBusinessRow(d.kind,base,i,period)}catch(e){reason=e.message}
   if(reason)fail.push({row:(selected.length>1?(r.sheet+'!'):'')+r.rowNumber,reason});else mapped.push(base);
@@ -521,6 +518,8 @@ function r62WireImport(){
  modal.querySelector('#r104LabelAdd')?.addEventListener('change',e=>{const index=Number(e.target.value);if(Number.isInteger(index)&&index>=0&&!d.labelColumns.includes(index))d.labelColumns.push(index);rerender()});
  modal.querySelectorAll('[data-label-remove]').forEach(el=>el.onclick=()=>{d.labelColumns.splice(+el.dataset.labelRemove,1);rerender()});
  modal.querySelectorAll('[data-label-move]').forEach(el=>el.onclick=()=>{const from=+el.dataset.labelPos,to=from+(el.dataset.labelMove==='up'?-1:1);if(to>=0&&to<d.labelColumns.length)[d.labelColumns[from],d.labelColumns[to]]=[d.labelColumns[to],d.labelColumns[from]];rerender()});
+ modal.querySelectorAll('[data-label-title]').forEach(el=>el.oninput=()=>{d.labelTitles??={};d.labelTitles[el.dataset.labelTitle]=el.value;r96RememberImport(d)});
+ modal.querySelectorAll('[data-label-missing]').forEach(el=>el.onclick=()=>{d.labelMissing.splice(+el.dataset.labelMissing,1);rerender()});
  modal.querySelector('#r79Advanced')?.addEventListener('toggle',e=>{d.advanced=e.target.open});
  modal.querySelector('#r96KeepImport').onclick=()=>r96RememberImport(d,true);
  modal.querySelector('#r96EditDirections')?.addEventListener('click',()=>r96ShowDirectionEditor());
@@ -531,17 +530,17 @@ function r62WireImport(){
  modal.querySelector('#r80SkipFile')?.addEventListener('click',async()=>{close(true);await r80NextImportFile()});
  modal.querySelector('#r62Close').onclick=close;modal.querySelector('#r62Cancel').onclick=close;
  modal.addEventListener('keydown',e=>p109TrapDialogFocus(e,modal));
- modal.querySelector('#r62Header').onchange=e=>{d.header=e.target.checked;d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);d.labelColumns=r104DefaultLabelColumns(d.kind,d.mapping);d.startMode=d.endMode=d.outingMode=null;d.dateMode=d.mapping.datetime>=0?'combined':'split';rerender()};
- modal.querySelector('#r62Skip').onchange=e=>{d.skip=Math.max(0,Math.min(100,Number(e.target.value)||0));d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);d.labelColumns=r104DefaultLabelColumns(d.kind,d.mapping);d.startMode=d.endMode=d.outingMode=null;d.dateMode=d.mapping.datetime>=0?'combined':'split';rerender()};
- modal.querySelector('#r79ImportMonth').onchange=e=>{d.targetMonth=e.target.value;rerender(false)};
- modal.querySelector('#r79UseFileMonth')?.addEventListener('click',e=>{d.targetMonth=e.currentTarget.dataset.month;rerender(false)});
+ modal.querySelector('#r62Header').onchange=e=>{d.header=e.target.checked;d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);d.labelColumns=r104DefaultLabelColumns(d.kind,d.mapping);p110PrepareDraft(d);d.startMode=d.endMode=d.outingMode=null;d.dateMode=d.mapping.datetime>=0?'combined':'split';rerender()};
+ modal.querySelector('#r62Skip').onchange=e=>{d.skip=Math.max(0,Math.min(100,Number(e.target.value)||0));d.mapping=r62InferColumns({...d.grid,kind:d.kind},d.header,d.skip);d.labelColumns=r104DefaultLabelColumns(d.kind,d.mapping);p110PrepareDraft(d);d.startMode=d.endMode=d.outingMode=null;d.dateMode=d.mapping.datetime>=0?'combined':'split';rerender()};
+ modal.querySelector('#r79ImportMonth').onchange=e=>{d.targetMonth=e.target.value;p110PrepareDraft(d);rerender(false)};
+ modal.querySelector('#r79UseFileMonth')?.addEventListener('click',e=>{d.targetMonth=e.currentTarget.dataset.month;p110PrepareDraft(d);rerender(false)});
  modal.querySelector('#r100Sheet')?.addEventListener('change',async e=>{
   const previous=r96SettingsFromDraft(d),choice=e.target.value;r63ReadingImport=true;
   modal.querySelectorAll('select,input,button').forEach(el=>el.disabled=true);
   try{
    const grid=await P109_TABLES.readGrid(d.file,d.encoding,choice),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
    if(r62ImportDraft!==d)return;
-   d.grid=grid;d.mapping=restored.mapping;d.labelColumns=r104RestoreLabelColumns(previous,grid,d.kind,d.header,d.skip,d.mapping);d.mappingChanged=restored.changed;d.validated=null;rerender(false);
+   d.grid=grid;d.mapping=restored.mapping;d.labelColumns=r104RestoreLabelColumns(previous,grid,d.kind,d.header,d.skip,d.mapping);p110PrepareDraft(d,previous);d.mappingChanged=restored.changed;d.validated=null;rerender(false);
   }catch(err){if(r62ImportDraft===d){d.error=err.message;r62ShowImport()}}
   finally{r63ReadingImport=false}
  });
@@ -556,7 +555,7 @@ function r62WireImport(){
   try{
    const grid=await P109_TABLES.readGrid(d.file,d.encoding,d.grid.sheetChoice),restored=r96RestoreMapping(previous,grid,d.kind,d.header,d.skip);
    if(r62ImportDraft!==d)return;
-   d.grid=grid;d.mapping=restored.mapping;d.labelColumns=r104RestoreLabelColumns(previous,grid,d.kind,d.header,d.skip,d.mapping);d.mappingChanged=restored.changed;rerender();
+   d.grid=grid;d.mapping=restored.mapping;d.labelColumns=r104RestoreLabelColumns(previous,grid,d.kind,d.header,d.skip,d.mapping);p110PrepareDraft(d,previous);d.mappingChanged=restored.changed;rerender();
   }
   catch(err){if(r62ImportDraft===d){d.encoding=previous.encoding;d.error=err.message;r62ShowImport()}}
   finally{r63ReadingImport=false}
@@ -587,10 +586,10 @@ function r62WireImport(){
     if(!switchMonth(y,m,true,true,true))throw Error('无法打开所选导入月份');
    }
    const converter={attendance:importAttendance,leave:importLeaves,trip:importTrips,outing:importOutings,overtime:importOvertime}[d.kind];
-   const oldProfile=r62ImportProfile();await converter(d.file,{sheet:d.grid.sheet,selectedSheets:d.grid.selectedSheets,rows:data.rows,headers:Object.keys(data.rows[0]),importMode:d.importMode});
+   const oldProfile=r62ImportProfile();await converter(d.file,{sheet:d.grid.sheet,selectedSheets:d.grid.selectedSheets,rows:data.rows,headers:Object.keys(data.rows[0]),importMode:d.importMode,labelImportSettings:{header:d.header,skip:d.skip,encoding:d.encoding}});
    const settings=r96RememberImport(d),nextProfile={...oldProfile,templates:{...(oldProfile.templates||{}),[d.kind]:settings}};
    if(d.kind==='attendance')nextProfile.rules=d.rules.map(r=>({...r}));
-   state.importProfile=nextProfile;state.saved=false;rememberMonth();state.importCommitting=false;close(true);render();await r80NextImportFile();
+   state.importProfile=nextProfile;p110ApplyDraft(d);state.saved=false;rememberMonth();state.importCommitting=false;close(true);render();await r80NextImportFile();
   }catch(e){
    p109RestoreSession(before);reanalyze();render();
    d.error=e.name==='AbortError'?'已取消，原数据已保留。':e.name==='NotAllowedError'?'项目目录没有写入权限，请重新授权后重试。':('导入失败：'+e.message);
@@ -658,6 +657,7 @@ async function r62OpenImport(file,kind){
   startMode:restored.reused?saved?.startMode:null,endMode:restored.reused?saved?.endMode:null,
   outingMode:restored.reused?saved?.outingMode:null};
  r62ImportDraft.dateMode=restored.reused&&saved?.dateMode?saved.dateMode:r62ImportDraft.mapping.datetime>=0?'combined':'split';
+ p110PrepareDraft(r62ImportDraft,saved);
  r62ShowImport();
  }finally{indicator.remove();r63ReadingImport=false}
 }

@@ -353,7 +353,7 @@ function r68RulesHtml(){
 }
 function r68TemplatesHtml(){
  const profile=r62ImportProfile();
- return r68SidebarHeader('导入模板','各类独立记忆；列结构变化时重新核对。')+
+ return r68SidebarHeader('导入模板','各类独立记忆；列结构变化时重新核对。','<button class="r68-btn" type="button" data-p110-labels="leave">时间块文字</button>')+
   '<div class="r68-template-grid">'+[
    ['attendance','考勤打卡'],['leave','请假'],['trip','出差'],['outing','外出'],['overtime','登记加班']
   ].map(([key,title])=>{

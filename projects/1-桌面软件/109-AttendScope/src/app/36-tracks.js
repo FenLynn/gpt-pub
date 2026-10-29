@@ -29,10 +29,10 @@ function r104TrackLabel(record){
   return [...new Set((record?.labelParts||[]).map(value=>String(value??'').trim()).filter(Boolean))].join(' · ');
 }
 function r23BehaviorSegments(a,key){
-  if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',label:r104TrackLabel(p),sourceIds:[p.id]}));
-  if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',label:r104TrackLabel(p),sourceIds:[p.id]}));
+  if(key==='trip')return (a.trips||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'出差',label:p110TrackLabel(p,key),sourceIds:[p.id]}));
+  if(key==='leave')return (a.leaves||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'请假',label:p110TrackLabel(p,key),sourceIds:[p.id]}));
   if(key==='outing')return [
-   ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',label:r104TrackLabel(p),origin:'registered',sourceIds:[p.id]})),
+   ...(a.outings||[]).map(p=>({from:minutes(p.start||RULES.amStart),to:minutes(p.end||RULES.pmEnd),title:'Excel 外出报备',label:p110TrackLabel(p,key),origin:'registered',sourceIds:[p.id]})),
    ...(a.temporaryOutings||[]).flatMap(p=>p.parts.map(([from,to])=>({from,to,
     title:(p.origin==='manual'?'补录':'自动')+'临时外出 · '+({green:'绿色',red:'红色',exclude:'已排除'}[p.status]),
     origin:'temporary',manual:p.origin==='manual',status:p.status,reason:p.reason,minutes:p.minutes,note:p.note,
@@ -40,7 +40,7 @@ function r23BehaviorSegments(a,key){
   ];
   if(key==='overtime')return [
    ...p109RegisteredOvertime(a).map(p=>({from:minutes(p.start||RULES.pmEnd),to:minutes(p.end||'20:00'),
-    title:'登记加班',origin:'registered',sourceIds:[p.id]})),
+    title:'登记加班',label:p110TrackLabel(p,key),origin:'registered',sourceIds:[p.id]})),
    ...(a.autoOvertime?.segments||[]).map(p=>({from:p.from,to:p.to,
     title:(p.origin==='manual'?'补录加班':p.inference==='midnight'?'午夜推算加班':'自动加班')+(p.requiresConfirmation&&p.accepted===false?' · 超长待确认':p.accepted!==false?' · 已勾选':' · 已取消'),
     reason:p.inference==='midnight'?'当天首张为凌晨出卡，缺少进入证据，按 00:00 推算；原始记录未补造':p.requiresConfirmation?'连续在岗超过待核时长，检查漏卡后使用右侧 ✓ 确认纳入':'依据完整进出区间推算',
@@ -99,19 +99,18 @@ function mountAttendanceTimeline(a){
       return {type:'rect',shape:{x,y:p[1]-h*.44,width:w,height:h*.61,r:2},
        style:{fill:palette[0],stroke:palette[1],lineWidth:1,lineDash:d.status==='exclude'?[3,3]:undefined}};
     }
+    let overtimeStyle=null;
     if(d.track==='overtime'){
       const kind=d.origin==='auto'?'auto':'registered';
       const palette=d.accepted===false?OVERTIME_VISUALS.excluded:OVERTIME_VISUALS[kind];
-      return {type:'rect',
-        shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
-        style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[
+      overtimeStyle={fill:new echarts.graphic.LinearGradient(0,0,1,0,[
           {offset:0,color:palette.top},{offset:1,color:palette.bottom}
-        ]),stroke:'rgba(163,84,99,.18)',lineWidth:.45}
-      };
+        ]),stroke:'rgba(163,84,99,.18)',lineWidth:.45};
     }
+    if(overtimeStyle&&!d.label)return {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},style:overtimeStyle};
     const colors=behaviorGradient[d.track]||['rgba(120,140,160,.18)','rgba(120,140,160,.5)'],children=[
       {type:'rect',shape:{x,y:p[1]-h/2,width:w,height:h,r:0},
-       style:{fill:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:colors[0]},{offset:1,color:colors[1]}]),stroke:'transparent',lineWidth:0}}
+       style:overtimeStyle||{fill:new echarts.graphic.LinearGradient(0,0,1,0,[{offset:0,color:colors[0]},{offset:1,color:colors[1]}]),stroke:'transparent',lineWidth:0}}
     ];
     if(d.label){
       const inside=w>=54,labelX=inside?x+5:x+w+6,maxWidth=Math.max(24,Math.min(180,chart.getWidth()-SIDE-54-labelX));
