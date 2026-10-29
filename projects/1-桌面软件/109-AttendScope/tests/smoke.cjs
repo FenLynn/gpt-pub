@@ -1993,6 +1993,7 @@ async function run(){
  await require('./r106-audit.cjs')({browser,out,root});
  await require('./r107-audit.cjs')({browser,out,root});
  await require('./r108-audit.cjs')({browser,out,root});
+ await require('./shift-end-stress.cjs')({browser,out,root});
  await require('./lifecycle-audit.cjs')({browser,out,root});
  await require('./ui-audit.cjs')({browser,out,root});
  if(!process.env.P109_URL&&remote.length)throw Error('Network requests from offline app '+JSON.stringify(remote));
