@@ -33,7 +33,7 @@ function r63ReportData(kind){
    ['末出',a.lastOut?.slice(0,8)||'—'],['在岗',fmtMinutes(a.presence)],
    ['班内工时',fmtMinutes(a.workMinutes??0)],['自动加班（已纳入）',fmtMinutes(auto)],
    ['登记加班',a.overtime?.length+' 条'],['出差',a.trips?.length+' 条'],
-   ['请假',a.leaves?.length+' 条'],['外出',a.outings?.length+' 条'],
+   ['请假',a.leaves?.length+' 条'],[p109FinalStatistics()?'实际外出':'报备外出',timelineBehaviorRows(a,'outing').length+' 次'],
    ['异常说明',(a.issues||[]).join('、')||'无']]};
 }
 function r63Legend(g,kind,x,y){

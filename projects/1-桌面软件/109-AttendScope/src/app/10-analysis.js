@@ -254,7 +254,7 @@ function attendanceBehaviors(a){
   const results=[];
   if(a.trips?.length)results.push('trip');
   if(a.leaves?.length)results.push('leave');
-  if(a.outings?.length||state.outings?.some(x=>x.employeeId===a.employee.id&&a.date>=x.startDate&&a.date<=x.endDate))results.push('outing');
+  if(p109FinalStatistics()?activeTemporaryOutings(a).length:(a.outings?.length||state.outings?.some(x=>x.employeeId===a.employee.id&&a.date>=x.startDate&&a.date<=x.endDate)))results.push('outing');
   if(activeTemporaryOutings(a).length)results.push('tempOuting');
   if(p109RegisteredOvertime(a).length||activeAutoOvertimeSegments(a).length||
     (!isWorkday(a.day)&&a.punches.length)||(!p109BusinessPriority()&&state.overtimeEntries?.some(x=>x.employeeId===a.employee.id&&x.date===a.date)))
@@ -262,7 +262,8 @@ function attendanceBehaviors(a){
   return results;
 }
 function activeAttendanceFlags(a){return (a?.attendanceFlags||[]).filter(flag=>flag.accepted!==false)}
-function attendanceHasLateEarly(a){return activeAttendanceFlags(a).some(flag=>flag.kind==='late'||flag.kind==='early')}
+function countedAttendanceFlags(a){return p109FinalStatistics()&&manualStatusFor(a)==='normal'?[]:activeAttendanceFlags(a)}
+function attendanceHasLateEarly(a){return countedAttendanceFlags(a).some(flag=>flag.kind==='late'||flag.kind==='early')}
 function attendanceCategory(a){return attendanceJudgment(a)}
 function matrixCategory(a,filter=state.filter){
   if(filter==='lateEarly'&&attendanceHasLateEarly(a))return 'lateEarly';
@@ -274,6 +275,7 @@ function categoryColor(category){return ({tempOutingRed:'#dc8388',tempOutingGree
 function outingFor(empId,date){return (state.outings||[]).filter(x=>x.employeeId===empId&&date>=x.startDate&&date<=x.endDate)}
 function overtimeFor(empId,date){return attendanceDailyRegistered(empId,date)}
 function behaviorMinutes(a,kind){
+  if(p109FinalStatistics()&&(kind==='outing'||kind==='tempOuting'))return analysisUnionMinutes(activeTemporaryOutings(a).flatMap(row=>row.parts||[[row.from,row.to]]));
   if(kind==='tempOuting')return activeTemporaryOutings(a).reduce((sum,r)=>sum+r.minutes,0);
   if(kind==='overtime'&&p109BusinessPriority())return analysisUnionMinutes([...p109RegisteredOvertime(a).map(r=>[minutes(r.start),minutes(r.end)]),...activeAutoOvertimeSegments(a).map(r=>[r.from,r.to])]);
   const intervals=kind==='leave'?a.leaves:kind==='outing'?a.outings:kind==='overtime'?a.overtime:[];

@@ -130,9 +130,9 @@ function p109RenameIntervalState(data,oldId,newId){
  for(const revision of data.revisions||[])if(revision.segmentId)revision.segmentId=change(revision.segmentId);
 }
 function p109TempSummary(items){
- const rows=items.filter(Boolean).flatMap(activeTemporaryOutings);
+ const days=items.filter(Boolean),rows=days.flatMap(activeTemporaryOutings);
  return {count:rows.length,green:rows.filter(r=>r.status==='green').length,
-  red:rows.filter(r=>r.status==='red').length,minutes:rows.reduce((sum,r)=>sum+r.minutes,0)};
+  red:rows.filter(r=>r.status==='red').length,minutes:p109FinalStatistics()?days.reduce((sum,a)=>sum+behaviorMinutes(a,'outing'),0):rows.reduce((sum,r)=>sum+r.minutes,0)};
 }
 function p109TempSummaryHtml(items,compact=false){
  const total=p109TempSummary(items),{limit,grace}=p109TempRules();

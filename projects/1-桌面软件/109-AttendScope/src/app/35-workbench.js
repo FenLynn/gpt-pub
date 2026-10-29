@@ -103,6 +103,7 @@ function attendPlotHtml(ctx){
   return top+'<div id="overviewTrendChart" class="overview-trend-chart plot-chart"></div>';
 }
 function timelineBehaviorRows(item,key){
+  if(key==='outing'&&p109FinalStatistics())return activeTemporaryOutings(item).map(row=>({...row,start:attendanceClock(row.from),end:attendanceClock(row.to)}));
   return ({trip:item.trips||[],leave:item.leaves||[],outing:item.outings||[],overtime:p109RegisteredOvertime(item)})[key]||[];
 }
 function timelineBehaviorClock(row,key,edge){
@@ -155,14 +156,14 @@ function timelineFullInsightHtml(item){
 function personalLateEarlySummaryHtml(employeeId){
  const days=Array.from({length:monthDays()},(_,i)=>state.analysis.get(employeeId+'|'+(i+1))).filter(Boolean);
  const flagged=days.filter(attendanceHasLateEarly);
- const late=days.reduce((n,a)=>n+activeAttendanceFlags(a).filter(f=>f.kind==='late').length,0);
- const early=days.reduce((n,a)=>n+activeAttendanceFlags(a).filter(f=>f.kind==='early').length,0);
- return '<section class="r77-anomaly-summary" aria-label="系统识别的迟到早退">'+
+ const late=days.reduce((n,a)=>n+countedAttendanceFlags(a).filter(f=>f.kind==='late').length,0);
+ const early=days.reduce((n,a)=>n+countedAttendanceFlags(a).filter(f=>f.kind==='early').length,0);
+ return '<section class="r77-anomaly-summary" aria-label="最终统计的迟到早退">'+
   '<header><strong>迟到早退</strong><small>已纳入 · 排除保留底稿</small></header>'+
   '<div class="r77-anomaly-totals"><span>迟到 <b>'+late+' 次</b></span><span>早退 <b>'+early+
   ' 次</b></span><span>涉及 <b>'+flagged.length+' 天</b></span></div>'+
   '<div class="r77-anomaly-days">'+(flagged.length?flagged.map(a=>
-   '<button type="button" data-person-anomaly-day="'+a.day+'" title="'+safeTableText(activeAttendanceFlags(a).map(f=>f.label+' '+f.time).join('、'))+
+   '<button type="button" data-person-anomaly-day="'+a.day+'" title="'+safeTableText(countedAttendanceFlags(a).map(f=>f.label+' '+f.time).join('、'))+
    (manualStatusFor(a)?' · 人工已调整判定':'')+'" aria-label="'+pad(a.day)+'日异常，查看时间轴">'+pad(a.day)+'日</button>'
   ).join(''):'<span>本月无明确迟到早退记录</span>')+'</div></section>';
 }
