@@ -17,7 +17,7 @@ async function p109CacheRead(key='current'){
   tx.oncomplete=()=>resolve(request.result||null);tx.onerror=tx.onabort=()=>reject(tx.error||Error('缓存读取中断'));
  })}finally{db.close()}
 }
-async function p109CacheWrite(record,expectedToken){
+async function p109CacheWrite(record,expectedToken,skipPreviousToken){
  const last=await p109CacheRead(),validToken=last&&last.bytes instanceof ArrayBuffer&&last.sha256===await p109Hash(new Uint8Array(last.bytes))?last.token:null;
  const db=await p109CacheOpen();let conflict=false;
  try{await new Promise((resolve,reject)=>{
@@ -25,7 +25,7 @@ async function p109CacheWrite(record,expectedToken){
   request.onsuccess=()=>{
    const old=request.result;
    if(old&&old.id===record.id&&old.token!==expectedToken){conflict=true;tx.abort();return}
-   if(old&&old.token===validToken)store.put(old,'previous');store.put(record,'current');
+   if(old&&old.token===validToken&&old.token!==skipPreviousToken)store.put(old,'previous');store.put(record,'current');
   };
   tx.oncomplete=resolve;tx.onerror=tx.onabort=()=>reject(conflict?Error('另一个页面已保存此项目，请先下载当前项目包，再重新打开最新缓存'):tx.error||Error('缓存写入中断'));
  })}finally{db.close()}
@@ -42,7 +42,7 @@ async function p109SaveLocalCache(){
     name:root.name,savedAt,bytes,sha256:await p109Hash(new Uint8Array(bytes))};
   if(state.projectDir!==origin||origin&&origin.revision!==revision||p109SessionFingerprint()!==fingerprint)
    throw Error('保存过程中内容发生变化，请再次保存');
-  await p109CacheWrite(record,origin?.cacheToken);
+  await p109CacheWrite(record,origin?.cacheToken,origin?.cacheRejectedToken);
   const verified=await p109CacheRead();
   if(!verified||verified.token!==record.token||verified.sha256!==record.sha256||await p109Hash(new Uint8Array(verified.bytes))!==record.sha256)
    throw Error('本机缓存读回校验失败，请下载项目包备份');
@@ -56,21 +56,26 @@ async function p109SaveLocalCache(){
  finally{state.storageBusy=false}
 }
 async function p109RestoreLocalCache(active=()=>true){
- let candidate=null,recovered=false,rejected=null;
+ let rejected=null;
  try{
   for(const key of ['current','previous']){
    const record=await p109CacheRead(key);if(!record)continue;
-   if(record.schemaVersion!==1||!(record.bytes instanceof ArrayBuffer)||!record.bytes.byteLength)continue;
+   if(!active()||state.projectDir)return false;
+   if(record.schemaVersion>1||record.appVersion&&p109CompareVersion(record.appVersion,P109_APP_VERSION)>0){toast('本机缓存来自更新版本，请先升级程序；现有缓存保持不变',true);return false}
+   if(key==='previous'&&rejected?.id&&record.id!==rejected.id)return false;
+   if(record.schemaVersion!==1||!(record.bytes instanceof ArrayBuffer)||!record.bytes.byteLength){if(key==='current')rejected=record;continue}
    if(await p109Hash(new Uint8Array(record.bytes))!==record.sha256){if(key==='current')rejected=record;continue}
-   candidate=record;recovered=key==='previous';break;
+   if(!active()||state.projectDir)return false;
+   const ok=await p109OpenPortableFile(new File([record.bytes],'cached-project.zip',{type:'application/zip'}),
+    {fromCache:true,onError:()=>{},active:()=>active()&&!state.projectDir});
+   if(!ok){if(!active()||state.projectDir)return false;if(key==='current')rejected=record;continue}
+   const recovered=key==='previous';
+   Object.assign(state.projectDir,{name:record.name,cacheId:record.id,cacheToken:record.token,cacheSavedAt:record.savedAt});
+   if(rejected&&rejected.id===record.id)Object.assign(state.projectDir,{cacheToken:rejected.token,cacheRejectedToken:rejected.token});
+   if(recovered){state.projectDir.pending=true;state.saved=false;rememberMonth()}
+   render();toast(recovered?'最近缓存校验失败，已恢复上一份有效缓存（'+new Date(record.savedAt).toLocaleString()+'）；请核对、保存并下载备份':'已恢复本机缓存 '+new Date(record.savedAt).toLocaleString());return true;
   }
-  if(!candidate||!active()||state.projectDir)return false;
-  const ok=await p109OpenPortableFile(new File([candidate.bytes],'cached-project.zip',{type:'application/zip'}),{fromCache:true});
-  if(!ok)return false;
-  Object.assign(state.projectDir,{name:candidate.name,cacheId:candidate.id,cacheToken:candidate.token,cacheSavedAt:candidate.savedAt});
-  if(rejected&&rejected.id===candidate.id)state.projectDir.cacheToken=rejected.token;
-  if(recovered){state.projectDir.pending=true;state.saved=false;rememberMonth()}
-  render();toast(recovered?'最近缓存校验失败，已恢复上一份有效缓存；请核对并下载备份':'已恢复本机缓存 '+new Date(candidate.savedAt).toLocaleString());return true;
+  return false;
  }catch(_){return false}
 }
 async function p109RestoreLocalCacheManually(){

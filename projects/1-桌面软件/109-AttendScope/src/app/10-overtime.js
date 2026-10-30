@@ -1,7 +1,7 @@
 'use strict';
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
- const r={...(rules||{}),punchEvidenceRuleVersion:rules?.punchEvidenceRuleVersion??(keepLegacy?1:2),outingStatisticsRuleVersion:rules?.outingStatisticsRuleVersion??(keepLegacy?1:2),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
+ const r={...(rules||{}),morningEvidenceRuleVersion:rules?.morningEvidenceRuleVersion??(keepLegacy?1:2),punchEvidenceRuleVersion:rules?.punchEvidenceRuleVersion??(keepLegacy?1:2),outingStatisticsRuleVersion:rules?.outingStatisticsRuleVersion??(keepLegacy?1:2),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
   punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),leaveReturnRuleVersion:rules?.leaveReturnRuleVersion??(keepLegacy?1:2),statisticsRuleVersion:rules?.statisticsRuleVersion??(keepLegacy?1:2),earlyDepartureRuleVersion:rules?.earlyDepartureRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
   midnightCutoffMinutes:rules?.midnightCutoffMinutes??360,maxVisitHours:rules?.maxVisitHours??16},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
@@ -15,6 +15,7 @@ function p109ValidOvertimeRules(rules){
  if(typeof rules!=='object'||Array.isArray(rules))return false;
  if(rules.punchRuleVersion!=null&&![1,2].includes(rules.punchRuleVersion))return false;
  if(rules.punchEvidenceRuleVersion!=null&&![1,2].includes(rules.punchEvidenceRuleVersion))return false;
+ if(rules.morningEvidenceRuleVersion!=null&&![1,2].includes(rules.morningEvidenceRuleVersion))return false;
  if(rules.leaveReturnRuleVersion!=null&&![1,2].includes(rules.leaveReturnRuleVersion))return false;
  if(rules.statisticsRuleVersion!=null&&![1,2].includes(rules.statisticsRuleVersion))return false;
  if(rules.outingStatisticsRuleVersion!=null&&![1,2].includes(rules.outingStatisticsRuleVersion))return false;

@@ -629,6 +629,12 @@ function analyzeDay(emp,d){
   analysisPairMinutes(pairs,RULES.pmStart,RULES.pmEnd);
  const presence=pairs.reduce((sum,[x,y])=>sum+Math.max(0,minutes(y.time)-minutes(x.time)),0);
  const firstIn=evidencePunches.find(p=>p.direction==='进');
+ // Completed pre-shift visits cannot stand in for arrival at this shift.
+ // A real visit crossing the shift boundary remains valid arrival evidence.
+ const shiftMorning=RULES.morningEvidenceRuleVersion===2,amBoundary=attendanceUtcMinute(date,RULES.amStart),
+  morningCovered=shiftMorning&&wholeVisits.some(v=>v.from<=amBoundary&&v.to>amBoundary),
+  morningIn=shiftMorning?evidencePunches.find(p=>p.direction==='进'&&!wholeVisits.some(v=>
+   v.to<=amBoundary&&attendanceUtcMinute(date,p.time)>=v.from&&attendanceUtcMinute(date,p.time)<v.to)):firstIn;
  const lastOut=[...evidencePunches].reverse().find(p=>p.direction==='出');
  const morningPair=pairs.find(([x,y])=>minutes(x.time)<lunchStart&&
    minutes(y.time)>=lunchStart-90&&minutes(y.time)<=lunchEnd);
@@ -677,18 +683,20 @@ function analyzeDay(emp,d){
     morningEndGrace=Number(RULES.graceAmEnd??0)||0,
     afternoonGrace=Number(RULES.gracePmStart??RULES.grace??5)||0,
     afternoonEndGrace=Number(RULES.gracePmEnd??0)||0,
-    firstMinute=firstIn?minutes(firstIn.time):null;
+    firstMinute=morningCovered?minutes(RULES.amStart):morningIn?minutes(morningIn.time):null;
   const morningEvidence=pairs.some(([x,y])=>minutes(x.time)<=lunchStart&&minutes(y.time)>minutes(RULES.amStart));
   const afternoonEvidence=pairs.some(([x,y])=>minutes(y.time)>lunchEnd&&minutes(x.time)<minutes(RULES.pmEnd));
-  if(firstIn&&!morningLeave){
+  if((morningIn||morningCovered)&&!morningLeave){
    if(firstMinute>minutes(RULES.amStart)+morningGrace&&firstMinute<lunchStart&&!businessCovers(RULES.amStart,firstMinute)&&
      !p109LeaveReturnOnly(emp.id,date,RULES.amStart,firstMinute)){
     severity='problem';issues.push('迟到');status='迟到';
-    attendanceFlags.push({kind:'late',label:'迟到',time:firstIn.time});
-   }else if(!morningEvidence&&firstMinute>lunchStart){
+    attendanceFlags.push({kind:'late',label:'迟到',time:morningIn.time});
+   }else if(!morningEvidence&&(shiftMorning?firstMinute>=lunchStart:firstMinute>lunchStart)){
     suspect('上午缺少完整出勤证据（待核）');
    }
   }
+  if(shiftMorning&&!morningIn&&!morningCovered&&!morningEvidence&&!morningLeave)
+   suspect('上午缺少完整出勤证据（待核）');
   const afternoonExit=!afternoonLeave?earlyDeparture(RULES.pmStart,RULES.pmEnd,afternoonEndGrace):null;
   if(lastOut&&!afternoonLeave){
    // Without any complete afternoon exit, a lunchtime "出" cannot establish

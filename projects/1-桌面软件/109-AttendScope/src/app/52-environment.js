@@ -136,7 +136,7 @@ function p109ShowStorageFallback(reason='当前环境不支持目录写入'){
  node.querySelector('#p109FallbackRetry').onclick=async()=>{p109CloseTransfer();await connectProjectDir()};
  node.querySelector('#p109FallbackPortable').onclick=()=>p109ExportPortable({adopt:true});node.querySelector('#p109FallbackRescue').onclick=p109RescueDownload;node.querySelector('#p109FallbackRescueText').onclick=()=>p109ShowRescueText();
 }
-async function p109OpenPortableFile(file,{fromCache=false}={}){
+async function p109OpenPortableFile(file,{fromCache=false,onError=null,active=()=>true}={}){
  if(p109ProjectBusy||state.storageBusy||state.importCommitting||p109ConnectionBusy||r62ImportDraft)return false;
  p109ProjectBusy=true;
  try{
@@ -147,8 +147,9 @@ async function p109OpenPortableFile(file,{fromCache=false}={}){
   for(const f of payload){const ref=m.files.find(x=>x.path===f.name);if(!ref||ref.bytes!==f.data.byteLength||ref.sha256!==await p109Hash(f.data))throw Error('项目包校验失败：'+f.name)}
   const root=p109MemoryRoot(file.name.replace(/\.zip$/i,''));for(const f of payload)await p109PortablePut(root,f.name,f.data);
   const project=await readJSON(root,'project.json');if(!project)throw Error('包中缺少项目配置');await p109ReadProject(root,project);
+  if(!active())return false;
   p109ProjectBusy=false;const ok=await connectProjectDir(root,{automatic:fromCache});if(ok){root.pending=false;render();p109CloseTransfer();if(!fromCache)toast('已打开便携项目；保存到本机缓存，下载项目包可另存备份')};return ok;
- }catch(e){toast('项目包未打开：'+e.message,true);return false}finally{p109ProjectBusy=false}
+ }catch(e){if(onError)onError(e);else toast('项目包未打开：'+e.message,true);return false}finally{p109ProjectBusy=false}
 }
 function p109PickPortable(){
  const input=document.createElement('input');input.type='file';input.accept='.zip,.json,application/zip,application/json';input.onchange=()=>{if(input.files?.[0])p109OpenPortableFile(input.files[0])};input.click();

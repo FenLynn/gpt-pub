@@ -184,19 +184,32 @@ async function p109ShowUpdate(file){
  const panel=document.createElement('section');panel.id='p109UpdateOverlay';panel.className='p109-recent-overlay';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','p109UpdateTitle');
  panel.innerHTML='<div class="p109-update-panel"><header><h2 id="p109UpdateTitle">程序升级</h2><button id="p109UpdateClose" aria-label="关闭升级">×</button></header><div class="p109-update-body"><p id="p109UpdateVersion"></p><p id="p109UpdateStatus" role="status" aria-live="polite">正在校验升级包…</p><ol><li>校验版本、完整文件与兼容性</li><li>自动备份、更新并逐项核验</li><li>完成后重新载入程序</li></ol><p id="p109UpdateDirectory">首次升级需授权包含 index.html 的程序文件夹。</p><button id="p109UpdateChoose">选择程序文件夹</button><p>项目数据保持原位。请使用可信来源的 P109 升级包。</p></div><footer><button id="p109UpdateCancel">取消</button><button class="primary-btn" id="p109UpdateInstall" disabled>校验中…</button></footer></div>';
  document.body.appendChild(panel);let running=false,programRoot=null,bundle=null;
+ const canChoose=typeof showDirectoryPicker==='function';
  if(location.protocol!=='file:'){
   const note=document.createElement('p');note.className='p109-update-web-note';
   note.textContent='当前从网站运行。此向导只更新你授权的本地离线程序目录，不会更新网站。网站版本由部署者在 Cloudflare Pages 等托管平台重新部署；本地更新完成后请打开本地 index.html。';
   panel.querySelector('.p109-update-body').prepend(note);
  }
  const status=panel.querySelector('#p109UpdateStatus'),install=panel.querySelector('#p109UpdateInstall'),choose=panel.querySelector('#p109UpdateChoose');
+ choose.disabled=true;
+ const manual=document.createElement('div');manual.id='p109UpdateManual';manual.hidden=true;
+ manual.innerHTML='<p>此环境无法直接更新程序文件夹，请按以下步骤升级：</p><ol><li>先保存当前工作，再下载完整项目 ZIP 并确认文件已保存。</li><li>把刚才校验通过的程序升级 ZIP 完整解压到一个新文件夹，保留旧程序和数据备份。</li><li>打开新文件夹内的 index.html，选择 Work，再打开已确认下载的项目 ZIP。核对数据后继续工作。</li></ol><button id="p109UpdateBackup">下载完整项目备份</button>';
+ panel.querySelector('.p109-update-body').appendChild(manual);
+ const showManual=()=>{manual.hidden=false;panel.querySelector('.p109-update-body > ol').hidden=true;
+  panel.querySelector('#p109UpdateDirectory').textContent='程序与项目数据分别保存；缓存保存不等于独立磁盘备份。';
+  if(!canChoose){choose.hidden=true;install.hidden=true}
+ };
  const close=()=>{if(running)return;if(install.dataset.reload&&location.protocol==='file:'){location.reload();return}panel.remove();document.getElementById('importBtn')?.focus()};
  panel.querySelector('#p109UpdateClose').onclick=close;panel.querySelector('#p109UpdateCancel').onclick=close;
  panel.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close()}else p109TrapDialogFocus(e,panel)});
  const refresh=()=>{const dirty=p109UnsavedMonths();install.disabled=!bundle||!programRoot||!!dirty.length;
+  choose.disabled=!bundle;
   install.textContent=bundle?.compare===0?'修复当前版本':'开始升级';
+  if(!canChoose&&bundle){showManual();status.textContent='完整性与兼容性校验通过，请按下方步骤解压升级';return}
   if(dirty.length)status.textContent='请先取消升级并保存这些月份：'+dirty.join('、');
  };
+ panel.querySelector('#p109UpdateBackup').onclick=()=>{if(!bundle)return;close();p109ExportPortable()};
+ if(!canChoose){choose.hidden=true;install.hidden=true}
  const setRoot=async root=>{
   let recovered=false;if(p109ProjectBusy)throw Error('请等待当前文件操作完成');
   p109ProjectBusy=true;try{recovered=await p109RecoverUpdate(root)}finally{p109ProjectBusy=false}
@@ -205,9 +218,10 @@ async function p109ShowUpdate(file){
   if(!f||!await p109File(root,'index.html'))throw Error('请选择包含 index.html 和 src 的程序文件夹');
   const version=/const P109_APP_VERSION='([^']+)'/.exec(await (await f.getFile()).text())?.[1];
   if(p109CompareVersion(version,P109_APP_VERSION)!==0)throw Error('文件夹版本与当前页面不同，请选择当前程序目录');
-  programRoot=root;panel.querySelector('#p109UpdateDirectory').textContent='程序文件夹：'+root.name+' · '+version;choose.textContent='更换程序文件夹';await p109RememberProgram(root);refresh();
+  programRoot=root;manual.hidden=true;panel.querySelector('.p109-update-body > ol').hidden=false;
+  panel.querySelector('#p109UpdateDirectory').textContent='程序文件夹：'+root.name+' · '+version;choose.textContent='更换程序文件夹';await p109RememberProgram(root);refresh();
  };
- choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError')status.textContent=e.message+'。无法授权时，先下载确认项目包，再把新版完整解压到新文件夹继续。'}};
+ choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError'){status.textContent='程序目录无法写入，可重新授权，或使用下方解压升级步骤。';showManual()}}};
  install.onclick=async()=>{
   if(install.dataset.reload){close();return}if(running)return;running=true;panel.querySelectorAll('button').forEach(b=>b.disabled=true);
   const ok=await p109ApplyCodeUpdate(file,{programRoot,confirmed:true,onProgress:t=>status.textContent=t,onError:t=>status.textContent=t});
@@ -221,7 +235,7 @@ async function p109ShowUpdate(file){
  panel.querySelector('#p109UpdateClose').focus();
  try{bundle=await p109InspectUpdate(file);if(!panel.isConnected)return;
   panel.querySelector('#p109UpdateVersion').textContent='当前 '+P109_APP_VERSION+' → '+bundle.appVersion+(bundle.compare===0?'（同版本修复）':'');status.textContent='完整性与兼容性校验通过';
-  refresh();const remembered=await p109ReadProgram();
+  refresh();if(!canChoose)return;const remembered=await p109ReadProgram();
   if(remembered&&typeof remembered.queryPermission==='function')try{
    if(await remembered.queryPermission({mode:'readwrite'})==='granted')await setRoot(remembered);
   }catch(_){}
