@@ -219,7 +219,7 @@ async function p109ShowUpdate(file){
   const version=/const P109_APP_VERSION='([^']+)'/.exec(await (await f.getFile()).text())?.[1];
   if(p109CompareVersion(version,P109_APP_VERSION)!==0)throw Error('文件夹版本与当前页面不同，请选择当前程序目录');
   programRoot=root;manual.hidden=true;panel.querySelector('.p109-update-body > ol').hidden=false;
-  panel.querySelector('#p109UpdateDirectory').textContent='程序文件夹：'+root.name+' · '+version;choose.textContent='更换程序文件夹';await p109RememberProgram(root);refresh();
+  panel.querySelector('#p109UpdateDirectory').textContent='程序文件夹：'+root.name+' · '+version;choose.textContent='更换程序文件夹';await p109RememberProgram(root);status.textContent='程序目录已确认，可开始升级';refresh();
  };
  choose.onclick=async()=>{try{const root=await showDirectoryPicker({id:'p109-program-update',mode:'readwrite'});await p109RequireWriteAccess(root,true);await setRoot(root)}catch(e){if(e.name!=='AbortError'){status.textContent='程序目录无法写入，可重新授权，或使用下方解压升级步骤。';showManual()}}};
  install.onclick=async()=>{

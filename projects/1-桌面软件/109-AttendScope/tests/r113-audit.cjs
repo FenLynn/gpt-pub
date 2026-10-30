@@ -94,6 +94,7 @@ module.exports=async({browser,root,out})=>{
    const root=p109MemoryRoot('程序'),rows=await p109ZipRead(__r113Bundle);for(const row of rows)await p109PortablePut(root,row.name,row.data);window.showDirectoryPicker=async()=>root;
   });await page.locator('#p109UpdateChoose').click();await page.waitForFunction(()=>document.querySelector('#p109UpdateManual').hidden&&!document.querySelector('#p109UpdateInstall').disabled);
   check(!await page.locator('#p109UpdateManual').isVisible()&&await page.locator('#p109UpdateInstall').isEnabled(),'authorizedRetryRestoresNormalUpgrade');
+  check((await page.locator('#p109UpdateStatus').innerText()).includes('程序目录已确认'),'authorizedRetryClearsOldFailure');
   await page.locator('#p109UpdateClose').click();check(await page.evaluate(()=>state.records.length===6),'cancelUpgradeKeepsData');
   check(!errors.length,'noRuntimeErrors');
   fs.writeFileSync(path.join(out,'r113-audit.json'),JSON.stringify({checks,morning,errors},null,2));console.log('P109_R113_AUDIT_PASS '+JSON.stringify({checks:Object.keys(checks).length}));
