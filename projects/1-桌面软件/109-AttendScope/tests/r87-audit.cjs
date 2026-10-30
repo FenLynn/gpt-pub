@@ -33,7 +33,7 @@ module.exports=async({browser,out,root})=>{
    const lunch=rows(gap('11:30','13:40'));checks.lunchSplit=lunch.length===1&&lunch[0].shift==='pm'&&lunch[0].minutes===10&&lunch[0].parts.length===1;
    const late=rows(__r87Seed([['08:25','进'],['17:00','出'],['20:00','进'],['21:00','出']]))[0];checks.afterShiftExcluded=late===undefined;
    __r87Seed([['08:25','进'],['10:00','出'],['10:05','出'],['10:20','进'],['10:25','进'],['17:10','出']]);
-   checks.nearestNoReuse=state.analysis.get(e.id+'|8').temporaryOutings.length===1&&state.analysis.get(e.id+'|8').temporaryOutings[0].minutes===15;
+   checks.nearestNoReuse=state.analysis.get(e.id+'|8').temporaryOutings.length===1&&state.analysis.get(e.id+'|8').temporaryOutings[0].minutes===(p112PunchEvidence()?20:15);
    checks.unknownBreaks=!rows(__r87Seed([['10:00','出'],['10:10','未标注'],['10:20','进']])).length;
    let a=gap('10:00','10:13');RULES.tempOutingMinutes=15;reanalyze();checks.editLimit=state.analysis.get(e.id+'|8').temporaryOutings[0].status==='green';
    RULES.tempOutingMinutes=10;RULES.tempOutingGraceMinutes=0;reanalyze();checks.zeroGrace=state.analysis.get(e.id+'|8').temporaryOutings[0].status==='red';

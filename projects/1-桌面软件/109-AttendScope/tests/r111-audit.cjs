@@ -51,7 +51,7 @@ module.exports=async({browser,root,out})=>{
    await p109OpenPortableFile(new File([built.zip],'r111.zip',{type:'application/zip'}));
    cases.zipKeepsSeparate=RULES.outingStatisticsRuleVersion===2&&near(v('outing','hours')*60,30)&&v('tempOuting','count')===0;
    cases.zipRawUnchanged=JSON.stringify(state.records)===original&&JSON.stringify(state.outings)===reportOriginal;
-   cases.schemaGuard=P109_DATA_SCHEMA===13&&workingPayload().schemaVersion===13;
+   cases.schemaGuard=P109_DATA_SCHEMA>=13&&workingPayload().schemaVersion===P109_DATA_SCHEMA;
    seed([['09:55','10:25']]);state.trips=[business('trip','08:30','17:10',['项目验收出差','上海','现场对接'])];
    state.leaves=[business('leave60','14:00','15:00',['事假','家庭事务及现场交接安排说明']),business('leave5','15:01','15:06',['五分钟请假','短区间文字'])];
    state.outings[0].labelParts=['公务外出','设备送检及返回园区'];

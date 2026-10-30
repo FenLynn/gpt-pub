@@ -1,7 +1,7 @@
 'use strict';
 // Version 1 remains available for historical frozen workspaces.
 function p109NormalizeOvertimeRules(rules,keepLegacy=false){
- const r={...(rules||{}),outingStatisticsRuleVersion:rules?.outingStatisticsRuleVersion??(keepLegacy?1:2),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
+ const r={...(rules||{}),punchEvidenceRuleVersion:rules?.punchEvidenceRuleVersion??(keepLegacy?1:2),outingStatisticsRuleVersion:rules?.outingStatisticsRuleVersion??(keepLegacy?1:2),businessRuleVersion:rules?.businessRuleVersion??(keepLegacy?1:2),
   punchRuleVersion:rules?.punchRuleVersion??(keepLegacy?1:2),leaveReturnRuleVersion:rules?.leaveReturnRuleVersion??(keepLegacy?1:2),statisticsRuleVersion:rules?.statisticsRuleVersion??(keepLegacy?1:2),earlyDepartureRuleVersion:rules?.earlyDepartureRuleVersion??(keepLegacy?1:2),midnightInference:rules?.midnightInference??true,
   midnightCutoffMinutes:rules?.midnightCutoffMinutes??360,maxVisitHours:rules?.maxVisitHours??16},number=(value,fallback,min=0)=>value!=null&&Number.isInteger(+value)&&+value>=min&&+value<=240?+value:fallback;
  if(r.overtimeRuleVersion===1||(keepLegacy&&r.overtimeRuleVersion!==2))
@@ -14,6 +14,7 @@ function p109ValidOvertimeRules(rules){
  if(rules==null)return true;
  if(typeof rules!=='object'||Array.isArray(rules))return false;
  if(rules.punchRuleVersion!=null&&![1,2].includes(rules.punchRuleVersion))return false;
+ if(rules.punchEvidenceRuleVersion!=null&&![1,2].includes(rules.punchEvidenceRuleVersion))return false;
  if(rules.leaveReturnRuleVersion!=null&&![1,2].includes(rules.leaveReturnRuleVersion))return false;
  if(rules.statisticsRuleVersion!=null&&![1,2].includes(rules.statisticsRuleVersion))return false;
  if(rules.outingStatisticsRuleVersion!=null&&![1,2].includes(rules.outingStatisticsRuleVersion))return false;
@@ -103,6 +104,7 @@ function p109SubtractOvertime(parts,registered){
  return result;
 }
 function p109ModernPunches(rules=RULES){return rules.punchRuleVersion===2||rules.punchRuleVersion==null&&!state.snapshotContext&&!state.activeBranch}
+function p112PunchEvidence(){return RULES.punchEvidenceRuleVersion===2}
 function p109MidnightOvertimePair(employeeId,date){
  if(!p109ModernPunches()||RULES.midnightInference===false)return [];
  const start=attendanceUtcMinute(date),rows=attendanceEmployeeRows(employeeId),
@@ -110,7 +112,7 @@ function p109MidnightOvertimePair(employeeId,date){
  if(!first||first.direction!=='出'||minutes(first.time)<=0||minutes(first.time)>(RULES.midnightCutoffMinutes??360))return [];
  if(attendanceVisitEvents(employeeId).some(v=>v.exit===first||v.exit.recordId&&v.exit.recordId===first.recordId))return [];
  const previous=rows.filter(r=>r.datetime.slice(0,10)<date).at(-1);
- if(previous){
+ if(previous&&(!p112PunchEvidence()||start+minutes(first.time)-attendanceUtcMinute(previous.datetime.slice(0,10),previous.time)<=36*60+1e-8)){
   if(previous.direction!=='出')return [];
   const gap=start+minutes(first.time)-attendanceUtcMinute(previous.datetime.slice(0,10),previous.time);
   if(gap<=Math.max(RULES.dupSeconds/60,p109TempRules().limit+p109TempRules().grace)+1e-8)return [];

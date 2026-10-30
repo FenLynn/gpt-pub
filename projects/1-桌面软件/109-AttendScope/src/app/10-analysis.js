@@ -335,12 +335,25 @@ function attendanceAdjacentRows(field='records'){
 }
 function attendanceEmployeeRows(employeeId){
  if(r63AnalysisIndex?.employeeRows.has(employeeId))return r63AnalysisIndex.employeeRows.get(employeeId);
- const rows=attendanceAdjacentRows('records').filter(x=>x.employeeId===employeeId&&
+ let rows=attendanceAdjacentRows('records').filter(x=>x.employeeId===employeeId&&
    x.datetime)
   .sort((a,b)=>a.datetime.localeCompare(b.datetime)||
     (a.direction==='进'?-1:1));
+ if(p112PunchEvidence())rows=attendanceEvidenceRows(rows);
  if(r63AnalysisIndex)r63AnalysisIndex.employeeRows.set(employeeId,rows);
  return rows;
+}
+function attendanceEvidenceRows(source){
+ const identity=row=>[row.recordId||'',row.importId||'',row.sheet||'',String(row.row??''),row.direction||''].join('/'),
+  rows=[...source].sort((a,b)=>a.datetime.localeCompare(b.datetime)||identity(a).localeCompare(identity(b))),result=[];
+ for(let i=0;i<rows.length;){
+  let end=i+1;while(end<rows.length&&rows[end].datetime===rows[i].datetime)end++;
+  const group=rows.slice(i,end),directions=new Set(group.map(r=>r.direction)),first=group[0];
+  if(directions.size>1)result.push({...first,direction:'未标注',sameSecondConflict:true,sourceIds:group.map(r=>r.recordId).filter(Boolean)});
+  else result.push(group.length>1?{...first,sameSecondCopies:group.length}:first);
+  i=end;
+ }
+ return result;
 }
 function attendanceVisitEvents(employeeId){
  if(r63AnalysisIndex?.visits.has(employeeId))return r63AnalysisIndex.visits.get(employeeId);
@@ -536,6 +549,7 @@ function setAutoOvertimeDecision(segmentId,accepted){
 function analyzeDay(emp,d){
  const date=isoDate(d),punches=(r63AnalysisIndex?.daily.get(emp.id+'|'+date)||state.records.filter(r=>r.employeeId===emp.id&&r.datetime.slice(0,10)===date))
    .sort((a,b)=>a.datetime.localeCompare(b.datetime));
+ const evidencePunches=p112PunchEvidence()?attendanceEvidenceRows(punches):punches;
  const completePairs=attendanceDailyVisits(emp.id,date);
  const leaves=leaveFor(emp.id,date),trips=tripFor(emp.id,date),outings=outingFor(emp.id,date),
    overtime=overtimeFor(emp.id,date),countedOvertime=p109OvertimeDaySources(overtime,date),typ=dayType(d);
@@ -549,10 +563,11 @@ function analyzeDay(emp,d){
  const priority=p109PriorityAbsences(emp.id,date),coveredWorkPunch=time=>p109BusinessPriority()&&
   [[minutes(RULES.amStart),minutes(RULES.amEnd)],[minutes(RULES.pmStart),minutes(RULES.pmEnd)]].some(([a,b])=>time>=a&&time<=b)&&
   priority.some(([a,b])=>time>=a&&time<=b);
- for(let i=0;i<punches.length;i++){
-  const p=punches[i],prev=punches[i-1],covered=coveredWorkPunch(minutes(p.time)),
+ for(let i=0;i<evidencePunches.length;i++){
+  const p=evidencePunches[i],prev=evidencePunches[i-1],covered=coveredWorkPunch(minutes(p.time)),
    note=message=>{if(covered){if(!issues.includes(message+'（报备覆盖）'))issues.push(message+'（报备覆盖）')}else suspect(message)};
-  if(!['进','出'].includes(p.direction)){note('未提供进出方向（待核）');if(!covered)markUncertain(p);continue}
+  if(!['进','出'].includes(p.direction)){note(p.sameSecondConflict?'同一时刻进出方向冲突或未明（待核）':'未提供进出方向（待核）');if(!covered)markUncertain(p);continue}
+  if(p.sameSecondCopies>1)note('同秒重复'+p.direction+'（'+p.sameSecondCopies+' 条）');
   if(prev&&prev.direction===p.direction){
    const diff=Math.abs(minutes(p.time)-minutes(prev.time));
    note(diff<=RULES.dupSeconds/60?'疑似重复'+p.direction:
@@ -589,9 +604,9 @@ function analyzeDay(emp,d){
   const possibilities=pairs.filter(([x,y])=>minutes(x.time)<limit&&
    minutes(y.time)>=minutes(start)&&minutes(y.time)<limit).filter(([,exit])=>{
     const left=minutes(exit.time),shiftEnd=minutes(end),
-     returned=punches.find(row=>row.direction==='进'&&minutes(row.time)>left),right=returned?minutes(returned.time):null;
+     returned=evidencePunches.find(row=>row.direction==='进'&&minutes(row.time)>left),right=returned?minutes(returned.time):null;
     if(p109ModernPunches()){
-     const tail=punches.filter(row=>minutes(row.time)>left&&(right==null||minutes(row.time)<right));
+     const tail=evidencePunches.filter(row=>minutes(row.time)>left&&(right==null||minutes(row.time)<right));
      // Repeated exits in one short terminal burst can establish the boundary.
      // Do not bridge a return or an unknown-direction record, or chain windows.
      if(tail.some(row=>row.direction==='出'&&minutes(row.time)>=shiftEnd&&minutes(row.time)-left<=shortGap+1e-8&&
@@ -613,12 +628,12 @@ function analyzeDay(emp,d){
  const workMinutes=analysisPairMinutes(pairs,RULES.amStart,RULES.amEnd)+
   analysisPairMinutes(pairs,RULES.pmStart,RULES.pmEnd);
  const presence=pairs.reduce((sum,[x,y])=>sum+Math.max(0,minutes(y.time)-minutes(x.time)),0);
- const firstIn=punches.find(p=>p.direction==='进');
- const lastOut=[...punches].reverse().find(p=>p.direction==='出');
+ const firstIn=evidencePunches.find(p=>p.direction==='进');
+ const lastOut=[...evidencePunches].reverse().find(p=>p.direction==='出');
  const morningPair=pairs.find(([x,y])=>minutes(x.time)<lunchStart&&
    minutes(y.time)>=lunchStart-90&&minutes(y.time)<=lunchEnd);
  const lunchReturn=pairs.find(([x,y])=>minutes(x.time)>=lunchStart-10&&
-   minutes(x.time)<=lunchEnd+120&&minutes(y.time)>lunchEnd);
+   minutes(x.time)<(p112PunchEvidence()?minutes(RULES.pmEnd):lunchEnd+120+1e-8)&&minutes(y.time)>lunchEnd);
  const crossesLunch=pairs.some(([x,y])=>minutes(x.time)<lunchStart&&minutes(y.time)>lunchEnd);
  const lunchEvidence=crossesLunch?(isWorkday(d)?'未分段（班内工时按班次扣午休）':'连续在岗跨中午（不扣午休）'):
   morningPair&&lunchReturn?'有午休进出':'未明确';
@@ -693,13 +708,14 @@ function analyzeDay(emp,d){
     severity='problem';status=status.includes('迟到')?'迟到/早退':'早退';
    }else suspect('午休提前离岗（待核）');
   }
-  if(morningPair&&lunchReturn&&!afternoonLeave){
+  if((morningPair||p112PunchEvidence())&&lunchReturn&&!afternoonLeave){
    const returnMinute=minutes(lunchReturn[0].time);
    const covered=businessCovers(lunchEnd,returnMinute);
    if(returnMinute>lunchEnd+afternoonGrace&&!covered&&!p109LeaveReturnOnly(emp.id,date,RULES.pmStart,returnMinute)){
     // Completed afternoon evidence permits a definite late check; missing
     // afternoon punches remain an uncertainty, never a fabricated absence.
-    if(afternoonEvidence&&!pairingUncertain){
+    const returnUncertain=p112PunchEvidence()?evidencePunches.some(p=>!['进','出'].includes(p.direction)&&!coveredWorkPunch(minutes(p.time))&&minutes(p.time)>=lunchStart&&minutes(p.time)<=returnMinute):pairingUncertain;
+    if(afternoonEvidence&&!returnUncertain){
      issues.push('下午迟到');severity='problem';
      attendanceFlags.push({kind:'late',label:'下午迟到',time:lunchReturn[0].time});
      status=status==='迟到'?'上午/下午迟到':status==='早退'?'迟到/早退':'下午迟到';
@@ -727,7 +743,7 @@ function analyzeDay(emp,d){
    else if(issues.length){severity='suspect';status='疑似打卡异常'}
    else{severity='normal';status=trips.length?'出差覆盖':leaves.length?'请假覆盖':outings.length?'外出覆盖':'正常'}
   }
-  const temporaryOutings=p109TemporaryOutings(emp,date,punches,pairs);
+  const temporaryOutings=p109TemporaryOutings(emp,date,evidencePunches,pairs);
   return {initialSeverity,initialStatus,initialIssues,employee:emp,date,day:d,dayType:typ,punches,pairs,leaves,trips,outings,overtime,countedOvertime,overtimeConflictMinutes,
   severity,status,issues,firstIn:firstIn?.time||'',lastOut:lastOut?.time||'',presence,workMinutes,
   lunchEvidence,autoOvertime,temporaryOutings,attendanceFlags,marker:''}}
