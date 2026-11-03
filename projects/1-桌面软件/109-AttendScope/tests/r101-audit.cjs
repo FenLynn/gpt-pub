@@ -43,13 +43,14 @@ module.exports=async({browser,out,root})=>{
   await locked.goto(pathToFileURL(path.join(root,'index.html')).href);await locked.evaluate(()=>p109RecentReady);await locked.locator('#r80Demo').click();
   await locked.locator('[data-workspace="person"]').click();check(await locked.locator('#p109AccessWait:not([hidden])').count()===1,'unactivated interaction enters the quiet waiting state');
   for(let i=0;i<4;i++)await locked.locator('#settingsBtn').click();check(await locked.locator('#settingsOverlay:not(.hidden)').count()===0,'four setting taps do not reveal the access page');
-  await locked.locator('#settingsBtn').click();await locked.waitForSelector('#settingsOverlay:not(.hidden) [data-p109-access-version]');
-  for(let i=0;i<5;i++)await locked.locator('[data-p109-access-version]').click();await locked.waitForSelector('#p109AccessKey');
+  await locked.locator('#settingsBtn').click();await locked.waitForSelector('#p109AccessKey');
   await locked.locator('#p109AccessKey').fill('invalid');await locked.locator('#p109AccessUnlock').click();check((await locked.locator('#p109AccessError').textContent())==='输入无效','wrong key cannot unlock');
   await locked.evaluate(()=>{document.getElementById('p109AccessOverlay')?.remove();p109AccessWrite({v:1,verified:true,activatedAt:Date.now(),refreshedAt:Date.now(),expiresAt:Date.now()+60000});p109AccessPaintVersion()});
+  await locked.locator('#settingsBtn').click();await locked.locator('[data-settings-section="advanced"]').click();
   check(await locked.locator('[data-p109-access-version].is-active').count()===1,'valid record paints the version green');
   await locked.evaluate(()=>{p109AccessWrite({v:1,verified:true,activatedAt:Date.now()-8*86400000,refreshedAt:Date.now()-8*86400000,expiresAt:Date.now()-1});p109AccessPaintVersion()});
-  for(let i=0;i<5;i++)await locked.locator('[data-p109-access-version]').click();await locked.locator('#p109AccessRenew').click();check(await locked.evaluate(()=>p109AccessAuthorized()),'expired verified key requires and accepts a manual seven-day refresh');
+  const gear=await locked.locator('#settingsBtn').boundingBox();for(let i=0;i<5;i++)await locked.mouse.click(gear.x+gear.width/2,gear.y+gear.height/2);
+  await locked.locator('#p109AccessRenew').click();check(await locked.evaluate(()=>p109AccessAuthorized()),'expired verified key requires and accepts a manual seven-day refresh');
   check(!lockErrors.length,'access flow has no script errors: '+lockErrors.join(' | '));
  }finally{await raw.close()}
  fs.writeFileSync(path.join(out,'r101-audit.json'),JSON.stringify({checks,errors},null,2));console.log('P109_R101_AUDIT_PASS '+JSON.stringify({checks:checks.length,errors:errors.length}));

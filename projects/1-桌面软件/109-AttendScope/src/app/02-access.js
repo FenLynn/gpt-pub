@@ -44,6 +44,7 @@ function p109AccessDialog(){
   (record?.verified?'<div class="r101-access-meta"><span>密钥</span><strong>******************************</strong><span>状态</span><strong>'+(active?'有效':'需要刷新')+'</strong><span>截止</span><strong>'+p109AccessDate(record.expiresAt)+'</strong></div><div class="r101-access-actions"><button type="button" id="p109AccessRevoke">撤销</button><button type="button" class="primary" id="p109AccessRenew">刷新 7 天</button></div>':
   '<label><span>密钥</span><input id="p109AccessKey" type="password" autocomplete="off" spellcheck="false"></label><div id="p109AccessError" role="status"></div><div class="r101-access-actions"><button type="button" class="primary" id="p109AccessUnlock">确认</button></div>')+'</div>';
  document.body.appendChild(node);const close=()=>{node.remove();p109AccessPaintVersion()};node.querySelector('#p109AccessClose').onclick=close;
+ node.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape')event.preventDefault();else p109TrapDialogFocus(event,node)});
  node.querySelector('#p109AccessRenew')?.addEventListener('click',()=>{p109AccessRefresh();p109AccessDialog()});
  node.querySelector('#p109AccessRevoke')?.addEventListener('click',()=>{p109AccessRemove();p109AccessShowWait();p109AccessDialog()});
  const submit=async()=>{const input=node.querySelector('#p109AccessKey'),error=node.querySelector('#p109AccessError'),candidate=String(input.value||'').trim().toLocaleLowerCase(),bytes=new TextEncoder().encode(candidate);
@@ -63,16 +64,23 @@ function p109AccessOpenSettings(){
   setTimeout(()=>document.querySelector('[data-settings-section="advanced"]')?.click(),0);p109AccessBypass=false},0);
 }
 function p109AccessSettingsClosed(){p109AccessSettingsWindow=false;document.getElementById('settingsOverlay')?.classList.remove('r101-access-recovery')}
-function p109AccessTapGear(target){
- if(!target.closest?.('#settingsBtn'))return false;
- p109AccessGearTaps++;const button=target.closest('#settingsBtn');button.classList.remove('is-tap');void button.offsetWidth;button.classList.add('is-tap');
+function p109AccessTapGear(event){
+ const button=document.getElementById('settingsBtn');if(!button||event.target.closest?.('.r101-access-card'))return false;
+ const direct=!!event.target.closest?.('#settingsBtn'),rect=button.getBoundingClientRect(),
+  covered=event.detail>0&&event.button===0&&rect.width>0&&rect.height>0&&event.clientX>=Math.max(0,rect.left)&&
+   event.clientX<Math.min(innerWidth,rect.right)&&event.clientY>=Math.max(0,rect.top)&&event.clientY<Math.min(innerHeight,rect.bottom);
+ if(!direct&&!covered)return false;
+ p109AccessGearTaps++;
  clearTimeout(p109AccessGearTimer);p109AccessGearTimer=setTimeout(()=>p109AccessGearTaps=0,6000);
- if(p109AccessGearTaps>=5){p109AccessGearTaps=0;clearTimeout(p109AccessGearTimer);p109AccessOpenSettings()}return true;
+ if(p109AccessGearTaps>=5){p109AccessGearTaps=0;clearTimeout(p109AccessGearTimer);p109AccessDialog();return true}
+ return !direct||!p109AccessAuthorized();
 }
 function p109AccessGuard(event){
- if(P109_LEGACY_UNSUPPORTED||p109AccessBypass||p109AccessAuthorized()||document.getElementById('p109ModeOverlay'))return;
- if(p109AccessSettingsWindow&&event.target.closest?.('#settingsOverlay,#p109AccessOverlay'))return;
- if(event.type==='click'&&p109AccessTapGear(event.target)){event.preventDefault();event.stopImmediatePropagation();return}
+ if(P109_LEGACY_UNSUPPORTED)return;
+ if(event.type==='click'&&p109AccessTapGear(event)){event.preventDefault();event.stopImmediatePropagation();return}
+ if(event.target.closest?.('#p109AccessOverlay'))return;
+ if(p109AccessBypass||p109AccessAuthorized()||document.getElementById('p109ModeOverlay'))return;
+ if(p109AccessSettingsWindow&&event.target.closest?.('#settingsOverlay'))return;
  event.preventDefault();event.stopImmediatePropagation();if(event.type==='click')p109AccessShowWait();
 }
 document.addEventListener('click',p109AccessGuard,true);document.addEventListener('keydown',p109AccessGuard,true);
