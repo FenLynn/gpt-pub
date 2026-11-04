@@ -15,7 +15,7 @@ const weapons={
 };
 let player,bullets,enemyShots,enemies,pickups,grenades,explosions,boss,stage,worldX,cameraX,spawnIndex,score,lives,paused=true,over=false,raf=0,last=0,difficulty="normal",keys={},lastShot=0,grenadeCount=3,weapon="rifle",lastGrenade=0,invulnerable=0,stageIntro=0;
 function configure(v){difficulty=v||"normal";}
-function params(){return difficulty==="easy"?{lives:5,enemySpeed:.68,fireRate:1.35,enemyDamage:.8}:{...difficulty==="hard"?{lives:2,enemySpeed:1.35,fireRate:.75,enemyDamage:1.25}:{lives:3,enemySpeed:1,fireRate:1,enemyDamage:1}};}
+function params(){return difficulty==="easy"?{lives:5,enemySpeed:.68,fireRate:.7,enemyDamage:.8}:difficulty==="hard"?{lives:2,enemySpeed:1.35,fireRate:1.35,enemyDamage:1.25}:{lives:3,enemySpeed:1,fireRate:1,enemyDamage:1};}
 function report(t){status.textContent=t;GameBridge.report(t,{score});}
 function resetStage(){worldX=80;cameraX=0;spawnIndex=0;enemies=[];enemyShots=[];bullets=[];pickups=[];grenades=[];explosions=[];boss=null;stageIntro=1.2;player.x=worldX;player.y=GROUND-42;player.vy=0;player.onGround=true;}
 function newGame(){cancelAnimationFrame(raf);const p=params();stage=1;score=0;lives=p.lives;weapon="rifle";grenadeCount=3;player={x:80,y:GROUND-42,w:24,h:42,vy:0,onGround:true,face:1,inv:0,dead:false};paused=false;over=false;keys={};last=performance.now();resetStage();updateHud();report("第 1 区域：前进并清除敌军");draw();raf=requestAnimationFrame(tick);}
