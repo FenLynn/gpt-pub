@@ -1,0 +1,11 @@
+(function(){
+"use strict";
+const boardEl=document.getElementById("board"),status=document.getElementById("status");let pieces=[],selected=-1,redTurn=true,flip=false,paused=false;
+function initial(){pieces=[];const back=["车","马","象","士","将","士","象","马","车"];for(let x=0;x<9;x++){pieces.push({x,y:0,t:back[x],side:"black"},{x,y:9,t:back[x],side:"red"});}for(const x of [1,7])pieces.push({x,y:2,t:"炮",side:"black"},{x,y:7,t:"炮",side:"red"});for(const x of [0,2,4,6,8])pieces.push({x,y:3,t:"卒",side:"black"},{x,y:6,t:"兵",side:"red"});selected=-1;redTurn=true;render();setStatus("红方先行 · 交互样例");}
+function setStatus(t){status.textContent=t;GameBridge.report(t);}
+function render(){boardEl.innerHTML="";for(let y=0;y<10;y++)for(let x=0;x<9;x++){const px=flip?8-x:x,py=flip?9-y:y;const cell=document.createElement("button");cell.className="xiangqi-cell";cell.type="button";const index=pieces.findIndex(p=>p.x===px&&p.y===py);if(index===selected)cell.classList.add("selected");if(selected>=0&&index<0)cell.classList.add("target");if(index>=0){const p=pieces[index],s=document.createElement("span");s.className="xiangqi-piece "+p.side;s.textContent=p.t;cell.appendChild(s);}cell.addEventListener("click",()=>clickCell(px,py));boardEl.appendChild(cell);}}
+function clickCell(x,y){if(paused)return;const idx=pieces.findIndex(p=>p.x===x&&p.y===y);if(selected<0){if(idx>=0){selected=idx;render();setStatus("已选中 "+pieces[idx].t+"，请选择目标位置");}return;}if(idx===selected){selected=-1;render();setStatus("已取消选择");return;}if(idx>=0&&pieces[idx].side===pieces[selected].side){selected=idx;render();return;}const moving=pieces[selected];if(idx>=0)pieces.splice(idx,1);moving.x=x;moving.y=y;selected=-1;redTurn=!redTurn;render();setStatus((redTurn?"红方":"黑方")+"回合 · 交互演示");}
+function newGame(){initial();}
+document.getElementById("reset").addEventListener("click",newGame);document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render();});
+GameBridge.register({init:newGame,newGame,pause(){paused=true;setStatus("已暂停");},resume(){paused=false;setStatus("继续交互");},dispose(){paused=true;}});
+})();
