@@ -157,15 +157,14 @@ window.addEventListener("message",event=>{
   paused=true;
   setGameState();
   $("stageLoading").classList.add("done");
+  send("SET_RAIL",{collapsed:railCollapsed});
   return;
  }
  if(m.sessionId!==sessionId)return;
- if(m.type==="HOTKEY"){
-  if(m.payload?.action==="start")startOrResumeGame();
-  else if(m.payload?.action==="pause")togglePause();
-  return;
- }
- if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
+ if(m.type==="HOTKEY"){if(m.payload?.action==="toggle")toggleGamePause();return;}
+ if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
+ 
+if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
  if(m.type==="STATE"){
   if(Number.isFinite(Number(m.payload?.score))){
    currentScore=Number(m.payload.score);
@@ -209,6 +208,13 @@ document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("clic
 $("breadcrumbCategory").addEventListener("click",()=>active?showLibrary(active.category):showHome());
 $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowerCase();renderLibrary();});
  $("startButton").addEventListener("click",()=>{if(started)endGame();else startGame();});$("pauseButton").addEventListener("click",togglePause);$("newGameButton").addEventListener("click",newRound);
+ $("railToggleButton").addEventListener("click",()=>{
+  railCollapsed=!railCollapsed;send("SET_RAIL",{collapsed:railCollapsed});
+  $("railToggleButton").setAttribute("aria-expanded",String(!railCollapsed));
+  $("railToggleButton").title=railCollapsed?"展开右侧操作栏":"收起右侧操作栏";
+  $("railToggleButton").setAttribute("aria-label",$("railToggleButton").title);
+  $("railToggleButton").innerHTML=railCollapsed?'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M9 10l3 2-3 2"/></svg>':'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M9 10l-3 2 3 2"/></svg>';
+ });
  $("modeControl").addEventListener("click",e=>{const b=e.target.closest("button[data-mode-index]");if(b)setMode(b.dataset.modeIndex);});
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
  document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));
@@ -224,12 +230,15 @@ document.addEventListener("keydown",e=>{
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
- if(!active||!ready||e.repeat||editable)return;
- if(e.key.toLowerCase()==="p"){e.preventDefault();togglePause();return;}
- if(e.key==="Enter"&&!(target&&target.closest("button,a,[role='button']"))){e.preventDefault();startOrResumeGame();}
+ if(!active||!ready||e.repeat||editable||e.key!=="Enter")return;
+ if(target&&target.closest("button,a,[role='button']"))return;
+ e.preventDefault();toggleGamePause();
 });
+
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&ready&&!paused)pauseGame();});
 setInterval(()=>{if(session?.running)updateSessionDisplay();updateHomeClock();},1000);
 window.addEventListener("beforeunload",()=>{if(session?.running)persistSessionTime();persistStats();});
-updateCounts();applySettings();renderHeatmap();renderRanking();updateHomeClock();dragHelp();
+if(typeof ResizeObserver!=="undefined"){heatmapObserver=new ResizeObserver(resizeHeatmap);heatmapObserver.observe($("heatmapGrid").parentElement);}
+ window.addEventListener("resize",resizeHeatmap);
+ updateCounts();applySettings();renderHeatmap();renderRanking();updateHomeClock();dragHelp();
 })();
