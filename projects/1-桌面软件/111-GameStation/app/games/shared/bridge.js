@@ -8,7 +8,7 @@ const native={
  requestAnimationFrame:window.requestAnimationFrame.bind(window),
  cancelAnimationFrame:window.cancelAnimationFrame.bind(window)
 };
-let handlers={},sessionId=null,disposed=false,timerPaused=false,nextTimerId=1;
+let handlers={},sessionId=null,disposed=false,timerPaused=false,preserveDuringPause=false,nextTimerId=1;
 const timers=new Map();
 function arm(record){
  if(timerPaused||disposed||!timers.has(record.id))return;
@@ -39,6 +39,7 @@ function createTimer(kind,callback,delay,args){
  timers.set(id,record);arm(record);return id;
 }
 function cancelTimer(id){
+ if(preserveDuringPause)return;
  const record=timers.get(id);
  if(!record){native.clearTimeout(id);return;}
  if(record.nativeId!==null){
@@ -86,6 +87,7 @@ function send(type,payload={}){
 }
 function report(status,extra={}){send("STATE",{status,...extra});}
 function safeCall(name,...args){if(typeof handlers[name]==="function")return handlers[name](...args);}
+function safePause(){preserveDuringPause=true;try{safeCall("pause");}finally{preserveDuringPause=false;}}
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
@@ -97,19 +99,19 @@ window.addEventListener("message",event=>{
  }
  if(m.sessionId!==sessionId)return;
  if(m.type==="NEW_GAME"){
-  suspendTimers();safeCall("newGame");safeCall("pause");
+  suspendTimers();safeCall("newGame");safePause();
  }else if(m.type==="PAUSE"){
-  suspendTimers();safeCall("pause");
+  suspendTimers();safePause();
  }else if(m.type==="RESUME"){
   resumeTimers();safeCall("resume");
  }else if(m.type==="SET_DIFFICULTY"){
-  suspendTimers();safeCall("setDifficulty",m.payload?.difficulty);safeCall("pause");
+  suspendTimers();safeCall("setDifficulty",m.payload?.difficulty);safePause();
  }else if(m.type==="SET_MODE"){
-  suspendTimers();safeCall("setMode",m.payload?.mode);safeCall("pause");
+  suspendTimers();safeCall("setMode",m.payload?.mode);safePause();
  }else if(m.type==="SET_OPTIONS"){
-  suspendTimers();safeCall("setOptions",m.payload||{});safeCall("pause");
+  suspendTimers();safeCall("setOptions",m.payload||{});safePause();
  }else if(m.type==="LOAD_STATE"){
-  suspendTimers();safeCall("loadState",m.payload||{});safeCall("pause");
+  suspendTimers();safeCall("loadState",m.payload||{});safePause();
  }else if(m.type==="DISPOSE"){
   suspendTimers();safeCall("dispose");disposeTimers();
  }
