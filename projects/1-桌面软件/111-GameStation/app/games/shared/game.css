@@ -161,13 +161,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  .game-tools-heading,.game-tool-note{grid-column:1/-1}
  .game-status,.turn-indicator{min-height:36px;font-size:12px}
  .game-tools .game-btn{height:34px;font-size:12px}
- .xiangqi-board{height:min(66vh,100%);max-width:100%}
+ .xiangqi-board{width:min(100%,calc(66vh * 9 / 10));height:auto;max-width:100%;max-height:66vh}
  .mine-classic{padding:7px;gap:6px}
  .mine-grid{--mine-cell-size:clamp(16px,4vw,22px)}
  .mine-top-panel{height:48px}
  .mine-counter{width:52px;height:32px;font-size:23px}
  .mine-face{width:34px;height:34px;font-size:19px}
- .tetris-layout .arcade-canvas{height:min(68vh,100%)}
+ .tetris-layout .arcade-canvas{width:min(100%,34vh);height:auto;max-height:68vh}
  .mine-side-stats,.tetris-metrics{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr))}
  .mine-side-stats>div,.tetris-metrics>div{flex-direction:column;align-items:flex-start;padding:7px}
 }
