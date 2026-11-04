@@ -7,6 +7,15 @@ on:
     paths:
       - "projects/1-桌面软件/111-GameStation/**"
       - ".github/workflows/p111-gamestation-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "projects/1-桌面软件/111-GameStation/**"
+      - ".github/workflows/p111-gamestation-ci.yml"
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
+      - "目录.md"
+      - "projects/1-桌面软件/README.md"
   workflow_dispatch:
 
 permissions:
