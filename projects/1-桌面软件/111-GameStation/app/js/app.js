@@ -23,6 +23,7 @@ const games=[
 ];
 const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"街机",card:"卡牌"};
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
+const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg>'};
 function read(key,fallback){try{const v=JSON.parse(localStorage.getItem(storePrefix+key));return v===null||v===undefined?fallback:v;}catch(e){return fallback;}}
 function write(key,value){try{localStorage.setItem(storePrefix+key,JSON.stringify(value));return true;}catch(e){return false;}}
 function normalizeStats(raw){const out={},known=new Set(games.map(g=>g.id));if(!raw||typeof raw!=="object"||Array.isArray(raw))return out;for(const [id,value] of Object.entries(raw)){if(!known.has(id)||!value||typeof value!=="object"||Array.isArray(value))continue;const days={};if(value.days&&typeof value.days==="object"&&!Array.isArray(value.days))for(const [day,ms] of Object.entries(value.days)){const n=Number(ms);if(/^\d{4}-\d{2}-\d{2}$/.test(day)&&Number.isFinite(n)&&n>0)days[day]=Math.min(n,86400000);}const plays=Math.max(0,Math.floor(Number(value.plays)||0));out[id]={plays,wins:Math.min(plays,Math.max(0,Math.floor(Number(value.wins)||0))),totalMs:Math.max(0,Number(value.totalMs)||0),bestScore:Math.max(0,Number(value.bestScore)||0),lastPlayed:/^\d{4}-\d{2}-\d{2}$/.test(String(value.lastPlayed||""))?String(value.lastPlayed):"",days};}return out;}
@@ -34,17 +35,61 @@ function fmtClock(ms){const sec=Math.floor(ms/1000),m=Math.floor(sec/60),s=sec%6
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[])));
-let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="";
+let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null;
 function statFor(id){if(!stats[id])stats[id]={plays:0,wins:0,totalMs:0,bestScore:0,lastPlayed:"",days:{}};const s=stats[id];s.plays=Number(s.plays)||0;s.wins=Number(s.wins)||0;s.totalMs=Number(s.totalMs)||0;s.bestScore=Number(s.bestScore)||0;s.days=s.days||{};return s;}
 function persistStats(){write("stats",stats);}
 function applySettings(){document.documentElement.style.setProperty("--ui-scale",String(settings.scale||"1"));$("uiScale").value=String(settings.scale||"1");}
-function updateHomeClock(){const now=new Date(),key=dateKey(now);$("homeDate").textContent=now.getFullYear()+"年"+(now.getMonth()+1)+"月"+now.getDate()+"日";$("homeTime").textContent=now.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false});$("homeWeekday").textContent="星期"+["日","一","二","三","四","五","六"][now.getDay()];if(key!==lastHomeDay){lastHomeDay=key;renderHeatmap();renderRanking();}const today=Object.values(stats).reduce((sum,s)=>sum+Number(s.days?.[key]||0),0);$("todaySummary").textContent=today?"今天已游玩 "+fmtDuration(today):"今天还没有游戏记录";}
-function renderHeatmap(){const grid=$("heatmapGrid"),months=$("heatmapMonths");grid.innerHTML="";months.innerHTML="";const today=new Date();today.setHours(0,0,0,0);const start=new Date(today);start.setDate(start.getDate()-363);start.setDate(start.getDate()-((start.getDay()+6)%7));let total=0,activeDays=0,lastMonth=-1;for(let w=0;w<53;w++){for(let d=0;d<7;d++){const date=new Date(start);date.setDate(start.getDate()+w*7+d);const key=dateKey(date);const ms=date>today?0:Object.values(stats).reduce((sum,s)=>sum+Number(s.days?.[key]||0),0);if(date<=today)total+=ms;if(ms>0)activeDays++;const minutes=Math.round(ms/60000),level=minutes<=0?0:minutes<15?1:minutes<45?2:minutes<90?3:4;const cell=document.createElement("span");cell.className="heatmap-cell level-"+level;cell.title=key+" · "+(minutes?minutes+" 分钟":"无游戏记录");cell.setAttribute("aria-label",cell.title);grid.appendChild(cell);if(d===0&&date.getMonth()!==lastMonth&&date<=today){const label=document.createElement("span");label.textContent=(date.getMonth()+1)+"月";label.style.left=(w*14)+"px";months.appendChild(label);lastMonth=date.getMonth();}}}$("activitySummary").textContent="过去一年 "+activeDays+" 天 · "+fmtDuration(total);}
+function updateHomeClock(){
+ const now=new Date(),key=dateKey(now);
+ $("homeDate").textContent=(now.getMonth()+1)+"月"+now.getDate()+"日 · 星期"+["日","一","二","三","四","五","六"][now.getDay()];
+ if(key!==lastHomeDay){lastHomeDay=key;renderHeatmap();renderRanking();}
+ const today=Object.values(stats).reduce((sum,s)=>sum+Number(s.days?.[key]||0),0);
+ $("todaySummary").textContent=today?"今天 "+fmtDuration(today):"今日尚无记录";
+}
+function renderHeatmap(){
+ const grid=$("heatmapGrid"),months=$("heatmapMonths");grid.innerHTML="";months.innerHTML="";
+ const today=new Date();today.setHours(0,0,0,0);
+ const start=new Date(today);start.setDate(start.getDate()-364);
+ const leading=(start.getDay()+6)%7;
+ for(let i=0;i<leading;i++){const blank=document.createElement("span");blank.className="heatmap-cell empty";blank.setAttribute("aria-hidden","true");grid.appendChild(blank);}
+ let total=0,activeDays=0;
+ for(let offset=0;offset<365;offset++){
+  const date=new Date(start);date.setDate(start.getDate()+offset);const key=dateKey(date);
+  const ms=Object.values(stats).reduce((sum,s)=>sum+Number(s.days?.[key]||0),0);
+  total+=ms;if(ms>0)activeDays++;
+  const minutes=Math.round(ms/60000),level=minutes<=0?0:minutes<15?1:minutes<45?2:minutes<90?3:4;
+  const cell=document.createElement("span");cell.className="heatmap-cell level-"+level;cell.dataset.date=key;
+  cell.title=key+" · "+(minutes?minutes+" 分钟":"无游戏记录");cell.setAttribute("aria-label",cell.title);grid.appendChild(cell);
+  if(date.getDate()===1||offset===0){const label=document.createElement("span");label.textContent=(date.getMonth()+1)+"月";label.dataset.column=String(Math.floor((leading+offset)/7));months.appendChild(label);}
+ }
+ grid.dataset.weeks=String(Math.ceil((leading+365)/7));
+ $("activitySummary").textContent="近 12 个月 · "+activeDays+" 天有记录 · "+fmtDuration(total);
+ resizeHeatmap();
+}
+function resizeHeatmap(){
+ const grid=$("heatmapGrid"),content=grid?.parentElement;if(!grid||!content)return;
+ const weeks=Number(grid.dataset.weeks)||53,gap=3,available=Math.max(0,content.clientWidth);
+ const cell=Math.max(8,Math.min(18,Math.floor((available-(weeks-1)*gap)/weeks)));
+ grid.style.setProperty("--heat-cell",cell+"px");grid.style.setProperty("--heat-gap",gap+"px");
+ $("heatmapMonths").querySelectorAll("[data-column]").forEach(label=>{label.style.left=(Number(label.dataset.column)*(cell+gap))+"px";});
+}
 function rankingValue(s,type){if(type==="time")return s.totalMs;if(type==="plays")return s.plays;return s.bestScore;}
-function renderRanking(){const list=$("rankingList");list.innerHTML="";const rows=games.map(g=>({game:g,stat:statFor(g.id)})).filter(x=>rankingValue(x.stat,rankingType)>0).sort((a,b)=>rankingValue(b.stat,rankingType)-rankingValue(a.stat,rankingType)||b.stat.wins-a.stat.wins||b.stat.plays-a.stat.plays).slice(0,10);$("rankingEmpty").classList.toggle("hidden",rows.length>0);rows.forEach((x,i)=>{const li=document.createElement("li");li.className="ranking-row";const value=rankingType==="time"?fmtDuration(x.stat.totalMs):rankingType==="plays"?x.stat.plays+" 次":x.stat.bestScore.toLocaleString("zh-CN");li.innerHTML='<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span><span class="ranking-name" title="'+escapeHtml(x.game.name)+'">'+escapeHtml(x.game.name)+'</span><span class="ranking-value">'+value+'</span>';list.appendChild(li);});}
+function renderRanking(){
+ const list=$("rankingList");list.innerHTML="";
+ const rows=games.map(g=>({game:g,stat:statFor(g.id)})).filter(x=>rankingValue(x.stat,rankingType)>0)
+  .sort((a,b)=>rankingValue(b.stat,rankingType)-rankingValue(a.stat,rankingType)||b.stat.wins-a.stat.wins||b.stat.plays-a.stat.plays).slice(0,10);
+ $("rankingEmpty").classList.toggle("hidden",rows.length>0);
+ rows.forEach((x,i)=>{
+  const li=document.createElement("li");li.className="ranking-row";
+  const value=rankingType==="time"?fmtDuration(x.stat.totalMs):rankingType==="plays"?x.stat.plays+" 次":x.stat.bestScore.toLocaleString("zh-CN");
+  const button=document.createElement("button");button.type="button";button.className="ranking-open";button.setAttribute("aria-label","打开"+x.game.name);
+  button.innerHTML='<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span><span class="ranking-name" title="'+escapeHtml(x.game.name)+'">'+escapeHtml(x.game.name)+'</span><span class="ranking-value">'+value+'</span>';
+  button.addEventListener("click",()=>openGame(x.game.id));li.appendChild(button);list.appendChild(li);
+ });
+}
 function updateCounts(){for(const cat of Object.keys(categoryNames))$("count-"+cat).textContent=games.filter(g=>cat==="all"||g.category===cat).length;if($("totalGameCount"))$("totalGameCount").textContent=String(games.length);}
-function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent="首页";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();}
-function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
+function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent="首页";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();}
+function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
 function renderLibrary(){const grid=$("gameGrid");grid.innerHTML="";const rows=games.filter(g=>(currentCategory==="all"||g.category===currentCategory)&&(!search||(g.name+" "+g.description).toLowerCase().includes(search)));$("libraryCount").textContent=rows.length+" 款";$("emptyState").classList.toggle("hidden",rows.length>0);rows.forEach(g=>{const b=document.createElement("button");b.className="game-card";b.type="button";b.innerHTML='<span class="game-card-icon">'+g.icon+'</span><span class="game-card-copy"><strong class="game-card-title">'+escapeHtml(g.name)+'</strong><span class="game-card-meta"><i class="game-card-status '+(g.status==="prototype"?"prototype":"")+'"></i>'+(g.status==="prototype"?"持续完善":"可直接游玩")+'</span></span><span class="game-card-arrow">›</span>';b.addEventListener("click",()=>openGame(g.id));grid.appendChild(b);});}
 function send(type,payload={}){if(!active||!frame.contentWindow)return;frame.contentWindow.postMessage({channel:"gamestation",protocolVersion:1,gameId:active.id,sessionId,type,payload},"*");}
 function setBreadcrumb(){$("breadcrumbCategory").textContent=active.categoryName;$("crumbGameSep").classList.remove("hidden");$("breadcrumbGame").textContent=active.name;$("breadcrumbGame").classList.remove("hidden");}
@@ -58,14 +103,12 @@ function renderGameControls(){
 }
 function setGameState(){
  $("gameElapsed").textContent=session?fmtClock(session.elapsedMs):"00:00";
- const finished=!!session?.finished;
- $("startButton").textContent=started?"结束":"开始";
- $("startButton").classList.toggle("end-action",started);
- $("startButton").disabled=!ready||finished||(!started&&!paused);
- $("pauseButton").textContent=started&&!finished&&paused?"继续":"暂停";
+ const finished=!!session?.finished,startLabel=started?"结束":"开始",pauseLabel=started&&!finished&&paused?"继续":"暂停";
+ $("startButton").innerHTML=started?icons.stop:icons.play;$("startButton").setAttribute("aria-label",startLabel);$("startButton").title=startLabel;
+ $("startButton").classList.toggle("end-action",started);$("startButton").disabled=!ready||finished||(!started&&!paused);
+ $("pauseButton").innerHTML=started&&!finished&&paused?icons.play:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;
  $("pauseButton").disabled=!ready||!started||finished;
- $("newGameButton").textContent="下一局";
- $("newGameButton").disabled=!ready;
+ $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
 }
 function persistSessionTime(){if(!session||!session.running)return;const now=Date.now(),delta=Math.max(0,now-session.lastTick);session.lastTick=now;session.elapsedMs+=delta;const s=statFor(session.id),key=dateKey(new Date(now));s.totalMs+=delta;s.days[key]=(Number(s.days[key])||0)+delta;}
 function startClock(){if(!session||session.running)return;session.running=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
@@ -77,14 +120,31 @@ function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
 function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");startClock();focusGameFrame();toast("继续游戏");}
 function togglePause(){if(paused)resumeGame();else pauseGame();}
+function toggleGamePause(){if(!ready||session?.finished)return;if(!started){startGame();return;}togglePause();}
 function startOrResumeGame(){if(!ready||session?.finished)return;if(started){if(paused)resumeGame();return;}startGame();}
 function focusGameFrame(){
  try{frame.focus({preventScroll:true});frame.contentWindow?.focus();}
  catch{frame.focus();}
 }
-function newRound(){if(!ready)return;stopClock();send("NEW_GAME");if(session){session.elapsedMs=0;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;}currentScore=0;started=false;roundCounted=false;paused=true;setGameState();renderGameControls();}
+function newRound(){
+ if(!ready||!session)return;
+ stopClock();session.elapsedMs=0;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;
+ currentScore=0;started=false;roundCounted=false;paused=true;
+ send("NEW_GAME");send("RESUME");if(!roundCounted)countRound();startClock();focusGameFrame();setGameState();renderGameControls();
+}
 function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;const s=statFor(session.id);if(Number.isFinite(Number(payload.score)))s.bestScore=Math.max(s.bestScore,Number(payload.score));const msg=String(payload.message||"");if(payload.win===true||/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg))s.wins++;persistStats();renderHeatmap();renderRanking();setGameState();}
-function openGame(id){const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};setBreadcrumb();$("gameControls").classList.remove("hidden");$("gameActions").classList.remove("hidden");renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;$("startButton").textContent="开始";$("pauseButton").textContent="暂停";$("gameElapsed").textContent="00:00";$("helpTitle").textContent=g.name+" · 玩法";homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");$("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry;closeHelp();shell.classList.remove("menu-open");}
+function openGame(id){
+ const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;
+ sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
+ ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;railCollapsed=false;
+ session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
+ setBreadcrumb();$("gameControls").classList.remove("hidden");$("gameActions").classList.remove("hidden");$("railToggleButton").classList.remove("hidden");
+ $("railToggleButton").setAttribute("aria-expanded","true");$("railToggleButton").title="收起右侧操作栏";$("railToggleButton").setAttribute("aria-label","收起右侧操作栏");
+ renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
+ $("gameElapsed").textContent="00:00";$("helpTitle").textContent=g.name+" · 玩法";
+ homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
+ $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry;closeHelp();shell.classList.remove("menu-open");
+}
 function closeGame(){if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;}
 window.addEventListener("message",event=>{
  if(!active||event.source!==frame.contentWindow)return;
