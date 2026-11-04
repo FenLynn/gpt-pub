@@ -168,6 +168,7 @@ const games = [
     await page.waitForTimeout(100);
     assert.ok(await mines.locator(".mine-cell.open").count() > openedBeforeChord, "middle-click should chord-open adjacent cells when flags match");
     await page.locator("#difficultyControl button[data-difficulty='easy']").click();
+    await page.waitForTimeout(150);
     assert.equal(await mines.locator(".mine-cell").count(), 81, "easy Minesweeper level should be 9×9");
     assert.equal(await mines.locator("#level").innerText(), "初级");
 
