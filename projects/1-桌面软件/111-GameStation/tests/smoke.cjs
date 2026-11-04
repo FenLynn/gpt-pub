@@ -228,7 +228,7 @@ const games = [
     await mines.locator("body").evaluate(() => {
       let n=0;
       window.__p111MineRandomCalls=0;
-      window.Math.random=()=>{window.__p111MineRandomCalls++;return ((n++%256)+0.1)/256;};
+      window.Math.random=()=>{const index=n++%40;window.__p111MineRandomCalls++;return (index+0.1)/256;};
     });
     await page.locator("#newGameButton").click();
     const mineRandomCalls = await mines.locator("body").evaluate(() => window.__p111MineRandomCalls);
