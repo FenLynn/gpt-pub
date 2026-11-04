@@ -16,6 +16,6 @@ function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2
 function next(){if(over||paused)return;const list=moves(b,turn);if(!list.length){if(!moves(b,3-turn).length){finish();return;}turn=3-turn;report((turn===1?"黑棋":"白棋")+"无合法步，自动跳过");render();if(mode==="ai"&&turn===2)scheduleAI();return;}render();report(turn===1?"黑棋回合":"白棋回合");if(mode==="ai"&&turn===2)scheduleAI();}
 function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const m=moves(b,turn).find(v=>v.x===x&&v.y===y);if(!m)return;apply(b,m,turn);turn=3-turn;next();}
 function newGame(){clearTimeout(timer);b=Array.from({length:8},()=>Array(8).fill(0));b[3][3]=b[4][4]=2;b[3][4]=b[4][3]=1;turn=1;paused=false;over=false;render();report("黑棋先行");}
-document.getElementById("reset").onclick=newGame;
+
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;next();},setMode(v){mode=v==="two"?"two":"ai";newGame();},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
