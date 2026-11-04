@@ -39,7 +39,7 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 - 日常开发：p111-exp（从最新 main 建立）
 - 稳定候选：p111-stable（尚未建立；达到完整候选准入后再建）
 - 正式主线：main（禁止直接写入）
-- 当前没有程序版本、CI、Artifact、标签或 Release。
+- 当前没有正式程序版本、稳定分支、Artifact、标签或 Release；P111 GameStation CI 已建立。
 
 ## 当前原型边界
 
