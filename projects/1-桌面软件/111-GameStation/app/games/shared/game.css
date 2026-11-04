@@ -107,9 +107,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   background-color:#ecdab8;
   background-image:
     linear-gradient(to right,#ad916d 1px,transparent 1px),
+    linear-gradient(to right,#ad916d 1px,transparent 1px),
     linear-gradient(to bottom,#ad916d 1px,transparent 1px);
-  background-size:12.5% 100%,100% 11.111111%;
-  background-position:left top;
+  background-size:11.111111% 40%,11.111111% 40%,100% 10%;
+  background-position:5.555555% 5%,5.555555% 55%,0 5%;
+  background-repeat:repeat-x,repeat-x,repeat-y;
   box-shadow:0 8px 24px rgba(88,65,37,.10);
 }
 .xiangqi-cell{min-width:0;min-height:0;border:0;border-radius:0;background:transparent;overflow:visible}
