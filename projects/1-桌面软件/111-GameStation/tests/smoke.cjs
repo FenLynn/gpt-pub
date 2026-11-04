@@ -47,7 +47,18 @@ const games = [
       await page.locator("#startButton").waitFor({ state: "attached" });
       await page.waitForFunction(() => !document.querySelector("#startButton").disabled);
       await page.locator("#startButton").click();
-      await page.waitForTimeout(100);
+      await page.waitForFunction(() => document.activeElement?.id === "gameFrame");
+      const frameLayout = await page.frameLocator("#gameFrame").locator("#game").evaluate(root => {
+        const main = root.querySelector(".game-main-board");
+        const rect = (main || root).getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      });
+      assert.ok(frameLayout.width > 200 && frameLayout.height > 250, name + " should receive a usable game area");
+      await page.keyboard.press("p");
+      await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "继续");
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "暂停");
+      await page.waitForTimeout(80);
     } catch (error) {
       console.error("Failed game:", name);
       console.error("iframe src:", await page.locator("#gameFrame").getAttribute("src"));
@@ -165,14 +176,8 @@ const games = [
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "本机双人");
     await page.locator("#modeControl button[data-mode-index='0']").click();
     await page.locator("#startButton").click();
-    const gomokuGeometry = await gomoku.locator(".gomoku-cell").nth(112).evaluate(el => {
-      const rect = el.getBoundingClientRect(), board = el.closest("#board"), boardRect = board.getBoundingClientRect();
-      const style = getComputedStyle(el), boardStyle = getComputedStyle(board);
-      return {cell:{x:rect.x,y:rect.y,width:rect.width,height:rect.height,display:style.display,visibility:style.visibility,opacity:style.opacity},board:{x:boardRect.x,y:boardRect.y,width:boardRect.width,height:boardRect.height,display:boardStyle.display,gridRows:boardStyle.gridTemplateRows},viewport:{width:innerWidth,height:innerHeight}};
-    });
-    console.log("GOMOKU_GEOMETRY "+JSON.stringify(gomokuGeometry));
-    fs.mkdirSync(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
-    await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/gomoku-workspace.png")});
+    const gomokuCellBox = await gomoku.locator(".gomoku-cell").nth(112).boundingBox();
+    assert.ok(gomokuCellBox && gomokuCellBox.width > 0 && gomokuCellBox.height > 0, "Gomoku intersections must be visible and clickable");
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
     assert.ok(await gomoku.locator(".stone").count() >= 2, "gomoku human and AI should both place a stone");
@@ -184,6 +189,14 @@ const games = [
     const mines = page.frameLocator("#gameFrame");
     assert.equal(await mines.locator(".mine-cell").count(), 256, "default Minesweeper level should be 16×16");
     assert.equal(await mines.locator("#counter").innerText(), "040", "classic mine counter should use three digits");
+    const mineTileStyle = await mines.locator(".mine-cell").first().evaluate(el => ({
+      backgroundImage: getComputedStyle(el).backgroundImage,
+      cellSize: getComputedStyle(el).width,
+      boardSize: el.parentElement.getBoundingClientRect().width,
+      areaSize: el.closest(".game-main-board").getBoundingClientRect().width
+    }));
+    assert.match(mineTileStyle.backgroundImage, /linear-gradient/, "Minesweeper should use the Windows 7 blue beveled tile treatment");
+    assert.ok(parseFloat(mineTileStyle.cellSize) >= 18, "desktop Minesweeper cells should expand to use the available area");
     await mines.locator("body").evaluate(() => { let n=0; Math.random=()=>((n++%256)+0.1)/256; });
     await page.locator("#newGameButton").click();
     await page.locator("#startButton").click();
@@ -231,13 +244,25 @@ const games = [
     await page.waitForTimeout(90);
     const frameB = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
     assert.notEqual(frameA,frameB,"Tetris falling piece should render between grid steps");
-    await tetris.locator("canvas").click();
-    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowUp");
+    for(let i=0;i<8;i++)await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(80);
+    const tetrisTop = await tetris.locator("#canvas").getAttribute("data-piece-top");
+    assert.ok(tetrisTop === "" || Number(tetrisTop) >= 0, "Tetris active cells must never enter a negative row");
 
     await openGame("贪吃蛇");
     const snake = page.frameLocator("#gameFrame");
-    await snake.locator("canvas").click();
+    const snakeCanvas = snake.locator("#canvas");
+    const snakeYBefore = Number(await snakeCanvas.getAttribute("data-head-y"));
     await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(160);
+    const snakeYAfter = Number(await snakeCanvas.getAttribute("data-head-y"));
+    assert.ok(snakeYAfter > snakeYBefore, "Snake should respond to the shared iframe keyboard focus without an extra canvas click");
+    await page.keyboard.press("a");
+    await page.waitForTimeout(140);
+    const snakeXAfter = Number(await snakeCanvas.getAttribute("data-head-x"));
+    assert.ok(snakeXAfter < 11, "Snake should accept WASD as well as arrow keys");
 
     await openGame("斗地主");
     const ddz = page.frameLocator("#gameFrame");
