@@ -9,8 +9,20 @@ function formatCounter(value){const n=String(value);return n.length>=3?n.slice(-
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score:opened,remaining:MINES-flags});}
 function fitBoard(){
  const rect=gameArea.getBoundingClientRect();
- const availableWidth=Math.max(0,rect.width-42);
- const availableHeight=Math.max(0,rect.height-116);
+ const classic=document.querySelector(".mine-classic"),panel=document.querySelector(".mine-top-panel");
+ const classicStyle=getComputedStyle(classic),gridStyle=getComputedStyle(boardEl);
+ const px=value=>Number.parseFloat(value)||0;
+ const horizontalOverhead=
+  px(classicStyle.paddingLeft)+px(classicStyle.paddingRight)+px(classicStyle.borderLeftWidth)+px(classicStyle.borderRightWidth)+
+  px(gridStyle.paddingLeft)+px(gridStyle.paddingRight)+px(gridStyle.borderLeftWidth)+px(gridStyle.borderRightWidth)+
+  Math.max(0,W-1)*px(gridStyle.columnGap);
+ const verticalOverhead=
+  panel.getBoundingClientRect().height+px(classicStyle.rowGap)+
+  px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+px(classicStyle.borderTopWidth)+px(classicStyle.borderBottomWidth)+
+  px(gridStyle.paddingTop)+px(gridStyle.paddingBottom)+px(gridStyle.borderTopWidth)+px(gridStyle.borderBottomWidth)+
+  Math.max(0,H-1)*px(gridStyle.rowGap);
+ const availableWidth=Math.max(0,rect.width-horizontalOverhead);
+ const availableHeight=Math.max(0,rect.height-verticalOverhead);
  const size=Math.max(10,Math.min(48,availableWidth/W,availableHeight/H));
  const rounded=Math.round(size*10)/10;
  boardEl.style.setProperty("--mine-cell-size",rounded+"px");
