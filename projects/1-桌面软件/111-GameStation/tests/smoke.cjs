@@ -20,7 +20,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
   page.on("pageerror", error => pageErrors.push(error.message));
 
   async function openGame(name) {
-    await page.locator("#backToLibrary").click().catch(() => {});
+    if (await page.locator("#workspaceView").isVisible()) await page.locator("#backToLibrary").click();
     await page.locator(".game-card").filter({ hasText: name }).click();
     await page.locator("#stageLoading").waitFor({ state: "hidden", timeout: 8000 });
     await page.waitForTimeout(120);
@@ -46,7 +46,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
     assert.equal(await mines.locator(".mine-cell").count(), 81, "minesweeper board should contain 81 cells");
     await mines.locator(".mine-cell").first().click();
     assert.ok(await mines.locator(".mine-cell.open").count() >= 1, "first reveal should open a cell");
-    await mines.locator(".mine-cell").nth(80).click({ button: "right" });
+    await mines.locator(".mine-cell:not(.open)").first().click({ button: "right" });
     assert.ok(await mines.locator(".mine-cell.flag").count() >= 1, "right click should place a flag");
 
     await openGame("中国象棋");
@@ -75,8 +75,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
     await snake.locator("canvas").click();
     await page.keyboard.press("ArrowDown");
 
+    await page.locator("#immersiveButton").click();
+    assert.ok(await page.locator("#appShell").evaluate(el => el.classList.contains("immersive")), "immersive mode should hide the sidebar");
+    await page.locator("#immersiveButton").click();
     await page.locator("#backToLibrary").click();
-    await page.locator("#immersiveButton").count().catch(() => 0);
     await page.locator("#feedbackOpen").click();
     await page.locator("#feedbackText").fill("CI 自动化体验反馈测试");
     assert.ok(await page.locator("#feedbackCopy").isEnabled(), "feedback copy action should be available");
