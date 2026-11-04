@@ -283,7 +283,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         let deck = [];
         let piles = { stock: [], waste: [], foundations: [[], [], [], []], tableau: [[], [], [], [], [], [], []] };
         
-        let CARD_W = 80, CARD_H = 115, GAP = 15;
+        let CARD_W = 80, CARD_H = 115, GAP = 15, DOWN_STEP = .22, UP_STEP = .28;
         let POS = {};
         let selectedCard = null;
 
@@ -291,7 +291,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         let elapsedSeconds = 0;
         let isGameStarted = false;
         let bestTime = localStorage.getItem('simpleSolitaireBestTime');
-        let gamePaused = false, drawCount = 1, winReported = false;
+        let gamePaused = false, drawCount = 1, winReported = false, moveCount = 0, undoStack = [];
 
         let draggedCards = [];
         let dragSourcePile = null;
@@ -300,52 +300,38 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
 
         // --- Layout Engine (Perfect Centering & Exact Height) ---
         function calculateLayout() {
-            const board = document.getElementById('board');
-            let availableW = window.innerWidth * 0.92; 
-            if (availableW > 800) availableW = 800; 
-            
-            let w = availableW / 8.08; 
-            if (w > 85) w = 85; 
-            
-            CARD_W = w;
-            CARD_H = w * 1.45; 
-            GAP = w * 0.18; 
+ const board=document.getElementById("board");
+ const area=document.querySelector(".solitaire-layout .game-main-board");
+ const availableW=Math.max(0,area.clientWidth*.96),availableH=Math.max(0,area.clientHeight*.96);
+ const w=Math.max(34,Math.min(availableW/8.08,availableH/4.9,150));
+ CARD_W=w;CARD_H=w*1.45;GAP=w*.18;
+ board.style.width=(7*CARD_W+6*GAP)+"px";
+ document.documentElement.style.setProperty("--card-w",CARD_W+"px");
+ document.documentElement.style.setProperty("--card-h",CARD_H+"px");
+ POS.stock={x:0,y:0};POS.waste={x:CARD_W+GAP,y:0};
+ POS.founds=Array.from({length:4},(_,i)=>({x:(i+3)*(CARD_W+GAP),y:0}));
+ POS.tabs=Array.from({length:7},(_,i)=>({x:i*(CARD_W+GAP),y:CARD_H+GAP+10}));
+ const updatePh=(id,x,y)=>{const el=document.getElementById(id);if(el){el.style.left=x+"px";el.style.top=y+"px";}};
+ updatePh("ph-stock",POS.stock.x,POS.stock.y);updatePh("ph-waste",POS.waste.x,POS.waste.y);
+ POS.founds.forEach((p,i)=>updatePh("ph-found-"+i,p.x,p.y));
+ POS.tabs.forEach((p,i)=>updatePh("ph-tab-"+i,p.x,p.y));
+ let maxDown=6,maxUp=1;
+ piles.tableau.forEach(pile=>{const down=pile.filter(card=>!card.isFaceUp).length,up=pile.length-down;maxDown=Math.max(maxDown,down);maxUp=Math.max(maxUp,up);});
+ const fixed=POS.tabs[0].y+CARD_H,steps=maxDown*.22+Math.max(0,maxUp-1)*.28;
+ const scale=Math.min(1,Math.max(.12,(availableH-fixed)/Math.max(1,CARD_H*steps)));
+ DOWN_STEP=.22*scale;UP_STEP=.28*scale;
+ let maxTabHeight=POS.tabs[0].y;
+ piles.tableau.forEach((pile,i)=>{
+  let h=POS.tabs[i].y;
+  pile.forEach(card=>{h+=CARD_H*(card.isFaceUp?UP_STEP:DOWN_STEP);});
+  maxTabHeight=Math.max(maxTabHeight,h);
+ });
+ board.style.height=(maxTabHeight+CARD_H)+"px";
+}
+window.addEventListener("resize",()=>{calculateLayout();renderAll();});
+document.getElementById("undoButton").addEventListener("click",undoMove);
 
-            let boardWidth = (7 * CARD_W) + (6 * GAP);
-            board.style.width = boardWidth + 'px';
-
-            document.documentElement.style.setProperty('--card-w', `${CARD_W}px`);
-            document.documentElement.style.setProperty('--card-h', `${CARD_H}px`);
-
-            POS.stock = { x: 0, y: 0 };
-            POS.waste = { x: CARD_W + GAP, y: 0 };
-            POS.founds = Array.from({length: 4}, (_, i) => ({ x: (i+3)*(CARD_W+GAP), y: 0 }));
-            POS.tabs = Array.from({length: 7}, (_, i) => ({ x: i*(CARD_W+GAP), y: CARD_H + GAP + 10 }));
-
-            // Live Update Placeholder Positions on Screen Resize
-            const updatePh = (id, x, y) => {
-                const el = document.getElementById(id);
-                if (el) { el.style.left = `${x}px`; el.style.top = `${y}px`; }
-            };
-            updatePh('ph-stock', POS.stock.x, POS.stock.y);
-            updatePh('ph-waste', POS.waste.x, POS.waste.y);
-            POS.founds.forEach((p, i) => updatePh(`ph-found-${i}`, p.x, p.y));
-            POS.tabs.forEach((p, i) => updatePh(`ph-tab-${i}`, p.x, p.y));
-
-            // Dynamic Board Height (Eliminates Desktop Scrolling)
-            let maxTabHeight = POS.tabs[0].y;
-            piles.tableau.forEach((pile, i) => {
-                let h = POS.tabs[i].y;
-                pile.forEach(c => { h += c.isFaceUp ? (CARD_H * 0.25) : (CARD_H * 0.16); });
-                if (h > maxTabHeight) maxTabHeight = h;
-            });
-            board.style.height = `${maxTabHeight + CARD_H}px`;
-        }
-
-        window.addEventListener('resize', () => { calculateLayout(); renderAll(); });
-
-        // --- Initialization ---
-        function setupDOM() {
+function setupDOM() {
             const board = document.getElementById('board');
             board.innerHTML = ''; 
             calculateLayout(); // Initializes variables
@@ -390,48 +376,28 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         }
 
         function initGame() {
-            gamePaused = false; winReported = false;
-            stopTimer(); elapsedSeconds = 0; isGameStarted = false; updateTimerUI();
-            selectedCard = null; draggedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
-            deck.forEach(c => { c.isFaceUp = false; c.el.classList.remove('face-up'); });
-
-            let shuffled = [...deck];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-
-            piles = { stock: [], waste: [], foundations: [[], [], [], []], tableau: [[], [], [], [], [], [], []] };
-            for (let i = 0; i < 7; i++) {
-                for (let j = 0; j <= i; j++) {
-                    const card = shuffled.pop();
-                    if (j === i) card.isFaceUp = true;
-                    piles.tableau[i].push(card);
-                }
-            }
-            piles.stock = shuffled;
-            calculateLayout(); 
-            renderAll();
-        }
-
-        // --- Rendering ---
-        function renderAll() {
-            let zBase = 10;
-            piles.stock.forEach((card, idx) => updateCard(card, POS.stock.x, POS.stock.y, zBase + idx, false));
-            piles.waste.forEach((card, idx) => updateCard(card, POS.waste.x, POS.waste.y, zBase + idx, true));
-            piles.foundations.forEach((pile, fIdx) => {
-                pile.forEach((card, idx) => updateCard(card, POS.founds[fIdx].x, POS.founds[fIdx].y, zBase + idx, true));
-            });
-            piles.tableau.forEach((pile, tIdx) => {
-                let yOffset = POS.tabs[tIdx].y;
-                pile.forEach((card, idx) => {
-                    updateCard(card, POS.tabs[tIdx].x, yOffset, zBase + idx, card.isFaceUp);
-                    yOffset += card.isFaceUp ? (CARD_H * 0.25) : (CARD_H * 0.16);
-                });
-            });
-        }
-
-        function updateCard(card, x, y, z, faceUp) {
+ gamePaused=false;winReported=false;stopTimer();elapsedSeconds=0;isGameStarted=false;
+ moveCount=0;undoStack=[];updateTimerUI();
+ selectedCard=null;draggedCards=[];document.querySelectorAll(".card").forEach(card=>card.classList.remove("selected"));
+ deck.forEach(card=>{card.isFaceUp=false;card.el.classList.remove("face-up");});
+ const shuffled=[...deck];
+ for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
+ piles={stock:[],waste:[],foundations:[[],[],[],[]],tableau:[[],[],[],[],[],[],[]]};
+ for(let i=0;i<7;i++)for(let j=0;j<=i;j++){const card=shuffled.pop();if(j===i)card.isFaceUp=true;piles.tableau[i].push(card);}
+ piles.stock=shuffled;calculateLayout();renderAll();reportStatus("新局开始 · 点击牌堆发牌");
+}
+function renderAll() {
+ let zBase=10;
+ piles.stock.forEach((card,idx)=>updateCard(card,POS.stock.x,POS.stock.y,zBase+idx,false));
+ piles.waste.forEach((card,idx)=>updateCard(card,POS.waste.x,POS.waste.y,zBase+idx,true));
+ piles.foundations.forEach((pile,fIdx)=>pile.forEach((card,idx)=>updateCard(card,POS.founds[fIdx].x,POS.founds[fIdx].y,zBase+idx,true)));
+ piles.tableau.forEach((pile,tIdx)=>{
+  let yOffset=POS.tabs[tIdx].y;
+  pile.forEach((card,idx)=>{updateCard(card,POS.tabs[tIdx].x,yOffset,zBase+idx,card.isFaceUp);yOffset+=CARD_H*(card.isFaceUp?UP_STEP:DOWN_STEP);});
+ });
+ updateSideMetrics();
+}
+function updateCard(card, x, y, z, faceUp) {
             if (draggedCards.includes(card)) return; 
             card.isFaceUp = faceUp;
             card.el.style.zIndex = z;
@@ -482,28 +448,18 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
             return info.arr.slice(info.idx);
         }
 
-        function moveCards(cards, sourceArr, targetArr) {
-            if (gamePaused) return;
-            startTimer();
-            const idx = sourceArr.indexOf(cards[0]);
-            sourceArr.splice(idx, cards.length);
-            targetArr.push(...cards);
-            
-            cards.forEach(c => c.el.classList.add('moving'));
-            setTimeout(() => cards.forEach(c => c.el.classList.remove('moving')), 250);
-
-            if (sourceArr.length > 0 && sourceArr !== piles.stock && sourceArr !== piles.waste) {
-                const newTop = sourceArr[sourceArr.length - 1];
-                if (!newTop.isFaceUp) newTop.isFaceUp = true;
-            }
-            
-            calculateLayout();
-            renderAll();
-            GameBridge.report("进行中", { score: Math.max(0, 10000-elapsedSeconds) });
-            checkWin();
-        }
-
-        function attemptAutoMove(card, sourcePileId) {
+        function moveCards(cards,sourceArr,targetArr) {
+ if(gamePaused||!cards?.length)return;
+ const idx=sourceArr.indexOf(cards[0]);if(idx<0)return;
+ pushUndo();startTimer();sourceArr.splice(idx,cards.length);targetArr.push(...cards);moveCount++;
+ cards.forEach(card=>card.el.classList.add("moving"));
+ setTimeout(()=>cards.forEach(card=>card.el.classList.remove("moving")),250);
+ if(sourceArr.length>0&&sourceArr!==piles.stock&&sourceArr!==piles.waste){
+  const newTop=sourceArr[sourceArr.length-1];if(newTop&&!newTop.isFaceUp)newTop.isFaceUp=true;
+ }
+ calculateLayout();renderAll();reportStatus("进行中");checkWin();
+}
+function attemptAutoMove(card, sourcePileId) {
             const draggables = getDraggableCards(card);
             if (!draggables) return false;
             
@@ -523,17 +479,13 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         }
 
         function handleStockClick() {
-            if (gamePaused) return;
-            startTimer(); clearSelection();
-            if (piles.stock.length > 0) {
-                for (let i=0; i<drawCount && piles.stock.length>0; i++) piles.waste.push(piles.stock.pop());
-            } else while (piles.waste.length > 0) piles.stock.push(piles.waste.pop());
-            calculateLayout();
-            renderAll();
-            GameBridge.report("进行中", { score: Math.max(0, 10000-elapsedSeconds) });
-        }
-
-        function clearSelection() {
+ if(gamePaused||(!piles.stock.length&&!piles.waste.length))return;
+ pushUndo();startTimer();clearSelection();
+ if(piles.stock.length>0){for(let i=0;i<drawCount&&piles.stock.length>0;i++)piles.waste.push(piles.stock.pop());}
+ else while(piles.waste.length>0){const card=piles.waste.pop();card.isFaceUp=false;piles.stock.push(card);}
+ moveCount++;calculateLayout();renderAll();reportStatus(piles.stock.length?"已发牌":"牌堆已回收");
+}
+function clearSelection() {
             selectedCard = null;
             document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
         }
@@ -639,10 +591,39 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
                 timerInterval = setInterval(() => { elapsedSeconds++; updateTimerUI(); }, 1000);
             }
         }
-        function stopTimer() { clearInterval(timerInterval); }
+        function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
         function formatTime(s) { const m = Math.floor(s/60); const sc = s%60; return `${m.toString().padStart(2,'0')}:${sc.toString().padStart(2,'0')}`; }
-        function updateTimerUI() { document.getElementById('timer').innerText = formatTime(elapsedSeconds); }
-        function updateBestTimeUI() { document.getElementById('best-time').innerText = bestTime ? formatTime(bestTime) : '--:--'; }
+        function updateTimerUI() { const el=document.getElementById('timer');if(el)el.textContent=formatTime(elapsedSeconds); }
+        function updateBestTimeUI() { const el=document.getElementById('best-time');if(el)el.textContent=bestTime?formatTime(bestTime):'--:--'; }
+        function updateSideMetrics(){
+            const moves=document.getElementById("moveCount"),stockCount=document.getElementById("stockCount");
+            if(moves)moves.textContent=String(moveCount);
+            if(stockCount)stockCount.textContent=String(piles.stock.length);
+            updateTimerUI();updateBestTimeUI();
+            const undo=document.getElementById("undoButton");if(undo)undo.disabled=gamePaused||undoStack.length===0;
+        }
+        function reportStatus(message){
+            const status=document.getElementById("solitaireStatus");if(status)status.textContent=message;
+            GameBridge.report(message,{score:Math.max(0,10000-elapsedSeconds),moves:moveCount,stock:piles.stock.length});
+            updateSideMetrics();
+        }
+        function captureState(){
+            return {stock:piles.stock.map(c=>c.id),waste:piles.waste.map(c=>c.id),
+                foundations:piles.foundations.map(p=>p.map(c=>c.id)),tableau:piles.tableau.map(p=>p.map(c=>c.id)),
+                faceUp:Object.fromEntries(deck.map(c=>[c.id,c.isFaceUp])),moveCount};
+        }
+        function pushUndo(){
+            undoStack.push(captureState());if(undoStack.length>100)undoStack.shift();
+        }
+        function undoMove(){
+            if(gamePaused||!undoStack.length)return;
+            const state=undoStack.pop(),byId=new Map(deck.map(c=>[c.id,c]));
+            piles={stock:state.stock.map(id=>byId.get(id)),waste:state.waste.map(id=>byId.get(id)),
+                foundations:state.foundations.map(p=>p.map(id=>byId.get(id))),tableau:state.tableau.map(p=>p.map(id=>byId.get(id)))};
+            deck.forEach(card=>{card.isFaceUp=!!state.faceUp[card.id];});
+            moveCount=state.moveCount;selectedCard=null;draggedCards=[];calculateLayout();renderAll();reportStatus("已撤销一步");
+        }
+
 
         function checkWin() {
             if (piles.foundations.every(f => f.length === 13)) {
@@ -773,8 +754,8 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         GameBridge.register({
             init(p) { drawCount = p.difficulty === "easy" ? 1 : 3; initGame(); },
             newGame: initGame,
-            pause() { gamePaused = true; document.body.classList.add("gs-paused"); },
-            resume() { gamePaused = false; document.body.classList.remove("gs-paused"); },
+            pause() { gamePaused = true; document.body.classList.add("gs-paused");reportStatus("已暂停"); },
+            resume() { gamePaused = false; document.body.classList.remove("gs-paused");reportStatus("继续游戏"); },
             setDifficulty(v) { drawCount = v === "easy" ? 1 : 3; },
             dispose() { gamePaused = true; stopTimer(); }
         });
