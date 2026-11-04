@@ -300,6 +300,23 @@ const games = [
     assert.ok(await page.locator("#appShell").evaluate(el => el.classList.contains("menu-open")));
     await page.locator("#mobileMenu").click();
 
+    await openGame("扫雷");
+    const mobileMines = page.frameLocator("#gameFrame");
+    const mobileMineFit = await mobileMines.locator(".mine-classic").evaluate(el => ({
+      board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect()
+    }));
+    assert.ok(mobileMineFit.board.width <= mobileMineFit.area.width + 2, "mobile Minesweeper board should fit its available width");
+    await openGame("贪吃蛇");
+    const mobileSnake = page.frameLocator("#gameFrame");
+    const mobileSnakeCanvas = mobileSnake.locator("#canvas");
+    const mobileSnakeY = Number(await mobileSnakeCanvas.getAttribute("data-head-y"));
+    await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(180);
+    assert.ok(Number(await mobileSnakeCanvas.getAttribute("data-head-y")) > mobileSnakeY, "mobile Snake should accept directional input");
+    await openGame("俄罗斯方块");
+    const mobileTetrisCanvas = await page.frameLocator("#gameFrame").locator("#canvas").boundingBox();
+    assert.ok(mobileTetrisCanvas && mobileTetrisCanvas.width > 100 && mobileTetrisCanvas.height > 200, "mobile Tetris canvas should remain fully visible");
+
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator("#settingsButton").click();
     assert.ok(await page.locator("#settingsBackdrop").isVisible());
