@@ -224,3 +224,146 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  .snake-layout .arcade-canvas{width:min(100%,54vh);height:auto;max-height:54vh}
  .contra-layout .arcade-canvas{width:100%;height:auto;max-height:54vh}
 }
+
+
+/* P111 R8 · reclaim the play area and restore the Windows 7 Minesweeper palette */
+.game-root.game-layout{
+  grid-template-columns:minmax(145px,170px) minmax(0,1fr) minmax(150px,180px);
+  gap:clamp(10px,1vw,16px);
+  padding:clamp(10px,1.15vw,14px);
+}
+.game-guide,.game-tools{gap:11px;padding:12px 9px}
+.game-tools{padding-left:14px}
+.game-main-board>.board-wrap,
+.game-main-board>.canvas-panel,
+.game-main-board>.game-panel{
+  width:100%;height:100%;max-width:none;max-height:none;
+  padding:0;border:0;border-radius:0;background:transparent;
+  box-shadow:none;overflow:hidden;
+}
+.reversi-layout #board{width:min(100%,90vh)!important;max-height:100%;aspect-ratio:1}
+.connect4-layout #board{width:min(100%,calc(90vh * 7 / 6))!important;max-height:100%;aspect-ratio:7/6}
+.checkers-layout #board{width:min(100%,90vh)!important;max-height:100%;aspect-ratio:1}
+.game2048-layout #board{width:min(100%,90vh)!important;max-height:100%;aspect-ratio:1}
+.memory-layout #board{width:min(100%,90vh)!important;max-height:100%;aspect-ratio:1}
+.sudoku-layout #board{width:min(100%,90vh)!important;max-height:100%;aspect-ratio:1}
+.sokoban-layout #board{width:min(100%,calc(90vh * 9 / 7))!important;max-height:100%;aspect-ratio:9/7}
+.battleship-layout .game-main-board{overflow:hidden}
+.battleship-layout .fleet-boards{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:center;justify-items:center;gap:clamp(10px,1.4vw,20px);
+}
+.battleship-layout .fleet-board{width:100%;min-width:0}
+.battleship-layout .fleet-board .game-grid{
+  width:min(100%,44vh)!important;height:auto!important;max-width:100%;max-height:100%;
+  aspect-ratio:1;grid-template-columns:repeat(10,minmax(0,1fr))!important;gap:1px;
+}
+.solitaire-layout{width:min(100%,1400px);max-width:100%}
+.game-root:not(.game-layout)>.game-panel{width:min(100%,1400px)!important;max-height:100%}
+.game-root:not(.game-layout)>.game-row{width:min(100%,1400px);max-width:100%}
+.tetris-layout .game-main-board>.canvas-panel,
+.snake-layout .game-main-board>.canvas-panel,
+.pong-layout .game-main-board>.canvas-panel,
+.contra-layout .game-main-board>.canvas-panel{display:grid;place-items:center}
+.tetris-layout .arcade-canvas{
+  width:auto;height:min(100%,90vh);max-width:100%;max-height:100%;
+  aspect-ratio:1/2;border-radius:9px;background:#152536;
+  box-shadow:0 10px 28px rgba(29,48,66,.16);image-rendering:pixelated;
+}
+.snake-layout .arcade-canvas{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1}
+.pong-layout .arcade-canvas{width:min(100%,calc(90vh * 16 / 9));height:auto;max-width:100%;max-height:100%;aspect-ratio:16/9}
+.contra-layout .arcade-canvas{width:min(100%,calc(90vh * 16 / 9));height:auto;max-width:100%;max-height:100%;aspect-ratio:16/9}
+.minesweeper-layout .game-main-board{overflow:auto}
+.mine-classic{
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  width:max-content;max-width:100%;max-height:100%;padding:11px;
+  border:1px solid #8eafc8;border-radius:5px;
+  background:linear-gradient(180deg,#e7f2fb 0%,#c8deef 100%);
+  box-shadow:inset 0 1px 0 #fff,0 8px 22px rgba(38,83,119,.14);
+}
+.mine-top-panel{
+  width:100%;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:6px 8px;border:1px solid #9ab8cf;border-radius:3px;
+  background:linear-gradient(180deg,#e1eff9 0%,#c4dced 100%);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(91,132,164,.18);
+}
+.mine-counter{
+  width:62px;height:38px;display:grid;place-items:center;
+  border:1px solid #6387a4;border-radius:2px;
+  background:linear-gradient(180deg,#163b5b 0%,#09243d 100%);
+  color:#ff625a;font-family:Consolas,"Courier New",monospace;
+  font-size:27px;font-weight:750;letter-spacing:1px;line-height:1;
+  font-variant-numeric:tabular-nums;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.6),0 1px 0 #fff;
+}
+.mine-face{
+  width:38px;height:38px;display:grid;place-items:center;padding:0;
+  border:1px solid #8baac2;border-radius:4px;
+  background:linear-gradient(180deg,#f8fcff 0%,#d7e9f6 48%,#b5d1e5 100%);
+  color:#315c7b;font-size:22px;line-height:1;
+  box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(40,76,105,.16);
+}
+.mine-face:active{background:linear-gradient(180deg,#b5d3e8,#e2eff8);box-shadow:inset 0 1px 3px rgba(42,86,120,.28)}
+.mine-grid{
+  --mine-cell-size:28px;
+  display:grid;grid-template-columns:repeat(var(--cols,16),var(--mine-cell-size));
+  grid-auto-rows:var(--mine-cell-size);gap:2px;
+  width:max-content;max-width:100%;max-height:none;overflow:visible;
+  padding:7px;border:1px solid #8eafc8;border-radius:2px;
+  background:linear-gradient(180deg,#b5d1e5,#d7e8f4);
+  box-shadow:inset 0 1px 3px rgba(46,91,127,.2);
+}
+.mine-cell{
+  width:var(--mine-cell-size);height:var(--mine-cell-size);
+  min-width:0;min-height:0;aspect-ratio:auto;padding:0;
+  border:1px solid #86abc8;border-radius:2px;
+  background:linear-gradient(145deg,#f7fbff 0%,#d9ebf8 44%,#b5d3e9 100%);
+  color:#244c6b;font-family:"Segoe UI",Arial,sans-serif;
+  font-size:clamp(9px,calc(var(--mine-cell-size) * .52),20px);
+  font-weight:800;line-height:1;
+  box-shadow:inset 1px 1px 0 rgba(255,255,255,.96),inset -1px -1px 0 rgba(62,111,151,.24),0 1px 1px rgba(56,95,128,.14);
+}
+.mine-cell:hover:not(.open){background:linear-gradient(145deg,#fff 0%,#e6f4ff 45%,#c4e0f3 100%);border-color:#6e9fc4}
+.mine-cell:active:not(.open){background:linear-gradient(145deg,#9fc6e3,#c9e0f0);box-shadow:inset 1px 1px 3px rgba(41,91,132,.32)}
+.mine-cell.open{
+  border:1px solid #b5ccdd;border-radius:1px;
+  background:linear-gradient(145deg,#edf6fc,#e2eff8);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.72);
+}
+.mine-cell.flag{color:#d23e37}
+.mine-cell.mine{border:1px solid #c78f8b;background:#f4d9d7;color:#b22e2e}
+.mine-cell[data-n="1"]{color:#185fc4}.mine-cell[data-n="2"]{color:#218447}
+.mine-cell[data-n="3"]{color:#cf3939}.mine-cell[data-n="4"]{color:#273c9b}
+.mine-cell[data-n="5"]{color:#87312f}.mine-cell[data-n="6"]{color:#268d91}
+.mine-cell[data-n="7"]{color:#1f2933}.mine-cell[data-n="8"]{color:#75808a}
+.hotkey-hint{margin-left:4px;color:#8295a5;font-size:11px;white-space:nowrap}
+@media(max-width:900px){
+  .game-root.game-layout{grid-template-columns:minmax(120px,145px) minmax(0,1fr) minmax(140px,165px);gap:8px;padding:8px}
+  .game-guide,.game-tools{padding:10px 7px;gap:9px}
+  .game-tools{padding-left:10px}
+  .battleship-layout .fleet-board .game-grid{width:min(100%,40vh)!important}
+}
+@media(max-width:700px){
+  .game-root.game-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:7px;padding:7px}
+  .game-root.game-layout .game-main-board{min-height:0}
+  .game-root.game-layout .game-main-board>.game-panel,
+  .game-root.game-layout .game-main-board>.board-wrap,
+  .game-root.game-layout .game-main-board>.canvas-panel{min-height:0}
+  .mine-classic{padding:7px;gap:6px}
+  .mine-top-panel{height:46px}
+  .mine-counter{width:52px;height:32px;font-size:22px}
+  .mine-face{width:33px;height:33px;font-size:19px}
+  .mine-grid{padding:5px;gap:1px}
+  .tetris-layout .arcade-canvas{height:min(100%,64vh);width:auto;max-height:100%}
+  .snake-layout .arcade-canvas{width:min(100%,64vh);max-height:100%}
+  .pong-layout .arcade-canvas{width:min(100%,calc(54vh * 16 / 9));max-height:100%}
+  .contra-layout .arcade-canvas{width:100%;max-height:100%}
+  .battleship-layout .fleet-boards{gap:5px}
+  .battleship-layout .fleet-board .game-grid{width:min(100%,40vw)!important}
+  .hotkey-hint{display:none}
+}
+@media(max-width:420px){
+  .game-guide,.game-tools{font-size:12px}
+  .mine-classic{max-width:100%}
+  .mine-cell{font-size:clamp(8px,calc(var(--mine-cell-size) * .52),15px)}
+}
