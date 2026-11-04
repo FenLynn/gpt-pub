@@ -531,3 +531,130 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  .xiangqi-piece{font-size:clamp(13px,2.15vh,22px);border-width:1.5px}
  .xiangqi-river-label{font-size:28px;letter-spacing:5px}
 }
+
+
+/* P111 R9 · card tables share the same centered board and right-hand action rail */
+.card-table-layout .game-main-board{
+ display:grid;place-items:stretch;padding:clamp(10px,1.2vw,18px);
+ border:1px solid #dce8e2;border-radius:12px;overflow:hidden;
+ background:radial-gradient(ellipse at 50% 40%,#e7f1e9 0%,#dcebe1 60%,#d4e5da 100%);
+}
+.card-table-main{
+ width:100%;height:100%;min-width:0;min-height:0;
+ display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;
+ gap:clamp(10px,1.4vh,16px);overflow:hidden;
+}
+.card-table-layout .opponents-row{
+ flex:none;display:flex;align-items:center;justify-content:space-around;gap:8px;
+ min-height:48px;padding:5px 8px;border:1px solid rgba(255,255,255,.7);
+ border-radius:10px;background:rgba(255,255,255,.62);
+}
+.card-table-layout .opponents-row .metric-pill{background:rgba(255,255,255,.85)}
+.card-table-center{
+ display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;
+ min-height:76px;padding:12px;border:1px solid rgba(255,255,255,.62);
+ border-radius:11px;background:rgba(255,255,255,.42);
+}
+.card-table-layout .card-hand{
+ width:100%;min-width:0;max-width:100%;max-height:30vh;min-height:72px;
+ display:flex;align-items:flex-end;justify-content:center;flex-wrap:nowrap;
+ gap:clamp(2px,.3vw,5px);overflow-x:auto;overflow-y:hidden;padding:5px 2px 8px;
+ scrollbar-width:thin;scrollbar-color:#9bb8a6 transparent;
+}
+.card-table-layout .playing-card{
+ flex:0 0 clamp(34px,3.3vw,50px);width:clamp(34px,3.3vw,50px);
+ height:clamp(50px,7.3vh,78px);border:1px solid #cbd8d0;border-radius:7px;
+ background:linear-gradient(155deg,#fff 0%,#fbfcfa 100%);
+ color:#243847;font-size:clamp(14px,1.65vh,19px);font-weight:720;
+ box-shadow:0 2px 4px rgba(33,57,42,.13);
+}
+.card-table-layout .playing-card.red{color:#c42f39}
+.card-table-layout .playing-card.selected{transform:translateY(-8px);outline:2px solid #6fa68b;outline-offset:1px}
+.card-table-layout .game-log-panel{
+ max-height:110px;min-height:42px;overflow:hidden;padding:8px 10px;
+ border:1px solid rgba(255,255,255,.65);border-radius:8px;
+ background:rgba(255,255,255,.48);color:#647c6c;font-size:12px;line-height:1.55;
+}
+.game-tools .game-info-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:0;border:1px solid #e1e8ed;border-radius:9px;background:#fff;overflow:hidden;
+}
+.game-tools .game-info-grid>div{
+ min-width:0;display:flex;flex-direction:column;gap:3px;padding:9px 10px;
+ border-bottom:1px solid #edf1f4;
+}
+.game-tools .game-info-grid span{color:#8498a7;font-size:11px}
+.game-tools .game-info-grid strong{color:#36576e;font-size:14px;overflow-wrap:anywhere}
+.game-tools .game-action-group{
+ display:flex;flex-direction:column;align-items:stretch;gap:7px;
+ padding:9px;border:1px solid #e1e8ed;border-radius:9px;background:#fff;
+}
+.game-tools .game-action-group:empty{display:none}
+.game-tools .game-action-group .game-row{justify-content:flex-start}
+.game-tools .game-action-group span{font-size:12px;color:#647d90;line-height:1.5}
+.game-tools .game-action-group .game-btn{width:100%}
+.game-tools .game-rule-panel{
+ padding:10px;border:1px solid #e1e8ed;border-radius:9px;background:#fff;color:#536f83;
+}
+.game-tools .game-rule-panel summary{cursor:pointer;font-size:13px;font-weight:650}
+.game-tools .rule-toggle-list{display:flex;flex-direction:column;gap:9px;padding-top:10px}
+.game-tools .rule-toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:#60798c}
+.game-tools .game-tool-note{margin-top:auto}
+.doudizhu-layout .game-main-board{
+ background:radial-gradient(ellipse at 50% 40%,#e6f0e8 0%,#d6e8dc 58%,#c9dfd2 100%);
+}
+.doudizhu-layout .card-table-center{min-height:110px}
+.doudizhu-layout .card-hand{margin-top:auto}
+.doudizhu-layout .game-tools .game-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mahjong-layout .game-main-board{
+ background:radial-gradient(ellipse at 50% 35%,#e6f0e9 0%,#d9e9df 65%,#cddfd5 100%);
+}
+.mahjong-layout .mahjong-area{
+ flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:12px;
+ padding:12px;border:1px solid rgba(255,255,255,.75);border-radius:12px;background:rgba(255,255,255,.48);
+ overflow:hidden;
+}
+.mahjong-layout .mahjong-melds,.mahjong-layout .mahjong-discards{
+ display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:9px;
+ min-height:48px;max-width:100%;overflow:hidden;
+}
+.mahjong-layout .meld-seat,.mahjong-layout .discard-seat{
+ display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:5px;
+ color:#607b6b;font-size:12px;
+}
+.mahjong-layout .tile-mini,.mahjong-layout .tile-card{
+ display:inline-grid;place-items:center;min-width:29px;height:39px;padding:0 4px;
+ border:1px solid #b8c9bc;border-radius:4px;
+ background:linear-gradient(150deg,#fffef8,#e8f0e6);
+ color:#356b51;font-family:"STKaiti","KaiTi","Noto Serif CJK SC",serif;
+ font-size:18px;font-weight:760;box-shadow:0 2px 3px rgba(39,75,48,.12);
+}
+.mahjong-layout .mahjong-hand{
+ flex:none;max-height:22vh;min-height:64px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+ justify-content:center;align-items:flex-end;padding:5px 2px 8px;
+}
+.mahjong-layout .mahjong-hand .tile-card{
+ flex:0 0 clamp(32px,3vw,43px);width:clamp(32px,3vw,43px);
+ height:clamp(47px,6.8vh,68px);font-size:clamp(15px,1.9vh,21px);
+}
+.sanguosha-layout .game-main-board{
+ background:radial-gradient(ellipse at 50% 38%,#f2eee5 0%,#ebe7dc 62%,#e4e0d5 100%);
+ border-color:#e3ddd0;
+}
+.sanguosha-layout .opponents-row{background:rgba(255,255,255,.72)}
+.sanguosha-layout .card-hand{margin-top:auto}
+.sanguosha-layout .player-chip{min-width:0;min-height:54px;flex-direction:column;align-items:flex-start;gap:3px;padding:7px 10px}
+.sanguosha-layout .player-chip.active{border-color:#9fc4ab;background:#eff7f0}
+.sanguosha-layout .game-log-panel{max-height:100px;background:rgba(255,255,255,.68);color:#796f5f}
+.sanguosha-layout .game-tools .game-action-group{max-height:36vh;overflow-y:auto;scrollbar-width:thin}
+.sanguosha-layout .game-tools .game-action-group[style*="display: none"]{display:none!important}
+@media(max-width:700px){
+ .card-table-layout .game-main-board{padding:5px}
+ .card-table-main{gap:7px}
+ .card-table-layout .opponents-row{gap:4px;padding:4px}
+ .card-table-layout .card-hand{max-height:24vh;min-height:55px;justify-content:flex-start}
+ .card-table-layout .playing-card{flex-basis:clamp(27px,7vw,35px);width:clamp(27px,7vw,35px);height:clamp(40px,6vh,50px)}
+ .mahjong-layout .mahjong-area{gap:6px;padding:6px}
+ .mahjong-layout .mahjong-hand .tile-card{flex-basis:28px;width:28px;height:42px;font-size:14px}
+ .sanguosha-layout .player-chip{padding:5px 6px;font-size:10px}
+}
