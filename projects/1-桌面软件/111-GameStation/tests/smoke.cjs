@@ -165,6 +165,14 @@ const games = [
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "本机双人");
     await page.locator("#modeControl button[data-mode-index='0']").click();
     await page.locator("#startButton").click();
+    const gomokuGeometry = await gomoku.locator(".gomoku-cell").nth(112).evaluate(el => {
+      const rect = el.getBoundingClientRect(), board = el.closest("#board"), boardRect = board.getBoundingClientRect();
+      const style = getComputedStyle(el), boardStyle = getComputedStyle(board);
+      return {cell:{x:rect.x,y:rect.y,width:rect.width,height:rect.height,display:style.display,visibility:style.visibility,opacity:style.opacity},board:{x:boardRect.x,y:boardRect.y,width:boardRect.width,height:boardRect.height,display:boardStyle.display,gridRows:boardStyle.gridTemplateRows},viewport:{width:innerWidth,height:innerHeight}};
+    });
+    console.log("GOMOKU_GEOMETRY "+JSON.stringify(gomokuGeometry));
+    fs.mkdirSync(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
+    await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/gomoku-workspace.png")});
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
     assert.ok(await gomoku.locator(".stone").count() >= 2, "gomoku human and AI should both place a stone");
