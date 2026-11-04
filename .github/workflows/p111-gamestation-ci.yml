@@ -1,0 +1,111 @@
+name: P111 GameStation CI
+
+on:
+  push:
+    branches:
+      - p111-exp
+    paths:
+      - "projects/1-桌面软件/111-GameStation/**"
+      - ".github/workflows/p111-gamestation-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "projects/1-桌面软件/111-GameStation/**"
+      - ".github/workflows/p111-gamestation-ci.yml"
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
+      - "目录.md"
+      - "projects/1-桌面软件/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p111-gamestation-ci
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: P111 scope gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          while IFS= read -r file; do
+            case "$file" in
+              projects/1-桌面软件/111-GameStation/*|.github/workflows/p111-gamestation-ci.yml|.github/workflows/repository-pages.yml|docs/repository-pages.md|目录.md|projects/1-桌面软件/README.md)
+                ;;
+              *)
+                echo "::error file=$file::P111 branch contains an out-of-scope change"
+                exit 1
+                ;;
+            esac
+          done < <(git -c core.quotepath=false diff --name-only origin/main...HEAD)
+
+      - name: Strict offline and source guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="projects/1-桌面软件/111-GameStation/app"
+          test -s "$APP/index.html"
+          test -s "$APP/css/app.css"
+          test -s "$APP/js/app.js"
+          test -s "$APP/games/shared/bridge.js"
+          test -s "$APP/games/shared/game.css"
+          for game in gomoku xiangqi minesweeper solitaire tetris snake; do
+            test -s "$APP/games/$game/index.html"
+            test -s "$APP/games/$game/game.js"
+          done
+          if grep -RInE 'https?://' "$APP"; then
+            echo "::error::Remote URL found in the runtime app"
+            exit 1
+          fi
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP"; then
+            echo "::error::Network API found in the runtime app"
+            exit 1
+          fi
+
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          find projects/1-桌面软件/111-GameStation/app -name '*.js' -print0 | while IFS= read -r -d '' file; do
+            node --check "$file"
+          done
+          node --check projects/1-桌面软件/111-GameStation/tests/smoke.cjs
+
+      - name: Install CJK fonts and browser test tools
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends fonts-noto-cjk
+          fc-cache -f
+          npm install --prefix "$RUNNER_TEMP/p111-playwright" --no-save --no-audit --no-fund playwright@1.58.2
+          command -v google-chrome || command -v chromium || command -v chromium-browser
+
+      - name: Real Chromium file URL smoke
+        shell: bash
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/p111-playwright/node_modules/playwright
+        run: |
+          set -euo pipefail
+          export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
+          node projects/1-桌面软件/111-GameStation/tests/smoke.cjs
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p111-gamestation-browser-smoke
+          path: projects/1-桌面软件/111-GameStation/p111-smoke-artifacts
+          retention-days: 7
+          if-no-files-found: ignore

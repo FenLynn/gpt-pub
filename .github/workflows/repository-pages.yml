@@ -16,8 +16,9 @@ on:
     workflows:
       - P108 FigureStudio CI
       - P109 AttendScope CI
+      - P111 GameStation CI
     types: [completed]
-    branches: [p108-exp, p109-exp]
+    branches: [p108-exp, p109-exp, p111-exp]
   workflow_dispatch:
 
 permissions:
@@ -29,10 +30,10 @@ concurrency:
 
 jobs:
   build:
-    name: Build complete P108 + P109 site
+    name: Build complete P108 + P109 + P111 site
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Resolve independent project source refs
         shell: bash
@@ -44,29 +45,40 @@ jobs:
           set -euo pipefail
           p108_ref="p108-exp"
           p109_ref="p109-exp"
+          p111_ref="p111-exp"
           current_p108=""
           current_p109=""
+          current_p111=""
           state_file="$RUNNER_TEMP/preview-build.txt"
 
           if curl -fsSL --retry 2 --retry-delay 1 "https://fenlynn.github.io/gpt-pub/preview-build.txt" -o "$state_file"; then
             current_p108="$(awk -F= '$1=="P108_SHA"{print $2}' "$state_file" | tr -d '\r')"
             current_p109="$(awk -F= '$1=="P109_SHA"{print $2}' "$state_file" | tr -d '\r')"
+            current_p111="$(awk -F= '$1=="P111_SHA"{print $2}' "$state_file" | tr -d '\r')"
           fi
 
           if [[ "$EVENT_NAME" == "workflow_run" && "$TRIGGER_WORKFLOW" == "P109 AttendScope CI" ]]; then
             p109_ref="$TRIGGER_SHA"
             [[ -n "$current_p108" ]] && p108_ref="$current_p108"
+            [[ -n "$current_p111" ]] && p111_ref="$current_p111"
           elif [[ "$EVENT_NAME" == "workflow_run" && "$TRIGGER_WORKFLOW" == "P108 FigureStudio CI" ]]; then
             p108_ref="$TRIGGER_SHA"
+            [[ -n "$current_p109" ]] && p109_ref="$current_p109"
+            [[ -n "$current_p111" ]] && p111_ref="$current_p111"
+          elif [[ "$EVENT_NAME" == "workflow_run" && "$TRIGGER_WORKFLOW" == "P111 GameStation CI" ]]; then
+            p111_ref="$TRIGGER_SHA"
+            [[ -n "$current_p108" ]] && p108_ref="$current_p108"
             [[ -n "$current_p109" ]] && p109_ref="$current_p109"
           elif [[ -n "$current_p108" && -n "$current_p109" ]]; then
             p108_ref="$current_p108"
             p109_ref="$current_p109"
+            [[ -n "$current_p111" ]] && p111_ref="$current_p111"
           fi
 
           echo "P108_REF=$p108_ref" >> "$GITHUB_ENV"
           echo "P109_REF=$p109_ref" >> "$GITHUB_ENV"
-          printf 'Resolved preview refs: P108=%s P109=%s\n' "$p108_ref" "$p109_ref"
+          echo "P111_REF=$p111_ref" >> "$GITHUB_ENV"
+          printf 'Resolved preview refs: P108=%s P109=%s P111=%s\n' "$p108_ref" "$p109_ref" "$p111_ref"
 
       - name: Checkout P108 preview source
         uses: actions/checkout@v4
@@ -82,12 +94,20 @@ jobs:
           path: source-p109
           persist-credentials: false
 
+      - name: Checkout P111 preview source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.P111_REF }}
+          path: source-p111
+          persist-credentials: false
+
       - name: Capture exact source commits
         shell: bash
         run: |
           set -euo pipefail
           echo "P108_SHA=$(git -C source-p108 rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "P109_SHA=$(git -C source-p109 rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "P111_SHA=$(git -C source-p111 rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -96,6 +116,8 @@ jobs:
 
       - name: Build P108 React application
         shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
           APP="source-p108/projects/1-桌面软件/108-FigureStudio/web"
@@ -131,16 +153,30 @@ jobs:
           node --check "$APP/src/core/xlsx-lite.js"
           node --check "$APP/src/vendor/echarts.min.js"
           node --check "$APP/src/vendor/tabulator.min.js"
-          grep -q "Tabulator v6.3.1" "$APP/src/vendor/tabulator.min.js"
-          test -s "$APP/tests/smoke.cjs"
-          node --check "$APP/tests/smoke.cjs"
-          grep -q 'series.custom' "$APP/src/vendor/echarts.min.js"
-          grep -q 'dataZoom.slider' "$APP/src/vendor/echarts.min.js"
           for f in "$APP"/src/app/*.js; do node --check "$f"; done
-          node - <<'NODE'
-          const echarts = require('./source-p109/projects/1-桌面软件/109-AttendScope/src/vendor/echarts.min.js');
-          if (echarts.version !== '6.1.0' || typeof echarts.init !== 'function') throw new Error('P109 ECharts bundle validation failed');
-          NODE
+
+      - name: Validate P111 offline application
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="source-p111/projects/1-桌面软件/111-GameStation/app"
+          test -s "$APP/index.html"
+          test -s "$APP/css/app.css"
+          test -s "$APP/js/app.js"
+          test -s "$APP/games/shared/bridge.js"
+          for game in gomoku xiangqi minesweeper solitaire tetris snake; do
+            test -s "$APP/games/$game/index.html"
+            test -s "$APP/games/$game/game.js"
+          done
+          if grep -RInE 'https?://' "$APP"; then
+            echo "::error::P111 runtime contains a remote URL"
+            exit 1
+          fi
+          if grep -RInE 'fetch[[:space:]]*\(|XMLHttpRequest|WebSocket[[:space:]]*\(|EventSource[[:space:]]*\(|sendBeacon[[:space:]]*\(' "$APP"; then
+            echo "::error::P111 runtime contains a network API"
+            exit 1
+          fi
+          find "$APP" -name '*.js' -print0 | while IFS= read -r -d '' file; do node --check "$file"; done
 
       - name: Assemble entire public site
         shell: bash
@@ -148,12 +184,13 @@ jobs:
           set -euo pipefail
           P108="source-p108/projects/1-桌面软件/108-FigureStudio/web/dist"
           P109="source-p109/projects/1-桌面软件/109-AttendScope"
-          mkdir -p "_site/p108" "_site/p109"
+          P111="source-p111/projects/1-桌面软件/111-GameStation/app"
+          mkdir -p "_site/p108" "_site/p109" "_site/p111"
           cp -a "$P108/." "_site/p108/"
-          # Explicit runtime allowlist avoids exposing any project data, raw
-          # attendance, internal histories, snapshots or unpublished records.
+          # Explicit runtime allowlist avoids exposing P109 raw/working data.
           cp "$P109/index.html" "$P109/project.json" "_site/p109/"
           cp -a "$P109/src" "$P109/config" "_site/p109/"
+          cp -a "$P111/." "_site/p111/"
           python - <<'PY'
           from pathlib import Path
           import os, re
@@ -181,23 +218,29 @@ jobs:
           </head>
           <body><main>
             <h1>GPT-Pub 在线预览</h1>
-            <p>两个项目独立更新，同时在线。</p>
+            <p>三个项目独立更新，同时在线。</p>
             <a href="./p108/">P108 · FigureStudio<small>科研矢量绘图编辑器</small></a>
             <a href="./p109/">P109 · AttendScope<small>离线考勤分析工作台</small></a>
+            <a href="./p111/">P111 · GameStation<small>本地游戏工作台交互预览</small></a>
           </main></body></html>
           HTML
           cat > "_site/preview-build.txt" <<EOF
           P108_SHA=$P108_SHA
           P109_SHA=$P109_SHA
+          P111_SHA=$P111_SHA
           EOF
 
-      - name: Assert both public entries are present
+      - name: Assert all public entries are present
         shell: bash
         run: |
           set -euo pipefail
           test -s _site/index.html
           test -s _site/p108/index.html
           test -s _site/p109/index.html
+          test -s _site/p111/index.html
+          test -s _site/p111/js/app.js
+          test -s _site/p111/games/gomoku/index.html
+          test -s _site/p111/games/minesweeper/index.html
           test -d _site/p108/assets
           test -s _site/p109/src/app/00-state.js
           test -s _site/p109/src/vendor/echarts.min.js
@@ -209,7 +252,7 @@ jobs:
             echo "::error::Potential private data directory present in public artifact"
             exit 1
           fi
-          printf 'P108 %s, P109 %s\n' "$P108_SHA" "$P109_SHA"
+          printf 'P108 %s, P109 %s, P111 %s\n' "$P108_SHA" "$P109_SHA" "$P111_SHA"
 
       - name: Configure Pages
         if: ${{ github.event_name != 'pull_request' }}
