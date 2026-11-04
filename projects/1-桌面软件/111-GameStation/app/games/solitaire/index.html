@@ -235,7 +235,20 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         </div>
     </div>
 
-    <div id="game" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="board"></div></div>
+    <main class="game-root game-layout solitaire-layout" id="game">
+      <section class="game-main-board"><div class="solitaire-table"><div id="board"></div></div></section>
+      <aside class="game-tools">
+        <div class="game-status" id="solitaireStatus">发牌完成</div>
+        <div class="side-score">
+          <div><span>用时</span><strong id="timer">00:00</strong></div>
+          <div><span>最佳</span><strong id="best-time">--:--</strong></div>
+          <div><span>步数</span><strong id="moveCount">0</strong></div>
+          <div><span>牌堆</span><strong id="stockCount">24</strong></div>
+        </div>
+        <button class="game-btn" id="undoButton" type="button">撤销一步</button>
+        <div class="game-tool-note">红黑交替、点数递减。空列只能放 K；A 起按花色递增收至 K。</div>
+      </aside>
+    </main>
 
     <!-- Non-Blocking Bottom Drawer Menu -->
     <div id="bottom-drawer" class="drawer closed">
