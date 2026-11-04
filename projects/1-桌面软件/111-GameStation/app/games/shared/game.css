@@ -382,3 +382,99 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  width:min(100%,90vh);height:min(100%,90vh);max-width:100%;max-height:100%;
  aspect-ratio:1;align-self:center;justify-self:center;
 }
+
+
+/* P111 R9 · one consistent right rail; the board owns the remaining viewport */
+.game-root.game-layout{
+ display:grid!important;
+ grid-template-columns:minmax(0,1fr) minmax(190px,226px)!important;
+ grid-template-rows:minmax(0,1fr)!important;
+ align-items:stretch!important;justify-items:stretch!important;
+ gap:clamp(9px,1vw,14px)!important;
+ width:100%;height:100%;min-height:0;max-height:100%;
+ padding:clamp(5px,.65vw,9px)!important;
+ overflow:hidden!important;background:#f7f9fb!important;
+}
+.game-root.game-layout>.game-guide{display:none!important}
+.game-root.game-layout>.game-main-board{
+ grid-column:1;grid-row:1;min-width:0;min-height:0;width:100%;height:100%;
+ display:grid;place-items:center;overflow:hidden;
+}
+.game-root.game-layout>.game-tools{
+ grid-column:2;grid-row:1;min-width:0;min-height:0;width:100%;height:100%;
+ display:flex;flex-direction:column;align-items:stretch;gap:10px;
+ padding:12px 10px 10px 14px;border:0;border-left:1px solid #dfe8ee;
+ border-radius:0;background:transparent;overflow-x:hidden;overflow-y:auto;
+ scrollbar-width:none;
+}
+.game-root.game-layout>.game-tools::-webkit-scrollbar{display:none}
+.game-root.game-layout .game-tools-heading{display:none!important}
+.game-root.game-layout .game-status{
+ order:-10;min-height:42px;display:flex;align-items:center;
+ padding:9px 11px;border:1px solid #dce7ee;border-radius:9px;
+ background:#fff;color:#3e5d73;font-size:14px;font-weight:650;line-height:1.45;
+}
+.game-root.game-layout .turn-indicator{
+ order:-11;min-height:42px;padding:8px 10px;border:1px solid #dce7ee;
+ border-radius:9px;background:#fff;
+}
+.game-root.game-layout .side-score,
+.game-root.game-layout .mine-side-stats,
+.game-root.game-layout .tetris-metrics{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:0;border:1px solid #e1e8ed;border-radius:9px;background:#fff;overflow:hidden;
+}
+.game-root.game-layout .side-score>div,
+.game-root.game-layout .mine-side-stats>div,
+.game-root.game-layout .tetris-metrics>div{
+ min-width:0;display:flex;flex-direction:column;align-items:flex-start;
+ gap:3px;padding:9px 10px;border-bottom:1px solid #edf1f4;
+}
+.game-root.game-layout .side-score span,
+.game-root.game-layout .mine-side-stats span,
+.game-root.game-layout .tetris-metrics span{font-size:11px;color:#8498a7}
+.game-root.game-layout .side-score strong,
+.game-root.game-layout .mine-side-stats strong,
+.game-root.game-layout .tetris-metrics strong{font-size:15px;color:#36576e}
+.game-root.game-layout .game-tools .game-btn{
+ width:100%;min-height:37px;height:auto;flex:none;padding:7px 10px;
+ border:1px solid #d8e5ed;border-radius:8px;background:#fff;color:#42647a;
+ font-size:13px;font-weight:650;text-align:center;
+}
+.game-root.game-layout .game-tools .game-btn:hover:not(:disabled){background:#f1f8fc;border-color:#bdd5e4}
+.game-root.game-layout .game-tools .game-btn.primary{background:#e7f3fb;border-color:#c6dfef;color:#176fae}
+.game-root.game-layout .game-tool-note{
+ margin-top:auto;padding:9px 10px;border:1px solid #e3ebf0;border-radius:8px;
+ background:rgba(255,255,255,.65);color:#8496a3;font-size:12px;line-height:1.6;
+}
+.game-root.game-layout.rail-collapsed{grid-template-columns:minmax(0,1fr)!important}
+.game-root.game-layout.rail-collapsed>.game-tools{display:none!important}
+.game-root.game-layout.rail-collapsed>.game-main-board{grid-column:1;width:100%}
+.game-root.game-layout .game-main-board>.board-wrap,
+.game-root.game-layout .game-main-board>.canvas-panel,
+.game-root.game-layout .game-main-board>.game-panel{
+ width:100%;height:100%;max-width:none;max-height:none;min-width:0;min-height:0;
+ padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:hidden;
+}
+.game-root.game-layout .game-main-board>.game-panel{display:grid;place-items:center}
+.game-root.game-layout .game-main-board>.board-wrap{display:grid;place-items:center}
+.game-root.game-layout .game-main-board>.canvas-panel{display:grid;place-items:center}
+.game-root.game-layout .xiangqi-layout .game-main-board>.board-wrap{display:grid;place-items:center}
+@media(max-width:900px){
+ .game-root.game-layout{grid-template-columns:minmax(0,1fr) minmax(158px,184px)!important;gap:7px!important;padding:5px!important}
+ .game-root.game-layout>.game-tools{padding:9px 6px 8px 9px;gap:8px}
+}
+@media(max-width:700px){
+ .game-root.game-layout{grid-template-columns:minmax(0,1fr) minmax(128px,142px)!important;grid-template-rows:minmax(0,1fr)!important;gap:5px!important;padding:4px!important;overflow:hidden!important}
+ .game-root.game-layout>.game-tools{grid-column:2;grid-row:1;padding:7px 4px 6px 7px;gap:6px}
+ .game-root.game-layout .game-status,.game-root.game-layout .turn-indicator{min-height:34px;padding:6px 7px;font-size:11px}
+ .game-root.game-layout .game-tools .game-btn{min-height:31px;padding:5px 6px;font-size:11px}
+ .game-root.game-layout .side-score>div,.game-root.game-layout .mine-side-stats>div,.game-root.game-layout .tetris-metrics>div{padding:6px}
+ .game-root.game-layout .side-score strong,.game-root.game-layout .mine-side-stats strong,.game-root.game-layout .tetris-metrics strong{font-size:13px}
+ .game-root.game-layout .game-tool-note{font-size:10px;padding:6px}
+ .game-root.game-layout.rail-collapsed{grid-template-columns:minmax(0,1fr)!important}
+}
+@media(max-width:380px){
+ .game-root.game-layout{grid-template-columns:minmax(0,1fr) 116px!important}
+ .game-root.game-layout.rail-collapsed{grid-template-columns:minmax(0,1fr)!important}
+}
