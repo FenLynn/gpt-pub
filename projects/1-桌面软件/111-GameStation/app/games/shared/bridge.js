@@ -92,7 +92,7 @@ function safeCall(name,...args){if(typeof handlers[name]==="function")return han
 function safePause(){preserveDuringPause=true;try{safeCall("pause");}finally{preserveDuringPause=false;}}
 function safeResume(){
  preserveDuringPause=false;safeCall("resume");resumeTimers();activityPending=false;
- if(pendingKey){const key=pendingKey;pendingKey=null;window.dispatchEvent(new KeyboardEvent("keydown",{key:key.key,code:key.code,bubbles:true,cancelable:true,shiftKey:key.shiftKey,ctrlKey:key.ctrlKey,altKey:key.altKey,metaKey:key.metaKey}));}
+ if(pendingKey){const key=pendingKey;pendingKey=null;document.dispatchEvent(new KeyboardEvent("keydown",{key:key.key,code:key.code,bubbles:true,cancelable:true,shiftKey:key.shiftKey,ctrlKey:key.ctrlKey,altKey:key.altKey,metaKey:key.metaKey}));}
 }
 function isEditableTarget(target){
  const element=target instanceof Element?target:null;
