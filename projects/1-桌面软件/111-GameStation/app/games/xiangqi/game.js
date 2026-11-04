@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status");
+const el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot");
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
 const values={"帅":10000,"将":10000,"车":900,"马":430,"炮":450,"仕":220,"士":220,"相":220,"象":220,"兵":100,"卒":100};
@@ -23,7 +23,11 @@ function legalMoves(b,side){const out=[];for(let y=0;y<10;y++)for(let x=0;x<9;x+
 function evaluate(b){let score=0;for(let y=0;y<10;y++)for(let x=0;x<9;x++){const p=b[y][x];if(!p)continue;let v=values[p.t]||0;if(p.t==="兵"||p.t==="卒")v+=((p.side==="red"?6-y:y-3)*9)+(x>=2&&x<=6?8:0);if(p.t==="马")v+=(x>=2&&x<=6?18:0);if(p.t==="车")v+=(x>=2&&x<=6?7:0);score+=p.side==="red"?v:-v;}return score;}
 function search(b,side,depth,alpha,beta,ply){if(!findGeneral(b,"red"))return -100000+ply;if(!findGeneral(b,"black"))return 100000-ply;const moves=legalMoves(b,side);if(!moves.length)return side==="red"?-99000+ply:99000-ply;if(depth===0)return evaluate(b);moves.sort((a,c)=>{const av=b[a.ty][a.tx]?values[b[a.ty][a.tx].t]||0:0,cv=b[c.ty][c.tx]?values[b[c.ty][c.tx].t]||0:0;return cv-av;});if(side==="red"){let best=-Infinity;for(const m of moves){const n=clone(b);apply(n,m);best=Math.max(best,search(n,"black",depth-1,alpha,beta,ply+1));alpha=Math.max(alpha,best);if(beta<=alpha)break;}return best;}let best=Infinity;for(const m of moves){const n=clone(b);apply(n,m);best=Math.min(best,search(n,"red",depth-1,alpha,beta,ply+1));beta=Math.min(beta,best);if(beta<=alpha)break;}return best;}
 function chooseAI(){const ms=legalMoves(board,"black");if(!ms.length)return null;const depth=difficulty==="easy"?1:difficulty==="hard"?3:2;let best=Infinity,choices=[];for(const m of ms){const n=clone(board),captured=apply(n,m);let v=search(n,"red",depth-1,-Infinity,Infinity,1);if(captured)v-=0.01;if(v<best){best=v;choices=[m];}else if(v===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
-function report(t){status.textContent=t;GameBridge.report(t);}
+function report(t){
+ status.textContent=t;
+ if(turnText&&turnDot){const side=turn==="red"?"red":"black";turnDot.className="turn-dot "+side;if(over&&/获胜|困毙/.test(t))turnText.textContent=t;else if(/AI 思考中/.test(t))turnText.textContent="黑方正在思考";else turnText.textContent="轮到"+(turn==="red"?"红方":"黑方")+"走";}
+ GameBridge.report(t,{turn,side:turn});
+}
 function render(){el.innerHTML="";const targets=new Set(selectedMoves.map(m=>m.tx+","+m.ty));for(let y=0;y<10;y++)for(let x=0;x<9;x++){const px=flip?8-x:x,py=flip?9-y:y,cell=document.createElement("button");cell.type="button";cell.className="xiangqi-cell";if(selected&&selected.x===px&&selected.y===py)cell.classList.add("selected");if(targets.has(px+","+py))cell.classList.add("target");const p=board[py][px];if(p){const s=document.createElement("span");s.className="xiangqi-piece "+p.side;s.textContent=p.t;cell.appendChild(s);}cell.addEventListener("click",()=>clickCell(px,py));el.appendChild(cell);}}
 function endIfNeeded(){const king=findGeneral(board,turn);if(!king){over=true;const winner=opposite(turn);report(winner==="red"?"红方获胜":"黑方获胜");GameBridge.send("GAME_OVER",{message:winner==="red"?"红方获胜":"黑方获胜",score:winner==="red"?1:0,win:winner==="red"});return true;}const ms=legalMoves(board,turn);if(!ms.length){over=true;const winner=opposite(turn);report(winner==="red"?"红方获胜 · 困毙":"黑方获胜 · 困毙");GameBridge.send("GAME_OVER",{message:winner==="red"?"红方获胜":"黑方获胜",score:winner==="red"?1:0,win:winner==="red"});return true;}return false;}
 function scheduleAI(){clearTimeout(aiTimer);if(paused||over||mode!=="ai"||turn!=="black")return;aiTimer=setTimeout(()=>{if(paused||over||turn!=="black")return;const m=chooseAI();if(!m){endIfNeeded();return;}history.push({board:clone(board),turn});apply(board,m);turn="red";selected=null;selectedMoves=[];render();if(!endIfNeeded())report(inCheck(board,"red")?"红方被将军":"红方回合");},difficulty==="easy"?180:360);}
