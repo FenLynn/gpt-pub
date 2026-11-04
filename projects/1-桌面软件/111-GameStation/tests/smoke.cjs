@@ -156,7 +156,7 @@ const games = [
     const mines = page.frameLocator("#gameFrame");
     assert.equal(await mines.locator(".mine-cell").count(), 256, "default Minesweeper level should be 16×16");
     assert.equal(await mines.locator("#counter").innerText(), "040", "classic mine counter should use three digits");
-    await mines.evaluate(() => { let n=0; Math.random=()=>((n++%256)+0.1)/256; });
+    await mines.locator("body").evaluate(() => { let n=0; Math.random=()=>((n++%256)+0.1)/256; });
     await page.locator("#newGameButton").click();
     await page.locator("#startButton").click();
     await mines.locator(".mine-cell").nth(56).click();
