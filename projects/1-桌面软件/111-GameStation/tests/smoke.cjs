@@ -14,6 +14,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const remoteRequests = [];
   const pageErrors = [];
+  const browserConsole = [];
+  page.on("console", message => browserConsole.push(message.type()+": "+message.text()));
+  page.on("requestfailed", request => browserConsole.push("requestfailed: "+request.url()+" "+request.failure()?.errorText));
   page.on("request", request => {
     if (/^https?:/i.test(request.url())) remoteRequests.push(request.url());
   });
@@ -22,7 +25,15 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
   async function openGame(name) {
     if (await page.locator("#workspaceView").isVisible()) await page.locator("#backToLibrary").click();
     await page.locator(".game-card").filter({ hasText: name }).click();
-    await page.locator("#stageLoading").waitFor({ state: "hidden", timeout: 8000 });
+    try {
+      await page.locator("#stageLoading").waitFor({ state: "hidden", timeout: 8000 });
+    } catch (error) {
+      console.error("iframe src:", await page.locator("#gameFrame").getAttribute("src"));
+      console.error("frame URLs:", page.frames().map(frame => frame.url()));
+      console.error("iframe body:", await page.frameLocator("#gameFrame").locator("body").innerText().catch(e => String(e)));
+      console.error("browser console:", browserConsole);
+      throw error;
+    }
     await page.waitForTimeout(120);
   }
 
