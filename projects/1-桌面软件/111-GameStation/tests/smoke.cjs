@@ -34,6 +34,9 @@ const games = [
 
   async function openGame(name) {
     if (await page.locator("#workspaceView").isVisible()) {
+      const mobileMenu = page.locator("#mobileMenu");
+      const menuOpen = await page.locator("#appShell").evaluate(el => el.classList.contains("menu-open"));
+      if (await mobileMenu.isVisible() && !menuOpen) await mobileMenu.click();
       await page.locator('[data-category="all"]').click();
       currentGame = "host";
     } else {
