@@ -95,8 +95,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 /* Chinese chess: each cell is an intersection, not a square. */
 .xiangqi-layout .game-main-board>.board-wrap{display:grid;place-items:center}
 .xiangqi-board{
-  width:auto;
-  height:100%;
+  width:min(100%,calc(90vh * 9 / 10));
+  height:auto;
   max-width:100%;
   max-height:100%;
   aspect-ratio:9/10;
@@ -143,7 +143,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .mine-side-stats strong,.tetris-metrics strong{color:#3d5b72;font-size:16px;font-weight:740;font-variant-numeric:tabular-nums}
 /* Tetris: continuous fall animation and a clear keyboard legend. */
 .tetris-layout .game-main-board>.canvas-panel{display:grid;place-items:center}
-.tetris-layout .arcade-canvas{height:min(88vh,100%);width:auto;max-width:100%;max-height:100%;aspect-ratio:1/2;border-radius:9px;background:#152536;box-shadow:0 10px 28px rgba(29,48,66,.16);image-rendering:pixelated}
+.tetris-layout .arcade-canvas{width:min(100%,45vh);height:auto;max-width:100%;max-height:90vh;aspect-ratio:1/2;border-radius:9px;background:#152536;box-shadow:0 10px 28px rgba(29,48,66,.16);image-rendering:pixelated}
 .tetris-layout .game-status{margin-bottom:3px}
 .tetris-metrics{margin-top:2px}
 @media(max-width:900px){
@@ -180,47 +180,47 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .side-score span{color:#8798a5;font-size:12px}
 .side-score strong{color:#3d5b72;font-size:16px;font-weight:740;font-variant-numeric:tabular-nums}
 .gomoku-layout .game-main-board>.board-wrap{display:grid;place-items:center}
-.gomoku-layout .gomoku-board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1;flex:none}.gomoku-layout .gomoku-cell{width:100%;height:100%}
-.reversi-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(8,minmax(0,1fr))!important}
+.gomoku-layout .gomoku-board{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;flex:none}.gomoku-layout .gomoku-cell{width:100%;height:100%}
+.reversi-layout #board{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(8,minmax(0,1fr))!important}
 .reversi-layout #board .game-cell{width:auto!important;height:auto!important;border-radius:0!important}
-.connect4-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:7/6;grid-template-columns:repeat(7,minmax(0,1fr))!important}
+.connect4-layout #board{width:min(100%,calc(90vh * 7 / 6));height:auto;max-width:100%;max-height:100%;aspect-ratio:7/6;grid-template-columns:repeat(7,minmax(0,1fr))!important}
 .connect4-layout #board .game-cell{width:auto!important;height:auto!important;border-radius:50%!important}
-.checkers-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(8,minmax(0,1fr))!important}
+.checkers-layout #board{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(8,minmax(0,1fr))!important}
 .checkers-layout #board .game-cell{width:auto!important;height:auto!important}
-.game2048-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.game2048-layout #board{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .game2048-layout #board .tile{width:auto!important;height:auto!important;aspect-ratio:1}
-.memory-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1}
+.memory-layout #board{width:min(100%,88vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1}
 .memory-layout #board .game-cell{width:auto!important;height:auto!important;aspect-ratio:1}
-.sudoku-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(9,minmax(0,1fr))!important}
+.sudoku-layout #board{width:min(100%,90vh);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(9,minmax(0,1fr))!important}
 .sudoku-layout #board .game-cell{width:auto!important;height:auto!important;aspect-ratio:1}
 .sudoku-layout .number-pad{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;justify-content:stretch}
 .sudoku-layout .number-pad button{width:100%;height:35px}
-.sokoban-layout #board{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:9/7;grid-template-columns:repeat(9,minmax(0,1fr))!important}
+.sokoban-layout #board{width:min(100%,calc(90vh * 9 / 7));height:auto;max-width:100%;max-height:100%;aspect-ratio:9/7;grid-template-columns:repeat(9,minmax(0,1fr))!important}
 .sokoban-layout #board .game-cell{width:auto!important;height:auto!important}
 .battleship-layout .game-main-board{overflow:auto}
 .fleet-boards{width:100%;height:100%;display:flex;align-items:center;justify-content:center;gap:clamp(12px,2vw,26px)}
 .fleet-board{min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px}
 .fleet-title{color:#71889a;font-size:13px;font-weight:650;text-align:center}
-.battleship-layout .fleet-board .game-grid{width:auto;height:min(45vh,100%);max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(10,minmax(0,1fr))!important;gap:1px}
+.battleship-layout .fleet-board .game-grid{width:min(46vh,100%);height:auto;max-width:100%;max-height:100%;aspect-ratio:1;grid-template-columns:repeat(10,minmax(0,1fr))!important;gap:1px}
 .battleship-layout .fleet-board .game-cell{width:auto!important;height:auto!important;min-width:0;min-height:0;font-size:clamp(10px,1.5vh,14px)}
 .pong-layout .game-main-board>.canvas-panel,.snake-layout .game-main-board>.canvas-panel,.contra-layout .game-main-board>.canvas-panel{display:grid;place-items:center}
-.pong-layout .arcade-canvas{height:100%;width:auto;max-width:100%;max-height:100%;aspect-ratio:16/9}
-.snake-layout .arcade-canvas{height:100%;width:auto;max-width:100%;max-height:100%;aspect-ratio:1}
-.contra-layout .arcade-canvas{width:auto;height:100%;max-width:100%;max-height:100%;aspect-ratio:16/9;border-radius:10px;outline:1px solid #dbe4ea;box-shadow:0 10px 28px rgba(29,48,66,.14)}
+.pong-layout .arcade-canvas{width:min(100%,calc(90vh * 16 / 9));height:auto;max-width:100%;max-height:90vh;aspect-ratio:16/9}
+.snake-layout .arcade-canvas{width:min(100%,90vh);height:auto;max-width:100%;max-height:90vh;aspect-ratio:1}
+.contra-layout .arcade-canvas{width:min(100%,calc(90vh * 16 / 9));height:auto;max-width:100%;max-height:90vh;aspect-ratio:16/9;border-radius:10px;outline:1px solid #dbe4ea;box-shadow:0 10px 28px rgba(29,48,66,.14)}
 @media(max-width:900px){
- .gomoku-layout .gomoku-board{width:auto;height:100%}
+ .gomoku-layout .gomoku-board{width:min(100%,88vh);height:auto}
  .fleet-boards{gap:9px}
- .battleship-layout .fleet-board .game-grid{width:min(38vh,calc((100vw - 400px)/2))}
+ .battleship-layout .fleet-board .game-grid{width:min(38vh,calc((100vw - 400px)/2));height:auto}
 }
 @media(max-width:700px){
  .game-root.game-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
  .side-score{grid-template-columns:repeat(2,minmax(0,1fr))}
  .side-score>div{padding:8px}
  .fleet-boards{gap:6px}
- .battleship-layout .fleet-board .game-grid{width:min(42vw,32vh)}
+ .battleship-layout .fleet-board .game-grid{width:min(42vw,32vh);height:auto}
  .fleet-title{font-size:10px}
  .sudoku-layout .number-pad{grid-template-columns:repeat(5,minmax(0,1fr))}
- .pong-layout .arcade-canvas{height:min(54vh,100%)}
- .snake-layout .arcade-canvas{height:min(54vh,100%)}
+ .pong-layout .arcade-canvas{width:min(100%,calc(54vh * 16 / 9));height:auto;max-height:54vh}
+ .snake-layout .arcade-canvas{width:min(100%,54vh);height:auto;max-height:54vh}
  .contra-layout .arcade-canvas{width:100%;height:auto;max-height:54vh}
 }
