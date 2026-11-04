@@ -319,10 +319,17 @@ const games = [
 
     await openGame("扫雷");
     const mobileMines = page.frameLocator("#gameFrame");
+    const mobileToolbar = await page.evaluate(() => {
+      const menu = document.querySelector("#mobileMenu").getBoundingClientRect();
+      const controls = document.querySelector("#gameControls").getBoundingClientRect();
+      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsHeight: controls.height };
+    });
+    assert.ok(mobileToolbar.controlsHeight > 0 && mobileToolbar.controlsTop >= mobileToolbar.menuBottom - 2, "mobile mode controls must not cover the menu button");
+    await page.locator("#difficultyControl button[data-difficulty='hard']").click();
     const mobileMineFit = await mobileMines.locator(".mine-classic").evaluate(el => ({
       board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect()
     }));
-    assert.ok(mobileMineFit.board.width <= mobileMineFit.area.width + 2, "mobile Minesweeper board should fit its available width");
+    assert.ok(mobileMineFit.board.width <= mobileMineFit.area.width + 2, "mobile hard Minesweeper board should fit its available width");
     await openGame("贪吃蛇");
     const mobileSnake = page.frameLocator("#gameFrame");
     const mobileSnakeCanvas = mobileSnake.locator("#canvas");
