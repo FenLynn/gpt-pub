@@ -16,7 +16,7 @@ function lock(){piece.shape.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)
 function tick(){if(paused||over)return;const p={...piece,y:piece.y+1};if(!collision(p))piece=p;else lock();draw();}
 function configure(v){difficulty=v||"normal";baseSpeed=difficulty==="easy"?650:difficulty==="hard"?300:480;}
 function newGame(){stop();grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;piece=randomPiece();updateScore();setStatus("游戏进行中");run();draw();canvas.focus();}
-function pause(){paused=true;stop();setStatus("已暂停");draw();}
+function pause(){paused=true;setStatus("已暂停");draw();}
 function resume(){if(over)return;paused=false;setStatus("游戏进行中");run();draw();}
 function move(dx,dy){if(paused||over)return;const p={...piece,x:piece.x+dx,y:piece.y+dy};if(!collision(p)){piece=p;draw();}else if(dy>0)lock();}
 function hardDrop(){if(paused||over)return;while(!collision({...piece,y:piece.y+1}))piece.y++;lock();draw();}
