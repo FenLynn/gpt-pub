@@ -62,7 +62,8 @@ function configure(value){difficulty=value||"normal";baseSpeed=difficulty==="eas
 function newGame(){
  stop();grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;dropAccumulator=0;piece=randomPiece();updateScore();setStatus("游戏进行中");run();draw();canvas.focus();
 }
-function pause(){if(paused)return;paused=true;stop();setStatus("已暂停");draw();}
+function pause(){if(paused)return;paused=true;setStatus("已暂停");draw();}
+function pauseLocal(){if(paused)return;paused=true;stop();setStatus("已暂停");draw();}
 function resume(){if(over)return;paused=false;setStatus("游戏进行中");run();draw();canvas.focus();}
 function move(dx,dy){
  if(paused||over)return;
@@ -78,7 +79,7 @@ function hardDrop(){
 }
 function onKeyDown(event){
  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(event.key))event.preventDefault();
- if(event.key==="p"||event.key==="P"){if(paused)resume();else pause();return;}
+ if(event.key==="p"||event.key==="P"){if(paused)resume();else pauseLocal();return;}
  if(paused||over)return;
  if(event.key==="ArrowLeft")move(-1,0);
  else if(event.key==="ArrowRight")move(1,0);
@@ -94,6 +95,6 @@ GameBridge.register({
  pause,
  resume,
  setDifficulty(value){configure(value);},
- dispose(){pause();window.removeEventListener("keydown",onKeyDown);}
+ dispose(){paused=true;stop();window.removeEventListener("keydown",onKeyDown);}
 });
 })();
