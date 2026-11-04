@@ -33,7 +33,7 @@ jobs:
           git fetch origin main
           while IFS= read -r file; do
             case "$file" in
-              projects/1-桌面软件/111-GameStation/*|.github/workflows/p111-gamestation-ci.yml|目录.md|projects/1-桌面软件/README.md)
+              projects/1-桌面软件/111-GameStation/*|.github/workflows/p111-gamestation-ci.yml|.github/workflows/repository-pages.yml|docs/repository-pages.md|目录.md|projects/1-桌面软件/README.md)
                 ;;
               *)
                 echo "::error file=$file::P111 branch contains an out-of-scope change"
