@@ -60,7 +60,8 @@ const games = [
       });
       assert.ok(frameLayout.width > 200 && frameLayout.height > 250, name + " should receive a usable game area");
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
-      const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-");
+      const viewport=page.viewportSize();
+      const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
       await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/games/"+screenshotName+".png")});
       await page.keyboard.press("p");
       await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "继续");
