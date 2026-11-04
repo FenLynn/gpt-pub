@@ -226,15 +226,6 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
 </head>
 <body data-game="solitaire">
 
-    <div class="header">
-        <h1>SOLITAIRE</h1>
-        <div class="stats">
-            <button class="refresh-btn" onclick="initGame()" title="New Game">↻</button>
-            <span>TIME: <b id="timer">00:00</b></span>
-            <span>BEST: <b id="best-time">--:--</b></span>
-        </div>
-    </div>
-
     <main class="game-root game-layout solitaire-layout" id="game">
       <section class="game-main-board"><div class="solitaire-table"><div id="board"></div></div></section>
       <aside class="game-tools">
