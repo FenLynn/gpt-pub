@@ -113,12 +113,12 @@ const games = [
     const pong = page.frameLocator("#gameFrame");
     assert.ok(await pong.locator("canvas").isVisible());
     await page.locator("#pauseButton").click();
-    const pausedAt = await page.locator("#gameElapsed").innerText();
+    const pongPausedAt = await page.locator("#gameElapsed").innerText();
     await page.waitForTimeout(1200);
-    assert.equal(await page.locator("#gameElapsed").innerText(), pausedAt, "paused game time must stop");
+    assert.equal(await page.locator("#gameElapsed").innerText(), pongPausedAt, "paused game time must stop");
     await page.locator("#startButton").click();
 
-    await openGame("横版射击");
+    await openGame("魂斗罗（原创模式）");
     const contra = page.frameLocator("#gameFrame");
     assert.ok(await contra.locator("canvas").isVisible());
 
