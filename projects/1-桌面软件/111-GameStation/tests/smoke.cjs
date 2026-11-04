@@ -179,6 +179,20 @@ const games = [
     await page.locator("#modeControl button[data-mode-index='0']").click();
     await page.locator("#startButton").click();
     const gomokuCellBox = await gomoku.locator(".gomoku-cell").nth(112).boundingBox();
+    if(!gomokuCellBox){
+      const gomokuLayout = await gomoku.locator("#game").evaluate(root => {
+        const selectors=["#game",".game-main-board",".board-wrap","#board",".gomoku-cell"];
+        return selectors.map(selector=>{
+          const el=root.querySelector(selector);
+          if(!el)return {selector,missing:true};
+          const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
+          return {selector,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},display:style.display,visibility:style.visibility,overflow:style.overflow,position:style.position};
+        });
+      });
+      console.error("GOMOKU_LAYOUT "+JSON.stringify(gomokuLayout));
+      await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
+      await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/gomoku-layout-failure.png")});
+    }
     assert.ok(gomokuCellBox && gomokuCellBox.width > 0 && gomokuCellBox.height > 0, "Gomoku intersections must be visible and clickable");
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
