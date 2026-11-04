@@ -2,112 +2,178 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7fa">
-  <title>GameStation · 本地游戏工作台</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#151b28">
+  <title>GameStation · 个人游戏工作台</title>
   <link rel="stylesheet" href="./css/app.css">
 </head>
 <body>
-  <div class="app-shell" id="appShell">
-    <aside class="sidebar" id="sidebar">
-      <a class="brand" href="./index.html" aria-label="GameStation 首页">
-        <span class="brand-mark"><i></i><i></i><i></i><i></i></span>
-        <span><strong>GameStation</strong><small>LOCAL PLAYGROUND</small></span>
-      </a>
-      <div class="side-section">
-        <div class="side-label">工作台</div>
-        <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span><span>游戏库</span><kbd>⌘ 1</kbd></button>
-        <button class="nav-item" data-view="recent"><span class="nav-icon">◷</span><span>最近游玩</span></button>
-        <button class="nav-item" data-view="favorites"><span class="nav-icon">☆</span><span>我的收藏</span></button>
+<div class="app-shell" id="appShell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="./index.html" aria-label="GameStation 首页">
+      <span class="brand-mark"><i></i><i></i><i></i><i></i></span>
+      <span class="brand-copy"><strong>GameStation</strong><small>YOUR LOCAL ARCADE</small></span>
+    </a>
+    <div class="side-caption">工作台</div>
+    <nav class="primary-nav" aria-label="主导航">
+      <button class="nav-item active" data-view="home"><span class="nav-symbol">⌂</span><span>游戏库</span><kbd>01</kbd></button>
+      <button class="nav-item" data-view="recent"><span class="nav-symbol">◷</span><span>最近游玩</span></button>
+      <button class="nav-item" data-view="favorites"><span class="nav-symbol">☆</span><span>我的收藏</span></button>
+    </nav>
+    <div class="side-divider"></div>
+    <div class="side-caption">探索分类</div>
+    <nav class="category-nav" aria-label="游戏分类">
+      <button class="category-item active" data-category="all"><span class="category-symbol all">✣</span><span>全部游戏</span><b id="count-all">19</b></button>
+      <button class="category-item" data-category="board"><span class="category-symbol board">♟</span><span>棋类对战</span><b id="count-board">6</b></button>
+      <button class="category-item" data-category="puzzle"><span class="category-symbol puzzle">▦</span><span>益智解谜</span><b id="count-puzzle">5</b></button>
+      <button class="category-item" data-category="arcade"><span class="category-symbol arcade">◈</span><span>街机动作</span><b id="count-arcade">4</b></button>
+      <button class="category-item" data-category="card"><span class="category-symbol card">♣</span><span>卡牌桌游</span><b id="count-card">4</b></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="offline-panel">
+        <span class="offline-orbit"><i></i></span>
+        <div><strong>完全离线运行</strong><small>无需账号 · 无需联网</small></div>
+        <span class="offline-check">✓</span>
       </div>
-      <div class="side-section">
-        <div class="side-label">游戏分类</div>
-        <button class="nav-item category active" data-category="all"><span class="category-dot all"></span><span>全部游戏</span><b>6</b></button>
-        <button class="nav-item category" data-category="board"><span class="category-dot board"></span><span>棋类对战</span></button>
-        <button class="nav-item category" data-category="puzzle"><span class="category-dot puzzle"></span><span>益智休闲</span></button>
-        <button class="nav-item category" data-category="arcade"><span class="category-dot arcade"></span><span>经典街机</span></button>
-      </div>
-      <div class="sidebar-bottom">
-        <div class="offline-card"><span class="offline-dot"></span><div><strong>本地运行</strong><small>无需账号 · 无需联网</small></div></div>
-        <button class="nav-item" id="settingsButton"><span class="nav-icon">⚙</span><span>使用说明</span></button>
-      </div>
-    </aside>
+      <button class="nav-item settings-link" id="settingsButton"><span class="nav-symbol">⚙</span><span>使用说明</span></button>
+      <div class="sidebar-foot">PERSONAL PLAYGROUND <span>·</span> v0.x</div>
+    </div>
+  </aside>
 
-    <main class="main-area">
-      <header class="topbar">
-        <div class="breadcrumbs"><span>GameStation</span><span class="crumb-sep">/</span><strong id="breadcrumbCurrent">游戏库</strong></div>
-        <div class="top-actions">
-          <span class="preview-chip"><span></span>交互预览版</span>
-          <button class="icon-button" id="feedbackOpen" title="提交体验反馈" aria-label="提交体验反馈">✎</button>
-          <button class="avatar-button" title="本地体验">G</button>
-        </div>
-      </header>
+  <main class="main-area">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu" id="mobileMenu" aria-label="打开导航">☰</button>
+        <div class="breadcrumbs"><span>GameStation</span><i>/</i><strong id="breadcrumbCurrent">游戏库</strong></div>
+      </div>
+      <div class="topbar-actions">
+        <span class="local-indicator"><i></i>本地工作区</span>
+        <button class="top-icon" id="feedbackOpen" title="提交体验反馈" aria-label="提交体验反馈">✎</button>
+        <button class="profile-mark" title="个人游戏空间">G</button>
+      </div>
+    </header>
 
-      <section class="home-view view-panel" id="homeView">
-        <div class="welcome-row">
-          <div>
-            <div class="eyebrow">YOUR PERSONAL ARCADE</div>
-            <h1>想玩点什么？</h1>
-            <p class="muted">一个入口，收藏你喜欢的经典游戏。所有内容都在本地运行。</p>
+    <section class="home-view view-panel" id="homeView">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="hero-kicker"><span></span> YOUR PERSONAL ARCADE</div>
+          <h1>好游戏，<em>随时开局。</em></h1>
+          <p>把喜欢的经典游戏收进一个地方。没有账号、广告和网络依赖，打开即玩。</p>
+          <div class="hero-actions">
+            <button class="hero-primary" id="randomGame">随便玩一局 <span>↗</span></button>
+            <button class="hero-secondary" id="browseGames">浏览全部游戏</button>
           </div>
-          <div class="welcome-art" aria-hidden="true"><span>♟</span><span>▦</span><span>◉</span></div>
+          <div class="hero-stats">
+            <div><strong id="heroTotal">19</strong><span>款游戏</span></div>
+            <i></i>
+            <div><strong id="heroPlayable">15</strong><span>可运行模块</span></div>
+            <i></i>
+            <div><strong>100%</strong><span>本地运行</span></div>
+          </div>
         </div>
-        <div class="section-heading">
-          <div><h2>游戏库</h2><p>首批 6 款体验模块</p></div>
-          <div class="view-tools"><label class="search-box"><span>⌕</span><input id="gameSearch" type="search" placeholder="搜索游戏…" autocomplete="off"></label><button class="view-toggle active" aria-label="网格视图">▦</button></div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-glow"></div>
+          <div class="art-card art-card-back"><span>♟</span></div>
+          <div class="art-card art-card-mid"><span>2048</span><i>2</i><i>4</i><i>8</i></div>
+          <div class="art-card art-card-front"><span>GAME</span><strong>STATION</strong><div class="art-dots"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
         </div>
-        <div class="game-grid" id="gameGrid"></div>
-        <div class="bottom-note"><span class="note-icon">i</span><span>当前为交互原型：部分游戏已可完整试玩，部分仍在验证规则与 AI。你的反馈会直接用于下一轮迭代。</span></div>
+        <div class="hero-index">01 <span>/</span> 04</div>
       </section>
 
-      <section class="workspace-view view-panel hidden" id="workspaceView">
-        <div class="workspace-heading">
-          <div class="workspace-title">
-            <button class="back-button" id="backToLibrary" title="返回游戏库">←</button>
-            <div><div class="eyebrow" id="gameCategoryLabel">BOARD GAME</div><h1 id="activeGameTitle">五子棋</h1><p class="muted" id="activeGameDescription"></p></div>
+      <section class="library-section" id="librarySection">
+        <div class="library-heading">
+          <div>
+            <div class="section-kicker">THE COLLECTION</div>
+            <div class="section-title-row"><h2 id="libraryTitle">游戏库</h2><span class="collection-count" id="libraryCount">19 款游戏</span></div>
+            <p id="librarySubtitle">从经典棋类到街机挑战，挑一款开始。</p>
           </div>
-          <div class="workspace-actions">
-            <label class="difficulty-control hidden" id="difficultyControl">难度 <select id="difficultySelect"><option value="easy">简单</option><option value="normal" selected>中等</option><option value="hard">困难</option></select></label>
-            <button class="secondary-button" id="pauseButton">Ⅱ 暂停</button>
-            <button class="primary-button" id="newGameButton">↻ 新游戏</button>
-            <span class="action-divider"></span>
-            <button class="icon-button" id="immersiveButton" title="沉浸模式" aria-label="沉浸模式">⛶</button>
-            <button class="icon-button" id="fullscreenButton" title="浏览器全屏" aria-label="浏览器全屏">⛶</button>
+          <div class="library-tools">
+            <label class="search-box"><span>⌕</span><input id="gameSearch" type="search" placeholder="搜索游戏名称…" autocomplete="off"><kbd>/</kbd></label>
+            <div class="view-switch" role="group" aria-label="游戏视图">
+              <button class="view-toggle active" data-layout="grid" aria-label="网格视图">▦</button>
+              <button class="view-toggle" data-layout="list" aria-label="列表视图">☷</button>
+            </div>
           </div>
         </div>
+        <div class="filter-row">
+          <div class="filter-pills" role="group" aria-label="游戏状态">
+            <button class="filter-pill active" data-status="all">全部</button>
+            <button class="filter-pill" data-status="ready">可直接游玩</button>
+            <button class="filter-pill" data-status="prototype">体验原型</button>
+            <button class="filter-pill" data-status="planned">待完善</button>
+          </div>
+          <span class="sort-label">按推荐顺序排列 <span>⌄</span></span>
+        </div>
+        <div class="game-grid" id="gameGrid" aria-live="polite"></div>
+        <div class="empty-state hidden" id="emptyState"><span>⌕</span><strong>没有找到匹配的游戏</strong><p>换个关键词，或试试其他分类。</p><button id="clearFilters">清除筛选</button></div>
+        <footer class="library-footer"><span>GAMESTATION LIBRARY</span><span>所有游戏均在本机运行 <i>·</i> 玩家数据不上传</span></footer>
+      </section>
+    </section>
+
+    <section class="workspace-view view-panel hidden" id="workspaceView">
+      <div class="workspace-toolbar">
+        <div class="workspace-heading">
+          <button class="back-button" id="backToLibrary" aria-label="返回游戏库">←</button>
+          <div class="workspace-title-wrap"><div class="workspace-eyebrow" id="gameCategoryLabel">BOARD GAME</div><h1 id="activeGameTitle">五子棋</h1><p id="activeGameDescription">经典五连棋</p></div>
+        </div>
+        <div class="workspace-actions">
+          <label class="difficulty-control hidden" id="difficultyControl">AI 难度
+            <select id="difficultySelect"><option value="easy">简单</option><option value="normal" selected>中等</option><option value="hard">困难</option></select>
+          </label>
+          <button class="tool-button" id="pauseButton">Ⅱ <span>暂停</span></button>
+          <button class="tool-button primary" id="newGameButton">↻ <span>新游戏</span></button>
+          <span class="toolbar-divider"></span>
+          <button class="square-tool" id="immersiveButton" title="沉浸工作区" aria-label="沉浸工作区">⛶</button>
+          <button class="square-tool" id="fullscreenButton" title="浏览器全屏" aria-label="浏览器全屏">⛶</button>
+        </div>
+      </div>
+      <div class="workspace-layout">
         <div class="game-stage-wrap">
           <div class="game-stage" id="gameStage">
-            <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在加载游戏…</span></div>
+            <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在载入游戏模块…</span></div>
             <iframe id="gameFrame" title="GameStation 游戏工作区" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
           </div>
           <div class="stage-footer"><span class="stage-state"><i id="stateDot"></i><span id="stageStateText">等待游戏启动</span></span><span id="stageMeta">本地模块 · 独立运行</span></div>
         </div>
-      </section>
-
-      <section class="help-view view-panel hidden" id="helpView">
-        <div class="eyebrow">QUICK GUIDE</div><h1>使用说明</h1>
-        <div class="help-card"><h3>这是一个什么版本？</h3><p>这是 GameStation 的第一阶段交互原型，用于验证主页布局、游戏切换、模块通信、沉浸模式和浏览器全屏。它不是正式发行版。</p></div>
-        <div class="help-card"><h3>完全离线</h3><p>网页不加载 CDN、在线字体、远程图片或第三方在线服务。Pages 只是供你在线体验预览；程序设计目标仍是下载后断网本地运行。</p></div>
-        <div class="help-card"><h3>当前游戏完成度</h3><p>五子棋、扫雷、俄罗斯方块和贪吃蛇提供可操作试玩；中国象棋和纸牌目前是交互样例，规则完整性尚未验收。</p></div>
-        <div class="help-card"><h3>如何反馈？</h3><p>点击右上角的铅笔按钮，选择问题类型并描述体验。反馈内容不会自动上传；你可以复制后发回本次对话。</p></div>
-      </section>
-    </main>
-  </div>
-
-  <div class="feedback-backdrop hidden" id="feedbackBackdrop">
-    <section class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
-      <div class="modal-heading"><div><div class="eyebrow">HELP US IMPROVE</div><h2 id="feedbackTitle">体验反馈</h2></div><button class="icon-button" id="feedbackClose" aria-label="关闭">×</button></div>
-      <p class="muted">告诉我哪里好用、哪里别扭，或你希望增加什么。反馈仅在本机整理，不会自动上传。</p>
-      <label class="field-label" for="feedbackType">反馈类型</label>
-      <select id="feedbackType" class="full-field"><option>界面与布局</option><option>操作与交互</option><option>游戏规则或 AI</option><option>性能或兼容性</option><option>新功能建议</option></select>
-      <label class="field-label" for="feedbackText">具体意见</label>
-      <textarea id="feedbackText" class="full-field feedback-textarea" rows="5" placeholder="例如：左侧导航太宽；希望象棋支持悔棋；在 1366px 屏幕上游戏区域太小……"></textarea>
-      <div class="feedback-context" id="feedbackContext">当前页面：游戏库</div>
-      <div class="modal-actions"><button class="secondary-button" id="feedbackCancel">取消</button><button class="primary-button" id="feedbackCopy">复制反馈</button></div>
-      <div class="feedback-hint" id="feedbackHint" aria-live="polite"></div>
+        <aside class="game-side-info">
+          <div class="info-block"><div class="info-label">NOW PLAYING</div><div class="info-game-icon" id="infoGameIcon">⚫</div><h3 id="infoGameName">五子棋</h3><p id="infoGameDescription">经典五连棋 · 黑棋先行</p></div>
+          <div class="info-divider"></div>
+          <div class="info-block"><div class="info-label">游戏信息</div><div class="info-row"><span>分类</span><strong id="infoCategory">棋类对战</strong></div><div class="info-row"><span>模式</span><strong id="infoModes">双人 / 人机</strong></div><div class="info-row"><span>运行方式</span><strong>本地离线</strong></div></div>
+          <div class="info-divider"></div>
+          <div class="info-block"><div class="info-label">操作提示</div><p class="info-tip" id="infoTip">点击棋盘交叉点落子。可在游戏内切换对战模式。</p></div>
+          <div class="info-bottom"><span class="mini-status-dot"></span><span>此模块独立运行</span></div>
+        </aside>
+      </div>
     </section>
-  </div>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./js/app.js"></script>
+
+    <section class="help-view view-panel hidden" id="helpView">
+      <div class="section-kicker">QUICK GUIDE</div><h1>使用说明</h1>
+      <div class="help-grid">
+        <article class="help-card"><span>01</span><h3>完全离线</h3><p>主页、游戏逻辑和资源均随程序本地提供。GitHub Pages 仅用于在线预览，不是正常运行的依赖。</p></article>
+        <article class="help-card"><span>02</span><h3>独立游戏模块</h3><p>每款游戏独立运行，切换游戏时会释放旧模块，避免计时器、动画和键盘事件残留。</p></article>
+        <article class="help-card"><span>03</span><h3>三种工作模式</h3><p>普通工作区保留导航；沉浸工作区隐藏导航；浏览器全屏由浏览器控制，可按 Esc 退出。</p></article>
+        <article class="help-card"><span>04</span><h3>玩家数据</h3><p>收藏与最近游玩保存在当前浏览器本地。完整存档、跨设备备份和恢复功能仍在后续开发。</p></article>
+      </div>
+      <div class="help-note"><strong>开发状态说明</strong><p>“可直接游玩”表示当前模块具备完整的基本玩法；“体验原型”表示入口和核心交互已接入，但规则、AI 或素材仍需继续完善。不要将原型状态理解为正式发行质量。</p></div>
+    </section>
+  </main>
+</div>
+
+<div class="feedback-backdrop hidden" id="feedbackBackdrop">
+  <section class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+    <div class="modal-heading"><div><div class="section-kicker">SEND FEEDBACK</div><h2 id="feedbackTitle">体验反馈</h2></div><button class="top-icon" id="feedbackClose" aria-label="关闭">×</button></div>
+    <p>告诉我哪里好用、哪里别扭，或你希望增加什么。反馈只在本机整理，不会自动上传。</p>
+    <label class="field-label" for="feedbackType">反馈类型</label>
+    <select id="feedbackType" class="full-field"><option>界面与布局</option><option>操作与交互</option><option>游戏规则或 AI</option><option>性能或兼容性</option><option>新游戏建议</option></select>
+    <label class="field-label" for="feedbackText">具体意见</label>
+    <textarea id="feedbackText" class="full-field" rows="5" placeholder="例如：游戏卡片太密；希望增加悔棋；窄屏下棋盘太小……"></textarea>
+    <div class="feedback-context" id="feedbackContext">当前页面：游戏库</div>
+    <div class="modal-actions"><button class="tool-button" id="feedbackCancel">取消</button><button class="tool-button primary" id="feedbackCopy">复制反馈</button></div>
+    <div class="feedback-hint" id="feedbackHint" aria-live="polite"></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="./js/app.js"></script>
 </body>
 </html>
