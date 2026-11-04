@@ -181,6 +181,8 @@ const games = [
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "本机双人");
     await page.locator("#modeControl button[data-mode-index='0']").click();
     await page.locator("#startButton").click();
+    const gomokuBoardBox = await gomoku.locator(".gomoku-board").boundingBox();
+    assert.ok(gomokuBoardBox && Math.abs(gomokuBoardBox.width-gomokuBoardBox.height)<1, "Gomoku board must remain square while filling the available area");
     const gomokuCellBox = await gomoku.locator(".gomoku-cell").nth(112).boundingBox();
     if(!gomokuCellBox){
       const gomokuLayout = await gomoku.locator("#game").evaluate(root => {
