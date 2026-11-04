@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 const games = [
   "五子棋","中国象棋","黑白棋","四子棋","海战棋","国际跳棋",
   "扫雷","2048","记忆翻牌","数独","推箱子",
-  "俄罗斯方块","贪吃蛇","Pong","横版射击",
+  "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）",
   "经典纸牌","斗地主","麻将","三国杀"
 ];
 
@@ -165,13 +165,15 @@ const games = [
 
     await openGame("麻将");
     const mahjong = page.frameLocator("#gameFrame");
-    await mahjong.locator("#draw").click();
-    assert.equal(await mahjong.locator(".playing-card").count(), 14);
+    assert.equal(await mahjong.locator("#hand .playing-card").count(), 14, "dealer should start with 14 Mahjong tiles");
+    await mahjong.locator("#hand .playing-card").last().click();
+    assert.equal(await mahjong.locator("#hand .playing-card").count(), 13, "discarding should reduce the concealed hand to 13 tiles");
 
     await openGame("三国杀");
     const sanguosha = page.frameLocator("#gameFrame");
-    assert.equal(await sanguosha.locator(".playing-card").count(), 4);
+    assert.equal(await sanguosha.locator(".playing-card").count(), 6, "Xiao Qiao should start with four cards plus two for the first turn");
     await sanguosha.locator("#endTurn").click();
+    await page.waitForTimeout(150);
 
     await page.locator('[data-category="all"]').click();
     await page.setViewportSize({ width: 390, height: 844 });
