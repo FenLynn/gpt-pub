@@ -74,6 +74,7 @@ function disposeTimers(){
   }
  }
  timers.clear();
+ window.removeEventListener("keydown",handleHostShortcut,true);
 }
 window.setTimeout=function(callback,delay,...args){return createTimer("timeout",callback,delay,args);};
 window.clearTimeout=cancelTimer;
@@ -89,6 +90,26 @@ function report(status,extra={}){send("STATE",{status,...extra});}
 function safeCall(name,...args){if(typeof handlers[name]==="function")return handlers[name](...args);}
 function safePause(){preserveDuringPause=true;try{safeCall("pause");}finally{preserveDuringPause=false;}}
 function safeResume(){preserveDuringPause=false;safeCall("resume");resumeTimers();}
+function isEditableTarget(target){
+ const element=target instanceof Element?target:null;
+ return !!element&&(element.matches("input,textarea,select")||element.isContentEditable||!!element.closest("[contenteditable='true']"));
+}
+function isInteractiveTarget(target){
+ const element=target instanceof Element?target:null;
+ return !!element&&!!element.closest("button,a,[role='button']");
+}
+function handleHostShortcut(event){
+ if(disposed||!sessionId||event.repeat||isEditableTarget(event.target))return;
+ let action=null;
+ if(event.key==="Enter"&&!isInteractiveTarget(event.target))action="start";
+ else if(event.key.toLowerCase()==="p")action="pause";
+ if(!action)return;
+ event.preventDefault();
+ event.stopPropagation();
+ event.stopImmediatePropagation();
+ send("HOTKEY",{action});
+}
+window.addEventListener("keydown",handleHostShortcut,true);
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
