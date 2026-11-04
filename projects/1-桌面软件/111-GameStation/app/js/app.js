@@ -16,7 +16,7 @@ const games=[
 {id:"snake",name:"贪吃蛇",category:"arcade",categoryName:"街机",icon:"〰",description:"吃到食物增长，避免碰撞。",status:"ready",entry:"./games/snake/index.html",difficulty:true,difficultyLabels:["慢速","标准","快速"],tip:"方向键控制移动。",help:[["目标","吃到食物增长身体，尽可能获得高分。"],["操作","方向键控制方向；不能直接反向进入自己的身体。"],["难度","慢速、标准、快速对应不同移动速度。"],["结束","撞墙或撞到自身时游戏结束。"]]},
 {id:"pong",name:"Pong",category:"arcade",categoryName:"街机",icon:"▤",description:"控制球拍，与电脑争夺分数。",status:"ready",entry:"./games/pong/index.html",difficulty:true,tip:"W/S 或 ↑/↓ 控制球拍，也可使用鼠标。",help:[["目标","先达到目标分数的一方获胜。"],["操作","W/S 或 ↑/↓ 控制左侧球拍，也可移动鼠标。"],["AI 难度","简单反应较慢；中等跟随球路；困难更积极预测落点。"],["比赛","顶部暂停和新局控制整场比赛。"]]},
 {id:"contra",name:"魂斗罗（原创模式）",category:"arcade",categoryName:"街机",icon:"✦",description:"原创像素风横版射击。",status:"prototype",entry:"./games/contra/index.html",difficulty:true,tip:"A/D 移动，W 或空格跳跃，J 射击。",help:[["玩法","这是独立原创的横版射击玩法，不包含原作 ROM、图像或音乐。"],["操作","A/D 移动，W 或空格跳跃，J 射击。"],["目标","躲避敌人攻击并击败敌人，尽可能走得更远。"],["难度","调整敌人出现频率、移动速度和玩家容错。"]]},
-{id:"solitaire",name:"经典纸牌",category:"card",categoryName:"卡牌",icon:"♣",description:"按花色将牌从 A 排到 K。",status:"playable",entry:"./games/solitaire/index.html",difficulty:true,difficultyLabels:["抽一张","抽三张","抽三张"],tip:"红黑交替、点数递减移动牌列。",help:[["目标","将四种花色分别从 A 到 K 移入基础牌堆。"],["操作","点击牌堆抽牌；点击明牌后再点击目标牌列或基础牌堆。"],["移动规则","牌列按红黑交替、点数递减排列；空列只能放 K。"],["难度","抽一张较易；抽三张更具挑战。"]]},
+{id:"solitaire",name:"经典纸牌",category:"card",categoryName:"卡牌",icon:"♣",description:"按花色将牌从 A 排到 K。",status:"playable",entry:"./games/solitaire/index.html",difficulty:true,difficultyLabels:["抽一张","抽三张"],tip:"红黑交替、点数递减移动牌列。",help:[["目标","将四种花色分别从 A 到 K 移入基础牌堆。"],["操作","点击牌堆抽牌；点击明牌后再点击目标牌列或基础牌堆。"],["移动规则","牌列按红黑交替、点数递减排列；空列只能放 K。"],["难度","抽一张较易；抽三张更具挑战。"]]},
 {id:"doudizhu",name:"斗地主",category:"card",categoryName:"卡牌",icon:"♠",description:"单人对战两名本地 AI。",status:"playable",entry:"./games/doudizhu/index.html",difficulty:true,difficultyLabels:["入门 AI","标准 AI","强力 AI"],tip:"先叫地主，再按牌型出牌。",help:[["基本流程","三人游戏，发牌后竞叫地主。地主获得底牌并先出牌；先出完手牌的一方获胜。"],["牌型","单张、对子、三张、三带、顺子、连对、飞机、四带二、炸弹和王炸。"],["操作","选择手牌后出牌；无法压过上家时可以不出。"],["AI","AI 根据当前可见牌局、已出牌和自身手牌作出判断，不读取其他玩家隐藏手牌。"]]},
 {id:"mahjong",name:"麻将",category:"card",categoryName:"卡牌",icon:"🀄",description:"四人麻将，可调整常用规则。",status:"prototype",entry:"./games/mahjong/index.html",difficulty:true,tip:"摸牌、打牌，组成面子和将牌。",help:[["基本规则","四人、136 张基础牌。通过顺子、刻子、杠子和一对将组成和牌结构。"],["操作","摸牌后选择一张打出；可根据上家弃牌执行吃、碰、杠或胡。"],["规则设置","本局可切换允许吃牌、七对胡牌和允许杠牌；杠后补牌可自摸胡牌。当前采用 136 张基础牌，不含花牌。"],["AI","电脑仅依据自己手牌、公开弃牌和已公开副露决策。"]]},
 {id:"sanguosha",name:"三国杀",category:"card",categoryName:"卡牌",icon:"⚔",description:"身份局基础包与小乔扩展角色。",status:"prototype",entry:"./games/sanguosha/index.html",difficulty:true,tip:"摸牌、出牌、响应杀闪，完成身份目标。",help:[["身份与目标","身份局中各角色拥有隐藏身份和不同胜利目标。主公需要存活并清除反贼与内奸。"],["回合流程","回合开始摸两张牌，出牌阶段可使用手牌，最后结束回合。角色体力归零时进入濒死与桃自救流程。"],["基本牌与锦囊","当前本地规则包含杀、闪、桃、酒，以及决斗、过河拆桥、顺手牵羊、无中生有、南蛮入侵、万箭齐发和桃园结义。装备、判定区与完整标准牌堆仍待扩展。"],["小乔技能","红颜：黑桃视为红桃；天香：受到伤害时，可弃置红桃（含红颜转换的黑桃）转移伤害，目标受到伤害后按已损失体力摸牌。"]]}
@@ -61,7 +61,7 @@ function setGameState(){
  $("startButton").textContent=started?"结束":"开始";
  $("startButton").classList.toggle("end-action",started);
  $("startButton").disabled=!ready||finished||(!started&&!paused);
- $("pauseButton").textContent=started&&paused?"继续":"暂停";
+ $("pauseButton").textContent=started&&!finished&&paused?"继续":"暂停";
  $("pauseButton").disabled=!ready||!started||finished;
  $("newGameButton").textContent="下一局";
  $("newGameButton").disabled=!ready;
