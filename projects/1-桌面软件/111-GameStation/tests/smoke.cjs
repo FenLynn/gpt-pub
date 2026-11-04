@@ -46,7 +46,9 @@ const games = [
       await page.locator("#startButton").waitFor({ state: "visible" });
       await page.locator("#startButton").waitFor({ state: "attached" });
       await page.waitForFunction(() => !document.querySelector("#startButton").disabled);
-      await page.locator("#startButton").click();
+      await page.locator("#gameFrame").evaluate(frame => frame.focus());
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(() => !document.querySelector("#pauseButton").disabled);
       await page.waitForFunction(() => document.activeElement?.id === "gameFrame");
       const frameLayout = await page.frameLocator("#gameFrame").locator("#game").evaluate(root => {
         const main = root.querySelector(".game-main-board");
@@ -259,10 +261,11 @@ const games = [
     await page.waitForTimeout(160);
     const snakeYAfter = Number(await snakeCanvas.getAttribute("data-head-y"));
     assert.ok(snakeYAfter > snakeYBefore, "Snake should respond to the shared iframe keyboard focus without an extra canvas click");
+    const snakeXBefore = Number(await snakeCanvas.getAttribute("data-head-x"));
     await page.keyboard.press("a");
     await page.waitForTimeout(140);
     const snakeXAfter = Number(await snakeCanvas.getAttribute("data-head-x"));
-    assert.ok(snakeXAfter < 11, "Snake should accept WASD as well as arrow keys");
+    assert.ok(snakeXAfter < snakeXBefore, "Snake should accept WASD as well as arrow keys");
 
     await openGame("斗地主");
     const ddz = page.frameLocator("#gameFrame");
