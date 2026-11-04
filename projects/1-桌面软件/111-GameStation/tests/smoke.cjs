@@ -231,7 +231,12 @@ const games = [
       window.Math.random=()=>{const index=n++%40;window.__p111MineRandomCalls++;return (index+0.1)/256;};
     });
     await page.locator("#newGameButton").click();
-    const mineRandomCalls = await mines.locator("body").evaluate(() => window.__p111MineRandomCalls);
+    let mineRandomCalls=0;
+    for(let attempt=0;attempt<30;attempt++){
+      mineRandomCalls=await mines.locator("body").evaluate(() => window.__p111MineRandomCalls);
+      if(mineRandomCalls>=40)break;
+      await page.waitForTimeout(40);
+    }
     console.log("MINES_RANDOM_CALLS "+mineRandomCalls);
     assert.ok(mineRandomCalls >= 40, "Minesweeper deterministic seed should be used when rebuilding the board");
     await page.locator("#startButton").click();
