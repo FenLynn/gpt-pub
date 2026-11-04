@@ -3,15 +3,28 @@
 let W=16,H=16,MINES=40,difficulty="normal";
 const boardEl=document.getElementById("board"),status=document.getElementById("status"),counter=document.getElementById("counter");
 const timerEl=document.getElementById("timer"),levelEl=document.getElementById("level"),openedEl=document.getElementById("openedCount"),remainingEl=document.getElementById("remaining"),face=document.getElementById("reset");
-let cells=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,timerId=null;
+const gameArea=document.querySelector(".game-main-board");
+let cells=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,timerId=null,resizeObserver=null;
 function formatCounter(value){const n=String(value);return n.length>=3?n.slice(-3):n.padStart(3,"0");}
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score:opened,remaining:MINES-flags});}
+function fitBoard(){
+ const rect=gameArea.getBoundingClientRect();
+ const availableWidth=Math.max(0,rect.width-42);
+ const availableHeight=Math.max(0,rect.height-116);
+ const size=Math.max(10,Math.min(48,availableWidth/W,availableHeight/H));
+ const rounded=Math.round(size*10)/10;
+ boardEl.style.setProperty("--mine-cell-size",rounded+"px");
+ boardEl.dataset.cellSize=String(rounded);
+}
 function configure(value){
  difficulty=value||"normal";
  if(difficulty==="easy"){W=9;H=9;MINES=10;levelEl.textContent="初级";}
  else if(difficulty==="hard"){W=30;H=16;MINES=99;levelEl.textContent="高级";}
  else{W=16;H=16;MINES=40;levelEl.textContent="中级";}
  boardEl.style.setProperty("--cols",W);
+ boardEl.dataset.rows=String(H);
+ boardEl.dataset.columns=String(W);
+ fitBoard();
 }
 function stopTimer(){if(timerId!==null){clearInterval(timerId);timerId=null;}}
 function updateTimer(){timerEl.textContent=formatCounter(seconds);}
@@ -29,7 +42,7 @@ function makeBoard(){
  let placed=0;
  while(placed<MINES){const i=Math.floor(Math.random()*cells.length);if(!cells[i].mine){cells[i].mine=true;placed++;}}
  recount();started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
- face.textContent="🙂";updateCounters();render();setStatus("点击任意方格开始");
+ face.textContent="🙂";updateCounters();render();fitBoard();setStatus("点击任意方格开始");
 }
 function recount(){
  cells.forEach(cell=>cell.n=0);
@@ -66,7 +79,7 @@ function render(){
   button.addEventListener("auxclick",event=>{if(event.button===1){event.preventDefault();chord(index);}});
   boardEl.appendChild(button);
  });
- updateCounters();
+ updateCounters();fitBoard();
 }
 function relocateFirst(index){
  if(!cells[index].mine)return;
@@ -100,7 +113,6 @@ function win(){
  render();setStatus("恭喜，全部排除！");
  GameBridge.send("GAME_OVER",{message:"扫雷成功",score:opened,win:true});
 }
-function checkWin(){if(opened===W*H-MINES)win();}
 function reveal(index){
  if(paused||over||cells[index].open||cells[index].flag)return;
  if(!started){relocateFirst(index);started=true;startTimer();}
@@ -129,14 +141,17 @@ function chord(index){
  setStatus("继续排查");
 }
 function newGame(){makeBoard();}
+function onResize(){fitBoard();}
 face.addEventListener("click",newGame);
 boardEl.addEventListener("contextmenu",event=>event.preventDefault());
+window.addEventListener("resize",onResize);
+if(typeof ResizeObserver!=="undefined"){resizeObserver=new ResizeObserver(fitBoard);resizeObserver.observe(gameArea);}
 GameBridge.register({
  init(payload){configure(payload.difficulty);newGame();},
  newGame,
  pause(){paused=true;setStatus("已暂停");},
  resume(){paused=false;if(started&&!over)setStatus("继续排查");},
  setDifficulty(value){configure(value);},
- dispose(){paused=true;stopTimer();}
+ dispose(){paused=true;stopTimer();resizeObserver?.disconnect();window.removeEventListener("resize",onResize);}
 });
 })();
