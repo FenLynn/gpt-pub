@@ -8,7 +8,7 @@ const native={
  requestAnimationFrame:window.requestAnimationFrame.bind(window),
  cancelAnimationFrame:window.cancelAnimationFrame.bind(window)
 };
-let handlers={},sessionId=null,disposed=false,timerPaused=false,preserveDuringPause=false,nextTimerId=1;
+let handlers={},sessionId=null,disposed=false,timerPaused=false,preserveDuringPause=false,nextTimerId=1,pendingKey=null,activityPending=false;
 const timers=new Map();
 function arm(record){
  if(timerPaused||disposed||!timers.has(record.id))return;
@@ -75,6 +75,7 @@ function disposeTimers(){
  }
  timers.clear();
  window.removeEventListener("keydown",handleHostShortcut,true);
+ window.removeEventListener("pointerdown",handlePointerActivity,true);
 }
 window.setTimeout=function(callback,delay,...args){return createTimer("timeout",callback,delay,args);};
 window.clearTimeout=cancelTimer;
@@ -89,41 +90,45 @@ function send(type,payload={}){
 function report(status,extra={}){send("STATE",{status,...extra});}
 function safeCall(name,...args){if(typeof handlers[name]==="function")return handlers[name](...args);}
 function safePause(){preserveDuringPause=true;try{safeCall("pause");}finally{preserveDuringPause=false;}}
-function safeResume(){preserveDuringPause=false;safeCall("resume");resumeTimers();}
+function safeResume(){
+ preserveDuringPause=false;safeCall("resume");resumeTimers();activityPending=false;
+ if(pendingKey){const key=pendingKey;pendingKey=null;window.dispatchEvent(new KeyboardEvent("keydown",{key:key.key,code:key.code,bubbles:true,cancelable:true,shiftKey:key.shiftKey,ctrlKey:key.ctrlKey,altKey:key.altKey,metaKey:key.metaKey}));}
+}
 function isEditableTarget(target){
  const element=target instanceof Element?target:null;
  return !!element&&(element.matches("input,textarea,select")||element.isContentEditable||!!element.closest("[contenteditable='true']"));
 }
-function isInteractiveTarget(target){
- const element=target instanceof Element?target:null;
- return !!element&&!!element.closest("button,a,[role='button']");
-}
+function isGameplayKey(key){return key===" "||key.startsWith("Arrow")||/^[a-z0-9]$/i.test(key);}
+function stopCapturedEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();}
 function handleHostShortcut(event){
- if(disposed||!sessionId||event.repeat||isEditableTarget(event.target))return;
- let action=null;
- if(event.key==="Enter"&&!isInteractiveTarget(event.target))action="start";
- else if(event.key.toLowerCase()==="p")action="pause";
- if(!action)return;
- event.preventDefault();
- event.stopPropagation();
- event.stopImmediatePropagation();
- send("HOTKEY",{action});
+ if(disposed||!sessionId||!event.isTrusted||event.repeat||isEditableTarget(event.target))return;
+ if(event.key==="Enter"){stopCapturedEvent(event);send("HOTKEY",{action:"toggle"});return;}
+ if(timerPaused&&isGameplayKey(event.key)){
+  stopCapturedEvent(event);
+  pendingKey={key:event.key,code:event.code,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,altKey:event.altKey,metaKey:event.metaKey};
+  if(!activityPending){activityPending=true;send("ACTIVITY");}
+ }
+}
+function handlePointerActivity(event){
+ if(disposed||!sessionId||!timerPaused||activityPending||isEditableTarget(event.target))return;
+ activityPending=true;send("ACTIVITY");
 }
 window.addEventListener("keydown",handleHostShortcut,true);
+window.addEventListener("pointerdown",handlePointerActivity,true);
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
  if(!m||m.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!==gameId)return;
  if(m.type==="INIT"){
   sessionId=m.payload?.sessionId||null;
-  safeCall("init",m.payload||{});
+  activityPending=false;pendingKey=null;safeCall("init",m.payload||{});
   return;
  }
  if(m.sessionId!==sessionId)return;
  if(m.type==="NEW_GAME"){
   suspendTimers();safeCall("newGame");safePause();
  }else if(m.type==="PAUSE"){
-  suspendTimers();safePause();
+  activityPending=false;pendingKey=null;suspendTimers();safePause();
  }else if(m.type==="RESUME"){
   safeResume();
  }else if(m.type==="SET_DIFFICULTY"){
@@ -134,6 +139,10 @@ window.addEventListener("message",event=>{
   suspendTimers();safeCall("setOptions",m.payload||{});safePause();
  }else if(m.type==="LOAD_STATE"){
   suspendTimers();safeCall("loadState",m.payload||{});safePause();
+ }else if(m.type==="SET_RAIL"){
+  const root=document.querySelector(".game-root");
+  root?.classList.toggle("rail-collapsed",!!m.payload?.collapsed);
+  window.dispatchEvent(new Event("resize"));
  }else if(m.type==="DISPOSE"){
   suspendTimers();safeCall("dispose");disposeTimers();
  }
