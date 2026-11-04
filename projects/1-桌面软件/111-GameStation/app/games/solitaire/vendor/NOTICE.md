@@ -2,7 +2,7 @@
 
 ## jhatzimalis/solitaire
 
-- Upstream: https://github.com/jhatzimalis/solitaire
+- Upstream: github.com/jhatzimalis/solitaire
 - Pinned commit: a737d5a60d79d0e5a24f320354709ae35dc4ec7d
 - License: MIT (full text below)
 - Adapted source: upstream single-file Klondike implementation.
