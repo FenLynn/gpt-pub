@@ -76,13 +76,13 @@ const games = [
     assert.equal(await g2048.locator(".tile").count(), 16);
     await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(1150);
-    const beforePause = await page.locator("#gameElapsed").innerText();
     await page.locator("#pauseButton").click();
-    await page.waitForTimeout(1250);
-    assert.equal(await page.locator("#gameElapsed").innerText(), beforePause, "paused time must not be counted");
+    const pausedAt = await page.locator("#gameElapsed").innerText();
+    await page.waitForTimeout(1350);
+    assert.equal(await page.locator("#gameElapsed").innerText(), pausedAt, "paused time must not be counted");
     await page.locator("#startButton").click();
-    await page.waitForTimeout(1150);
-    assert.notEqual(await page.locator("#gameElapsed").innerText(), beforePause, "the game clock must resume after unpausing");
+    await page.waitForTimeout(1350);
+    assert.notEqual(await page.locator("#gameElapsed").innerText(), pausedAt, "the game clock must resume after unpausing");
 
     await openGame("记忆翻牌");
     const memory = page.frameLocator("#gameFrame");
