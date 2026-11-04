@@ -380,3 +380,22 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .hero-description{max-width:100%}
   .home-art{display:none}
 }
+
+/* P111 R8.3 · mobile game controls occupy their own row instead of covering navigation */
+@media(max-width:700px){
+  .main-area{grid-template-rows:auto minmax(0,1fr)}
+  .topbar{
+    height:auto;min-height:var(--topbar);flex-wrap:wrap;align-content:center;
+    row-gap:5px;padding:6px 8px;
+  }
+  .topbar-left{order:1;min-width:0;flex:1 1 auto}
+  .topbar-actions{order:2;flex:0 0 auto;margin-left:auto}
+  .game-controls{
+    order:3;flex:1 1 100%;width:100%;max-width:100%;
+    justify-content:flex-start;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;
+  }
+  .game-controls .segment-control{flex:none}
+}
+@media(max-width:420px){
+  .game-controls{max-width:100%;flex:1 1 100%;overflow-x:auto}
+}
