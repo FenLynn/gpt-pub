@@ -12,7 +12,7 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 - [产品架构与技术路线](设计与演进.md)
 - [游戏范围与模块接口](docs/游戏范围与模块接口.md)
 - [开源项目与许可证调研](docs/开源项目调研.md)
-- 在线预览入口：`https://fenlynn.github.io/gpt-pub/p111/`（需统一 Pages 工作流接入并部署后可用）
+- Cloudflare Pages 分支预览：`https://p111-exp.gpt-pub.pages.dev/`（以 Cloudflare 成功部署状态为准）
 - 仓库上位规则：GPT_RULES.md → projects/1-桌面软件/开发约束.md
 
 ## 产品边界
