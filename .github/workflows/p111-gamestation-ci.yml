@@ -22,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: p111-gamestation-ci
+  group: p111-gamestation-ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
