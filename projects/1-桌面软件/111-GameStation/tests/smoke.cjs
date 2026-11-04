@@ -224,8 +224,15 @@ const games = [
     }));
     assert.ok(hardMineFit.board.width <= hardMineFit.area.width + 2, "hard Minesweeper should fit the available desktop width without a horizontal scrollbar");
     await page.locator("#difficultyControl button[data-difficulty='normal']").click();
-    await mines.locator("body").evaluate(() => { let n=0; Math.random=()=>((n++%256)+0.1)/256; });
+    await mines.locator("body").evaluate(() => {
+      let n=0;
+      window.__p111MineRandomCalls=0;
+      window.Math.random=()=>{window.__p111MineRandomCalls++;return ((n++%256)+0.1)/256;};
+    });
     await page.locator("#newGameButton").click();
+    const mineRandomCalls = await mines.locator("body").evaluate(() => window.__p111MineRandomCalls);
+    console.log("MINES_RANDOM_CALLS "+mineRandomCalls);
+    assert.ok(mineRandomCalls >= 40, "Minesweeper deterministic seed should be used when rebuilding the board");
     await page.locator("#startButton").click();
     await mines.locator(".mine-cell").nth(56).click();
     assert.equal(await mines.locator(".mine-cell").nth(56).getAttribute("data-n"), "1", "deterministic cell should show one adjacent mine");
