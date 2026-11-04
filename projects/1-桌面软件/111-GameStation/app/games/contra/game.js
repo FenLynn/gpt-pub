@@ -58,6 +58,6 @@ function pause(){paused=true;cancelAnimationFrame(raf);report("已暂停");draw(
 function resume(){if(over)return;cancelAnimationFrame(raf);paused=false;last=performance.now();report("继续行动");raf=requestAnimationFrame(tick);draw();}
 function keydown(e){const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")keys.a=true;if(k==="d"||k==="arrowright")keys.d=true;if(k==="w"||k==="arrowup"||k===" ")keys.w=true;if(k==="j")keys.j=true;if(k==="k"&&!keys.k){keys.k=true;throwGrenade();}}
 function keyup(e){const k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")keys.a=false;if(k==="d"||k==="arrowright")keys.d=false;if(k==="w"||k==="arrowup"||k===" ")keys.w=false;if(k==="j")keys.j=false;if(k==="k")keys.k=false;}
-window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);document.getElementById("start").onclick=newGame;document.getElementById("pause").onclick=()=>paused?resume():pause();canvas.addEventListener("pointerdown",()=>canvas.focus());
+window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("pointerdown",()=>canvas.focus());
 GameBridge.register({init(p){configure(p.difficulty);newGame();pause();},newGame,resume,pause,setDifficulty(v){configure(v);},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);}});
 })();
