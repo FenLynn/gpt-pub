@@ -104,6 +104,7 @@ window.addEventListener("message",event=>{
   else if(m.payload?.action==="pause")togglePause();
   return;
  }
+ if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
  if(m.type==="STATE"){
   if(Number.isFinite(Number(m.payload?.score))){
    currentScore=Number(m.payload.score);
