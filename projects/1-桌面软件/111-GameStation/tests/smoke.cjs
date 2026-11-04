@@ -224,6 +224,7 @@ const games = [
     }));
     assert.ok(hardMineFit.board.width <= hardMineFit.area.width + 2, "hard Minesweeper should fit the available desktop width without a horizontal scrollbar");
     await page.locator("#difficultyControl button[data-difficulty='normal']").click();
+    await page.waitForTimeout(150);
     await mines.locator("body").evaluate(() => {
       let n=0;
       window.__p111MineRandomCalls=0;
