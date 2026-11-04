@@ -142,8 +142,10 @@ const games = [
 
     await openGame("经典纸牌");
     const solitaire = page.frameLocator("#gameFrame");
-    await solitaire.locator("#stock").click();
-    assert.equal(await solitaire.locator("#waste .card").count(), 1);
+    assert.equal(await solitaire.locator("#board .card").count(), 52);
+    await solitaire.locator(".stock-empty").click();
+    await page.waitForTimeout(150);
+    assert.equal(await solitaire.locator("#board .card").count(), 52);
 
     await openGame("俄罗斯方块");
     const tetris = page.frameLocator("#gameFrame");
@@ -157,7 +159,9 @@ const games = [
 
     await openGame("斗地主");
     const ddz = page.frameLocator("#gameFrame");
-    assert.equal(await ddz.locator(".playing-card").count(), 20);
+    assert.equal(await ddz.locator(".playing-card").count(), 17, "Dou Dizhu must deal 17 cards to the human seat");
+    assert.ok(await ddz.locator("#bidControls").count() === 1);
+    assert.ok(await ddz.locator("#phaseLabel").innerText() === "叫地主" || await ddz.locator("#phaseLabel").innerText() === "出牌");
 
     await openGame("麻将");
     const mahjong = page.frameLocator("#gameFrame");
