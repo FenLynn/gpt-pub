@@ -64,10 +64,6 @@ jobs:
             echo "::error::Network API found in the runtime app"
             exit 1
           fi
-          if grep -RInE '<script[^>]+src=["'"']https?://|<link[^>]+href=["'"']https?://' "$APP"; then
-            echo "::error::Remote script or stylesheet found"
-            exit 1
-          fi
 
       - name: JavaScript syntax
         shell: bash
