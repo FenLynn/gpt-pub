@@ -62,3 +62,110 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 @media(max-width:700px){.game-root{padding:6px;gap:7px}.gomoku-board{width:min(82vw,62vh)}.xiangqi-board{width:min(84vw,62vh)}.mine-grid{max-width:94vw}.solitaire-layout{width:100%;height:90%;overflow:hidden}.solitaire-top,.solitaire-columns{gap:3px}.game-row{gap:4px}.game-panel,.board-wrap,.canvas-panel{padding:5px}.playing-card{width:29px;height:40px}}
 
 .hidden{display:none!important}.hint-card{outline:2px solid #78ae91;outline-offset:2px}
+
+
+/* P111 R3–R6 · generous three-zone play layout */
+.game-root.game-layout{
+  display:grid;
+  grid-template-columns:minmax(165px,205px) minmax(0,1fr) minmax(185px,225px);
+  grid-template-rows:minmax(0,1fr);
+  align-items:stretch;
+  justify-items:stretch;
+  gap:clamp(14px,1.7vw,26px);
+  padding:clamp(12px,1.8vw,24px);
+  background:#f7f9fb;
+}
+.game-guide,.game-tools{min-width:0;min-height:0;display:flex;flex-direction:column;align-items:stretch;gap:13px;padding:16px 12px}
+.game-guide{align-self:stretch;color:#81909c;font-size:14px;line-height:1.8}
+.game-guide h2{margin:0;color:#506a7e;font-size:17px;font-weight:720}
+.game-guide p{margin:0;color:#7f8f9c;font-size:14px;line-height:1.85}
+.game-guide-kicker{color:#9aabb7;font-size:10px;font-weight:760;letter-spacing:1.5px}
+.guide-note,.game-tool-note{padding:10px 11px;border:1px solid rgba(219,228,235,.78);border-radius:9px;background:rgba(255,255,255,.48);color:#8998a4;font-size:12px;line-height:1.75}
+.game-main-board{min-width:0;min-height:0;width:100%;height:100%;display:grid;place-items:center;overflow:hidden}
+.game-main-board>.board-wrap,.game-main-board>.canvas-panel{width:100%;height:100%;max-width:none;max-height:none;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;overflow:hidden}
+.game-tools{border-left:1px solid #e3e9ee;padding-left:19px}
+.game-tools-heading{margin:2px 0 1px;color:#8a9aa6;font-size:11px;font-weight:760;letter-spacing:.8px}
+.game-status{min-height:42px;display:flex;align-items:center;padding:9px 11px;border:1px solid #e2e9ee;border-radius:9px;background:rgba(255,255,255,.76);color:#526c80;font-size:14px;font-weight:650;line-height:1.5}
+.game-tools .game-btn{width:100%;height:39px;padding:0 12px;font-size:14px;text-align:center}
+.turn-indicator{display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 11px;border-radius:9px;background:#fff;border:1px solid #e0e8ee}
+.turn-indicator strong{color:#3f596d;font-size:15px;font-weight:730}
+.turn-dot{width:12px;height:12px;flex:none;border-radius:50%;background:#bf4b43;box-shadow:0 0 0 4px rgba(191,75,67,.12)}
+.turn-dot.black{background:#35424e;box-shadow:0 0 0 4px rgba(53,66,78,.12)}
+.turn-dot.red{background:#bf4b43;box-shadow:0 0 0 4px rgba(191,75,67,.12)}
+/* Chinese chess: each cell is an intersection, not a square. */
+.xiangqi-layout .game-main-board>.board-wrap{display:grid;place-items:center}
+.xiangqi-board{
+  width:auto;
+  height:min(88vh,100%);
+  max-width:100%;
+  max-height:100%;
+  aspect-ratio:9/10;
+  grid-template-columns:repeat(9,minmax(0,1fr));
+  grid-template-rows:repeat(10,minmax(0,1fr));
+  border:2px solid #c5a77c;
+  padding:0;
+  background-color:#ecdab8;
+  background-image:
+    linear-gradient(to right,#ad916d 1px,transparent 1px),
+    linear-gradient(to bottom,#ad916d 1px,transparent 1px);
+  background-size:12.5% 100%,100% 11.111111%;
+  background-position:left top;
+  box-shadow:0 8px 24px rgba(88,65,37,.10);
+}
+.xiangqi-cell{min-width:0;min-height:0;border:0;border-radius:0;background:transparent;overflow:visible}
+.xiangqi-cell.selected{background:radial-gradient(circle,rgba(238,191,89,.36) 0 48%,transparent 52%)}
+.xiangqi-cell.target{background:radial-gradient(circle,rgba(108,176,133,.40) 0 22%,transparent 27%)}
+.xiangqi-piece{width:78%;aspect-ratio:1;border:2px solid #ad916d;background:radial-gradient(circle at 34% 27%,#fffdf4,#f0dfc0 78%);font-size:clamp(15px,2.1vh,25px);box-shadow:0 2px 3px rgba(67,49,28,.20),inset 0 0 0 2px rgba(255,255,255,.48)}
+.xiangqi-piece.red{color:#b83f35}.xiangqi-piece.black{color:#303c46}
+.xiangqi-cell.selected .xiangqi-piece{box-shadow:0 0 0 3px rgba(222,166,60,.48),0 2px 3px rgba(67,49,28,.2)}
+/* Windows classic Minesweeper */
+.minesweeper-layout{grid-template-columns:minmax(170px,205px) minmax(0,1fr) minmax(180px,220px)}
+.mine-classic{display:flex;flex-direction:column;gap:10px;max-width:100%;max-height:100%;padding:12px;background:#c0c0c0;border:3px solid;border-color:#fff #777 #777 #fff;box-shadow:0 7px 22px rgba(35,53,68,.12)}
+.mine-top-panel{height:56px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border:3px solid;border-color:#777 #fff #fff #777;background:#c0c0c0}
+.mine-counter{width:61px;height:38px;display:grid;place-items:center;background:#111;color:#ef3b32;border:1px solid #777;font-family:Consolas,"Courier New",monospace;font-size:28px;font-weight:700;letter-spacing:1px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:inset 0 1px 3px #000}
+.mine-face{width:38px;height:38px;display:grid;place-items:center;padding:0;border:3px solid;border-color:#fff #777 #777 #fff;border-radius:3px;background:#c0c0c0;font-size:22px;line-height:1}
+.mine-face:active{border-color:#777 #fff #fff #777;padding-top:2px;padding-left:2px}
+.mine-grid{--mine-cell-size:clamp(20px,3.05vh,30px);display:grid;grid-template-columns:repeat(var(--cols,16),var(--mine-cell-size));gap:0;width:max-content;max-width:100%;max-height:calc(100% - 66px);padding:6px;border:3px solid;border-color:#777 #fff #fff #777;border-radius:0;background:#c0c0c0;overflow:auto}
+.mine-cell{width:var(--mine-cell-size);height:var(--mine-cell-size);min-width:0;min-height:0;aspect-ratio:auto;padding:0;border:2px solid;border-color:#fff #777 #777 #fff;border-radius:0;background:#c0c0c0;color:#152b48;font-family:Arial,sans-serif;font-size:clamp(13px,1.8vh,18px);font-weight:800;line-height:1}
+.mine-cell.open{border:1px solid #858585;border-radius:0;background:#c0c0c0}
+.mine-cell.flag{color:#d32323}
+.mine-cell.mine{border:1px solid #858585;background:#d5d5d5;color:#111}
+.mine-cell[data-n="1"]{color:#0000d0}.mine-cell[data-n="2"]{color:#168020}.mine-cell[data-n="3"]{color:#d02020}.mine-cell[data-n="4"]{color:#101080}.mine-cell[data-n="5"]{color:#801010}.mine-cell[data-n="6"]{color:#168080}.mine-cell[data-n="7"]{color:#111}.mine-cell[data-n="8"]{color:#777}
+.key-instruction{display:flex;align-items:flex-start;gap:10px;color:#8796a2;font-size:13px;line-height:1.55}
+.key-instruction strong{min-width:58px;padding:3px 6px;border:1px solid #dce5eb;border-radius:5px;background:rgba(255,255,255,.72);color:#647e91;font-size:12px;text-align:center;font-weight:700}
+.key-instruction span{padding-top:2px}
+.mine-side-stats,.tetris-metrics{display:grid;gap:0;border:1px solid #e1e8ed;border-radius:10px;background:rgba(255,255,255,.78);overflow:hidden}
+.mine-side-stats>div,.tetris-metrics>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 11px;border-bottom:1px solid #edf1f4}
+.mine-side-stats>div:last-child,.tetris-metrics>div:last-child{border-bottom:0}
+.mine-side-stats span,.tetris-metrics span{color:#8a9aa6;font-size:12px}
+.mine-side-stats strong,.tetris-metrics strong{color:#3d5b72;font-size:16px;font-weight:740;font-variant-numeric:tabular-nums}
+/* Tetris: continuous fall animation and a clear keyboard legend. */
+.tetris-layout .game-main-board>.canvas-panel{display:grid;place-items:center}
+.tetris-layout .arcade-canvas{height:min(88vh,100%);width:auto;max-width:100%;max-height:100%;aspect-ratio:1/2;border-radius:9px;background:#152536;box-shadow:0 10px 28px rgba(29,48,66,.16);image-rendering:pixelated}
+.tetris-layout .game-status{margin-bottom:3px}
+.tetris-metrics{margin-top:2px}
+@media(max-width:900px){
+ .game-root.game-layout{grid-template-columns:minmax(130px,165px) minmax(0,1fr) minmax(155px,185px);gap:10px;padding:10px}
+ .game-guide,.game-tools{padding:12px 8px;gap:10px}
+ .game-tools{padding-left:12px}
+ .xiangqi-board{height:min(82vh,100%)}
+ .mine-grid{--mine-cell-size:clamp(18px,2.65vh,26px)}
+}
+@media(max-width:700px){
+ .game-root.game-layout{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto;gap:8px;padding:8px;overflow:auto}
+ .game-guide{display:none}
+ .game-main-board{min-height:0}
+ .game-tools{border-left:0;border-top:1px solid #e3e9ee;padding:9px 4px 4px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:7px}
+ .game-tools-heading,.game-tool-note{grid-column:1/-1}
+ .game-status,.turn-indicator{min-height:36px;font-size:12px}
+ .game-tools .game-btn{height:34px;font-size:12px}
+ .xiangqi-board{height:min(66vh,100%);max-width:100%}
+ .mine-classic{padding:7px;gap:6px}
+ .mine-grid{--mine-cell-size:clamp(16px,4vw,22px)}
+ .mine-top-panel{height:48px}
+ .mine-counter{width:52px;height:32px;font-size:23px}
+ .mine-face{width:34px;height:34px;font-size:19px}
+ .tetris-layout .arcade-canvas{height:min(68vh,100%)}
+ .mine-side-stats,.tetris-metrics{grid-column:1/-1;grid-template-columns:repeat(3,minmax(0,1fr))}
+ .mine-side-stats>div,.tetris-metrics>div{flex-direction:column;align-items:flex-start;padding:7px}
+}
