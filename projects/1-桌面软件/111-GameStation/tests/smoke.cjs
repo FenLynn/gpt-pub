@@ -61,7 +61,25 @@ const games = [
   try {
     await page.goto(pathToFileURL(path.join(root, "index.html")).href);
     await page.locator("#homeDate").waitFor({ state: "visible" });
+    const chromeLayout = await page.evaluate(() => {
+      const rect = selector => document.querySelector(selector).getBoundingClientRect();
+      return {
+        brandHeight: rect(".brand").height,
+        topbarHeight: rect("#topbar").height,
+        sidebarColor: getComputedStyle(document.querySelector(".sidebar")).backgroundColor,
+        topbarColor: getComputedStyle(document.querySelector("#topbar")).backgroundColor,
+        workspaceColor: getComputedStyle(document.querySelector("#workspaceView")).backgroundColor,
+        logoSquares: document.querySelectorAll(".brand-mark i").length,
+        favicon: document.querySelector('link[rel="icon"]')?.getAttribute("href") || ""
+      };
+    });
+    assert.equal(chromeLayout.logoSquares, 4, "four-square brand mark should be retained");
+    assert.equal(chromeLayout.brandHeight, chromeLayout.topbarHeight, "brand rail and topbar should have equal height");
+    assert.equal(chromeLayout.sidebarColor, chromeLayout.topbarColor, "left navigation and topbar should share a color");
+    assert.notEqual(chromeLayout.workspaceColor, chromeLayout.topbarColor, "game workspace should have a separate surface color");
+    assert.ok(chromeLayout.favicon.startsWith("data:image/svg+xml"), "four-square favicon should be local and offline");
     assert.match(await page.locator("#homeWeekday").innerText(), /^星期[一二三四五六日]$/);
+    assert.ok(await page.locator(".home-hero").isVisible(), "home should show the redesigned hero");
     assert.equal(await page.locator("#totalGameCount").innerText(), "19");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
     assert.equal(await page.locator(".heatmap-cell").count(), 371, "one-year activity grid should contain 53×7 cells");
@@ -81,6 +99,8 @@ const games = [
     assert.equal(await page.locator("#startButton").innerText(), "结束", "start action should become end after the game starts");
     assert.equal(await page.locator("#pauseButton").innerText(), "暂停");
     assert.equal(await page.locator("#newGameButton").innerText(), "下一局");
+    const toolbarOrder = await page.locator("#gameActions").evaluate(el=>Array.from(el.children).map(node=>node.id||"elapsed"));
+    assert.deepEqual(toolbarOrder.slice(0,4), ["elapsed","startButton","pauseButton","newGameButton"], "toolbar actions should keep time/start/pause/next order");
     await page.locator("#pauseButton").click();
     assert.equal(await page.locator("#pauseButton").innerText(), "继续");
     const pausedAt = await page.locator("#gameElapsed").innerText();
