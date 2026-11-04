@@ -1,18 +1,142 @@
 (function(){
 "use strict";
-let W=9,H=9,MINES=10;
+let W=16,H=16,MINES=40,difficulty="normal";
 const boardEl=document.getElementById("board"),status=document.getElementById("status"),counter=document.getElementById("counter");
-let cells=[],started=false,over=false,paused=false,flags=0,opened=0,difficulty="easy";
-function setStatus(t){status.textContent=t;GameBridge.report(t,{score:opened});}
-function configure(v){difficulty=v||"easy";if(difficulty==="hard"){W=30;H=16;MINES=99;}else if(difficulty==="normal"){W=16;H=16;MINES=40;}else{W=9;H=9;MINES=10;}}
-function makeBoard(){cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));let placed=0;while(placed<MINES){const i=Math.floor(Math.random()*cells.length);if(!cells[i].mine){cells[i].mine=true;placed++;}}recount();started=false;over=false;paused=false;flags=0;opened=0;boardEl.style.setProperty("--cols",W);boardEl.style.width="min(90vw,"+Math.min(720,Math.round(window.innerHeight*.72))+"px)";render();setStatus("点击任意格子开始");}
-function recount(){cells.forEach(c=>c.n=0);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const c=cells[y*W+x];if(c.mine)continue;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const a=x+dx,b=y+dy;if(a>=0&&a<W&&b>=0&&b<H&&cells[b*W+a].mine)c.n++;}}}
-function render(){boardEl.innerHTML="";cells.forEach((c,i)=>{const b=document.createElement("button");b.type="button";b.className="mine-cell"+(c.open?" open":"")+(c.flag?" flag":"")+(c.open&&c.mine?" mine":"");if(c.open){if(c.mine)b.textContent="✹";else if(c.n)b.textContent=c.n;b.dataset.n=c.n;}else if(c.flag)b.textContent="⚑";b.setAttribute("aria-label",c.open?(c.mine?"地雷":c.n?"数字 "+c.n:"空白"):c.flag?"已标记":"未翻开");b.addEventListener("click",()=>reveal(i));b.addEventListener("contextmenu",e=>{e.preventDefault();toggleFlag(i);});boardEl.appendChild(b);});counter.textContent="旗帜 "+flags+" / "+MINES+" · 已翻开 "+opened;}
-function relocateFirst(i){if(!cells[i].mine)return;cells[i].mine=false;let j=-1;for(let k=0;k<cells.length;k++)if(k!==i&&!cells[k].mine){j=k;break;}if(j>=0)cells[j].mine=true;recount();}
-function flood(i){const q=[i],seen=new Set();while(q.length){const k=q.pop();if(seen.has(k))continue;seen.add(k);const c=cells[k];if(!c||c.open||c.flag||c.mine)continue;c.open=true;opened++;if(c.n===0){const x=k%W,y=Math.floor(k/W);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const a=x+dx,b=y+dy;if(a>=0&&a<W&&b>=0&&b<H)q.push(b*W+a);}}}}
-function reveal(i){if(paused||over||cells[i].open||cells[i].flag)return;if(!started){relocateFirst(i);started=true;}const c=cells[i];if(c.mine){c.open=true;over=true;cells.forEach(x=>{if(x.mine)x.open=true;});render();setStatus("踩到地雷 · 再试一次");GameBridge.send("GAME_OVER",{message:"踩到地雷",score:opened,win:false});return;}flood(i);if(opened===W*H-MINES){over=true;setStatus("恭喜，全部排除！");GameBridge.send("GAME_OVER",{message:"扫雷成功",score:opened,win:true});}else setStatus("继续排查");render();}
-function toggleFlag(i){if(paused||over||cells[i].open)return;cells[i].flag=!cells[i].flag;flags+=cells[i].flag?1:-1;render();}
+const timerEl=document.getElementById("timer"),levelEl=document.getElementById("level"),openedEl=document.getElementById("openedCount"),remainingEl=document.getElementById("remaining"),face=document.getElementById("reset");
+let cells=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,timerId=null;
+function formatCounter(value){const n=String(value);return n.length>=3?n.slice(-3):n.padStart(3,"0");}
+function setStatus(message){status.textContent=message;GameBridge.report(message,{score:opened,remaining:MINES-flags});}
+function configure(value){
+ difficulty=value||"normal";
+ if(difficulty==="easy"){W=9;H=9;MINES=10;levelEl.textContent="初级";}
+ else if(difficulty==="hard"){W=30;H=16;MINES=99;levelEl.textContent="高级";}
+ else{W=16;H=16;MINES=40;levelEl.textContent="中级";}
+ boardEl.style.setProperty("--cols",W);
+}
+function stopTimer(){if(timerId!==null){clearInterval(timerId);timerId=null;}}
+function updateTimer(){timerEl.textContent=formatCounter(seconds);}
+function startTimer(){if(timerId!==null)return;timerId=setInterval(()=>{if(!paused&&!over){seconds++;updateTimer();}},1000);}
+function updateCounters(){
+ const left=MINES-flags;
+ counter.textContent=formatCounter(left);
+ remainingEl.textContent=formatCounter(left);
+ openedEl.textContent=String(opened);
+ updateTimer();
+}
+function makeBoard(){
+ stopTimer();
+ cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));
+ let placed=0;
+ while(placed<MINES){const i=Math.floor(Math.random()*cells.length);if(!cells[i].mine){cells[i].mine=true;placed++;}}
+ recount();started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
+ face.textContent="🙂";updateCounters();render();setStatus("点击任意方格开始");
+}
+function recount(){
+ cells.forEach(cell=>cell.n=0);
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const cell=cells[y*W+x];if(cell.mine)continue;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+   const nx=x+dx,ny=y+dy;
+   if(nx>=0&&nx<W&&ny>=0&&ny<H&&cells[ny*W+nx].mine)cell.n++;
+  }
+ }
+}
+function neighbors(index){
+ const x=index%W,y=Math.floor(index/W),out=[];
+ for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+  if(!dx&&!dy)continue;
+  const nx=x+dx,ny=y+dy;
+  if(nx>=0&&nx<W&&ny>=0&&ny<H)out.push(ny*W+nx);
+ }
+ return out;
+}
+function render(){
+ boardEl.innerHTML="";
+ cells.forEach((cell,index)=>{
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="mine-cell"+(cell.open?" open":"")+(cell.flag?" flag":"")+(cell.open&&cell.mine?" mine":"");
+  button.dataset.n=String(cell.n);
+  if(cell.open){if(cell.mine)button.textContent="✹";else if(cell.n)button.textContent=String(cell.n);}
+  else if(cell.flag)button.textContent="⚑";
+  button.setAttribute("aria-label",cell.open?(cell.mine?"地雷":cell.n?"数字 "+cell.n:"空白"):cell.flag?"已标记":"未翻开");
+  button.addEventListener("click",()=>reveal(index));
+  button.addEventListener("contextmenu",event=>{event.preventDefault();toggleFlag(index);});
+  button.addEventListener("mousedown",event=>{if(event.button===1)event.preventDefault();});
+  button.addEventListener("auxclick",event=>{if(event.button===1){event.preventDefault();chord(index);}});
+  boardEl.appendChild(button);
+ });
+ updateCounters();
+}
+function relocateFirst(index){
+ if(!cells[index].mine)return;
+ cells[index].mine=false;
+ let replacement=-1;
+ for(let i=0;i<cells.length;i++)if(i!==index&&!cells[i].mine){replacement=i;break;}
+ if(replacement>=0)cells[replacement].mine=true;
+ recount();
+}
+function flood(index){
+ const queue=[index],seen=new Set();
+ while(queue.length){
+  const current=queue.pop();
+  if(seen.has(current))continue;
+  seen.add(current);
+  const cell=cells[current];
+  if(!cell||cell.open||cell.flag||cell.mine)continue;
+  cell.open=true;opened++;
+  if(cell.n===0)queue.push(...neighbors(current));
+ }
+}
+function lose(){
+ over=true;stopTimer();face.textContent="😵";
+ cells.forEach(cell=>{if(cell.mine)cell.open=true;});
+ render();setStatus("踩到地雷 · 再试一次");
+ GameBridge.send("GAME_OVER",{message:"踩到地雷",score:opened,win:false});
+}
+function win(){
+ over=true;stopTimer();face.textContent="😎";
+ cells.forEach(cell=>{if(cell.mine&&!cell.flag){cell.flag=true;flags++;}});
+ render();setStatus("恭喜，全部排除！");
+ GameBridge.send("GAME_OVER",{message:"扫雷成功",score:opened,win:true});
+}
+function checkWin(){if(opened===W*H-MINES)win();}
+function reveal(index){
+ if(paused||over||cells[index].open||cells[index].flag)return;
+ if(!started){relocateFirst(index);started=true;startTimer();}
+ if(cells[index].mine){lose();return;}
+ flood(index);render();
+ if(opened===W*H-MINES){win();return;}
+ setStatus("继续排查");
+}
+function toggleFlag(index){
+ if(paused||over||cells[index].open)return;
+ cells[index].flag=!cells[index].flag;
+ flags+=cells[index].flag?1:-1;
+ render();
+}
+function chord(index){
+ const cell=cells[index];
+ if(paused||over||!cell?.open||cell.n===0)return;
+ const around=neighbors(index),flagged=around.filter(i=>cells[i].flag).length;
+ if(flagged!==cell.n)return;
+ const covered=around.filter(i=>!cells[i].open&&!cells[i].flag);
+ if(!covered.length)return;
+ if(covered.some(i=>cells[i].mine)){lose();return;}
+ covered.forEach(flood);
+ render();
+ if(opened===W*H-MINES){win();return;}
+ setStatus("继续排查");
+}
 function newGame(){makeBoard();}
-boardEl.addEventListener("contextmenu",e=>e.preventDefault());
-GameBridge.register({init(p){configure(p.difficulty);newGame();},newGame,pause(){paused=true;setStatus("已暂停");},resume(){paused=false;setStatus("继续排查");},setDifficulty(v){configure(v);},dispose(){paused=true;}});
+face.addEventListener("click",newGame);
+boardEl.addEventListener("contextmenu",event=>event.preventDefault());
+GameBridge.register({
+ init(payload){configure(payload.difficulty);newGame();},
+ newGame,
+ pause(){paused=true;setStatus("已暂停");},
+ resume(){paused=false;if(started&&!over)setStatus("继续排查");},
+ setDifficulty(value){configure(value);},
+ dispose(){paused=true;stopTimer();}
+});
 })();
