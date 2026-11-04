@@ -7,6 +7,8 @@ on:
     paths:
       - "projects/1-桌面软件/111-GameStation/**"
       - ".github/workflows/p111-gamestation-ci.yml"
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
   pull_request:
     branches: [main]
     paths:
