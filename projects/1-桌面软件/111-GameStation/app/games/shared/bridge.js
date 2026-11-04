@@ -88,6 +88,7 @@ function send(type,payload={}){
 function report(status,extra={}){send("STATE",{status,...extra});}
 function safeCall(name,...args){if(typeof handlers[name]==="function")return handlers[name](...args);}
 function safePause(){preserveDuringPause=true;try{safeCall("pause");}finally{preserveDuringPause=false;}}
+function safeResume(){preserveDuringPause=false;safeCall("resume");resumeTimers();}
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
@@ -103,7 +104,7 @@ window.addEventListener("message",event=>{
  }else if(m.type==="PAUSE"){
   suspendTimers();safePause();
  }else if(m.type==="RESUME"){
-  resumeTimers();safeCall("resume");
+  safeResume();
  }else if(m.type==="SET_DIFFICULTY"){
   suspendTimers();safeCall("setDifficulty",m.payload?.difficulty);safePause();
  }else if(m.type==="SET_MODE"){
