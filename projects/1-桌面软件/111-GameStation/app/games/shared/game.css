@@ -187,7 +187,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .checkers-layout #board .game-cell{width:auto!important;height:auto!important}
 .game2048-layout #board{width:min(78vh,100%);max-width:100%;aspect-ratio:1;grid-template-columns:repeat(4,minmax(0,1fr))!important}
 .game2048-layout #board .tile{width:auto!important;height:auto!important;aspect-ratio:1}
-.memory-layout #board{width:min(76vh,100%);max-width:100%;aspect-ratio:1;grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.memory-layout #board{width:min(76vh,100%);max-width:100%;aspect-ratio:1}
 .memory-layout #board .game-cell{width:auto!important;height:auto!important;aspect-ratio:1}
 .sudoku-layout #board{width:min(82vh,100%);max-width:100%;aspect-ratio:1;grid-template-columns:repeat(9,minmax(0,1fr))!important}
 .sudoku-layout #board .game-cell{width:auto!important;height:auto!important;aspect-ratio:1}
