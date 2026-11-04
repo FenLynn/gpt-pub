@@ -164,7 +164,7 @@ jobs:
           test -s "$APP/css/app.css"
           test -s "$APP/js/app.js"
           test -s "$APP/games/shared/bridge.js"
-          for game in gomoku xiangqi minesweeper solitaire tetris snake; do
+          for game in gomoku xiangqi reversi connect4 battleship checkers minesweeper 2048 memory sudoku sokoban tetris snake pong contra solitaire doudizhu mahjong sanguosha; do
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
@@ -239,8 +239,10 @@ jobs:
           test -s _site/p109/index.html
           test -s _site/p111/index.html
           test -s _site/p111/js/app.js
-          test -s _site/p111/games/gomoku/index.html
-          test -s _site/p111/games/minesweeper/index.html
+          for game in gomoku xiangqi reversi connect4 battleship checkers minesweeper 2048 memory sudoku sokoban tetris snake pong contra solitaire doudizhu mahjong sanguosha; do
+            test -s "_site/p111/games/$game/index.html"
+            test -s "_site/p111/games/$game/game.js"
+          done
           test -d _site/p108/assets
           test -s _site/p109/src/app/00-state.js
           test -s _site/p109/src/vendor/echarts.min.js

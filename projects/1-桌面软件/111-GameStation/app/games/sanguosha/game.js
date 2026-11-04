@@ -1,0 +1,18 @@
+(function(){
+"use strict";
+const handEl=document.getElementById("hand"),status=document.getElementById("status");let players=[],deck=[],turn=0,paused=false,over=false,usedSha=false,timer=null;
+const roleNames=["主公","忠臣","反贼","内奸"];
+function report(t){status.textContent=t;document.getElementById("tableInfo").textContent=t;GameBridge.report(t,{score:players[0]?.hp||0});}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function newGame(){clearTimeout(timer);deck=shuffle(["杀","杀","杀","杀","杀","闪","闪","闪","闪","桃","桃","桃","杀","闪","杀","桃","杀","闪","杀","杀","闪","桃","杀","闪","杀","桃","闪","杀","杀","闪","桃","杀","杀","闪","桃","杀","闪","杀","杀","桃"]);players=roleNames.map((role,i)=>({role,hp:4,hand:deck.splice(0,4),alive:true,name:i===0?"你":"AI "+i}));turn=0;paused=false;over=false;usedSha=false;render();report("你是主公 · 你的回合");}
+function render(){handEl.innerHTML="";players[0].hand.forEach((c,i)=>{const b=document.createElement("button");b.className="playing-card"+(c==="桃"?" red":"");b.style.width="50px";b.style.height="58px";b.textContent=c;b.onclick=()=>useCard(i);handEl.appendChild(b);});document.getElementById("hp").textContent=players[0].hp;document.getElementById("handCount").textContent=players[0].hand.length;document.getElementById("players").innerHTML=players.map((p,i)=>'<span class="metric-pill">'+p.name+' <strong>'+ (p.alive?"♥ "+p.hp:"阵亡")+'</strong></span>').join("");}
+function alive(){return players.filter(p=>p.alive);}
+function nextAlive(i){for(let k=1;k<=4;k++){const j=(i+k)%4;if(players[j].alive)return j;}return -1;}
+function checkEnd(){if(!players[0].alive){over=true;report("主公阵亡 · 游戏结束");GameBridge.send("GAME_OVER",{message:"主公阵亡"});return true;}if(alive().length<=1){over=true;report("对局结束");GameBridge.send("GAME_OVER",{message:"三国杀原型结束"});return true;}return false;}
+function attack(attacker,target){const p=players[target],dodge=p.hand.indexOf("闪");if(dodge>=0){p.hand.splice(dodge,1);report(p.name+" 打出闪，躲过攻击");}else{p.hp--;report(p.name+" 受到 1 点伤害");if(p.hp<=0){p.alive=false;report(p.name+" 阵亡");}}}
+function useCard(i){if(paused||over||turn!==0)return;const c=players[0].hand[i];if(c==="桃"){if(players[0].hp>=4){report("体力已满，桃暂不可用");return;}players[0].hand.splice(i,1);players[0].hp++;render();report("你使用桃，回复 1 点体力");return;}if(c==="杀"){if(usedSha){report("本回合已使用过杀");return;}players[0].hand.splice(i,1);usedSha=true;const target=nextAlive(0);if(target>=0)attack(0,target);render();checkEnd();return;}report("闪只能在受到攻击时使用");}
+function aiTurn(){if(paused||over)return;const p=players[turn];if(!p||!p.alive){advance();return;}p.hand.push(deck.length?deck.pop():"闪");if(p.hp<=2){const peach=p.hand.indexOf("桃");if(peach>=0){p.hand.splice(peach,1);p.hp++;}}const sha=p.hand.indexOf("杀");if(sha>=0){p.hand.splice(sha,1);const target=nextAlive(turn);if(target>=0)attack(turn,target);}render();if(checkEnd())return;advance();}
+function advance(){turn=nextAlive(turn);if(turn<0){checkEnd();return;}if(turn===0){usedSha=false;players[0].hand.push(deck.length?deck.pop():"闪");render();report("你的回合 · 摸牌后选择杀或桃");}else{report(players[turn].name+" 行动中");timer=setTimeout(aiTurn,600);}}
+document.getElementById("endTurn").onclick=()=>{if(turn!==0||paused||over)return;advance();};document.getElementById("reset").onclick=newGame;
+GameBridge.register({init:newGame,newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;if(turn!==0)aiTurn();else report("继续你的回合");},dispose(){paused=true;clearTimeout(timer);}});
+})();
