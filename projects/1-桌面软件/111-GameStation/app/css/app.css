@@ -514,3 +514,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
  .elapsed-label strong{font-size:12px}
  .topbar-actions{gap:3px}
 }
+
+/* R9.1: keep the home surface to date, activity and direct game ranking */
+.home-main{grid-template-rows:auto minmax(0,1fr)!important;gap:14px!important}
+.quick-start,.quick-start-section,.quick-start-grid{display:none!important}
+.home-layout{align-items:stretch}
+.heatmap-grid{max-width:100%}
+.heatmap-content{min-width:0;overflow:hidden!important}
