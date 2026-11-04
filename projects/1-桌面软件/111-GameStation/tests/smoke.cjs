@@ -59,6 +59,9 @@ const games = [
         return { width: rect.width, height: rect.height };
       });
       assert.ok(frameLayout.width > 200 && frameLayout.height > 250, name + " should receive a usable game area");
+      await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
+      const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-");
+      await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/games/"+screenshotName+".png")});
       await page.keyboard.press("p");
       await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "继续");
       await page.keyboard.press("Enter");
