@@ -21,14 +21,16 @@ const games = [
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const remoteRequests = [];
   const pageErrors = [];
+  let currentGame = "host";
   const browserConsole = [];
   page.on("console", message => browserConsole.push(message.type()+": "+message.text()));
   page.on("requestfailed", request => browserConsole.push("requestfailed: "+request.url()+" "+request.failure()?.errorText));
   page.on("request", request => { if (/^https?:/i.test(request.url())) remoteRequests.push(request.url()); });
-  page.on("pageerror", error => pageErrors.push(error.message));
+  page.on("pageerror", error => pageErrors.push(currentGame+": "+error.message));
 
   async function openGame(name) {
-    if (await page.locator("#workspaceView").isVisible()) await page.locator("#backToLibrary").click();
+    if (await page.locator("#workspaceView").isVisible()) { await page.locator("#backToLibrary").click(); currentGame = "host"; }
+    currentGame = name;
     await page.locator(".game-card").filter({ hasText: name }).click();
     try {
       await page.locator("#stageLoading").waitFor({ state: "hidden", timeout: 10000 });
