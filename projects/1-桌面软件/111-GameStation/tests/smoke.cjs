@@ -7,7 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 const games = [
   "五子棋","中国象棋","黑白棋","四子棋","海战棋","国际跳棋",
   "扫雷","2048","记忆翻牌","数独","推箱子",
-  "俄罗斯方块","贪吃蛇","Pong","魂斗罗",
+  "俄罗斯方块","贪吃蛇","Pong","横版射击",
   "经典纸牌","斗地主","麻将","三国杀"
 ];
 
@@ -19,22 +19,35 @@ const games = [
     args: ["--no-sandbox", "--disable-dev-shm-usage", "--allow-file-access-from-files"]
   });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  const remoteRequests = [];
-  const pageErrors = [];
+  const remoteRequests = [], pageErrors = [], browserConsole = [];
   let currentGame = "host";
-  const browserConsole = [];
   page.on("console", message => browserConsole.push(message.type()+": "+message.text()));
   page.on("requestfailed", request => browserConsole.push("requestfailed: "+request.url()+" "+request.failure()?.errorText));
   page.on("request", request => { if (/^https?:/i.test(request.url())) remoteRequests.push(request.url()); });
   page.on("pageerror", error => pageErrors.push(currentGame+": "+error.message));
 
+  async function openLibrary() {
+    if (!(await page.locator("#libraryView").isVisible())) {
+      await page.locator('[data-category="all"]').click();
+    }
+  }
+
   async function openGame(name) {
-    if (await page.locator("#workspaceView").isVisible()) { await page.locator("#backToLibrary").click(); currentGame = "host"; }
+    if (await page.locator("#workspaceView").isVisible()) {
+      await page.locator('[data-category="all"]').click();
+      currentGame = "host";
+    } else {
+      await openLibrary();
+    }
     currentGame = name;
     await page.locator(".game-card").filter({ hasText: name }).click();
     try {
-      await page.locator("#stageLoading").waitFor({ state: "hidden", timeout: 10000 });
-      await page.frameLocator("#gameFrame").locator("#game").waitFor({ state: "visible", timeout: 3000 });
+      await page.frameLocator("#gameFrame").locator("#game").waitFor({ state: "visible", timeout: 10000 });
+      await page.locator("#startButton").waitFor({ state: "visible" });
+      await page.locator("#startButton").waitFor({ state: "attached" });
+      await page.waitForFunction(() => !document.querySelector("#startButton").disabled);
+      await page.locator("#startButton").click();
+      await page.waitForTimeout(100);
     } catch (error) {
       console.error("Failed game:", name);
       console.error("iframe src:", await page.locator("#gameFrame").getAttribute("src"));
@@ -43,12 +56,17 @@ const games = [
       console.error("browser console:", browserConsole);
       throw error;
     }
-    await page.waitForTimeout(80);
   }
 
   try {
     await page.goto(pathToFileURL(path.join(root, "index.html")).href);
-    await page.locator(".game-card").first().waitFor();
+    await page.locator("#homeDate").waitFor({ state: "visible" });
+    assert.match(await page.locator("#homeWeekday").innerText(), /^星期[一二三四五六日]$/);
+    assert.equal(await page.locator(".heatmap-cell").count(), 371, "one-year activity grid should contain 53×7 cells");
+    await page.locator('[data-ranking="time"]').click();
+    assert.ok(await page.locator('[data-ranking="time"]').getAttribute("aria-selected") === "true");
+    await page.locator('[data-ranking="plays"]').click();
+    await page.locator('[data-category="all"]').click();
     assert.equal(await page.locator(".game-card").count(), 19, "all 19 planned games must appear in the library");
 
     for (const name of games) await openGame(name);
@@ -85,13 +103,16 @@ const games = [
 
     await openGame("Pong");
     const pong = page.frameLocator("#gameFrame");
-    await pong.locator("#start").click();
-    await pong.locator("#pause").click();
+    assert.ok(await pong.locator("canvas").isVisible());
+    await page.locator("#pauseButton").click();
+    const pausedAt = await page.locator("#gameElapsed").innerText();
+    await page.waitForTimeout(1200);
+    assert.equal(await page.locator("#gameElapsed").innerText(), pausedAt, "paused game time must stop");
+    await page.locator("#startButton").click();
 
-    await openGame("魂斗罗");
+    await openGame("横版射击");
     const contra = page.frameLocator("#gameFrame");
-    await contra.locator("#start").click();
-    await contra.locator("#pause").click();
+    assert.ok(await contra.locator("canvas").isVisible());
 
     await openGame("五子棋");
     const gomoku = page.frameLocator("#gameFrame");
@@ -122,13 +143,11 @@ const games = [
 
     await openGame("俄罗斯方块");
     const tetris = page.frameLocator("#gameFrame");
-    await tetris.locator("#start").click();
     await tetris.locator("canvas").click();
     await page.keyboard.press("ArrowLeft");
 
     await openGame("贪吃蛇");
     const snake = page.frameLocator("#gameFrame");
-    await snake.locator("#start").click();
     await snake.locator("canvas").click();
     await page.keyboard.press("ArrowDown");
 
@@ -146,7 +165,7 @@ const games = [
     assert.equal(await sanguosha.locator(".playing-card").count(), 4);
     await sanguosha.locator("#endTurn").click();
 
-    await page.locator("#backToLibrary").click();
+    await page.locator('[data-category="all"]').click();
     await page.setViewportSize({ width: 390, height: 844 });
     assert.ok(await page.locator(".game-card").first().isVisible(), "mobile library should remain visible");
     const width = await page.evaluate(() => document.documentElement.scrollWidth);
@@ -156,16 +175,21 @@ const games = [
     await page.locator("#mobileMenu").click();
 
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.locator("#feedbackOpen").click();
-    await page.locator("#feedbackText").fill("CI 自动化体验反馈测试");
-    assert.ok(await page.locator("#feedbackCopy").isEnabled());
-    await page.locator("#feedbackClose").click();
+    await page.locator("#settingsButton").click();
+    assert.ok(await page.locator("#settingsBackdrop").isVisible());
+    await page.locator("#uiScale").selectOption("1.08");
+    await page.locator("#settingsDone").click();
+
+    await page.locator("#helpButton").click();
+    assert.ok(await page.locator("#helpPanel").isVisible());
+    await page.locator(".help-chapter button").nth(1).click();
+    await page.locator("#helpClose").click();
 
     assert.deepEqual(remoteRequests, [], "the offline app must not make remote network requests");
     assert.deepEqual(pageErrors, [], "the host and game frames must not throw browser errors");
     await fs.promises.mkdir(path.resolve(__dirname, "../p111-smoke-artifacts"), { recursive: true }).catch(() => {});
     await page.screenshot({ path: path.resolve(__dirname, "../p111-smoke-artifacts/library.png"), fullPage: true });
-    console.log("P111 browser smoke passed: redesigned library, all 19 modules, core interactions, responsive layout, zero remote requests.");
+    console.log("P111 browser smoke passed: quiet dashboard, all 19 modules, unified start/pause/new-game, help/settings, responsive layout, zero remote requests.");
   } finally {
     await browser.close();
   }
