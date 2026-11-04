@@ -54,6 +54,7 @@ function renderGameControls(){
  if(hasModes)active.modes.forEach((label,index)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.modeIndex=String(index);b.setAttribute("aria-pressed",String(index===modeIndex));modeEl.appendChild(b);});
  const hasDifficulty=!!active?.difficulty;difficultyEl.classList.toggle("hidden",!hasDifficulty);difficultyEl.innerHTML="";
  if(hasDifficulty){const labels=active.difficultyLabels||["简单","中等","困难"],values=["easy","normal","hard"];labels.forEach((label,index)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.difficulty=values[index]||"hard";b.setAttribute("aria-pressed",String((values[index]||"hard")===difficulty));difficultyEl.appendChild(b);});}
+ $("gameControls").classList.toggle("hidden",!hasModes&&!hasDifficulty);
 }
 function setGameState(){
  $("gameElapsed").textContent=session?fmtClock(session.elapsedMs):"00:00";
