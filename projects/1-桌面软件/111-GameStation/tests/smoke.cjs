@@ -259,6 +259,11 @@ const games = [
 
     await openGame("中国象棋");
     const xiangqi = page.frameLocator("#gameFrame");
+    const xiangqiFit = await xiangqi.locator(".xiangqi-board").evaluate(el => {
+      const board=el.getBoundingClientRect(),area=el.closest(".game-main-board").getBoundingClientRect();
+      return {board:{width:board.width,height:board.height},area:{width:area.width,height:area.height}};
+    });
+    assert.ok(xiangqiFit.board.width > xiangqiFit.area.width*.75 && xiangqiFit.board.height > xiangqiFit.area.height*.75, "Xiangqi board should expand to use the center workspace");
     assert.equal(await xiangqi.locator(".xiangqi-cell").count(), 90);
     assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到红方走");
     const intersectionCell = xiangqi.locator(".xiangqi-cell").nth(81);
