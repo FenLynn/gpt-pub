@@ -12,6 +12,6 @@ function resume(){if(over)return;cancelAnimationFrame(raf);paused=false;last=per
 function keydown(e){if(["ArrowUp","ArrowDown"," "].includes(e.key))e.preventDefault();keys[e.key]=true;if(e.key===" "){paused?resume():pause();}}
 function keyup(e){keys[e.key]=false;}
 window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("mousemove",e=>{const r=canvas.getBoundingClientRect();playerY=(e.clientY-r.top)/r.height*360-35;playerY=Math.max(0,Math.min(290,playerY));});
-document.getElementById("start").onclick=start;document.getElementById("pause").onclick=pause;resetBall(1);draw();
+resetBall(1);draw();
 GameBridge.register({init(){pause();},newGame:start,pause,resume,setDifficulty(v){difficulty=v||"normal";},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);}});
 })();
