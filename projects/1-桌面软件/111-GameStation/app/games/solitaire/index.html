@@ -384,6 +384,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         }
 
         function initGame() {
+            gamePaused = false; winReported = false;
             stopTimer(); elapsedSeconds = 0; isGameStarted = false; updateTimerUI();
             selectedCard = null; draggedCards = []; document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
             deck.forEach(c => { c.isFaceUp = false; c.el.classList.remove('face-up'); });
@@ -476,6 +477,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         }
 
         function moveCards(cards, sourceArr, targetArr) {
+            if (gamePaused) return;
             startTimer();
             const idx = sourceArr.indexOf(cards[0]);
             sourceArr.splice(idx, cards.length);
@@ -491,6 +493,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
             
             calculateLayout();
             renderAll();
+            GameBridge.report("进行中", { score: Math.max(0, 10000-elapsedSeconds) });
             checkWin();
         }
 
@@ -514,11 +517,14 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         }
 
         function handleStockClick() {
+            if (gamePaused) return;
             startTimer(); clearSelection();
-            if (piles.stock.length > 0) piles.waste.push(piles.stock.pop());
-            else while (piles.waste.length > 0) piles.stock.push(piles.waste.pop());
+            if (piles.stock.length > 0) {
+                for (let i=0; i<drawCount && piles.stock.length>0; i++) piles.waste.push(piles.stock.pop());
+            } else while (piles.waste.length > 0) piles.stock.push(piles.waste.pop());
             calculateLayout();
             renderAll();
+            GameBridge.report("进行中", { score: Math.max(0, 10000-elapsedSeconds) });
         }
 
         function clearSelection() {
