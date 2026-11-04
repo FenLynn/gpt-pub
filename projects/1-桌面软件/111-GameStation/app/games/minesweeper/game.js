@@ -142,7 +142,8 @@ function chord(index){
 }
 function newGame(){makeBoard();}
 function onResize(){fitBoard();}
-face.addEventListener("click",newGame);
+function requestNewGame(){GameBridge.send("REQUEST_NEW_GAME");}
+face.addEventListener("click",requestNewGame);
 boardEl.addEventListener("contextmenu",event=>event.preventDefault());
 window.addEventListener("resize",onResize);
 if(typeof ResizeObserver!=="undefined"){resizeObserver=new ResizeObserver(fitBoard);resizeObserver.observe(gameArea);}
