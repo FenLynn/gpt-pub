@@ -367,3 +367,12 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
   .mine-classic{max-width:100%}
   .mine-cell{font-size:clamp(8px,calc(var(--mine-cell-size) * .52),15px)}
 }
+
+/* P111 R8.1 · inline game panels must not cap the board's usable area */
+.game-main-board>.game-panel{
+ width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;
+ padding:0!important;border:0!important;border-radius:0!important;
+ background:transparent!important;box-shadow:none!important;overflow:hidden!important;
+ aspect-ratio:auto!important;
+}
+@media(max-width:900px){.hotkey-hint{display:none}}
