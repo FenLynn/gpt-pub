@@ -356,6 +356,23 @@ const games = [
     const mobileTetrisCanvas = await page.frameLocator("#gameFrame").locator("#canvas").boundingBox();
     assert.ok(mobileTetrisCanvas && mobileTetrisCanvas.width > 100 && mobileTetrisCanvas.height > 200, "mobile Tetris canvas should remain fully visible");
 
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await openGame("扫雷");
+    const mine1366 = await page.frameLocator("#gameFrame").locator(".mine-classic").evaluate(el => ({
+      board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect(),
+      cellSize: Number(el.querySelector("#board").dataset.cellSize)
+    }));
+    assert.ok(mine1366.board.width <= mine1366.area.width + 2 && mine1366.cellSize >= 30, "1366×768 Minesweeper should use the available area without clipping");
+    await openGame("俄罗斯方块");
+    const tetris1366 = await page.frameLocator("#gameFrame").locator("#canvas").evaluate(el => {
+      const board=el.getBoundingClientRect(),area=el.closest(".game-main-board").getBoundingClientRect();
+      return {board:{left:board.left,top:board.top,right:board.right,bottom:board.bottom,width:board.width,height:board.height},area:{left:area.left,top:area.top,right:area.right,bottom:area.bottom}};
+    });
+    assert.ok(tetris1366.board.height > 500 && tetris1366.board.top >= tetris1366.area.top - 1 && tetris1366.board.bottom <= tetris1366.area.bottom + 1, "1366×768 Tetris should use the available vertical space without clipping");
+    await openGame("五子棋");
+    const gomoku1366 = await page.frameLocator("#gameFrame").locator(".gomoku-board").boundingBox();
+    assert.ok(gomoku1366 && Math.abs(gomoku1366.width-gomoku1366.height)<1 && gomoku1366.width > 500, "1366×768 Gomoku should remain square and fill the center area");
+
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator("#settingsButton").click();
     assert.ok(await page.locator("#settingsBackdrop").isVisible());
