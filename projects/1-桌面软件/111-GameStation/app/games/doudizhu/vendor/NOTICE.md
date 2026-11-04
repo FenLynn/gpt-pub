@@ -2,7 +2,7 @@
 
 ## justa-cai/doudizhu
 
-- Upstream: https://github.com/justa-cai/doudizhu
+- Upstream: github.com/justa-cai/doudizhu
 - Pinned commit: 360b5708219561abfe66e68578d37ead848f0845
 - License: MIT (full text below)
 - Adapted sources: js/rules.js, js/difficulty.js, js/ai/engine.js
