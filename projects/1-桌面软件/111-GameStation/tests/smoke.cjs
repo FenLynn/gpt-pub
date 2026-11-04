@@ -130,6 +130,7 @@ const games = [
     await page.locator("#difficultyPrev").click();
     await page.waitForTimeout(100);
     assert.equal(await mines.locator(".mine-cell").count(), 81, "easy Minesweeper level should be 9×9");
+    await page.locator("#startButton").click();
     await mines.locator(".mine-cell").first().click();
     assert.ok(await mines.locator(".mine-cell.open").count() >= 1);
 
