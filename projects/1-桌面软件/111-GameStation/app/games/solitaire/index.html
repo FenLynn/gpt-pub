@@ -767,7 +767,7 @@ body.gs-paused:after{content:"";position:fixed;inset:0;z-index:99999;background:
         GameBridge.register({
             init(p) { drawCount = p.difficulty === "easy" ? 1 : 3; initGame(); },
             newGame: initGame,
-            pause() { gamePaused = true; document.body.classList.add("gs-paused"); stopTimer(); },
+            pause() { gamePaused = true; document.body.classList.add("gs-paused"); },
             resume() { gamePaused = false; document.body.classList.remove("gs-paused"); },
             setDifficulty(v) { drawCount = v === "easy" ? 1 : 3; },
             dispose() { gamePaused = true; stopTimer(); }
