@@ -116,6 +116,8 @@ jobs:
 
       - name: Build P108 React application
         shell: bash
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           set -euo pipefail
           APP="source-p108/projects/1-桌面软件/108-FigureStudio/web"
