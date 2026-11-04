@@ -199,6 +199,12 @@ const games = [
     }));
     assert.match(mineTileStyle.backgroundImage, /linear-gradient/, "Minesweeper should use the Windows 7 blue beveled tile treatment");
     assert.ok(parseFloat(mineTileStyle.cellSize) >= 18, "desktop Minesweeper cells should expand to use the available area");
+    await page.locator("#difficultyControl button[data-difficulty='hard']").click();
+    const hardMineFit = await mines.locator(".mine-classic").evaluate(el => ({
+      board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect()
+    }));
+    assert.ok(hardMineFit.board.width <= hardMineFit.area.width + 2, "hard Minesweeper should fit the available desktop width without a horizontal scrollbar");
+    await page.locator("#difficultyControl button[data-difficulty='normal']").click();
     await mines.locator("body").evaluate(() => { let n=0; Math.random=()=>((n++%256)+0.1)/256; });
     await page.locator("#newGameButton").click();
     await page.locator("#startButton").click();
