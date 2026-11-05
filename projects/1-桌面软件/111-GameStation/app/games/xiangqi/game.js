@@ -67,24 +67,17 @@ function report(t){
 function drawBoardLines(){
  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
  svg.setAttribute("viewBox","0 0 800 900");svg.setAttribute("preserveAspectRatio","none");svg.classList.add("xiangqi-lines");svg.setAttribute("aria-hidden","true");
+ const X0=46,X1=754,Y0=48,Y1=852,xAt=x=>X0+(X1-X0)*x/8,yAt=y=>Y0+(Y1-Y0)*y/9;
  const line=(x1,y1,x2,y2)=>{const e=document.createElementNS(ns,"line");for(const [k,v] of Object.entries({x1,y1,x2,y2}))e.setAttribute(k,String(v));svg.appendChild(e);};
  const path=d=>{const e=document.createElementNS(ns,"path");e.setAttribute("d",d);svg.appendChild(e);};
- const rect=document.createElementNS(ns,"rect");rect.setAttribute("x","1");rect.setAttribute("y","1");rect.setAttribute("width","798");rect.setAttribute("height","898");rect.setAttribute("class","xiangqi-border");svg.appendChild(rect);
- for(let x=0;x<=8;x++){
-  const px=x*100;
-  if(x===0||x===8)line(px,0,px,900);
-  else{line(px,0,px,400);line(px,500,px,900);}
- }
- for(let y=0;y<=9;y++)line(0,y*100,800,y*100);
- path("M300 0 L500 200 M500 0 L300 200 M300 700 L500 900 M500 700 L300 900");
+ const rect=document.createElementNS(ns,"rect");rect.setAttribute("x",String(X0));rect.setAttribute("y",String(Y0));rect.setAttribute("width",String(X1-X0));rect.setAttribute("height",String(Y1-Y0));rect.setAttribute("class","xiangqi-border");svg.appendChild(rect);
+ for(let x=0;x<=8;x++){const px=xAt(x);if(x===0||x===8)line(px,Y0,px,Y1);else{line(px,Y0,px,yAt(4));line(px,yAt(5),px,Y1);}}
+ for(let y=0;y<=9;y++)line(X0,yAt(y),X1,yAt(y));
+ path("M"+xAt(3)+" "+yAt(0)+" L"+xAt(5)+" "+yAt(2)+" M"+xAt(5)+" "+yAt(0)+" L"+xAt(3)+" "+yAt(2)+" M"+xAt(3)+" "+yAt(7)+" L"+xAt(5)+" "+yAt(9)+" M"+xAt(5)+" "+yAt(7)+" L"+xAt(3)+" "+yAt(9));
  const label=(x,text)=>{const e=document.createElementNS(ns,"text");e.setAttribute("x",String(x));e.setAttribute("y","474");e.setAttribute("text-anchor","middle");e.setAttribute("class","xiangqi-river-label");e.textContent=text;svg.appendChild(e);};
- label(245,"楚河");label(555,"汉界");
- const mark=(x,y,dx,dy)=>{const a=9,b=19;path("M"+(x+dx*a)+" "+(y+dy*a)+" l"+(-dx*a)+" 0 l0 "+(-dy*b)+" M"+(x+dx*a)+" "+(y+dy*a)+" l0 "+(-dy*a)+" l"+(-dx*b)+" 0");};
- [[1,2],[7,2],[1,7],[7,7],[0,3],[2,3],[4,3],[6,3],[8,3],[0,6],[2,6],[4,6],[6,6],[8,6]].forEach(([x,y])=>{
-  const px=x*100,py=y*100;
-  if(x>0)mark(px,py,-1,-1);if(x<8)mark(px,py,1,-1);
-  if(x>0)mark(px,py,-1,1);if(x<8)mark(px,py,1,1);
- });
+ label(270,"楚河");label(530,"汉界");
+ const mark=(x,y,dx,dy)=>{const a=8,b=17;path("M"+(x+dx*a)+" "+(y+dy*a)+" l"+(-dx*a)+" 0 l0 "+(-dy*b)+" M"+(x+dx*a)+" "+(y+dy*a)+" l0 "+(-dy*a)+" l"+(-dx*b)+" 0");};
+ [[1,2],[7,2],[1,7],[7,7],[0,3],[2,3],[4,3],[6,3],[8,3],[0,6],[2,6],[4,6],[6,6],[8,6]].forEach(([x,y])=>{const px=xAt(x),py=yAt(y);if(x>0)mark(px,py,-1,-1);if(x<8)mark(px,py,1,-1);if(x>0)mark(px,py,-1,1);if(x<8)mark(px,py,1,1);});
  el.appendChild(svg);
 }
 function render(){
@@ -93,7 +86,7 @@ function render(){
  const targets=new Set(selectedMoves.map(m=>m.tx+","+m.ty));
  for(let y=0;y<10;y++)for(let x=0;x<9;x++){
   const px=flip?8-x:x,py=flip?9-y:y,cell=document.createElement("button");
-  cell.type="button";cell.className="xiangqi-cell";cell.style.left=(x/8*100)+"%";cell.style.top=(y/9*100)+"%";
+  cell.type="button";cell.className="xiangqi-cell";const boardX=46+(754-46)*x/8,boardY=48+(852-48)*y/9;cell.style.left=(boardX/800*100)+"%";cell.style.top=(boardY/900*100)+"%";cell.style.width=((754-46)/8/800*100)+"%";cell.style.height=((852-48)/9/900*100)+"%";
   cell.dataset.x=String(px);cell.dataset.y=String(py);
   if(selected&&selected.x===px&&selected.y===py)cell.classList.add("selected");
   if(targets.has(px+","+py))cell.classList.add("target");
