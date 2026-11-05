@@ -24,5 +24,5 @@ function undo(){if(!history.length||over||paused)return;clearTimeout(aiTimer);co
 undoButton.addEventListener("click",undo);
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(fitBoard);boardObserver.observe(boardArea);}
-GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);setStatus("已暂停");},resume(){paused=false;if(turn===-1&&mode==="ai")scheduleAI();else setStatus(turn===1?"轮到你了":"轮到白棋");},setMode(v){mode=v==="two"?"two":"ai";newGame();},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
+GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);setStatus("已暂停");},resume(){paused=false;if(turn===-1&&mode==="ai")scheduleAI();else setStatus(turn===1?"轮到你了":"轮到白棋");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
 })();
