@@ -228,6 +228,8 @@ const games = [
     const chess = page.frameLocator("#gameFrame");
     assert.equal(await chess.locator(".chess-square").count(), 64, "Chess must render all 64 squares");
     assert.equal(await chess.locator(".chess-piece").count(), 32, "Chess must start with 32 pieces");
+    const chessVisual=await chess.locator(".chess-piece").first().evaluate(el=>({fontSize:parseFloat(getComputedStyle(el).fontSize),axis:getComputedStyle(document.querySelector(".chess-axis-y")).display}));
+    assert.ok(chessVisual.fontSize>=50&&chessVisual.axis!=="none","Chess pieces and rank coordinates must be readable at desktop size");
     await chess.locator('[data-square="e2"]').click();
     await chess.locator('[data-square="e5"]').click();
     assert.equal(await chess.locator("#moveList li").count(), 0, "Chess must reject an illegal pawn move");
@@ -261,6 +263,8 @@ const games = [
     await openGame("五子棋");
     const gomoku = page.frameLocator("#gameFrame");
     assert.equal(await gomoku.locator(".gomoku-cell").count(), 225);
+    assert.equal(await gomoku.locator(".gomoku-axis-x span").count(), 15, "wooden Gomoku board should show A–O coordinates");
+    assert.equal(await gomoku.locator(".gomoku-axis-y span").count(), 15, "wooden Gomoku board should show 1–15 coordinates");
     assert.equal(await page.locator("#modeControl button").count(), 2);
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "人机对战");
     await page.locator("#modeControl button[data-mode-index='1']").click();
@@ -301,6 +305,8 @@ const games = [
     const mines = page.frameLocator("#gameFrame");
     assert.equal(await mines.locator(".mine-cell").count(), 256, "default Minesweeper level should be 16×16");
     assert.equal(await mines.locator("#counter").innerText(), "040", "classic mine counter should use three digits");
+    const mineCounterStyle=await mines.locator("#counter").evaluate(el=>getComputedStyle(el).color);
+    assert.equal(mineCounterStyle,"rgb(231, 247, 255)","Windows 7 Minesweeper counter should use the blue LCD display, not the old red-on-black style");
     const mineTileStyle = await mines.locator(".mine-cell").first().evaluate(el => ({
       backgroundImage: getComputedStyle(el).backgroundImage,
       cellSize: getComputedStyle(el).width,
@@ -383,6 +389,8 @@ const games = [
     await openGame("经典纸牌");
     const solitaire = page.frameLocator("#gameFrame");
     assert.equal(await solitaire.locator("#board .card").count(), 52);
+    const solitaireCardWidth=await solitaire.locator("#board .card").first().evaluate(el=>el.getBoundingClientRect().width);
+    assert.ok(solitaireCardWidth>=65&&solitaireCardWidth<=90,"Klondike cards should retain classic desktop proportions rather than expand across the whole table");
     await solitaire.locator("#board .card[style*='z-index: 33']").click({force:true});
     await page.waitForTimeout(150);
     assert.equal(await solitaire.locator("#board .card").count(), 52);
@@ -426,12 +434,18 @@ const games = [
     await openGame("麻将");
     const mahjong = page.frameLocator("#gameFrame");
     assert.equal(await mahjong.locator("#hand .playing-card").count(), 14, "dealer should start with 14 Mahjong tiles");
+    const mahjongCompass=await mahjong.locator(".mahjong-area").evaluate(el=>getComputedStyle(el,"::after").content);
+    assert.ok(mahjongCompass.includes("北"),"Mahjong table should show the central seat-wind compass");
     await mahjong.locator("#hand .playing-card").last().click();
     assert.equal(await mahjong.locator("#hand .playing-card").count(), 13, "discarding should reduce the concealed hand to 13 tiles");
 
     await openGame("三国杀");
     const sanguosha = page.frameLocator("#gameFrame");
     assert.equal(await sanguosha.locator(".playing-card").count(), 6, "Xiao Qiao should start with four cards plus two for the first turn");
+    const sanguoshaLayout=await sanguosha.locator(".card-table-main").evaluate(el=>({display:getComputedStyle(el).display,logRow:getComputedStyle(el.querySelector(".game-log-panel")).gridRowStart,handRow:getComputedStyle(el.querySelector(".card-hand")).gridRowStart}));
+    assert.equal(sanguoshaLayout.display,"grid","San Guo Sha should use a dedicated battlefield layout");
+    assert.equal(sanguoshaLayout.logRow,"2","San Guo Sha battle log should occupy the central play area");
+    assert.equal(sanguoshaLayout.handRow,"3","San Guo Sha hand cards should remain at the bottom of the table");
     await sanguosha.locator("#endTurn").click();
     await page.waitForTimeout(150);
 
