@@ -878,3 +878,12 @@ body{font-size:15px}
  .featured-copy small{display:-webkit-box;overflow:hidden;color:#8a9eaa;font-size:10px;line-height:1.45;-webkit-line-clamp:2;-webkit-box-orient:vertical}
  .featured-arrow{margin-left:auto;color:#9aafbb;font-size:14px}
 }
+
+
+/* P111 R11.2 · meaningful ranking empty state instead of a blank right rail */
+@media(min-width:701px){
+ .ranking-list:empty{flex:0;height:0;min-height:0;margin:0;padding:0}
+ .ranking-empty{display:grid;flex:1;min-height:260px;align-content:center;justify-items:center;gap:11px;margin:8px 2px;padding:22px 18px;border:1px dashed #d7e4eb;border-radius:12px;background:linear-gradient(145deg,#fbfdfe,#f5f9fb);color:#8399a8;font-size:13px;line-height:1.7;text-align:center}
+ .ranking-empty:before{content:"♔";width:52px;height:52px;display:grid;place-items:center;border:1px solid #dce7ed;border-radius:15px;background:#edf4f8;color:#7b9aae;font-family:Georgia,serif;font-size:30px;box-shadow:inset 0 1px #fff}
+ .ranking-empty:after{content:"完成一局后，成绩和游玩记录会自动出现在这里";max-width:210px;color:#9aaab4;font-size:11px}
+}
