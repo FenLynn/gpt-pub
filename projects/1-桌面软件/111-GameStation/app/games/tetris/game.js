@@ -40,14 +40,26 @@ function draw(){
  if(piece){
   const ghostY=ghostPiece();
   for(let y=0;y<piece.shape.length;y++)for(let x=0;x<piece.shape[y].length;x++)if(piece.shape[y][x])block(piece.x+x,ghostY+y,"#d6e5ee",.18);
-  const fraction=Math.min(.98,dropAccumulator/speed);
-  let top=ROWS;
+  // Only interpolate when the *whole* piece can legally move one grid row.
+  // Previously the fractional render offset continued even when collision()
+  // blocked the next step. It drew the piece below the floor/stack and then
+  // snapped it back up at lock(), appearing to fall and float upward.
+  const canFall=!collision({...piece,y:piece.y+1});
+  const fraction=canFall?Math.min(.98,Math.max(0,dropAccumulator/speed)):0;
+  let top=ROWS,bottom=-1;
   for(let y=0;y<piece.shape.length;y++)for(let x=0;x<piece.shape[y].length;x++)if(piece.shape[y][x]){
-   top=Math.min(top,piece.y+y);const renderY=piece.y+y+fraction;
+   top=Math.min(top,piece.y+y);bottom=Math.max(bottom,piece.y+y);
+   const renderY=piece.y+y+fraction;
+   // Canvas will clip any paint outside its logical 20-row playfield,
+   // but never allow an invalid offset to reach the block renderer.
    if(renderY>=0&&renderY<ROWS)block(piece.x+x,renderY,piece.color);
   }
   canvas.dataset.pieceTop=String(top);canvas.dataset.pieceY=String(piece.y);
- }else{canvas.dataset.pieceTop="";canvas.dataset.pieceY="";}
+  canvas.dataset.pieceCanFall=String(canFall);
+  canvas.dataset.pieceVisualBottom=String(bottom+fraction);
+  canvas.dataset.pieceLogicalBottom=String(bottom);
+  canvas.dataset.pieceRenderFraction=String(fraction);
+ }else{canvas.dataset.pieceTop="";canvas.dataset.pieceY="";canvas.dataset.pieceCanFall="";canvas.dataset.pieceVisualBottom="";canvas.dataset.pieceLogicalBottom="";canvas.dataset.pieceRenderFraction="";}
  if(paused&&!over){ctx.fillStyle="#ffffffdc";ctx.font="600 18px sans-serif";ctx.textAlign="center";ctx.fillText("已暂停",150,305);}
  if(over){ctx.fillStyle="#ffffffed";ctx.font="700 19px sans-serif";ctx.textAlign="center";ctx.fillText("游戏结束",150,305);}
  canvas.dataset.paused=String(paused);
