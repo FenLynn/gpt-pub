@@ -67,7 +67,9 @@ jobs:
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
-          if grep -RInE 'https?://' "$APP"; then
+          # SVG DOM namespace is a constant identifier, not a network request.
+          # Strip that exact namespace, but still reject any other URL on the same line.
+          if grep -RInE 'https?://' "$APP" | sed 's@http://www\.w3\.org/2000/svg@@g' | grep -E 'https?://'; then
             echo "::error::Remote URL found in the runtime app"
             exit 1
           fi
