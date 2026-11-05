@@ -921,3 +921,14 @@ body{font-size:15px}
  grid-auto-rows:76px!important;gap:8px!important}
  #gameGrid>.game-card{height:76px!important;min-height:76px!important;max-height:76px!important}
  .home-hero .hero-copy{max-width:100%!important}}
+
+
+/* P111 R17 · keep the home hero copy and decorative artwork in separate visual lanes. */
+@media(min-width:701px){
+ .home-hero .hero-copy{max-width:58%!important;min-width:0!important}
+ .home-hero .home-art{right:1%!important;width:32%!important;opacity:.28!important;pointer-events:none!important}
+}
+@media(max-width:860px){
+ .home-hero .hero-copy{max-width:100%!important}
+ .home-hero .home-art{display:none!important}
+}

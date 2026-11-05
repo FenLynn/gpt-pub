@@ -204,7 +204,7 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
    const s=statFor(active.id);
    s.bestScore=Math.max(s.bestScore,currentScore);
   }
-  if(m.payload?.status)setGameState();
+  if(typeof m.payload?.status==="string"&&m.payload.status.trim()){setGameState();send("HUD_NOTICE",{message:m.payload.status});}
   if(m.payload?.score!==undefined)persistStats();
  }else if(m.type==="SCORE"){
   const score=Number(m.payload?.score);

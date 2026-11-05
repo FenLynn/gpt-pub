@@ -8,7 +8,7 @@ let cells=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,ti
 function formatCounter(value){const n=Math.trunc(Number(value)||0);if(n<0)return "-"+String(Math.min(99,Math.abs(n))).padStart(2,"0");return String(Math.min(999,n)).padStart(3,"0");}
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score:opened,remaining:MINES-flags});}
 function fitBoard(){
- const rect=gameArea.getBoundingClientRect();
+ const rect=gameArea.getBoundingClientRect(),areaStyle=getComputedStyle(gameArea);
  const classic=document.querySelector(".mine-classic"),panel=document.querySelector(".mine-top-panel");
  const classicStyle=getComputedStyle(classic),gridStyle=getComputedStyle(boardEl);
  const px=value=>Number.parseFloat(value)||0;
@@ -21,8 +21,8 @@ function fitBoard(){
   px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+px(classicStyle.borderTopWidth)+px(classicStyle.borderBottomWidth)+
   px(gridStyle.paddingTop)+px(gridStyle.paddingBottom)+px(gridStyle.borderTopWidth)+px(gridStyle.borderBottomWidth)+
   Math.max(0,H-1)*px(gridStyle.rowGap);
- const availableWidth=Math.max(0,rect.width-horizontalOverhead);
- const availableHeight=Math.max(0,rect.height-verticalOverhead);
+ const availableWidth=Math.max(0,rect.width-px(areaStyle.paddingLeft)-px(areaStyle.paddingRight)-horizontalOverhead);
+ const availableHeight=Math.max(0,rect.height-px(areaStyle.paddingTop)-px(areaStyle.paddingBottom)-verticalOverhead);
  const size=Math.max(10,Math.min(48,availableWidth/W,availableHeight/H));
  const rounded=Math.round(size*10)/10;
  boardEl.style.setProperty("--mine-cell-size",rounded+"px");
@@ -82,8 +82,10 @@ function render(){
   button.type="button";
   button.className="mine-cell"+(cell.open?" open":"")+(cell.flag?" flag":"")+(cell.open&&cell.mine?" mine":"");
   button.dataset.n=String(cell.n);
-  if(cell.open){if(cell.mine)button.textContent="✹";else if(cell.n)button.textContent=String(cell.n);}
-  else if(cell.flag)button.textContent="⚑";
+  if(cell.open){
+   if(cell.mine)button.innerHTML='<svg class="mine-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2.5M9.5 3.5h5" fill="none" stroke="#26384a" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="14" r="7" fill="#202a34" stroke="#111820" stroke-width="1.2"/><circle cx="9.5" cy="11.5" r="2" fill="#aab7c2"/><path d="M17.5 7.5l2-2M19.5 10h2" stroke="#c34a36" stroke-width="1.8" stroke-linecap="round"/></svg>';
+   else if(cell.n)button.textContent=String(cell.n);
+  }else if(cell.flag)button.innerHTML='<svg class="mine-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 22V2.5" stroke="#52677a" stroke-width="2" stroke-linecap="round"/><path d="M7 3.5h12l-3.5 5L19 13H7z" fill="#e13e3e" stroke="#9f2525" stroke-width="1.2" stroke-linejoin="round"/><path d="M4 22h8" stroke="#52677a" stroke-width="2" stroke-linecap="round"/></svg>';
   button.setAttribute("aria-label",cell.open?(cell.mine?"地雷":cell.n?"数字 "+cell.n:"空白"):cell.flag?"已标记":"未翻开");
   button.addEventListener("click",()=>reveal(index));
   button.addEventListener("contextmenu",event=>{event.preventDefault();toggleFlag(index);});
@@ -159,6 +161,14 @@ face.addEventListener("click",requestNewGame);
 boardEl.addEventListener("contextmenu",event=>event.preventDefault());
 window.addEventListener("resize",onResize);
 if(typeof ResizeObserver!=="undefined"){resizeObserver=new ResizeObserver(fitBoard);resizeObserver.observe(gameArea);}
+if(new URLSearchParams(location.search).has("p111Test")){
+ configure("normal");newGame();
+ window.__p111MineTest={
+  forceFlag(index){if(cells[index]){cells[index].flag=true;render();}},
+  forceMine(index){cells.forEach(cell=>{cell.open=false;cell.flag=false;});if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}},
+  cellSize(){return Number(boardEl.dataset.cellSize)||0;}
+ };
+}
 GameBridge.register({
  init(payload){configure(payload.difficulty);newGame();},
  newGame,
