@@ -117,8 +117,76 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await xiangqi.evaluate(()=>window.__p111XiangqiTest.seedRepetition({redChecks:false,blackChecks:false}));
   assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.terminal()),true);
   assert.match(await xiangqi.locator("#turnText").innerText(),/循环局面和棋/);
+  const sg=await browser.newPage({viewport:{width:1100,height:850}});
+  sg.on("pageerror",err=>errors.push("Sanguosha: "+err.message));
+  await sg.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sanguosha/index.html")).href+"?p111Test=1");
+  await sg.waitForFunction(()=>typeof window.__p111SanguoshaTest?.addCard==="function");
+  const api=()=>sg.evaluate(()=>window.__p111SanguoshaTest.state());
+  const call=(name,...args)=>sg.evaluate(([n,a])=>window.__p111SanguoshaTest[n](...a),[name,args]);
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("setTurn",0);
+  await call("addCard",0,"dodge","club");
+  assert.equal(await call("canPlay","dodge"),false,"闪 must not be an active-play card");
+  await call("setHp",0,3);await call("addCard",0,"peach","heart");
+  assert.equal(await call("canPlay","peach"),false,"桃 cannot be wasted at full HP");
+  await call("setHp",0,2);
+  assert.equal(await call("canPlay","peach"),true,"桃 is legal when wounded");
+  // 酒 is once per active turn; it is not consumed as a dying-save quota.
+  await call("clearHand",0);await call("addCard",0,"wine","diamond");await call("addCard",0,"wine","club");
+  await call("setTurn",0);assert.equal(await call("canPlay","wine"),true);
+  await call("play","wine");await sg.waitForTimeout(40);
+  assert.equal((await call("flags")).usedWine,true);
+  assert.equal(await call("canPlay","wine"),false,"second active 酒 is forbidden in the same turn");
+  // 杀 is once per turn and must have a living target.
+  await call("clearHand",0);await call("clearHand",1);await call("addCard",0,"kill","spade");await call("addCard",0,"kill","heart");
+  await call("setTurn",0);await call("setDifficulty","hard");
+  assert.equal(await call("canPlay","kill"),true);
+  await call("play","kill",1);await sg.waitForTimeout(50);
+  assert.equal((await call("flags")).usedKill,true);
+  assert.equal(await call("canPlay","kill"),false,"second 杀 is forbidden in the same turn");
+  // A response-only 闪 is consumed only after an explicit incoming response request.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("addCard",0,"dodge","club");await call("setTurn",0);await call("response",0,"闪",1);
+  await sg.locator("#responseBar").waitFor({state:"visible"});
+  await sg.locator("#respondYes").click();await sg.waitForTimeout(30);
+  assert.equal((await api()).players[0].hand.some(c=>c.type==="dodge"),false,"responded 闪 is discarded");
+  // Player may use 酒 to save herself while dying, even after the active-use stage is over.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("addCard",0,"wine","diamond");await call("setHp",0,3);await call("damage",0,3,-1);
+  await sg.locator("#savePanel").waitFor({state:"visible"});
+  assert.equal((await api()).pendingSave.target,0);
+  await sg.locator("#saveWine").click();await sg.waitForTimeout(30);
+  assert.equal((await api()).players[0].hp,1,"dying 酒 restores one HP");
+  assert.equal((await api()).players[0].alive,true);
+  // 桃 may save another dying character; the rescue window passes through the living seats.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("addCard",0,"peach","heart");await call("setHp",2,2);await call("damage",2,2,1);
+  await sg.locator("#savePanel").waitFor({state:"visible"});
+  assert.equal((await api()).pendingSave.target,2);
+  await sg.locator("#savePeach").click();await sg.waitForTimeout(30);
+  assert.equal((await api()).players[2].hp,1);
+  assert.equal((await api()).players[2].alive,true);
+  // AI may use 酒 only to save itself when dying.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("addCard",1,"wine","club");await call("setHp",1,1);await call("damage",1,2,2);
+  await sg.waitForTimeout(30);
+  assert.equal((await api()).players[1].hp,1,"AI self-rescue with 酒");
+  assert.equal((await api()).players[1].alive,true);
+  // 小乔's 红颜 turns spades into hearts for 天香; damage transfers and target draws.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("addCard",0,"kill","spade");await call("setHp",0,3);await call("setHp",2,3);
+  const targetHandBefore=(await api()).players[2].hand.length;
+  await call("damage",0,1,-1);
+  await sg.locator("#tianxiangPanel").waitFor({state:"visible"});
+  await sg.locator("#tianxiangCards [data-card]").click();
+  await sg.locator('#tianxiangTargets [data-target="2"]').click();await sg.waitForTimeout(40);
+  const skillState=await api();
+  assert.equal(skillState.players[0].hp,3,"天香 prevents damage to 小乔");
+  assert.equal(skillState.players[2].hp,2,"天香 transfers the damage");
+  assert.equal(skillState.players[2].hand.length,targetHandBefore+1,"天香 target draws based on lost HP");
+  await sg.close();
   await xiangqi.close();
   assert.deepEqual(errors,[]);
-  console.log("P111 chess rules fixtures: both castles, attacked transit, en passant, four promotions, mate/stalemate, insufficient material, 50/75 moves, repetition passed");
+  console.log("P111 rule fixtures passed: chess special moves/draws; Xiangqi cannon/horse/generals/mate/stalemate/perpetual check; Sanguosha active/response cards, Peach/Wine rescue and Tianxiang.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});
