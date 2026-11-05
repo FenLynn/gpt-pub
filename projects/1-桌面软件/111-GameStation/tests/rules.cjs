@@ -259,9 +259,73 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   });
   assert.equal(settlement.result.over,true);assert.equal(settlement.win,true);
   assert.equal(settlement.multiplier,6,"spring doubles multiplier");assert.equal(settlement.scores.reduce((a,b)=>a+b,0),0);
+  const mj=await browser.newPage({viewport:{width:1100,height:850}});
+  mj.on("pageerror",err=>errors.push("Mahjong: "+err.message));
+  await mj.goto(pathToFileURL(path.resolve(__dirname,"../app/games/mahjong/index.html")).href+"?p111Test=1");
+  await mj.waitForFunction(()=>typeof window.__p111MahjongTest?.loadState==="function");
+  const mjCall=(name,...args)=>mj.evaluate(([n,a])=>window.__p111MahjongTest[n](...a),[name,args]);
+  const mjState=()=>mj.evaluate(()=>window.__p111MahjongTest.state());
+  const standard=[0,1,2,9,10,11,18,19,20,6,7,8,27,27];
+  assert.equal(await mjCall("canHu",standard,0),true,"standard four melds plus pair");
+  assert.equal(await mjCall("canHu",standard.slice(0,13),0),false,"13 tiles cannot declare Hu");
+  const sevenPairs=[0,0,1,1,2,2,9,9,10,10,27,27,28,28];
+  assert.equal(await mjCall("canHu",sevenPairs,0),true,"seven pairs enabled");
+  assert.equal(await mjCall("canHu",sevenPairs,1),false,"seven pairs not allowed with open melds");
+  await mjCall("setRules",{sevenPairs:false});
+  assert.equal(await mjCall("canHu",sevenPairs,0),false,"seven-pairs switch disables the pattern");
+  await mjCall("setRules",{sevenPairs:true});
+  const wall=await mjCall("wall");
+  assert.equal(wall.length,136);
+  for(let type=0;type<34;type++)assert.equal(wall.filter(x=>x===type).length,4,"four copies of tile "+type);
+  const initial=await mjState();
+  assert.deepEqual(initial.hands.map(x=>x.length),[14,13,13,13]);
+  assert.equal(initial.wall,83);
+  // Chi is available only to the next seat, while pong/kong are not seat-restricted.
+  await mjCall("loadState",{hands:[[],[3,5],[3,5],[]],pendingSeat:0,pendingType:4,paused:true});
+  assert.deepEqual((await mjCall("options",1,4)).chi,[[3,5]]);
+  assert.deepEqual((await mjCall("options",2,4)).chi,[]);
+  // Claims resolve by Hu > Kong > Pong > Chi, not by seat order alone.
+  await mjCall("loadState",{hands:[[],[27,27],[27,27,27],standard.slice(0,13)],pendingSeat:0,pendingType:27,paused:true});
+  await mjCall("buildClaims");
+  assert.deepEqual((await mjState()).claimQueue.map(q=>[q.seat,q.priority]),[[3,"hu"],[2,"kong"],[1,"pong"]]);
+  // Execute Pong, Chi and exposed Kong; tile counts and turn lifecycle remain consistent.
+  await mjCall("loadState",{hands:[[27,27],[],[],[]],wallTypes:[],pendingSeat:3,pendingType:27});
+  await mjCall("executeClaim",0,"pong",{});
+  let mstate=await mjState();
+  assert.equal(mstate.melds[0][0].kind,"pong");assert.deepEqual(mstate.melds[0][0].tiles,[27,27,27]);
+  assert.equal(mstate.hands[0].length,0);assert.equal(mstate.current,0);assert.equal(mstate.phase,"discard");
+  await mjCall("loadState",{hands:[[3,5],[],[],[]],pendingSeat:3,pendingType:4});
+  await mjCall("executeClaim",0,"chi",{chi:[[3,5]]});
+  mstate=await mjState();assert.equal(mstate.melds[0][0].kind,"chi");assert.deepEqual(mstate.melds[0][0].tiles,[3,4,5]);
+  await mjCall("loadState",{hands:[[27,27,27],[],[],[]],wallTypes:[8],pendingSeat:3,pendingType:27});
+  await mjCall("executeClaim",0,"kong",{});
+  mstate=await mjState();assert.equal(mstate.melds[0][0].kind,"kong");assert.equal(mstate.hands[0].length,1);assert.equal(mstate.hands[0][0],8);assert.equal(mstate.wall,0);
+  // Concealed Kong and added Kong both take a replacement tile.
+  await mjCall("loadState",{hands:[[0,0,0,0,1,2,3,4,5,6,7,8,9,10],[],[],[]],wallTypes:[11]});
+  assert.ok((await mjCall("kongOptions",0)).some(x=>x.kind==="concealed"&&x.type===0));
+  await mjCall("concealedKong",0,0);
+  mstate=await mjState();assert.equal(mstate.melds[0][0].kind,"concealed-kong");assert.equal(mstate.melds[0][0].tiles.length,4);
+  assert.equal(mstate.hands[0].length,11);assert.equal(mstate.hands[0][10],11);assert.equal(mstate.wall,0);
+  await mjCall("loadState",{hands:[[27,0,1,2,3,4,5,6,7,8,9],[],[],[]],melds:[[{kind:"pong",tiles:[27,27,27]}],[],[],[]],wallTypes:[12]});
+  assert.ok((await mjCall("kongOptions",0)).some(x=>x.kind==="added"&&x.type===27));
+  await mjCall("addedKong",0,27,0);
+  mstate=await mjState();assert.equal(mstate.melds[0][0].kind,"added-kong");assert.equal(mstate.melds[0][0].tiles.length,4);
+  assert.equal(mstate.hands[0].length,11);assert.equal(mstate.hands[0][10],12);assert.equal(mstate.wall,0);
+  // Added Kong may be robbed by an opponent who can Hu with the fourth tile.
+  await mjCall("loadState",{hands:[[27,0,1,2,3,4,5,6,7,8,9],standard.slice(0,13),[],[]],
+   melds:[[{kind:"pong",tiles:[27,27,27]}],[],[],[]],wallTypes:[12]});
+  await mjCall("addedKong",0,27,0);
+  mstate=await mjState();assert.equal(mstate.over,true,"rob-kong Hu ends the hand before the replacement draw");
+  assert.match(await mj.locator("#tableInfo").innerText(),/抢杠胡/);
+  // Empty wall ends in a draw rather than an invalid undefined tile.
+  await mjCall("loadState",{hands:[Array.from({length:14},(_,i)=>i),[],[],[]],wallTypes:[],phase:"draw"});
+  await mjCall("drawHuman");
+  assert.equal((await mjState()).over,true);
+  assert.match(await mj.locator("#tableInfo").innerText(),/流局/);
+  await mj.close();
   await ddz.close();
   await xiangqi.close();
   assert.deepEqual(errors,[]);
-  console.log("P111 rule fixtures passed: chess; Xiangqi; Sanguosha; Dou Dizhu 14 card types, bidding, pass cycle, exact-card ownership and settlement.");
+  console.log("P111 rule fixtures passed: chess; Xiangqi; Sanguosha; Dou Dizhu; Mahjong 136-tile wall, Hu patterns, claim priority, Chi/Pong/Kong, concealed/added/rob-kong and wall exhaustion.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});
