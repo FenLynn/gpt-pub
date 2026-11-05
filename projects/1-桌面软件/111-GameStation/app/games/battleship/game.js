@@ -5,7 +5,26 @@ let ownFleet,enemyFleet,own,enemy,remainingShips,shots,hits,paused=false,over=fa
 const fleetLengths=[5,4,3,3,2];
 function fleet(){const grid=Array.from({length:10},()=>Array(10).fill(0)),lengths={};let id=1;for(const len of fleetLengths){let ok=false,tries=0;while(!ok&&tries++<1500){const horizontal=Math.random()<.5,x=Math.floor(Math.random()*(horizontal?11-len:10)),y=Math.floor(Math.random()*(horizontal?10:11-len));let valid=true;for(let k=0;k<len;k++){const xx=x+(horizontal?k:0),yy=y+(horizontal?0:k);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const ax=xx+dx,ay=yy+dy;if(ax>=0&&ax<10&&ay>=0&&ay<10&&grid[ay][ax])valid=false;}}if(valid){for(let k=0;k<len;k++)grid[y+(horizontal?0:k)][x+(horizontal?k:0)]=id;lengths[id]=len;id++;ok=true;}}}return {grid,lengths};}
 function report(t){status.textContent=t;GameBridge.report(t,{score:hits});}
-function render(){enemyEl.innerHTML="";ownEl.innerHTML="";for(let y=0;y<10;y++)for(let x=0;x<10;x++){const a=document.createElement("button");a.className="game-cell";a.style.width="clamp(21px,3.6vw,31px)";a.style.height="clamp(21px,3.6vw,31px)";a.style.borderRadius="4px";a.style.background="#e4edf3";if(enemy[y][x]===1){a.textContent="×";a.classList.add("hit");}else if(enemy[y][x]===2){a.textContent="·";a.classList.add("miss");}a.disabled=enemy[y][x]!==0||paused||over;a.onclick=()=>attack(x,y);enemyEl.appendChild(a);const q=document.createElement("div");q.className="game-cell";q.style.width="clamp(21px,3.6vw,31px)";q.style.height="clamp(21px,3.6vw,31px)";q.style.borderRadius="4px";q.style.background=ownFleet.grid[y][x]>0?"#8aa9c0":"#e4edf3";if(own[y][x]===-1||own[y][x]===-3){q.textContent="×";q.classList.add("hit");}if(own[y][x]===-2){q.textContent="·";q.classList.add("miss");}ownEl.appendChild(q);}document.getElementById("hits").textContent=hits;document.getElementById("shots").textContent=shots;}
+function render(){
+ enemyEl.innerHTML="";ownEl.innerHTML="";
+ for(let y=0;y<10;y++)for(let x=0;x<10;x++){
+  const a=document.createElement("button");a.type="button";
+  a.className="game-cell sea-cell enemy-sea";
+  if(enemy[y][x]===1){a.textContent="×";a.classList.add("hit");}
+  else if(enemy[y][x]===2){a.textContent="·";a.classList.add("miss");}
+  a.disabled=enemy[y][x]!==0||paused||over;
+  a.setAttribute("aria-label",(x+1)+"列 "+(y+1)+"行"+(enemy[y][x]===1?"命中":enemy[y][x]===2?"未命中":"未攻击"));
+  a.addEventListener("click",()=>attack(x,y));enemyEl.appendChild(a);
+  const q=document.createElement("div");
+  q.className="game-cell sea-cell own-sea";
+  if(ownFleet.grid[y][x]>0)q.classList.add("ship");
+  if(own[y][x]===-1||own[y][x]===-3){q.textContent="×";q.classList.add("hit");}
+  else if(own[y][x]===-2){q.textContent="·";q.classList.add("miss");}
+  ownEl.appendChild(q);
+ }
+ document.getElementById("hits").textContent=hits;
+ document.getElementById("shots").textContent=shots;
+}
 function randomUnknown(){const cells=[];for(let y=0;y<10;y++)for(let x=0;x<10;x++)if(own[y][x]===0)cells.push([x,y]);return cells.length?cells[Math.floor(Math.random()*cells.length)]:null;}
 function huntTarget(){const targets=new Set();for(let y=0;y<10;y++)for(let x=0;x<10;x++)if(own[y][x]===-1){for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const xx=x+dx,yy=y+dy;if(xx>=0&&xx<10&&yy>=0&&yy<10&&own[yy][xx]===0)targets.add(yy*10+xx);}}if(targets.size){const a=[...targets];const v=a[Math.floor(Math.random()*a.length)];return [v%10,Math.floor(v/10)];}const parity=[];for(let y=0;y<10;y++)for(let x=0;x<10;x++)if(own[y][x]===0&&(x+y)%2===0)parity.push([x,y]);return parity.length?parity[Math.floor(Math.random()*parity.length)]:randomUnknown();}
 function probabilityTarget(){const score=Array.from({length:10},()=>Array(10).fill(0)),hitsNow=[];for(let y=0;y<10;y++)for(let x=0;x<10;x++)if(own[y][x]===-1)hitsNow.push([x,y]);let placements=0;for(const len of remainingShips)for(const horizontal of [true,false])for(let y=0;y<(horizontal?10:11-len);y++)for(let x=0;x<(horizontal?11-len:10);x++){const cells=[];let valid=true,covered=0;for(let k=0;k<len;k++){const xx=x+(horizontal?k:0),yy=y+(horizontal?0:k),v=own[yy][xx];if(v===-2||v===-3){valid=false;break;}if(v===-1)covered++;cells.push([xx,yy]);}if(!valid||(hitsNow.length&&!covered))continue;placements++;const weight=covered?4:1;for(const [xx,yy] of cells)if(own[yy][xx]===0)score[yy][xx]+=weight;}
