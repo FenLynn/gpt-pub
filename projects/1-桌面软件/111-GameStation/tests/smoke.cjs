@@ -64,9 +64,9 @@ const games = [
       const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
       await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/games/"+screenshotName+".png")});
       await page.keyboard.press("p");
-      await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "继续");
+      await page.waitForFunction(() => document.querySelector("#pauseButton")?.getAttribute("aria-label") === "继续");
       await page.keyboard.press("Enter");
-      await page.waitForFunction(() => document.querySelector("#pauseButton")?.innerText === "暂停");
+      await page.waitForFunction(() => document.querySelector("#pauseButton")?.getAttribute("aria-label") === "暂停");
       await page.waitForTimeout(80);
     } catch (error) {
       console.error("Failed game:", name);
@@ -98,7 +98,7 @@ const games = [
     assert.equal(chromeLayout.sidebarColor, chromeLayout.topbarColor, "left navigation and topbar should share a color");
     assert.notEqual(chromeLayout.workspaceColor, chromeLayout.topbarColor, "game workspace should have a separate surface color");
     assert.ok(chromeLayout.favicon.startsWith("data:image/svg+xml"), "four-square favicon should be local and offline");
-    assert.match(await page.locator("#homeWeekday").innerText(), /^星期[一二三四五六日]$/);
+    assert.match(await page.locator("#homeDate").innerText(), /^\d{1,2}月\d{1,2}日 · 星期[一二三四五六日]$/, "home date and weekday should share the same line");
     assert.ok(await page.locator(".home-hero").isVisible(), "home should show the redesigned hero");
     assert.equal(await page.locator("#totalGameCount").innerText(), "19");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
@@ -116,25 +116,25 @@ const games = [
     assert.equal(await g2048.locator(".tile").count(), 16);
     await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(1150);
-    assert.equal(await page.locator("#startButton").innerText(), "结束", "start action should become end after the game starts");
-    assert.equal(await page.locator("#pauseButton").innerText(), "暂停");
-    assert.equal(await page.locator("#newGameButton").innerText(), "下一局");
+    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "start action should become end after the game starts");
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停");
+    assert.equal(await page.locator("#newGameButton").getAttribute("aria-label"), "下一局");
     const toolbarOrder = await page.locator("#gameActions").evaluate(el=>Array.from(el.children).map(node=>node.id||"elapsed"));
     assert.deepEqual(toolbarOrder.slice(0,4), ["elapsed","startButton","pauseButton","newGameButton"], "toolbar actions should keep time/start/pause/next order");
     await page.locator("#pauseButton").click();
-    assert.equal(await page.locator("#pauseButton").innerText(), "继续");
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "继续");
     const pausedAt = await page.locator("#gameElapsed").innerText();
     await page.waitForTimeout(1350);
     assert.equal(await page.locator("#gameElapsed").innerText(), pausedAt, "paused time must not be counted");
     await page.locator("#pauseButton").click();
-    assert.equal(await page.locator("#pauseButton").innerText(), "暂停");
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停");
     await page.waitForTimeout(2200);
     assert.notEqual(await page.locator("#gameElapsed").innerText(), pausedAt, "the game clock must resume after unpausing");
     await page.locator("#startButton").click();
-    assert.equal(await page.locator("#startButton").innerText(), "结束");
+    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束");
     assert.equal(await page.locator("#startButton").isDisabled(), true, "end action should lock after the round ends");
     await page.locator("#newGameButton").click();
-    assert.equal(await page.locator("#startButton").innerText(), "开始", "next round should reset the toolbar state");
+    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "开始", "next round should reset the toolbar state");
 
     await openGame("记忆翻牌");
     const memory = page.frameLocator("#gameFrame");
@@ -170,7 +170,7 @@ const games = [
     await page.waitForTimeout(1200);
     assert.equal(await page.locator("#gameElapsed").innerText(), pongPausedAt, "paused game time must stop");
     await page.locator("#pauseButton").click();
-    assert.equal(await page.locator("#pauseButton").innerText(), "暂停");
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停");
 
     await openGame("魂斗罗（原创模式）");
     const contra = page.frameLocator("#gameFrame");
