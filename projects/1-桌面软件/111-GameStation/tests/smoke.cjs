@@ -136,6 +136,10 @@ const games = [
     assert.ok(homeActivityHeight<=300, "home activity heatmap should be a compact dashboard card, not a full-height empty panel");
     assert.equal(await page.locator("#totalGameCount").innerText(), "22");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
+    assert.ok(await page.locator(".recent-panel").isVisible(), "home should show recent games beside the activity heatmap");
+    assert.equal(await page.locator(".recent-game").count(), 4, "home should show four recent or recommended games");
+    assert.equal(await page.locator(".featured-game").count(), 8, "home should expose the eight curated classic games");
+    assert.ok(await page.locator("#rankingEmpty").isVisible(), "empty ranking should show a useful empty state instead of a blank panel");
     assert.equal(await page.locator(".heatmap-cell[data-date]").count(), 365, "activity grid must contain 365 real calendar days");
     assert.ok((await page.locator(".heatmap-cell").count()) <= 371, "weekday alignment may add at most six leading placeholders");
     await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
@@ -145,8 +149,6 @@ const games = [
     await page.locator('[data-ranking="plays"]').click();
     await page.locator('[data-category="all"]').click();
     assert.equal(await page.locator(".game-card").count(), 22, "all 22 planned games must appear in the library");
-    assert.equal(await page.locator(".featured-game").count(), 8, "home should expose the eight curated classic games");
-    assert.ok(await page.locator(".recent-panel").isVisible(), "home should show recent games beside the activity heatmap");
 
     for (const name of games) await openGame(name);
 
