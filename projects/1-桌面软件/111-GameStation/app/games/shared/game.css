@@ -1487,3 +1487,52 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
   background:#e1f0f8;color:#3c7092;font-size:13px;letter-spacing:.4px
  }
 }
+
+
+
+/* P111 R13.3 · traditional green felt Doudizhu table without washed-out cards */
+@media(min-width:701px){
+ .game-root.game-layout.card-table-layout.doudizhu-layout>.game-main-board{
+  border:7px solid #614936!important;border-radius:12px!important;padding:12px!important;
+  background:radial-gradient(ellipse at 50% 38%,#1a8867 0%,#137255 56%,#09533f 100%)!important;
+  box-shadow:inset 0 0 0 2px #ba9d69,inset 0 0 0 5px #266850,0 11px 25px #183c302f
+ }
+ .doudizhu-layout .card-table-main{
+  gap:11px!important;padding:8px!important;background:transparent!important;
+ }
+ .doudizhu-layout .opponents-row{
+  border:1px solid #e0d9ba6b!important;border-radius:9px!important;
+  padding:9px 11px!important;background:#0b5948a6!important;box-shadow:inset 0 1px #ffffff19
+ }
+ .doudizhu-layout .opponents-row .metric-pill{
+  border:1px solid #d3c59c!important;border-radius:7px!important;
+  padding:8px 12px!important;background:linear-gradient(145deg,#f9f2e1,#e8ddbe)!important;
+  color:#617160!important;box-shadow:0 2px 4px #062e2440
+ }
+ .doudizhu-layout .opponents-row .metric-pill strong{color:#376453}
+ .doudizhu-layout .card-table-center{
+  border:1px solid #e0d9ba50!important;border-radius:10px!important;
+  padding:14px!important;background:#0b59488c!important;color:#ecf1dd!important;
+  box-shadow:inset 0 4px 15px #003e2d55
+ }
+ .doudizhu-layout .card-table-center .metric-pill{
+  background:#f7f2e8!important;border-color:#d8cbac!important;color:#3d6251
+ }
+ .doudizhu-layout .card-table-center .metric-pill strong{color:#2c654d}
+ .doudizhu-layout .card-hand{
+  min-height:100px;max-height:144px;margin-top:auto!important;align-items:flex-end!important;
+  padding:9px 10px 6px!important;border-top:1px solid #e3d4a650!important
+ }
+ .doudizhu-layout .card-hand .playing-card{
+  width:clamp(37px,3.6vw,53px);height:clamp(66px,8.8vh,91px);
+  flex:0 0 clamp(37px,3.6vw,53px);
+  border:1px solid #d7ccb2!important;border-radius:6px!important;
+  background:linear-gradient(145deg,#fffefa,#f7efdf)!important;
+  color:#233c48!important;font-size:clamp(13px,1.8vh,18px);
+  box-shadow:0 3px 5px #00251c4a,inset 0 1px #fff
+ }
+ .doudizhu-layout .card-hand .playing-card.red{color:#bd3d36!important}
+ .doudizhu-layout .card-hand .playing-card.selected{
+  transform:translateY(-12px);outline:2px solid #f3d08b;box-shadow:0 7px 11px #00251c66
+ }
+}
