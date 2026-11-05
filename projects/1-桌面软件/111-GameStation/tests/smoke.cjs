@@ -74,7 +74,10 @@ const games = [
         const el=document.querySelector("#stageLoading");
         return !el || (el.classList.contains("done") && Number(getComputedStyle(el).opacity)<0.05);
       });
-      await page.locator("#toast").evaluate(el=>el.classList.remove("show"));
+      await page.evaluate(()=>{
+        document.querySelector("#toast")?.remove();
+        document.querySelector("#stageLoading")?.remove();
+      });
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
       const viewport=page.viewportSize();
       const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
