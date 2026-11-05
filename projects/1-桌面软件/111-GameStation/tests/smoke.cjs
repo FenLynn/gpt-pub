@@ -51,8 +51,8 @@ const names=[
   const v=await frame.locator("#game").evaluate(el=>{
    const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
    const main=el.querySelector(".game-main-board"),guide=el.querySelector(".game-guide"),tools=el.querySelector(".game-tools"),hud=el.querySelector("#gs-hud");
-   return {root:box(el),main:box(main),hud:box(hud),guide:getComputedStyle(guide).display,
-    tools:getComputedStyle(tools).display,columns:getComputedStyle(el).gridTemplateColumns,
+   return {root:box(el),main:box(main),hud:box(hud),guide:guide?getComputedStyle(guide).display:"none",
+    tools:tools?getComputedStyle(tools).display:"none",columns:getComputedStyle(el).gridTemplateColumns,
     viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth};
   });
   assert.equal(v.guide,"none",name+" legacy guide must be hidden");
