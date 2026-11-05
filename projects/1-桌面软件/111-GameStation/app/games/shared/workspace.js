@@ -186,7 +186,7 @@ function updateHud(payload){
  root.dataset.gsPaused=String(paused);
  if(finished)showNotice("本局结束",true);
  else if(started&&paused)showNotice("已暂停",true);
- else if(!paused)clearPersistentNotice();
+ else if(!paused||!started)clearPersistentNotice();
 }
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;

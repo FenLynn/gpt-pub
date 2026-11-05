@@ -97,7 +97,6 @@ const names=[
   });
   if(hero.artDisplay!=="none")assert.ok(hero.copy.right<=hero.art.left+3,"Home banner copy must not overlap decorative art");
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
-  assert.equal(await page.locator("#gameControls").isVisible(),false,"parent duplicate controls stay hidden while a game is open");
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),22);
@@ -109,6 +108,7 @@ const names=[
    await library();
    for(const name of names){
     await open(name);await start();await pauseResume();
+    assert.equal(await page.locator("#gameControls").isVisible(),false,"parent duplicate controls stay hidden while a game is open");
     await viewCheck(name,size.width,size.height);
     if(!noticeChecked){
      const id=await frame.locator("#game").getAttribute("data-game");
