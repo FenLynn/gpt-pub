@@ -55,7 +55,7 @@ function report(t){
  status.textContent=t;
  document.getElementById("undoButton").disabled=!history.length||paused||over;
  if(turnText&&turnDot){
-  const terminal=/获胜|困毙/.test(t)&&over,winner=/红方/.test(t)?"red":"black",side=terminal?winner:turn==="red"?"red":"black";
+  const terminal=/获胜|将死|困毙/.test(t)&&over,winner=/红方/.test(t)?"red":"black",side=terminal?winner:turn==="red"?"red":"black";
   turnDot.className="turn-dot "+side;
   if(terminal)turnText.textContent=t;
   else if(/AI 思考中/.test(t))turnText.textContent="黑方正在思考";
