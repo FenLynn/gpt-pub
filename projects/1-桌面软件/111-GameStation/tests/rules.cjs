@@ -217,7 +217,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await type([3,3,3,3],"BOMB");await type([13,14],"ROCKET");
   assert.equal(await classify([8,9,10,11,12]),null,"2 cannot enter a straight");
   assert.equal(await ddz.evaluate(()=>window.DDZRules.classify([0,0])),null,"same physical card ID cannot be repeated");
-  assert.equal(await classify([54]),null,"card IDs outside the 54-card deck are invalid");
+  assert.equal(await ddz.evaluate(()=>window.DDZRules.classify([54])),null,"card IDs outside the 54-card deck are invalid");
   const beats=async(a,b)=>ddz.evaluate(([x,y])=>{
    const R=window.DDZRules;const ids=ranks=>{const used={};return ranks.map(r=>{const n=used[r]||0;used[r]=n+1;return r<13?r*4+n:r===13?52:53;});};
    return R.beats(R.classify(ids(x)),R.classify(ids(y)));
