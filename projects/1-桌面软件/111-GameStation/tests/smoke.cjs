@@ -613,8 +613,21 @@ const games = [
     const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
     assert.ok(seededHumanHand.some(text => text.startsWith("闪")), "second deterministic deal should give Xiao Qiao a 闪 response");
     assert.equal(await sanguoshaHp(0), 3, "Xiao Qiao should start the response regression at three HP");
+    assert.equal(await sanguosha.locator("#endTurn").isEnabled(), true, "Sanguosha human turn must be active before ending the turn");
     await sanguosha.locator("#endTurn").click();
-    await sanguosha.locator("#responseBar").waitFor({ state: "visible", timeout: 10000 });
+    try {
+      await sanguosha.locator("#responseBar").waitFor({ state: "visible", timeout: 10000 });
+    } catch(error) {
+      const debug = {
+        hand: seededHumanHand,
+        randomCalls: await sanguosha.locator("body").evaluate(() => window.__p111SanguoshaRandomCalls || 0),
+        players: await sanguosha.locator("#players").innerText(),
+        status: await sanguosha.locator("#status").innerText().catch(() => ""),
+        log: await sanguosha.locator("#log").innerText().catch(() => "")
+      };
+      console.log("SANGUOSHA_RESPONSE_DEBUG " + JSON.stringify(debug));
+      throw error;
+    }
     await sanguosha.locator("#respondNo").click();
     if(await sanguosha.locator("#tianxiangPanel").isVisible()){
       await sanguosha.locator("#tianxiangCancel").click();
