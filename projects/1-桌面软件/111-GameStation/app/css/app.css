@@ -946,3 +946,12 @@ body{font-size:15px}
  font:800 18px/1 Consolas,"Segoe UI",monospace!important;
  font-variant-numeric:tabular-nums!important;letter-spacing:.035em;color:#294b63!important
 }
+
+
+/* R18 · distinguish familiar game pictograms from status glyphs; keep catalog icons optically balanced. */
+.game-card-icon,.quick-icon,.recent-icon,.featured-icon,.game-nav-icon{
+ display:grid;place-items:center;line-height:1;flex:none;font-family:"Segoe UI Emoji","Apple Color Emoji","Segoe UI Symbol","Microsoft YaHei",sans-serif;
+ font-variant-emoji:normal
+}
+.game-card-icon{font-size:clamp(21px,2vw,27px)}
+.quick-icon{font-size:21px}
