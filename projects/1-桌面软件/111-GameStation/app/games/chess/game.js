@@ -207,6 +207,44 @@ const claimButton=document.createElement("button");claimButton.type="button";cla
 claimButton.className="game-btn";claimButton.textContent="申请和棋";claimButton.disabled=true;
 claimButton.addEventListener("click",()=>{if(!paused&&!over&&canClaimDraw())finishDraw(halfMoves>=100?"和棋 · 50 回合规则":"和棋 · 三次重复局面");});
 document.querySelector(".game-tools")?.appendChild(claimButton);
+// Deterministic rules fixtures are only available on an explicitly test-only URL.
+// No fixture controls are exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ window.__p111ChessTest={
+  loadFen(fen){
+   const fields=String(fen).trim().split(/\s+/);
+   if(fields.length<4)throw new Error("Invalid fixture FEN");
+   const rows=fields[0].split("/");
+   if(rows.length!==8||!["w","b"].includes(fields[1]))throw new Error("Invalid fixture board");
+   const next=[];
+   for(const rank of rows){
+    const row=[];
+    for(const value of rank){
+     if(/[1-8]/.test(value)){for(let i=0;i<Number(value);i++)row.push(null);}
+     else if(/[KQRBNPkqrbnp]/.test(value))row.push({c:value===value.toUpperCase()?"w":"b",t:value.toUpperCase()});
+     else throw new Error("Invalid fixture piece");
+    }
+    if(row.length!==8)throw new Error("Invalid fixture rank");
+    next.push(row);
+   }
+   if(next.flat().filter(p=>p&&p.t==="K"&&p.c==="w").length!==1||
+      next.flat().filter(p=>p&&p.t==="K"&&p.c==="b").length!==1)throw new Error("Invalid kings");
+   board=next;turn=fields[1];mode="two";difficulty="normal";
+   castle={wK:fields[2].includes("K"),wQ:fields[2].includes("Q"),bK:fields[2].includes("k"),bQ:fields[2].includes("q")};
+   ep=fields[3]==="-"?null:{x:files.indexOf(fields[3][0]),y:8-Number(fields[3][1])};
+   if(ep&&(!inside(ep.x,ep.y)))throw new Error("Invalid EP square");
+   halfMoves=Math.max(0,Number(fields[4])||0);
+   moveNo=Math.max(1,Number(fields[5])||1);
+   captured={w:[],b:[]};history=[];moveLog=[];lastMove=null;selected=null;legal=[];
+   promotionChoices=null;document.getElementById("promotionChooser")?.remove();
+   paused=false;over=false;clearTimeout(aiTimer);
+   positions=[positionKey()];render();reportTurn();
+  },
+  checkEnd(){return checkEnd();},
+  state(){return{turn,halfMoves,repetitions:repetitions(),over,paused,castle:{...castle},ep:ep?{...ep}:null,
+    board:board.map(row=>row.map(p=>p?p.c+p.t:""))};}
+ };
+}
 GameBridge.register({
  init(payload){mode=payload.mode==="two"?"two":"ai";difficulty=payload.difficulty||"normal";newGame();},
  newGame,pause,resume,
