@@ -583,7 +583,7 @@ const games = [
       return Number(match[1]);
     };
     const seedSanguosha = async seed => {
-      await sanguosha.locator("body").evaluate(seedValue => {
+      await sanguosha.locator("body").evaluate((body, seedValue) => {
         let state = seedValue >>> 0;
         window.__p111SanguoshaRandomCalls = 0;
         Math.random = () => {
