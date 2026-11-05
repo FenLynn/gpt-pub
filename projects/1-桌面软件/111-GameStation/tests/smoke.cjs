@@ -599,7 +599,7 @@ const games = [
     // This avoids relying on whether another game's difficulty was already "easy".
     await page.locator("#difficultyControl button[data-difficulty='easy']").click();
     await page.waitForTimeout(180);
-    await seedSanguosha(437727);
+    await seedSanguosha(6167);
     await page.locator("#newGameButton").click();
     await page.waitForTimeout(180);
     assert.equal(await page.locator("#difficultyControl button[aria-pressed='true']").getAttribute("data-difficulty"), "easy");
@@ -612,6 +612,7 @@ const games = [
     assert.ok(sanguoshaRandomCalls>=59,"Sanguosha seeded deal must execute all 59 Fisher–Yates shuffle calls");
     const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
     assert.ok(seededHumanHand.some(text => text.startsWith("闪")), "second deterministic deal should give Xiao Qiao a 闪 response");
+    assert.ok(seededHumanHand.some(text => /[♥♠]/.test(text)), "second deterministic deal should exercise Xiao Qiao's Tianxiang response path");
     assert.equal(await sanguoshaHp(0), 3, "Xiao Qiao should start the response regression at three HP");
     assert.equal(await sanguosha.locator("#endTurn").isEnabled(), true, "Sanguosha human turn must be active before ending the turn");
     await sanguosha.locator("#endTurn").click();
@@ -629,11 +630,10 @@ const games = [
       throw error;
     }
     await sanguosha.locator("#respondNo").click();
-    if(await sanguosha.locator("#tianxiangPanel").isVisible()){
-      await sanguosha.locator("#tianxiangCancel").click();
-      await page.waitForTimeout(80);
-      assert.equal(await sanguosha.locator("#tianxiangPanel").isVisible(),false,"one declined response must not create a second Tianxiang damage prompt");
-    }
+    await sanguosha.locator("#tianxiangPanel").waitFor({ state: "visible", timeout: 3000 });
+    await sanguosha.locator("#tianxiangCancel").click();
+    await page.waitForTimeout(80);
+    assert.equal(await sanguosha.locator("#tianxiangPanel").isVisible(),false,"one declined response must not create a second Tianxiang damage prompt");
     await sanguosha.locator('#players [data-seat="0"]').filter({ hasText: "♥ 2/3" }).waitFor({ state: "visible", timeout: 10000 });
     assert.equal(await sanguoshaHp(0), 2, "declining 闪 must apply exactly one point of damage");
 
