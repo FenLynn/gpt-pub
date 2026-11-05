@@ -414,7 +414,14 @@ function setupDOM() {
  for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]];}
  piles={stock:[],waste:[],foundations:[[],[],[],[]],tableau:[[],[],[],[],[],[],[]]};
  for(let i=0;i<7;i++)for(let j=0;j<=i;j++){const card=shuffled.pop();if(j===i)card.isFaceUp=true;piles.tableau[i].push(card);}
- piles.stock=shuffled;calculateLayout();renderAll();reportStatus("新局开始 · 点击牌堆发牌");
+ piles.stock=shuffled;calculateLayout();
+ const board=document.getElementById("board");
+ // Keep every card at its final initial position: no diagonal flight from (0,0).
+ board.classList.add("instant-deal");
+ renderAll();
+ void board.offsetWidth; // flush non-animated layout before enabling transitions
+ requestAnimationFrame(()=>requestAnimationFrame(()=>board.classList.remove("instant-deal")));
+ reportStatus("新局开始 · 点击牌堆发牌");
 }
 function renderAll() {
  let zBase=10;
