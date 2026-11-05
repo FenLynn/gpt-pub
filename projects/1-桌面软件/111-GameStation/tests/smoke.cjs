@@ -593,6 +593,9 @@ const games = [
     assert.equal(await sanguoshaHp(2), 3, "an AI without 闪 must lose exactly one HP to 杀, not two");
 
     // Human has 闪 but chooses not to respond: the caller must still apply damage only once.
+    // The shared difficulty can carry over from earlier games in this full-suite run.
+    // Force a transition to easy after seeding so this click always starts a fresh deal.
+    await page.locator("#difficultyControl button[data-difficulty='normal']").click();
     await seedSanguosha(437727);
     await page.locator("#difficultyControl button[data-difficulty='easy']").click();
     const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
