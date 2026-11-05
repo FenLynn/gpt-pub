@@ -52,6 +52,8 @@ const games = [
       await page.locator("#gameFrame").evaluate(frame => frame.focus());
       await page.keyboard.press("Enter");
       await page.waitForFunction(() => !document.querySelector("#pauseButton").disabled);
+      await page.keyboard.press("Enter");
+      assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停", "Enter should start or resume, never toggle a running game into pause");
       await page.waitForFunction(() => document.activeElement?.id === "gameFrame");
       const frameLayout = await page.frameLocator("#gameFrame").locator("#game").evaluate(root => {
         const main = root.querySelector(".game-main-board");
@@ -59,12 +61,21 @@ const games = [
         return { width: rect.width, height: rect.height };
       });
       assert.ok(frameLayout.width > 200 && frameLayout.height > 250, name + " should receive a usable game area");
+      const zones=await page.frameLocator("#gameFrame").locator("#game").evaluate(root=>{
+        const guide=root.querySelector(".game-guide"),tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board");
+        return {guide:guide?getComputedStyle(guide).display:"absent",tools:tools?getComputedStyle(tools).display:"absent",main:main?.getBoundingClientRect().width||0,scroll:document.documentElement.scrollHeight};
+      });
+      assert.notEqual(zones.tools,"none",name+" right-side game actions must remain visible");
+      if(zones.guide!=="absent")assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible");
+      assert.ok(zones.main>250,name+" central board must retain priority workspace width");
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
       const viewport=page.viewportSize();
       const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
       await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/games/"+screenshotName+".png")});
       await page.keyboard.press("p");
       await page.waitForFunction(() => document.querySelector("#pauseButton")?.getAttribute("aria-label") === "继续");
+      assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "pause must not change the start/end action");
+      assert.equal(await page.locator("#pauseButton .action-label").innerText(), "继续", "pause control should expose its current action");
       await page.keyboard.press("Enter");
       await page.waitForFunction(() => document.querySelector("#pauseButton")?.getAttribute("aria-label") === "暂停");
       await page.waitForTimeout(80);
@@ -99,6 +110,7 @@ const games = [
     assert.notEqual(chromeLayout.workspaceColor, chromeLayout.topbarColor, "game workspace should have a separate surface color");
     assert.ok(chromeLayout.favicon.startsWith("data:image/svg+xml"), "four-square favicon should be local and offline");
     assert.match(await page.locator("#homeDate").innerText(), /^\d{1,2}月\d{1,2}日 · 星期[一二三四五六日]$/, "home date and weekday should share the same line");
+    assert.match(await page.locator("#homeTime").innerText(), /^\d{2}:\d{2}$/, "home clock should show local hours and minutes");
     assert.ok(await page.locator(".home-hero").isVisible(), "home should show the redesigned hero");
     assert.equal(await page.locator("#totalGameCount").innerText(), "19");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
@@ -316,6 +328,7 @@ const games = [
     await openGame("俄罗斯方块");
     const tetris = page.frameLocator("#gameFrame");
     assert.equal(await tetris.locator(".key-instruction").count(), 5, "Tetris should show the keyboard guide on the left");
+    assert.ok(await tetris.locator(".game-guide").isVisible(), "Tetris keyboard guide should be visible in the left rail");
     assert.ok(await tetris.locator("#score").isVisible());
     const frameA = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
     await page.waitForTimeout(90);
