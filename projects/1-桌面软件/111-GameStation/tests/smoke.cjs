@@ -596,8 +596,11 @@ const games = [
     // The shared difficulty can carry over from earlier games in this full-suite run.
     // Force a transition to easy after seeding so this click always starts a fresh deal.
     await page.locator("#difficultyControl button[data-difficulty='normal']").click();
+    await page.waitForTimeout(150);
     await seedSanguosha(437727);
     await page.locator("#difficultyControl button[data-difficulty='easy']").click();
+    await page.waitForTimeout(150);
+    assert.equal(await page.locator("#difficultyControl button[aria-pressed='true']").getAttribute("data-difficulty"), "easy");
     const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
     assert.ok(seededHumanHand.some(text => text.startsWith("闪")), "second deterministic deal should give Xiao Qiao a 闪 response");
     assert.ok(seededHumanHand.every(text => !/[♥♠]/.test(text)), "second deterministic deal should not expose Tianxiang cards");
