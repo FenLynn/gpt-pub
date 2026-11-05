@@ -123,6 +123,8 @@ const games = [
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
     assert.equal(await page.locator(".heatmap-cell[data-date]").count(), 365, "activity grid must contain 365 real calendar days");
     assert.ok((await page.locator(".heatmap-cell").count()) <= 371, "weekday alignment may add at most six leading placeholders");
+    await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
+    await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/home-1440x1000.png")});
     await page.locator('[data-ranking="time"]').click();
     assert.ok(await page.locator('[data-ranking="time"]').getAttribute("aria-selected") === "true");
     await page.locator('[data-ranking="plays"]').click();
