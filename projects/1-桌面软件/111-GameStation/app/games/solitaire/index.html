@@ -333,7 +333,7 @@ body{display:block!important;padding:0!important;background:#0a6b38;color:#203b2
  const board=document.getElementById("board");
  const area=document.querySelector(".solitaire-layout .game-main-board");
  const availableW=Math.max(0,area.clientWidth*.96),availableH=Math.max(0,area.clientHeight*.96);
- const w=Math.max(34,Math.min(availableW/8.08,availableH/4.9,150));
+ const w=Math.max(38,Math.min(availableW/9.6,availableH/6.0,82));
  CARD_W=w;CARD_H=w*1.45;GAP=w*.18;
  board.style.width=(7*CARD_W+6*GAP)+"px";
  document.documentElement.style.setProperty("--card-w",CARD_W+"px");
