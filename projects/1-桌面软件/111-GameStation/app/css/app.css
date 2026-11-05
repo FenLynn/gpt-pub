@@ -703,3 +703,32 @@ body{font-size:15px}
  .segment-control button{height:24px!important;min-width:42px!important;padding:0 7px!important}
  .sidebar .brand{height:52px!important;min-height:52px!important}
 }
+
+
+/* R10.4 · compact dashboard rhythm and a dedicated second row for mobile game controls */
+@media(min-width:621px){
+ .home-layout{height:auto;min-height:0;align-content:start}
+ .home-main{height:auto;grid-template-rows:auto 270px auto!important;align-content:start!important;gap:13px!important}
+ .activity-panel{height:270px!important;min-height:270px!important;justify-content:flex-start!important}
+ .activity-panel .heatmap-layout{margin-top:auto!important;margin-bottom:auto!important}
+ .ranking-panel{height:min(570px,calc(100dvh - 180px));min-height:430px}
+}
+@media(max-width:620px){
+ .main-area:has(#gameControls:not(.hidden)){grid-template-rows:88px minmax(0,1fr)!important}
+ .topbar:has(#gameControls:not(.hidden)){height:88px;min-height:88px;display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:38px 38px;align-content:center;row-gap:3px;padding:4px 7px;gap:0}
+ .topbar:has(#gameControls:not(.hidden)) .topbar-left{grid-column:1;grid-row:1;width:34px;min-width:34px;flex:none;display:flex;align-items:center;justify-content:flex-start}
+ .topbar:has(#gameControls:not(.hidden)) .breadcrumbs{display:none}
+ .topbar:has(#gameControls:not(.hidden)) .mobile-menu{width:30px;height:30px;display:grid;place-items:center;border:1px solid #d8e5ec;border-radius:8px;background:#fff;color:#49687d}
+ .topbar:has(#gameControls:not(.hidden)) .game-controls{grid-column:1/-1;grid-row:2;width:100%;min-width:0;min-height:34px;justify-content:center;gap:7px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+ .topbar:has(#gameControls:not(.hidden)) .game-controls::-webkit-scrollbar{display:none}
+ .topbar:has(#gameControls:not(.hidden)) .topbar-actions{grid-column:2;grid-row:1;width:100%;min-width:0;justify-content:flex-end;gap:4px}
+ .topbar:has(#gameControls:not(.hidden)) .round-actions{gap:3px;padding-right:4px}
+ .topbar:has(#gameControls:not(.hidden)) .elapsed-label{min-width:38px}
+ .topbar:has(#gameControls:not(.hidden)) .top-action,.topbar:has(#gameControls:not(.hidden)) .icon-action,.topbar:has(#gameControls:not(.hidden)) .help-action{width:30px;height:30px;min-width:30px;padding:0}
+ .topbar:has(#gameControls:not(.hidden)) .top-action{font-size:0;gap:0}
+ .topbar:has(#gameControls:not(.hidden)) .top-action svg{width:15px;height:15px}
+ .topbar:has(#gameControls:not(.hidden)) .help-action{font-size:0}
+ .topbar:has(#gameControls:not(.hidden)) .segment-control{min-height:30px;flex:none;padding:2px}
+ .topbar:has(#gameControls:not(.hidden)) .segment-control:before{display:none}
+ .topbar:has(#gameControls:not(.hidden)) .segment-control button{height:24px;min-width:43px;padding:0 7px;font-size:10px}
+}
