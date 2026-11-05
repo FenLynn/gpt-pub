@@ -1214,3 +1214,40 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  .gomoku-layout .stone.latest-stone{outline:2px solid #b56b42;outline-offset:3px}
  .gomoku-layout .stone.numbered-stone:after{pointer-events:none;opacity:.45}
 }
+
+
+
+/* R12 · desktop Chinese Chess match record like the reference sidebar */
+@media(min-width:701px){
+ .xiangqi-layout .game-tools .xiangqi-record{
+  display:flex;flex:1;min-height:185px;flex-direction:column;overflow:hidden;
+  border:1px solid #d6e3eb;border-radius:9px;background:#fff
+ }
+ .xiangqi-layout .xiangqi-record-heading{
+  height:39px;flex:none;display:flex;align-items:center;justify-content:space-between;
+  padding:0 11px;border-bottom:1px solid #e5edf2;background:#f6f9fb;
+  color:#49697d;font-size:12px;font-weight:750
+ }
+ .xiangqi-layout .xiangqi-record-heading span{color:#91a3af;font-size:10px;font-weight:600}
+ .xiangqi-layout #moveList{
+  flex:1;min-height:0;display:block;margin:0;padding:7px;overflow:auto;
+  list-style:none;scrollbar-width:thin;scrollbar-color:#ccdce6 transparent
+ }
+ .xiangqi-layout #moveList:empty:after{
+  content:"=== 开始 ===";display:block;margin:7px 0;
+  padding:10px 8px;border-radius:5px;background:#f4f7f9;
+  color:#7b94a4;font-size:12px;font-family:"STKaiti","KaiTi",serif;text-align:center
+ }
+ .xiangqi-layout #moveList li{
+  min-height:29px;display:flex;align-items:center;gap:7px;
+  padding:5px 7px;border-radius:5px;color:#586f7e;font-size:11px;
+  font-variant-numeric:tabular-nums;white-space:nowrap
+ }
+ .xiangqi-layout #moveList li:nth-child(2n){background:#f5f8fa}
+ .xiangqi-layout .xiangqi-move-index{width:26px;flex:none;color:#8ca0ae}
+ .xiangqi-layout .xiangqi-move-side{font-weight:800}
+ .xiangqi-layout .xiangqi-move-side.red{color:#b84539}
+ .xiangqi-layout .xiangqi-move-side.black{color:#2c414d}
+ .xiangqi-layout #resignButton{border-color:#e9d8d0;color:#a75b4d}
+ .xiangqi-layout #resignButton:hover:not(:disabled){background:#fff3ef;border-color:#e8c4b7}
+}
