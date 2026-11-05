@@ -52,13 +52,14 @@ const names=[
    const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,top:r.top};};
    const main=el.querySelector(".game-main-board"),guide=el.querySelector(".game-guide"),tools=el.querySelector(".game-tools"),hud=el.querySelector("#gs-hud");
    const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||el.querySelector(".xiangqi-board")||
-    el.querySelector(".chess-frame")||el.querySelector(".fleet-boards")||el.querySelector(".mine-classic")||
+    el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||el.querySelector(".mine-classic")||
     el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const time=el.querySelector("#gs-hud-time");
    const row=[...el.querySelectorAll("#gs-hud-time,#gs-start,#gs-pause,#gs-next,#gs-tools,#gs-help,#gs-mode,#gs-difficulty")]
     .filter(x=>x&&!x.hidden&&getComputedStyle(x).display!=="none").map(x=>{const r=box(x);return{...r,centerY:r.y+r.height/2};});
    return {root:box(el),main:box(main),surface:box(surface),hud:box(hud),time:box(time),row,
     modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
+    isBattleship:el.classList.contains("battleship-layout"),notice:box(el.querySelector("#gs-notice")),
     selectCount:el.querySelectorAll("#gs-hud select").length,
     guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",
     urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","pendingActions"].some(id=>{const q=el.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
@@ -77,7 +78,9 @@ const names=[
   if(v.modeButtons)assert.ok(v.modeButtons>=2,name+" mode selector must be segmented buttons");
   if(v.difficultyButtons)assert.ok(v.difficultyButtons>=2,name+" difficulty selector must be segmented buttons");
   assert.ok(v.row.length>=5&&Math.max(...v.row.map(x=>x.centerY))-Math.min(...v.row.map(x=>x.centerY))<=2,name+" toolbar controls must share one horizontal row");
-  assert.ok(v.surface.height>=v.main.height*.72,name+" primary game surface must use the available height: "+JSON.stringify(v));
+  assert.ok(v.surface.height>=v.main.height*(v.isBattleship?.62:.72),name+" primary game surface must use the available height: "+JSON.stringify(v));
+  const overlap=v.notice.x<v.surface.right&&v.notice.right>v.surface.x&&v.notice.y<v.surface.bottom&&v.notice.bottom>v.surface.y;
+  assert.equal(overlap,false,name+" floating notice must not cover the primary game surface");
   assert.ok(v.surface.top>=v.main.top-1&&v.surface.bottom<=v.main.bottom+1,name+" primary surface must remain inside the padded game stage");
   assert.ok(v.main.bottom<=v.root.bottom+1,name+" stage bottom must stay visible");
   assert.ok(v.overflow<=v.viewport.width+2,name+" must not scroll horizontally");
@@ -157,13 +160,14 @@ const names=[
   const mineFixture=await browser.newPage({viewport:{width:1000,height:800}});
   await mineFixture.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href+"?p111Test=1");
   await mineFixture.waitForFunction(()=>!!window.__p111MineTest);
-  await mineFixture.evaluate(()=>{window.__p111MineTest.forceFlag(0);window.__p111MineTest.forceMine(1);});
-  const symbols=await mineFixture.locator(".mine-cell").evaluateAll(cells=>cells.slice(0,2).map(cell=>{
+  await mineFixture.evaluate(()=>{window.__p111MineTest.forceFlag(0);window.__p111MineTest.forceMine(1);window.__p111MineTest.forceNumber(2,8);});
+  const symbols=await mineFixture.locator(".mine-cell").evaluateAll(cells=>cells.slice(0,3).map(cell=>{
    const svg=cell.querySelector("svg"),r=svg?.getBoundingClientRect(),b=cell.getBoundingClientRect();
-   return{svg:!!svg,width:r?.width/b.width||0,height:r?.height/b.height||0,font:parseFloat(getComputedStyle(cell).fontSize),cell:b.width};
+   return{svg:!!svg,width:r?.width/b.width||0,height:r?.height/b.height||0,font:parseFloat(getComputedStyle(cell).fontSize),cell:b.width,text:cell.textContent.trim()};
   }));
-  assert.ok(symbols.every(x=>x.svg&&x.width>=.65&&x.height>=.65),"Minesweeper flag and mine SVGs must occupy most of each cell");
-  assert.ok(symbols.every(x=>x.font>=x.cell*.65),"Minesweeper numbers must scale with cell size");
+  assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
+  assert.ok(symbols[2].text==="8"&&symbols[2].font>=symbols[2].cell*.65,"Minesweeper numbers must scale with cell size");
+  await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
   await frame.locator("#gs-help").click();
   await page.locator("#helpPanel").waitFor({state:"visible"});

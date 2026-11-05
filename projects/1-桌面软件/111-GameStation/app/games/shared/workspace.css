@@ -259,3 +259,15 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .gs-hud-time{left:8px!important;transform:translateY(-50%)!important}
  .gs-hud{padding-left:60px!important}
 }
+
+
+/* R17 notification placement: use empty side gutters, otherwise reserve a short top lane. */
+.gs-notice.side-left{left:12px;right:auto;transform:translateY(-7px)}
+.gs-notice.side-right{left:auto;right:12px;transform:translateY(-7px)}
+.gs-notice.side-left.is-visible,.gs-notice.side-right.is-visible{animation:gs-notice-side-life 2.4s ease both}
+.gs-notice.side-left.persistent,.gs-notice.side-right.persistent{transform:translateY(0);animation:none}
+@keyframes gs-notice-side-life{
+ 0%,78%{opacity:1;transform:translateY(0)}
+ 100%{opacity:0;transform:translateY(-5px)}
+}
+.game-root.gs-notice-lane>.game-main-board{padding-top:56px!important}

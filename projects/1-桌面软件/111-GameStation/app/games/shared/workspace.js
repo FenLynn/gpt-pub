@@ -20,9 +20,32 @@ function setExpanded(open){
 }
 function hideNotice(){
  if(!notice)return;
- notice.classList.remove("is-visible","persistent");
+ notice.classList.remove("is-visible","persistent","side-left","side-right");
  notice.hidden=true;
  noticePersistent=false;
+ root.classList.remove("gs-notice-lane");
+}
+function positionNotice(){
+ if(!notice)return;
+ const stage=notice.parentElement,stageRect=stage.getBoundingClientRect();
+ let surface=null;
+ if(root.classList.contains("battleship-layout"))surface=root.querySelector(".fleet-boards");
+ else surface=root.querySelector(".arcade-canvas,.gomoku-board,.xiangqi-board,.chess-frame,.mine-classic,.solitaire-table,.card-table-main,#board");
+ notice.classList.remove("side-left","side-right");
+ notice.style.maxWidth="";
+ root.classList.remove("gs-notice-lane");
+ if(!surface){root.classList.add("gs-notice-lane");return;}
+ const r=surface.getBoundingClientRect();
+ const leftGap=r.left-stageRect.left,rightGap=stageRect.right-r.right,topGap=r.top-stageRect.top;
+ if(leftGap>=160){
+  notice.classList.add("side-left");
+  notice.style.maxWidth=Math.max(120,Math.min(240,leftGap-20))+"px";
+ }else if(rightGap>=160){
+  notice.classList.add("side-right");
+  notice.style.maxWidth=Math.max(120,Math.min(240,rightGap-20))+"px";
+ }else if(topGap<56){
+  root.classList.add("gs-notice-lane");
+ }
 }
 function showNotice(message,persistent=false){
  const value=String(message||"").trim();
@@ -32,6 +55,7 @@ function showNotice(message,persistent=false){
  if(value===lastNotice&&now-lastNoticeAt<360&&!notice.hidden)return;
  lastNotice=value;lastNoticeAt=now;
  notice.textContent=value;
+ positionNotice();
  notice.hidden=false;
  notice.classList.remove("is-visible","persistent");
  void notice.offsetWidth;
@@ -100,7 +124,7 @@ function setup(){
  notice.hidden=true;
  main.appendChild(notice);
  notice.addEventListener("animationend",()=>{
-  if(!noticePersistent){notice.classList.remove("is-visible");notice.hidden=true;}
+  if(!noticePersistent)hideNotice();
  });
  hud.addEventListener("click",event=>{
   const modeButton=event.target.closest("button[data-mode-index]");
@@ -196,5 +220,6 @@ window.addEventListener("message",event=>{
  if(message.type==="HUD_STATE"){updateHud(message.payload||{});return;}
  if(message.type==="HUD_NOTICE"&&message.payload?.message)showNotice(message.payload.message,false);
 });
+window.addEventListener("resize",()=>{if(notice&&!notice.hidden)positionNotice();});
 setup();
 })();
