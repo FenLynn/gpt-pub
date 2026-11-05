@@ -99,6 +99,7 @@ document.getElementById("kongBar").addEventListener("click",e=>{const b=e.target
 document.getElementById("drawButton").onclick=drawHuman;document.getElementById("huButton").onclick=huHuman;document.getElementById("claimHu").onclick=()=>{if(pendingKong){pendingKong=null;finish(0,"抢杠胡");}else executeClaim(0,"hu",humanClaims);};document.getElementById("claimKong").onclick=()=>executeClaim(0,"kong",humanClaims);document.getElementById("claimPong").onclick=()=>executeClaim(0,"pong",humanClaims);document.getElementById("claimChi").onclick=()=>{const choices=humanClaims?.chi||[],index=Number(document.getElementById("chiChoice").value)||0;executeClaim(0,"chi",{chi:choices[index]?[choices[index]]:[]});};document.getElementById("claimPass").onclick=passClaim;
 document.getElementById("applyRules").onclick=()=>{rules={chi:document.getElementById("ruleChi").checked,sevenPairs:document.getElementById("ruleSevenPairs").checked,kong:document.getElementById("ruleKong").checked};report("规则已应用于当前对局");render();};
 if(new URLSearchParams(location.search).has("p111Test")){
+ newGame(); // Standalone rules fixtures do not receive the parent iframe INIT message.
  window.__p111MahjongTest={
   wall(){return makeWall().map(t=>t.type);},
   canHu(types,meldCount=0){return canHu(types,meldCount);},
