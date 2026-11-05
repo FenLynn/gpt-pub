@@ -155,6 +155,7 @@ const games = [
     await openGame("2048");
     const g2048 = page.frameLocator("#gameFrame");
     assert.equal(await g2048.locator(".tile").count(), 16);
+    assert.equal(await g2048.locator(".number-tile[data-value='2'],.number-tile[data-value='4']").count(),2,"2048 should start with two styled number tiles");
     await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(1150);
     assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "start action should become end after the game starts");
@@ -185,8 +186,23 @@ const games = [
     await memory.locator(".game-cell").nth(1).click();
     assert.equal(await memory.locator("#moves").innerText(), "1");
 
+    await openGame("黑白棋");
+    const reversi = page.frameLocator("#gameFrame");
+    assert.equal(await reversi.locator(".reversi-square").count(),64,"Reversi must render an 8×8 grid");
+    assert.equal(await reversi.locator(".reversi-disc").count(),4,"Reversi should start with four round discs");
+    const reversiPiece=await reversi.locator(".reversi-disc").first().evaluate(el=>({disc:el.getBoundingClientRect().width,cell:el.parentElement.getBoundingClientRect().width}));
+    assert.ok(reversiPiece.disc>20&&reversiPiece.disc<reversiPiece.cell*.92,"Reversi disc must sit INSIDE the tile, not color the entire square");
+
+    await openGame("国际跳棋");
+    const checkers = page.frameLocator("#gameFrame");
+    assert.equal(await checkers.locator(".checkers-square").count(),64,"Checkers must render an 8×8 board");
+    assert.equal(await checkers.locator(".checkers-disc").count(),24,"Checkers should start with 24 distinct round pieces");
+    const checkersPiece=await checkers.locator(".checkers-disc").first().evaluate(el=>({disc:el.getBoundingClientRect().width,cell:el.parentElement.getBoundingClientRect().width}));
+    assert.ok(checkersPiece.disc>20&&checkersPiece.disc<checkersPiece.cell*.92,"Checkers pieces must not be colored board squares");
+
     await openGame("四子棋");
     const connect4 = page.frameLocator("#gameFrame");
+    assert.equal(await connect4.locator(".connect4-disc").count(),42,"Connect Four must render all 42 recessed wells");
     await connect4.locator(".game-cell").first().click();
     assert.equal(await connect4.locator("#red").innerText(), "1");
     await page.locator("#modeControl button[data-mode-index='1']").click();
@@ -410,6 +426,7 @@ const games = [
     assert.equal(await tetris.locator(".key-instruction").count(), 6, "Tetris should show separate gameplay and shared-control shortcuts on the left");
     assert.ok(await tetris.locator(".game-guide").isVisible(), "Tetris keyboard guide should be visible in the left rail");
     assert.ok(await tetris.locator("#score").isVisible());
+    assert.equal(await tetris.locator("#canvas").getAttribute("data-ghost-visible"),"false","classic Tetris must not draw a confusing second phantom piece at the floor");
     const frameA = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
     await page.waitForTimeout(90);
     const frameB = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
