@@ -46,19 +46,19 @@ function update(dt,t){const p=params();if(keys.a||keys.ArrowLeft){player.x-=5.2*
 }
 function draw(){
  ctx.save();ctx.imageSmoothingEnabled=false;
- const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#4c8fbd");sky.addColorStop(.48,"#91c5d3");sky.addColorStop(1,"#d4d8b4");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#070e1b");sky.addColorStop(.46,"#111d2a");sky.addColorStop(1,"#1a3441");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
  const mountain=(worldX,base,peak,width,shade)=>{
   const x=worldX-cameraX*.16;if(x>W+width||x<-width)return;
   ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-width*.55,base);ctx.lineTo(x,peak);ctx.lineTo(x+width*.55,base);ctx.closePath();ctx.fill();
-  ctx.fillStyle="#d9e7df";ctx.beginPath();ctx.moveTo(x-width*.18,peak+width*.18);ctx.lineTo(x,peak);ctx.lineTo(x+width*.15,peak+width*.2);ctx.lineTo(x+width*.04,peak+width*.16);ctx.lineTo(x-width*.02,peak+width*.28);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#d8dedf";ctx.beginPath();ctx.moveTo(x-width*.18,peak+width*.18);ctx.lineTo(x,peak);ctx.lineTo(x+width*.15,peak+width*.2);ctx.lineTo(x+width*.04,peak+width*.16);ctx.lineTo(x-width*.02,peak+width*.28);ctx.closePath();ctx.fill();
  };
- for(let i=-1;i<8;i++){const wx=i*260+110;mountain(wx,285,68+(i%3)*24,245,i%2?"#607f8b":"#6d9298");mountain(wx+112,300,135+(i%2)*18,190,"#829fa0");}
- // broken clouds, deliberately built from chunky pixels
- for(let i=0;i<6;i++){const x=((i*177-cameraX*.28)%980+980)%980-90,y=58+(i%3)*37;ctx.fillStyle="#e8f2e6b8";ctx.fillRect(x+18,y,48,12);ctx.fillRect(x+7,y+12,78,12);ctx.fillRect(x+29,y-9,31,10);}
+ for(let i=-1;i<8;i++){const wx=i*260+110;mountain(wx,285,68+(i%3)*24,245,i%2?"#354758":"#405263");mountain(wx+112,300,135+(i%2)*18,190,"#415863");}
+ // Low-frequency parallax pixel stars, leaving the distant mountains legible.
+ for(let i=0;i<84;i++){const x=((i*137+43-cameraX*.08)%940+940)%940-50,y=35+(i*79%225);ctx.fillStyle=i%5===0?"#d5e5e9":"#899da9";const z=i%6===0?3:2;ctx.fillRect(x,y,z,z);}
  // far tree line
- ctx.fillStyle="#416c4c";for(let i=-1;i<20;i++){const x=i*52-(cameraX*.42%52);const h=34+(i*17%31);ctx.fillRect(x,GROUND-105-h,11,h+105);ctx.fillRect(x-17,GROUND-112-h,45,28);ctx.fillRect(x-10,GROUND-132-h,30,24);ctx.fillRect(x-25,GROUND-91-h,55,23);}
+ ctx.fillStyle="#2d5648";for(let i=-1;i<20;i++){const x=i*52-(cameraX*.42%52);const h=34+(i*17%31);ctx.fillRect(x,GROUND-105-h,11,h+105);ctx.fillRect(x-17,GROUND-112-h,45,28);ctx.fillRect(x-10,GROUND-132-h,30,24);ctx.fillRect(x-25,GROUND-91-h,55,23);}
  // layered jungle canopy
- for(let i=-1;i<12;i++){const x=i*88-(cameraX*.68%88),y=GROUND-100+(i%3)*8;ctx.fillStyle=i%2?"#245b35":"#2f713a";ctx.fillRect(x,y,75,32);ctx.fillRect(x+10,y-17,50,22);ctx.fillRect(x+20,y-31,30,18);ctx.fillStyle="#55934a";ctx.fillRect(x+6,y+3,18,7);ctx.fillRect(x+37,y-13,17,7);ctx.fillStyle="#173f31";ctx.fillRect(x+29,y+27,15,74);}
+ for(let i=-1;i<12;i++){const x=i*88-(cameraX*.68%88),y=GROUND-100+(i%3)*8;ctx.fillStyle=i%2?"#1b5635":"#2a703b";ctx.fillRect(x,y,75,32);ctx.fillRect(x+10,y-17,50,22);ctx.fillRect(x+20,y-31,30,18);ctx.fillStyle="#4d9946";ctx.fillRect(x+6,y+3,18,7);ctx.fillRect(x+37,y-13,17,7);ctx.fillStyle="#173f31";ctx.fillRect(x+29,y+27,15,74);}
  // rock shelf and grass lip
  const groundY=GROUND;ctx.fillStyle="#253f35";ctx.fillRect(0,groundY,W,H-groundY);
  ctx.fillStyle="#4c773c";ctx.fillRect(0,groundY-4,W,8);ctx.fillStyle="#82a94b";for(let x=0;x<W;x+=24){ctx.fillRect(x,groundY-7,15,4);ctx.fillRect(x+8,groundY-10,4,4);}
