@@ -4,7 +4,22 @@ const allIcons=["🍀","🌙","🎈","🍉","🚀","🎧","🐳","🌻","🧩","
 let cards=[],opened=[],matched=0,moves=0,locked=false,paused=false,tick=null,flipTimer=null,seconds=0,pairCount=8,difficulty="normal";
 function report(t){status.textContent=t;GameBridge.report(t,{score:Math.max(0,10000-moves*10-seconds*3)});}
 function timeText(){return Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0");}
-function render(){boardEl.innerHTML="";const cols=pairCount<=6?3:pairCount<=8?4:6;boardEl.style.gridTemplateColumns="repeat("+cols+",minmax(0,1fr))";cards.forEach((c,i)=>{const b=document.createElement("button");b.className="game-cell";b.style.width="clamp(42px,8vw,76px)";b.style.height="clamp(42px,8vw,76px)";b.style.fontSize="clamp(19px,3vw,30px)";b.style.background=c.open||c.matched?"#edf4f7":"#dceaf1";b.style.color=c.open||c.matched?"#354f62":"#7696aa";b.textContent=c.open||c.matched?c.icon:"✦";b.disabled=c.matched||c.open||paused;b.onclick=()=>flip(i);boardEl.appendChild(b);});document.getElementById("moves").textContent=moves;document.getElementById("pairs").textContent=matched+" / "+pairCount;document.getElementById("time").textContent=timeText();}
+function render(){
+ boardEl.innerHTML="";
+ const cols=pairCount<=6?3:pairCount<=8?4:6;
+ boardEl.style.gridTemplateColumns="repeat("+cols+",minmax(0,1fr))";
+ cards.forEach((c,i)=>{
+  const card=document.createElement("button");card.type="button";
+  card.className="game-cell memory-card "+(c.matched?"matched":c.open?"revealed":"face-down");
+  card.textContent=c.open||c.matched?c.icon:"✦";
+  card.disabled=c.matched||c.open||paused;
+  card.setAttribute("aria-label",c.matched?"已匹配":c.open?"已翻开":"未翻开");
+  card.addEventListener("click",()=>flip(i));boardEl.appendChild(card);
+ });
+ document.getElementById("moves").textContent=moves;
+ document.getElementById("pairs").textContent=matched+" / "+pairCount;
+ document.getElementById("time").textContent=timeText();
+}
 function stopClock(){if(tick!==null)clearInterval(tick);tick=null;}
 function startClock(){if(tick!==null||paused||matched===pairCount)return;tick=setInterval(()=>{seconds++;document.getElementById("time").textContent=timeText();},1000);}
 function configure(v){difficulty=v||"normal";pairCount=difficulty==="easy"?6:difficulty==="hard"?12:8;}
