@@ -30,7 +30,7 @@ function setup(){
   const sync=()=>{const t=status.textContent.trim();if(hud&&t&&!state.paused&&!state.finished)hud.querySelector("#gs-hud-status").textContent=t;};
   new MutationObserver(sync).observe(status,{childList:true,characterData:true,subtree:true});sync();
  }
- const alerts=["responseBar","tianxiangPanel","saveBar","pendingActions"].map(id=>document.getElementById(id)).filter(Boolean);
+ const alerts=["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","pendingActions"].map(id=>document.getElementById(id)).filter(Boolean);
  if(side&&alerts.length){
   const sync=()=>{
    const urgent=alerts.some(el=>el.offsetHeight>0&&getComputedStyle(el).visibility!=="hidden"&&getComputedStyle(el).display!=="none");

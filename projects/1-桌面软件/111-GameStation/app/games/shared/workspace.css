@@ -93,3 +93,10 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .gs-hud-select{height:27px;max-width:65px;font-size:10px}
 .gs-hud-button{height:27px;min-width:34px;padding:0 5px;font-size:10px}
 .game-root.game-layout>.game-tools{top:50px!important;max-height:calc(100% - 60px)!important}}
+
+/* Chess promotion remains over the board, without browser dialogs. */
+.chess-promotion-chooser{position:absolute;z-index:40;top:50%;left:50%;transform:translate(-50%,-50%);
+ display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;
+ min-width:280px;max-width:calc(100% - 24px);padding:14px;border:1px solid #aec6d6;
+ border-radius:12px;background:#fffefa;box-shadow:0 12px 36px #18394e66}
+.chess-promotion-chooser .game-btn{font-size:19px;min-width:55px;height:45px}
