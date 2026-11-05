@@ -102,7 +102,6 @@ function setup(){
  hud.id="gs-hud";
  hud.setAttribute("aria-label","游戏标题栏");
  hud.innerHTML='<div class="gs-hud-left"><strong class="gs-hud-name"></strong></div>'+
-  '<time class="gs-hud-time" id="gs-hud-time" aria-label="本局用时">00:00</time>'+
   '<div class="gs-hud-controls"><div class="gs-hud-options" id="gs-options"></div>'+
   '<div class="gs-hud-actions">'+
   '<button type="button" class="gs-hud-button" data-action="start" id="gs-start">开始</button>'+
@@ -213,7 +212,6 @@ function updateHud(payload){
  pause.textContent=started&&paused?"继续":"暂停";
  pause.disabled=!state.ready||!started||finished;
  next.disabled=!state.ready;
- hud.querySelector("#gs-hud-time").textContent=state.elapsed||"00:00";
  renderOptions();
  syncUrgentTools?.();
  root.dataset.gsPaused=String(paused);

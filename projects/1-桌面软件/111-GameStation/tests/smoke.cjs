@@ -54,10 +54,9 @@ const names=[
    const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||el.querySelector(".xiangqi-board")||
     el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||el.querySelector(".mine-classic")||
     el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
-   const time=el.querySelector("#gs-hud-time");
-   const row=[...el.querySelectorAll("#gs-hud-time,#gs-start,#gs-pause,#gs-next,#gs-tools,#gs-help,#gs-mode,#gs-difficulty")]
+   const row=[...el.querySelectorAll("#gs-start,#gs-pause,#gs-next,#gs-tools,#gs-help,#gs-mode,#gs-difficulty")]
     .filter(x=>x&&!x.hidden&&getComputedStyle(x).display!=="none").map(x=>{const r=box(x);return{...r,centerY:r.y+r.height/2};});
-   return {root:box(el),main:box(main),surface:box(surface),hud:box(hud),time:box(time),row,
+   return {root:box(el),main:box(main),surface:box(surface),hud:box(hud),row,
     modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
     isBattleship:el.classList.contains("battleship-layout"),notice:box(el.querySelector("#gs-notice")),
     selectCount:el.querySelectorAll("#gs-hud select").length,
@@ -73,7 +72,12 @@ const names=[
   assert.ok(v.main.width>=v.root.width*.97,name+" main board must use almost full iframe width: "+JSON.stringify(v));
   assert.ok(v.main.height>=v.root.height-58,name+" game stage must use available height: "+JSON.stringify(v));
   assert.ok(v.hud.width>=v.root.width*.97,name+" unified toolbar must span the game width");
-  assert.ok(Math.abs((v.time.x+v.time.width/2)-(v.hud.x+v.hud.width/2))<=2,name+" timer must be centered in the top title bar");
+  const hostClock=await page.locator("#hostGameTimer").evaluate(el=>{
+   const top=document.getElementById("topbar").getBoundingClientRect(),timer=el.getBoundingClientRect();
+   return{shown:getComputedStyle(el).display!=="none",offset:Math.abs((timer.x+timer.width/2)-(top.x+top.width/2)),text:el.textContent.trim()};
+  });
+  assert.ok(hostClock.shown&&hostClock.offset<=2&&/^\d{2}:\d{2}/.test(hostClock.text),name+" timer must be visible at the exact center of the topmost host title bar: "+JSON.stringify(hostClock));
+  assert.equal(await frame.locator("#gs-hud-time").count(),0,name+" inner game toolbar must not duplicate the clock");
   assert.equal(v.selectCount,0,name+" mode/difficulty must not use native dropdowns");
   if(v.modeButtons)assert.ok(v.modeButtons>=2,name+" mode selector must be segmented buttons");
   if(v.difficultyButtons)assert.ok(v.difficultyButtons>=2,name+" difficulty selector must be segmented buttons");

@@ -932,3 +932,17 @@ body{font-size:15px}
  .home-hero .hero-copy{max-width:100%!important}
  .home-hero .home-art{display:none!important}
 }
+
+
+/* R17 · A single session timer in the topmost site title bar. */
+.topbar{position:relative}
+.topbar .host-game-timer:not(.hidden){
+ display:flex!important;position:absolute!important;left:50%!important;top:50%!important;
+ transform:translate(-50%,-50%)!important;margin:0!important;padding:0 10px!important;
+ min-width:72px!important;min-height:30px!important;align-items:center;justify-content:center;
+ background:var(--shell,#eef7fc);border-radius:7px;pointer-events:none;z-index:3
+}
+.topbar .host-game-timer strong{
+ font:800 18px/1 Consolas,"Segoe UI",monospace!important;
+ font-variant-numeric:tabular-nums!important;letter-spacing:.035em;color:#294b63!important
+}

@@ -188,6 +188,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(skillState.players[0].hp,3,"天香 prevents damage to 小乔");
   assert.equal(skillState.players[2].hp,2,"天香 transfers the damage");
   assert.equal(skillState.players[2].hand.length,targetHandBefore+2,"天香 target draws two cards for 4 max HP minus 2 remaining HP");
+  // Card ID 0 is valid; Tianxiang must not treat it as absence of a selection.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("setHp",0,3);await call("setHp",2,4);await call("addCard",0,"kill","spade",0);
+  await call("damage",0,1,-1);
+  await sg.locator("#tianxiangPanel").waitFor({state:"visible"});
+  await sg.locator('#tianxiangCards [data-card="0"]').click();
+  await sg.locator('#tianxiangTargets [data-target="2"]').click();
+  assert.equal((await api()).players[2].hp,3,"天香 accepts selected card ID zero and transfers its damage");
   await sg.close();
   const ddz=await browser.newPage({viewport:{width:1100,height:850}});
   ddz.on("pageerror",err=>errors.push("Dou Dizhu: "+err.message));

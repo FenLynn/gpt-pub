@@ -171,11 +171,11 @@ function openGame(id){
  setBreadcrumb();$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");
  $("railToggleButton").setAttribute("aria-expanded","true");$("railToggleButton").title="收起右侧操作栏";$("railToggleButton").setAttribute("aria-label","收起右侧操作栏");
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
- $("gameElapsed").textContent="00:00";$("helpTitle").textContent=g.name+" · 玩法";
+ $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("helpTitle").textContent=g.name+" · 玩法";
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry;closeHelp();shell.classList.remove("menu-open");
 }
-function closeGame(){if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;}
+function closeGame(){if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;$("hostGameTimer").classList.add("hidden");}
 window.addEventListener("message",event=>{
  if(!active||event.source!==frame.contentWindow)return;
  const m=event.data;
