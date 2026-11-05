@@ -193,24 +193,18 @@ const games = [
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "本机双人");
     await page.locator("#modeControl button[data-mode-index='0']").click();
     assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "mode switch should start a new playable round");
-    const gomokuBoardBox = await gomoku.locator(".gomoku-board").boundingBox();
-    assert.ok(gomokuBoardBox && Math.abs(gomokuBoardBox.width-gomokuBoardBox.height)<1, "Gomoku board must remain square while filling the available area");
-    const gomokuCellBox = await gomoku.locator(".gomoku-cell").nth(112).boundingBox();
-    if(!gomokuCellBox){
-      const gomokuLayout = await gomoku.locator("#game").evaluate(root => {
-        const selectors=["#game",".game-main-board",".board-wrap","#board",".gomoku-cell"];
-        return selectors.map(selector=>{
-          const el=root.querySelector(selector);
-          if(!el)return {selector,missing:true};
-          const rect=el.getBoundingClientRect(),style=getComputedStyle(el);
-          return {selector,rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},display:style.display,visibility:style.visibility,overflow:style.overflow,position:style.position};
-        });
-      });
-      console.error("GOMOKU_LAYOUT "+JSON.stringify(gomokuLayout));
-      await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts"),{recursive:true});
-      await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/gomoku-layout-failure.png")});
-    }
-    assert.ok(gomokuCellBox && gomokuCellBox.width > 0 && gomokuCellBox.height > 0, "Gomoku intersections must be visible and clickable");
+    assert.ok(await page.locator("#gameFrame").isVisible(), "Gomoku game iframe must be visible in the host workspace");
+    const gomokuBoardBox = await gomoku.locator(".gomoku-board").evaluate(el => {
+      const r=el.getBoundingClientRect();return {width:r.width,height:r.height};
+    });
+    assert.ok(gomokuBoardBox.width>200 && Math.abs(gomokuBoardBox.width-gomokuBoardBox.height)<1, "Gomoku board must remain square while filling the available area");
+    const gomokuCellGeometry = await gomoku.locator(".gomoku-cell").nth(112).evaluate(el=>{
+      const r=el.getBoundingClientRect(),style=getComputedStyle(el);
+      return {connected:el.isConnected,width:r.width,height:r.height,display:style.display,visibility:style.visibility};
+    });
+    assert.ok(gomokuCellGeometry.connected && gomokuCellGeometry.width>10 && gomokuCellGeometry.height>10
+      && gomokuCellGeometry.display!=="none" && gomokuCellGeometry.visibility==="visible",
+      "Gomoku intersections must have visible, nonzero geometry inside the visible iframe");
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
     assert.ok(await gomoku.locator(".stone").count() >= 2, "gomoku human and AI should both place a stone");
