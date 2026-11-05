@@ -102,11 +102,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const twoScreens=await xiangqi.evaluate(()=>window.__p111XiangqiTest.pseudo());
   assert.equal(twoScreens.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,
    "cannon may capture only the first enemy piece after exactly one screen");
-  // A blocker prevents the facing-generals rule; moving it off the file is illegal.
-  await load([[4,0,"black","将"],[4,9,"red","帅"],[4,5,"red","兵"]]);
+  // A rook blocks the generals; a sideways move exposes the file and must be rejected,
+  // while moving along the same file keeps the blocker in place and remains legal.
+  await load([[4,0,"black","将"],[4,9,"red","帅"],[4,5,"red","车"]]);
   assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.faces()),false);
-  assert.equal((await getMoves()).some(m=>m.fx===4&&m.fy===5&&m.tx===4&&m.ty===4),false,
-   "a move that exposes the generals to each other is illegal");
+  const blockerMoves=await getMoves();
+  assert.equal(blockerMoves.some(m=>m.fx===4&&m.fy===5&&m.tx===3&&m.ty===5),false,
+   "moving the blocker sideways exposes the generals and is illegal");
+  assert.equal(blockerMoves.some(m=>m.fx===4&&m.fy===5&&m.tx===4&&m.ty===4),true,
+   "moving the blocker along the shared file keeps the generals separated");
   // Xiangqi threefold cycle: the side that continuously checks loses; neutral repetition draws.
   await load([[4,0,"black","将"],[3,9,"red","帅"],[4,2,"red","车"]],"black");
   assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.check("black")),true);
