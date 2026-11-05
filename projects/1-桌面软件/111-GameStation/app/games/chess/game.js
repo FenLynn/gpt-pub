@@ -36,7 +36,7 @@ function kingAt(b,color){for(let y=0;y<8;y++)for(let x=0;x<8;x++){const p=b[y][x
 function inCheck(b,color){const k=kingAt(b,color);return !!k&&attacked(b,k.x,k.y,opposite(color));}
 function pseudoMoves(b,x,y,color,rights,epSquare){
  const p=b[y][x];if(!p||p.c!==color)return[];const out=[];
- const add=(tx,ty,extra={})=>{if(!inside(tx,ty))return;const q=b[ty][tx];if(!q||q.c!==color)out.push({fx:x,fy:y,tx,ty,...extra});};
+ const add=(tx,ty,extra={})=>{if(!inside(tx,ty))return;const q=b[ty][tx];if(q&&q.t==="K")return;if(!q||q.c!==color)out.push({fx:x,fy:y,tx,ty,...extra});};
  if(p.t==="P"){
   const d=color==="w"?-1:1,start=color==="w"?6:1,promo=color==="w"?0:7;
   if(inside(x,y+d)&&!b[y+d][x]){add(x,y+d,{promotion:y+d===promo?"Q":null});if(y===start&&!b[y+2*d][x])add(x,y+2*d,{double:true});}
@@ -55,7 +55,7 @@ function pseudoMoves(b,x,y,color,rights,epSquare){
   const dirs=[];
   if(p.t==="B"||p.t==="Q")dirs.push([1,1],[1,-1],[-1,1],[-1,-1]);
   if(p.t==="R"||p.t==="Q")dirs.push([1,0],[-1,0],[0,1],[0,-1]);
-  for(const [dx,dy] of dirs){let tx=x+dx,ty=y+dy;while(inside(tx,ty)){const q=b[ty][tx];if(!q){out.push({fx:x,fy:y,tx,ty});}else{if(q.c!==color)out.push({fx:x,fy:y,tx,ty});break;}tx+=dx;ty+=dy;}}
+  for(const [dx,dy] of dirs){let tx=x+dx,ty=y+dy;while(inside(tx,ty)){const q=b[ty][tx];if(!q){out.push({fx:x,fy:y,tx,ty});}else{if(q.c!==color&&q.t!=="K")out.push({fx:x,fy:y,tx,ty});break;}tx+=dx;ty+=dy;}}
  }
  return out;
 }
