@@ -114,5 +114,5 @@ document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render(
 document.getElementById("undoButton").addEventListener("click",undo);
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(fitBoard);boardObserver.observe(boardArea);}
-GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(turn==="black"&&mode==="ai")scheduleAI();else report(turn==="red"?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";newGame();},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
+GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(turn==="black"&&mode==="ai")scheduleAI();else report(turn==="red"?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
 })();
