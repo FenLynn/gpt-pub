@@ -2,7 +2,7 @@
 "use strict";
 const N=15,board=Array.from({length:N},()=>Array(N).fill(0)),el=document.getElementById("board"),status=document.getElementById("status"),undoButton=document.getElementById("undoButton"),boardArea=document.querySelector(".game-main-board");
 let boardObserver=null;
-function fitBoard(){const size=Math.max(0,Math.min(boardArea.clientWidth,boardArea.clientHeight,window.innerHeight*.9));if(size>0){el.style.width=size+"px";el.style.height=size+"px";}}
+function fitBoard(){const size=Math.max(0,Math.min(boardArea.clientWidth,boardArea.clientHeight));if(size>0){el.style.width=size+"px";el.style.height=size+"px";}}
 let mode="ai",turn=1,over=false,paused=false,difficulty="normal",history=[],aiTimer=null;
 function setStatus(t){status.textContent=t;GameBridge.report(t,{score:history.length});}
 function render(){el.innerHTML="";for(let y=0;y<N;y++)for(let x=0;x<N;x++){const b=document.createElement("button");b.className="gomoku-cell";b.type="button";b.setAttribute("aria-label",(x+1)+"列 "+(y+1)+"行");if(board[y][x]){const s=document.createElement("span");s.className="stone "+(board[y][x]===1?"black":"white");b.appendChild(s);}b.addEventListener("click",()=>play(x,y));el.appendChild(b);}fitBoard();}
@@ -20,7 +20,7 @@ function place(x,y,p){if(board[y][x]||over)return false;board[y][x]=p;history.pu
 function scheduleAI(){clearTimeout(aiTimer);if(paused||over||mode!=="ai"||turn!==-1)return;aiTimer=setTimeout(()=>{if(paused||over||turn!==-1)return;const [x,y]=chooseAI();place(x,y,-1);turn=1;if(!over)setStatus("轮到你了 · 黑棋");},difficulty==="easy"?240:difficulty==="normal"?360:480);}
 function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const playing=turn;if(!place(x,y,playing))return;if(over)return;turn=-playing;if(mode==="ai"){setStatus("AI 思考中");scheduleAI();}else setStatus(turn===1?"轮到黑棋":"轮到白棋");}
 function newGame(){clearTimeout(aiTimer);for(let y=0;y<N;y++)board[y].fill(0);history=[];turn=1;over=false;paused=false;render();setStatus(mode==="ai"?"你执黑棋，请落子":"黑棋先行");}
-function undo(){if(!history.length||over||paused)return;clearTimeout(aiTimer);const count=mode==="ai"?Math.min(turn===-1?1:2,history.length):1;let lastSide=1;for(let i=0;i<count;i++){const m=history.pop();board[m.y][m.x]=0;lastSide=m.p;}turn=mode==="ai"?1:lastSide;render();setStatus("已悔棋 · "+(turn===1?"轮到黑棋":"轮到白棋"));}
+function undo(){if(!history.length||paused)return;clearTimeout(aiTimer);const count=mode==="ai"?Math.min(turn===-1?1:2,history.length):1;let lastSide=1;for(let i=0;i<count;i++){const m=history.pop();board[m.y][m.x]=0;lastSide=m.p;}turn=mode==="ai"?1:lastSide;render();setStatus("已悔棋 · "+(turn===1?"轮到黑棋":"轮到白棋"));}
 undoButton.addEventListener("click",undo);
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(fitBoard);boardObserver.observe(boardArea);}
