@@ -88,8 +88,25 @@ function renderRanking(){
   button.addEventListener("click",()=>openGame(x.game.id));li.appendChild(button);list.appendChild(li);
  });
 }
+function renderHomeRecent(){
+ const list=$("homeRecentList");if(!list)return;
+ const played=games.map(game=>({game,stat:stats[game.id]||{plays:0,totalMs:0,lastPlayed:""}}))
+  .filter(row=>row.stat.plays>0||row.stat.lastPlayed)
+  .sort((a,b)=>String(b.stat.lastPlayed).localeCompare(String(a.stat.lastPlayed))||b.stat.totalMs-a.stat.totalMs);
+ const rows=played.slice(0,4);
+ const fallback=["minesweeper","gomoku","tetris","solitaire"];
+ for(const id of fallback){if(rows.length>=4)break;if(!rows.some(row=>row.game.id===id)){const game=games.find(item=>item.id===id);if(game)rows.push({game,stat:{plays:0,totalMs:0,lastPlayed:""}});}}
+ $("recentSubtitle").textContent=played.length?"按最近游玩排序":"暂无记录 · 推荐体验";
+ list.innerHTML="";
+ rows.forEach(({game,stat})=>{
+  const button=document.createElement("button");button.type="button";button.className="recent-game";
+  const meta=stat.plays?("游玩 "+stat.plays+" 次 · "+fmtDuration(stat.totalMs)):game.description;
+  button.innerHTML='<span class="recent-icon">'+escapeHtml(game.icon)+'</span><span class="recent-copy"><strong>'+escapeHtml(game.name)+'</strong><small>'+escapeHtml(meta)+'</small></span><span class="recent-arrow">›</span>';
+  button.addEventListener("click",()=>openGame(game.id));list.appendChild(button);
+ });
+}
 function updateCounts(){for(const cat of Object.keys(categoryNames))$("count-"+cat).textContent=games.filter(g=>cat==="all"||g.category===cat).length;if($("totalGameCount"))$("totalGameCount").textContent=String(games.length);}
-function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent="首页";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();}
+function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent="首页";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();renderHomeRecent();}
 function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
 function renderLibrary(){const grid=$("gameGrid");grid.innerHTML="";const rows=games.filter(g=>(currentCategory==="all"||g.category===currentCategory)&&(!search||(g.name+" "+g.description).toLowerCase().includes(search)));$("libraryCount").textContent=rows.length+" 款";$("emptyState").classList.toggle("hidden",rows.length>0);rows.forEach(g=>{const b=document.createElement("button");b.className="game-card";b.type="button";b.innerHTML='<span class="game-card-icon">'+g.icon+'</span><span class="game-card-copy"><strong class="game-card-title">'+escapeHtml(g.name)+'</strong><span class="game-card-meta"><i class="game-card-status '+(g.status==="prototype"?"prototype":"")+'"></i>'+(g.status==="prototype"?"持续完善":"可直接游玩")+'</span></span><span class="game-card-arrow">›</span>';b.addEventListener("click",()=>openGame(g.id));grid.appendChild(b);});}
 function send(type,payload={}){if(!active||!frame.contentWindow)return;frame.contentWindow.postMessage({channel:"gamestation",protocolVersion:1,gameId:active.id,sessionId,type,payload},"*");}
@@ -115,7 +132,7 @@ function persistSessionTime(){if(!session||!session.running)return;const now=Dat
 function startClock(){if(!session||session.running)return;session.running=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
 function stopClock(){if(session&&session.running){persistSessionTime();session.running=false;persistStats();renderHeatmap();renderRanking();}paused=true;setGameState();}
 function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
-function countRound(){if(!session||roundCounted)return;const s=statFor(session.id);s.plays++;s.lastPlayed=dateKey(new Date());roundCounted=true;persistStats();renderRanking();}
+function countRound(){if(!session||roundCounted)return;const s=statFor(session.id);s.plays++;s.lastPlayed=dateKey(new Date());roundCounted=true;persistStats();renderRanking();renderHomeRecent();}
 function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");startClock();focusGameFrame();toast("开始游戏");}
 function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;persistStats();setGameState();toast("本局已结束");}
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
@@ -133,7 +150,7 @@ function newRound(){
  currentScore=0;started=false;roundCounted=false;paused=true;
  send("NEW_GAME");send("RESUME");if(!roundCounted)countRound();startClock();focusGameFrame();setGameState();renderGameControls();
 }
-function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;const s=statFor(session.id);if(Number.isFinite(Number(payload.score)))s.bestScore=Math.max(s.bestScore,Number(payload.score));const msg=String(payload.message||"");if(payload.win===true||/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg))s.wins++;persistStats();renderHeatmap();renderRanking();setGameState();}
+function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;const s=statFor(session.id);if(Number.isFinite(Number(payload.score)))s.bestScore=Math.max(s.bestScore,Number(payload.score));const msg=String(payload.message||"");if(payload.win===true||/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg))s.wins++;persistStats();renderHeatmap();renderRanking();renderHomeRecent();setGameState();}
 function openGame(id){
  const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
@@ -218,7 +235,7 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  });
  $("modeControl").addEventListener("click",e=>{const b=e.target.closest("button[data-mode-index]");if(b)setMode(b.dataset.modeIndex);});
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
- document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));
+ document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));$("recentBrowse").addEventListener("click",()=>showLibrary("all"));
 $("helpButton").addEventListener("click",()=>{$("helpPanel").classList.contains("hidden")?openHelp():closeHelp();});$("helpClose").addEventListener("click",closeHelp);
 $("fullscreenButton").addEventListener("click",async()=>{try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}catch(e){toast("浏览器未允许全屏");}});
 $("settingsButton").addEventListener("click",openSettings);$("settingsClose").addEventListener("click",closeSettings);$("settingsDone").addEventListener("click",closeSettings);
