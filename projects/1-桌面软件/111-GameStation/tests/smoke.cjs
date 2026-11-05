@@ -5,7 +5,7 @@ const path=require("node:path");
 const {pathToFileURL}=require("node:url");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
 const names=[
-"五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","国际跳棋","中国跳棋",
+"五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","国际跳棋","中国跳棋","飞行棋",
 "扫雷","2048","记忆翻牌","数独","推箱子",
 "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克",
 "经典纸牌","斗地主","麻将","三国杀"
@@ -100,7 +100,7 @@ const names=[
   await fs.promises.mkdir(path.join(artifacts,"games"),{recursive:true});
   await page.goto(pathToFileURL(path.join(root,"index.html")).href);
   await page.locator("#homeDate").waitFor({state:"visible"});
-  assert.equal(await page.locator("#totalGameCount").innerText(),"23");
+  assert.equal(await page.locator("#totalGameCount").innerText(),"24");
   assert.equal(await page.locator(".brand-mark i").count(),4);
   const hero=await page.locator(".home-hero").evaluate(el=>{
    const rect=n=>{const r=n.getBoundingClientRect();return{left:r.left,right:r.right};};
@@ -110,7 +110,7 @@ const names=[
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
   let noticeChecked=false;
   await library();
-  assert.equal(await page.locator(".game-card").count(),23);
+  assert.equal(await page.locator(".game-card").count(),24);
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});

@@ -1593,3 +1593,19 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
 .chinese-checkers-layout .star-token{stroke-width:3;filter:drop-shadow(1px 3px 3px #263e584c)}
 .chinese-checkers-layout .star-token.token-0{fill:#dc6458;stroke:#a73a3e}
 .chinese-checkers-layout .star-token.token-1{fill:#609bd2;stroke:#32669d}
+
+
+/* R18 · Flight Chess: 52-step course + colored home lanes, all controls within the play surface. */
+.flight-chess-layout .flight-stage{position:relative;width:min(100cqw,100cqh);height:min(100cqw,100cqh);max-width:100%;max-height:100%;aspect-ratio:1}
+.flight-chess-layout #board.flight-board{display:block;width:100%;height:100%;overflow:visible}
+.flight-chess-layout .game-main-board{background:radial-gradient(circle at 45% 38%,#fcf6e9,#e6d2b7 85%)!important}
+.flight-chess-layout .flight-outline{fill:#faf2e4;stroke:#ad937c;stroke-width:12;filter:drop-shadow(0 9px 11px #4e403043)}
+.flight-chess-layout .flight-center-pad{fill:#f7dfbd;stroke:#b89371;stroke-width:5}
+.flight-chess-layout .flight-aircraft{cursor:pointer;transition:filter .12s}
+.flight-chess-layout .flight-aircraft.can-move{filter:drop-shadow(0 0 7px #f6be42)}
+.flight-chess-layout .flight-aircraft-number{fill:#fff;font:bold 12px/1 "Segoe UI",Arial,sans-serif;pointer-events:none}
+.flight-chess-layout .flight-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:125px;pointer-events:none}
+.flight-chess-layout .flight-center>*{pointer-events:auto}
+.flight-chess-layout #turnText{font-size:12px;color:#685a4c;font-weight:750;white-space:nowrap;text-align:center}
+.flight-chess-layout .flight-dice{font-size:43px;line-height:1;color:#4e718e;text-shadow:0 1px #fff}
+.flight-chess-layout #rollButton{min-width:100px;border:1px solid #a7c3d5;background:#fffdf5;color:#366b8b}
