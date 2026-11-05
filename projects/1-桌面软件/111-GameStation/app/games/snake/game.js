@@ -7,14 +7,46 @@ function setStatus(message){status.textContent=message;GameBridge.report(message
 function configure(value){difficulty=value||"normal";speed=difficulty==="easy"?170:difficulty==="hard"?88:125;}
 function placeFood(){const occupied=new Set(snake.map(p=>p.y*SIZE+p.x)),free=[];for(let i=0;i<SIZE*SIZE;i++)if(!occupied.has(i))free.push(i);if(!free.length)return null;const n=free[Math.floor(Math.random()*free.length)];return{x:n%SIZE,y:Math.floor(n/SIZE)};}
 function draw(){
- ctx.clearRect(0,0,PIXEL,PIXEL);ctx.fillStyle="#142d3a";ctx.fillRect(0,0,PIXEL,PIXEL);
- ctx.strokeStyle="#ffffff0a";ctx.lineWidth=1;
- for(let i=1;i<SIZE;i++){ctx.beginPath();ctx.moveTo(i*CELL,0);ctx.lineTo(i*CELL,PIXEL);ctx.stroke();ctx.beginPath();ctx.moveTo(0,i*CELL);ctx.lineTo(PIXEL,i*CELL);ctx.stroke();}
- if(food){ctx.fillStyle="#f0a36d";ctx.beginPath();ctx.arc(food.x*CELL+CELL/2,food.y*CELL+CELL/2,7,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff4";ctx.beginPath();ctx.arc(food.x*CELL+7,food.y*CELL+6,2,0,Math.PI*2);ctx.fill();}
- snake.forEach((part,index)=>{ctx.fillStyle=index?"#5fae91":"#a5dfc2";ctx.beginPath();ctx.roundRect(part.x*CELL+1,part.y*CELL+1,CELL-2,CELL-2,index?5:7);ctx.fill();if(!index){ctx.fillStyle="#234b42";const ex=dir.y===0?dir.x>0?14:5:11,ey=dir.x===0?dir.y>0?14:5:6;ctx.beginPath();ctx.arc(part.x*CELL+ex,part.y*CELL+ey,1.5,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(part.x*CELL+ex,part.y*CELL+ey+5,1.5,0,Math.PI*2);ctx.fill();}});
- if(paused&&!over){ctx.fillStyle="#ffffffd9";ctx.font="600 18px sans-serif";ctx.textAlign="center";ctx.fillText("已暂停",PIXEL/2,PIXEL/2);}
- if(over){ctx.fillStyle="#ffffffed";ctx.font="700 18px sans-serif";ctx.textAlign="center";ctx.fillText("游戏结束",PIXEL/2,PIXEL/2);}
- canvas.dataset.headX=String(snake[0]?.x??"");canvas.dataset.headY=String(snake[0]?.y??"");canvas.dataset.score=String(score);canvas.dataset.paused=String(paused);
+ ctx.clearRect(0,0,PIXEL,PIXEL);
+ const bg=ctx.createLinearGradient(0,0,PIXEL,PIXEL);
+ bg.addColorStop(0,"#102b35");bg.addColorStop(.52,"#183e48");bg.addColorStop(1,"#0c2935");
+ ctx.fillStyle=bg;ctx.fillRect(0,0,PIXEL,PIXEL);
+ ctx.strokeStyle="#b7d6da10";ctx.lineWidth=1;
+ for(let i=1;i<SIZE;i++){
+  ctx.beginPath();ctx.moveTo(i*CELL+.5,0);ctx.lineTo(i*CELL+.5,PIXEL);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,i*CELL+.5);ctx.lineTo(PIXEL,i*CELL+.5);ctx.stroke();
+ }
+ if(food){
+  const fx=food.x*CELL+CELL/2,fy=food.y*CELL+CELL/2;
+  const glow=ctx.createRadialGradient(fx,fy,2,fx,fy,CELL*.8);
+  glow.addColorStop(0,"#ec755f55");glow.addColorStop(1,"#ec755f00");
+  ctx.fillStyle=glow;ctx.fillRect(fx-CELL*.8,fy-CELL*.8,CELL*1.6,CELL*1.6);
+  ctx.fillStyle="#dc594c";ctx.beginPath();ctx.arc(fx,fy+1,8,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#ffb392";ctx.beginPath();ctx.arc(fx-3,fy-3,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#77c87d";ctx.fillRect(fx,fy-11,5,4);
+ }
+ snake.forEach((part,index)=>{
+  const x=part.x*CELL+1,y=part.y*CELL+1,head=index===0;
+  const grad=ctx.createLinearGradient(x,y,x+CELL,y+CELL);
+  if(head){grad.addColorStop(0,"#c3f5a5");grad.addColorStop(.48,"#75cc86");grad.addColorStop(1,"#329b7d");}
+  else{grad.addColorStop(0,"#7ad4a4");grad.addColorStop(.5,"#4bb58b");grad.addColorStop(1,"#279378");}
+  ctx.fillStyle=grad;ctx.beginPath();ctx.roundRect(x,y,CELL-2,CELL-2,head?7:5);ctx.fill();
+  ctx.fillStyle="#ffffff3d";ctx.fillRect(x+4,y+4,CELL-12,3);
+  ctx.fillStyle="#0c544b66";ctx.fillRect(x+5,y+CELL-7,CELL-12,2);
+  if(head){
+   const ex=dir.y===0?dir.x>0?14:5:11,ey=dir.x===0?dir.y>0?14:5:6;
+   ctx.fillStyle="#173e3a";ctx.beginPath();ctx.arc(part.x*CELL+ex,part.y*CELL+ey,1.8,0,Math.PI*2);ctx.fill();
+   ctx.beginPath();ctx.arc(part.x*CELL+ex,part.y*CELL+ey+5,1.8,0,Math.PI*2);ctx.fill();
+  }
+ });
+ if(paused||over){
+  ctx.fillStyle="#091e2bc0";ctx.fillRect(0,0,PIXEL,PIXEL);
+  ctx.fillStyle="#e5f6e7";ctx.font="700 22px sans-serif";ctx.textAlign="center";
+  ctx.fillText(over?"游戏结束":"已暂停",PIXEL/2,PIXEL/2);
+ }
+ canvas.dataset.headX=String(snake[0]?.x??"");
+ canvas.dataset.headY=String(snake[0]?.y??"");
+ canvas.dataset.score=String(score);canvas.dataset.paused=String(paused);
 }
 function stop(){if(rafId!==null)cancelAnimationFrame(rafId);rafId=null;lastFrame=0;accumulator=0;}
 function finish(message,win=false){over=true;paused=true;stop();setStatus(message);GameBridge.send("GAME_OVER",{message,score,win});draw();}
