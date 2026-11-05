@@ -101,7 +101,7 @@ function draw(){
  const px=Math.round(player.x-cameraX),py=Math.round(player.y);
  ctx.globalAlpha=player.inv>0&&Math.floor(player.inv*12)%2===0?.35:1;soldier(px,py,player.face,"#316a70","#e7bf8d",1);ctx.globalAlpha=1;
  // Pixel-art HUD strip
- ctx.fillStyle="#102a34d9";ctx.fillRect(0,0,W,43);ctx.fillStyle="#e9d59f";ctx.font="bold 14px monospace";ctx.textAlign="left";ctx.fillText("CONTRA  //  ZONE "+stage,16,19);ctx.font="11px monospace";ctx.fillStyle="#d2e4c4";ctx.fillText("MISSION "+Math.round(player.x/STAGE_LENGTH*100)+"%",16,34);
+ ctx.fillStyle="#102a34d9";ctx.fillRect(0,0,W,43);ctx.fillStyle="#e9d59f";ctx.font="bold 14px monospace";ctx.textAlign="left";ctx.fillText("CONTRA  //  ZONE "+stage,30,19);ctx.font="11px monospace";ctx.fillStyle="#d2e4c4";ctx.fillText("MISSION "+Math.round(player.x/STAGE_LENGTH*100)+"%",30,34);
  ctx.fillStyle="#28453e";ctx.fillRect(190,17,190,7);ctx.fillStyle="#e2b86d";ctx.fillRect(190,17,190*Math.min(1,player.x/STAGE_LENGTH),7);
  ctx.fillStyle="#f4e8c9";ctx.font="bold 12px monospace";ctx.fillText("SCORE "+String(score).padStart(6,"0"),W-210,19);ctx.fillText("LIFE "+lives+"   G "+grenadeCount,W-210,34);
  if(stageIntro>0){ctx.fillStyle="#0c1d26a8";ctx.fillRect(230,70,340,58);ctx.strokeStyle="#d5b477";ctx.strokeRect(230,70,340,58);ctx.fillStyle="#f5e6bd";ctx.font="bold 25px monospace";ctx.textAlign="center";ctx.fillText("AREA "+stage,400,108);}
