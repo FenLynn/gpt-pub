@@ -27,7 +27,7 @@ function makeMap(){
 }
 function tank(x,y,enemy){return{x,y,dir:"up",enemy,alive:true,moveClock:0,fireClock:0};}
 function reset(){
- makeMap();const c=cfg();player=tank(7,12,false);enemies=[];bullets=[];kills=0;lives=c.lives;spawned=0;spawnTimer=0;moveTimer=0;fireTimer=0;aiTimer=0;baseAlive=true;keys={};over=false;paused=false;updateHud();
+ cancelAnimationFrame(raf);raf=0;makeMap();const c=cfg();player=tank(7,12,false);enemies=[];bullets=[];kills=0;lives=c.lives;spawned=0;spawnTimer=0;moveTimer=0;fireTimer=0;aiTimer=0;baseAlive=true;keys={};over=false;paused=false;updateHud();
  spawnEnemy(1);spawnEnemy(7);spawnEnemy(14);report("守卫基地 · 敌军来袭");
 }
 function updateHud(){document.getElementById("stage").textContent="1";document.getElementById("kills").textContent=kills+" / "+MAX_KILLS;document.getElementById("lives").textContent=String(lives);document.getElementById("baseState").textContent=baseAlive?"安全":"被摧毁";}
