@@ -131,7 +131,7 @@ function reveal(index){
  if(cells[index].mine){lose();return;}
  flood(index);render();
  if(opened===W*H-MINES){win();return;}
- setStatus("继续排查");
+ setStatus("游戏进行中");
 }
 function toggleFlag(index){
  if(paused||over||cells[index].open)return;
@@ -150,7 +150,7 @@ function chord(index){
  covered.forEach(flood);
  render();
  if(opened===W*H-MINES){win();return;}
- setStatus("继续排查");
+ setStatus("游戏进行中");
 }
 function newGame(){makeBoard();}
 function onResize(){fitBoard();}
@@ -163,7 +163,7 @@ GameBridge.register({
  init(payload){configure(payload.difficulty);newGame();},
  newGame,
  pause(){paused=true;setStatus("已暂停");},
- resume(){paused=false;if(started&&!over)setStatus("继续排查");},
+ resume(){paused=false;if(!over)setStatus(started?"游戏进行中":"点击任意方格开始");},
  setDifficulty(value){configure(value);},
  dispose(){paused=true;stopTimer();resizeObserver?.disconnect();window.removeEventListener("resize",onResize);}
 });
