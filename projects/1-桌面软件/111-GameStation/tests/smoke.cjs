@@ -215,6 +215,25 @@ const names=[
   const mx=Number(await mario.getAttribute("data-player-x"));
   await mario.press("ArrowRight");await page.keyboard.down("ArrowRight");await page.waitForTimeout(150);await page.keyboard.up("ArrowRight");
   assert.ok(Number(await mario.getAttribute("data-player-x"))>mx,"Mario must respond to movement");
+  await open("五子棋");await start();
+  const goGrid=await frame.locator("#board").evaluate(el=>({
+   lines:el.querySelectorAll(".gomoku-lines line").length,
+   stars:el.querySelectorAll(".gomoku-lines circle").length,
+   buttons:el.querySelectorAll(".gomoku-cell").length,
+   shape:(()=>{const r=el.getBoundingClientRect();return r.width/r.height})()
+  }));
+  assert.equal(goGrid.lines,30,"Gomoku perimeter/grid lines must be exactly 15 vertical + 15 horizontal segments");
+  assert.equal(goGrid.stars,9,"Gomoku has 9 precisely located star points");
+  assert.equal(goGrid.buttons,225,"Gomoku has exactly 225 intersections");
+  assert.ok(Math.abs(goGrid.shape-1)<.015,"Gomoku board must remain square");
+  await frame.locator(".gomoku-cell").nth(112).click();
+  assert.equal(await frame.locator(".stone.stone-arrived").count(),1,"Gomoku last stone must animate on landing");
+  await open("中国象棋");await start();
+  const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
+   const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
+  });
+  assert.ok(Math.abs(xiangqiRatio.width-xiangqiRatio.height)<=1.5,"Xiangqi pieces must be truly circular, not elliptical: "+JSON.stringify(xiangqiRatio));
+  assert.equal(await frame.locator(".xiangqi-cell").count(),90,"Xiangqi must have exactly 90 intersections");
   await open("国际象棋");await start();
   assert.equal(await frame.locator(".chess-square").count(),64);
   await frame.locator('#gs-mode button[data-mode-index="1"]').click();
