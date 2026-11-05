@@ -107,6 +107,7 @@ function drawTank(t){
  ctx.fillStyle="#d7d4b4";ctx.fillRect(-1,-24,2,8);ctx.restore();
 }
 function draw(){
+ canvas.dataset.playerX=String(player?.x??"");canvas.dataset.playerY=String(player?.y??"");canvas.dataset.kills=String(kills);canvas.dataset.bullets=String(bullets.length);
  ctx.save();ctx.imageSmoothingEnabled=false;ctx.fillStyle="#0b1712";ctx.fillRect(0,0,W,H);
  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
   const px=x*T,py=y*T,tile=map[y][x];ctx.fillStyle="#182b1d";ctx.fillRect(px,py,T,T);
