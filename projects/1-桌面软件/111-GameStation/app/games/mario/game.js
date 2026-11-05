@@ -73,7 +73,7 @@ function draw(){
  enemies.forEach(e=>{if(e.alive)drawEnemy(Math.round(e.x-camera),Math.round(e.y));});
  // flag and castle
  const flagX=goalX-camera;ctx.fillStyle="#7c5632";ctx.fillRect(flagX,GROUND-230,7,230);ctx.fillStyle="#2ebc63";ctx.fillRect(flagX+7,GROUND-224,56,34);ctx.fillStyle="#f4e6ae";ctx.fillRect(flagX+7,GROUND-224,10,34);ctx.fillStyle="#b66b3a";ctx.fillRect(flagX+85,GROUND-70,68,70);ctx.fillStyle="#e3c08b";ctx.fillRect(flagX+95,GROUND-61,48,61);
- const px=player.x-camera;ctx.globalAlpha=invuln>0&&Math.floor(invuln*12)%2===0?.35:1;drawMario(Math.round(px),Math.round(player.y),player.face);ctx.globalAlpha=1;
+ const px=player.x-camera;canvas.dataset.playerX=String(player.x);canvas.dataset.coins=String(coinCount);canvas.dataset.lives=String(lives);ctx.globalAlpha=invuln>0&&Math.floor(invuln*12)%2===0?.35:1;drawMario(Math.round(px),Math.round(player.y),player.face);ctx.globalAlpha=1;
  // arcade HUD
  ctx.fillStyle="#27364cdd";ctx.fillRect(0,0,W,37);ctx.fillStyle="#fff1b2";ctx.font="bold 15px monospace";ctx.textAlign="left";ctx.fillText("WORLD 1-1",18,24);ctx.fillText("× "+coinCount,250,24);ctx.fillText("SCORE "+String(score).padStart(6,"0"),420,24);ctx.fillText("LIFE "+lives,790,24);
  if(paused||over){ctx.fillStyle="#1b2d3d88";ctx.fillRect(0,37,W,H-37);ctx.fillStyle="#fff4cf";ctx.font="bold 28px monospace";ctx.textAlign="center";ctx.fillText(over?"STAGE CLEAR":"PAUSED",W/2,H/2);}
