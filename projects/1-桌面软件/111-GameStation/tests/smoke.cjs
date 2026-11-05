@@ -131,6 +131,9 @@ const games = [
     assert.match(await page.locator("#homeDate").innerText(), /^\d{1,2}月\d{1,2}日 · 星期[一二三四五六日]$/, "home date and weekday should share the same line");
     assert.match(await page.locator("#homeTime").innerText(), /^\d{2}:\d{2}$/, "home clock should show local hours and minutes");
     assert.ok(await page.locator(".home-hero").isVisible(), "home should show the redesigned hero");
+    assert.ok(await page.locator(".quick-start").isVisible(), "home should show the quick-start categories");
+    const homeActivityHeight=await page.locator(".activity-panel").evaluate(el=>el.getBoundingClientRect().height);
+    assert.ok(homeActivityHeight<=300, "home activity heatmap should be a compact dashboard card, not a full-height empty panel");
     assert.equal(await page.locator("#totalGameCount").innerText(), "19");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
     assert.equal(await page.locator(".heatmap-cell[data-date]").count(), 365, "activity grid must contain 365 real calendar days");
@@ -410,9 +413,12 @@ const games = [
       const controls = document.querySelector("#gameControls").getBoundingClientRect();
       const topbar = document.querySelector(".topbar").getBoundingClientRect();
       const workspace = document.querySelector(".workspace-view").getBoundingClientRect();
-      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsHeight: controls.height, topbarBottom:topbar.bottom,workspaceTop:workspace.top };
+      const actions=document.querySelector(".topbar-actions").getBoundingClientRect();
+      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsBottom:controls.bottom, controlsHeight: controls.height, actionsTop:actions.top, actionsBottom:actions.bottom, topbarBottom:topbar.bottom,workspaceTop:workspace.top };
     });
     assert.ok(mobileToolbar.controlsHeight > 0 && mobileToolbar.controlsTop >= mobileToolbar.menuBottom - 2, "mobile mode controls must not cover the menu button");
+    assert.ok(mobileToolbar.controlsBottom <= mobileToolbar.topbarBottom + 1, "mobile mode and difficulty controls must stay inside the expanded toolbar, not overlap the game board");
+    assert.ok(mobileToolbar.actionsTop >= 0 && mobileToolbar.actionsBottom <= mobileToolbar.topbarBottom + 1, "mobile game actions must stay inside the first toolbar row");
     assert.ok(mobileToolbar.topbarBottom <= mobileToolbar.workspaceTop + 1, "mobile topbar rows must not spill over the game workspace");
     await page.locator("#difficultyControl button[data-difficulty='hard']").click();
     const mobileMineFit = await mobileMines.locator(".mine-classic").evaluate(el => ({
