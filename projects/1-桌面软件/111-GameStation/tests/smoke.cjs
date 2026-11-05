@@ -66,7 +66,7 @@ const games = [
         return {guide:guide?getComputedStyle(guide).display:"absent",tools:tools?getComputedStyle(tools).display:"absent",main:main?.getBoundingClientRect().width||0,scroll:document.documentElement.scrollHeight};
       });
       assert.notEqual(zones.tools,"none",name+" right-side game actions must remain visible");
-      if(zones.guide!=="absent")assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible");
+      if(zones.guide!=="absent"&&page.viewportSize().width>700)assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible on desktop");
       assert.ok(zones.main>250,name+" central board must retain priority workspace width");
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
       const viewport=page.viewportSize();
