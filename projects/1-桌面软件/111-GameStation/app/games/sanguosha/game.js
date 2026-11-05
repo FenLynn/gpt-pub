@@ -160,7 +160,8 @@ document.getElementById("targetPanel").addEventListener("click",e=>{const b=e.ta
 document.getElementById("tianxiangCards").addEventListener("click",e=>{const b=e.target.closest("[data-card]");if(!b||!pendingTianxiang)return;const id=Number(b.dataset.card);pendingTianxiang.cardId=id;document.getElementById("tianxiangTargets").innerHTML=players.map((p,i)=>p.alive&&i!==0?'<button class="game-btn" data-target="'+i+'">'+(i===lordSeat?"主公":"AI "+i)+'</button>':"").join("");});
 document.getElementById("tianxiangTargets").addEventListener("click",e=>{const b=e.target.closest("[data-target]");if(!b||!pendingTianxiang?.cardId)return;resolveTianxiang(pendingTianxiang.cardId,Number(b.dataset.target));});
 if(new URLSearchParams(location.search).has("p111Test")){
- window.__p111SanguoshaTest={
+ newGame();
+  window.__p111SanguoshaTest={
   addCard(seat,type,suit="heart"){
    const def=defs.find(d=>d[1]===type);if(!def)throw Error("Unknown card type");
    const id=Math.max(-1,...players.flatMap(p=>p.hand.map(c=>c.id)),...discardPile.map(c=>c.id))+1;

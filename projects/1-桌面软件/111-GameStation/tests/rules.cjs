@@ -1,4 +1,4 @@
-/* P111 R16 - deterministic chess rules fixtures. All files are opened via file:// */
+/* P111 R17 - deterministic rules fixtures. All files are opened via file:// */
 const assert=require("node:assert/strict");
 const path=require("node:path"),{pathToFileURL}=require("node:url");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
