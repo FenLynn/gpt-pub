@@ -36,9 +36,9 @@ function dateKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2
 function fmtDuration(ms){const sec=Math.floor(Math.max(0,ms)/1000),h=Math.floor(sec/3600),m=Math.floor(sec%3600/60);return h?h+"小时"+m+"分":m+"分";}
 function fmtClock(ms){const sec=Math.floor(ms/1000),m=Math.floor(sec/60),s=sec%60;return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function toast(message){const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
+function toast(message){if(active){send("HUD_NOTICE",{message});return;}const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[])));
-let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null;
+let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null,helpSource={lines:[],note:""};
 function statFor(id){if(!stats[id])stats[id]={plays:0,wins:0,totalMs:0,bestScore:0,lastPlayed:"",days:{}};const s=stats[id];s.plays=Number(s.plays)||0;s.wins=Number(s.wins)||0;s.totalMs=Number(s.totalMs)||0;s.bestScore=Number(s.bestScore)||0;s.days=s.days||{};return s;}
 function persistStats(){write("stats",stats);}
 function applySettings(){document.documentElement.style.setProperty("--ui-scale",String(settings.scale||"1"));$("uiScale").value=String(settings.scale||"1");}
@@ -138,11 +138,12 @@ function setGameState(){
  $("pauseButton").innerHTML=started&&!finished&&paused?icons.resume:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;$("pauseButton").classList.toggle("continue-action",started&&!finished&&paused);
  $("pauseButton").disabled=!ready||!started||finished;
  $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
+ if(active&&ready)send("HUD_STATE",{ready,started,paused,finished,elapsed:session?fmtClock(session.elapsedMs):"00:00",modeIndex,difficulty});
 }
 function persistSessionTime(){if(!session||!session.running)return;const now=Date.now(),delta=Math.max(0,now-session.lastTick);session.lastTick=now;session.elapsedMs+=delta;const s=statFor(session.id),key=dateKey(new Date(now));s.totalMs+=delta;s.days[key]=(Number(s.days[key])||0)+delta;}
 function startClock(){if(!session||session.running)return;session.running=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
 function stopClock(){if(session&&session.running){persistSessionTime();session.running=false;persistStats();renderHeatmap();renderRanking();}paused=true;setGameState();}
-function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
+function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(active&&ready)send("HUD_STATE",{ready,started,paused,finished:!!session?.finished,elapsed:fmtClock(session.elapsedMs),modeIndex,difficulty});if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
 function countRound(){if(!session||roundCounted)return;const s=statFor(session.id);s.plays++;s.lastPlayed=dateKey(new Date());roundCounted=true;persistStats();renderRanking();renderHomeRecent();}
 function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");startClock();focusGameFrame();toast("开始游戏");}
 function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;persistStats();setGameState();toast("本局已结束");}
@@ -165,9 +166,9 @@ function finishGame(payload={}){if(!session||session.finished)return;stopClock()
 function openGame(id){
  const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
- ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;railCollapsed=false;
+ ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;railCollapsed=false;helpSource={lines:[],note:""};
  session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
- setBreadcrumb();$("gameControls").classList.remove("hidden");$("gameActions").classList.remove("hidden");$("railToggleButton").classList.remove("hidden");$("helpButton").classList.remove("hidden");
+ setBreadcrumb();$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");
  $("railToggleButton").setAttribute("aria-expanded","true");$("railToggleButton").title="收起右侧操作栏";$("railToggleButton").setAttribute("aria-label","收起右侧操作栏");
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
  $("gameElapsed").textContent="00:00";$("helpTitle").textContent=g.name+" · 玩法";
@@ -181,7 +182,7 @@ window.addEventListener("message",event=>{
  if(!m||m.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!==active.id)return;
  if(m.type==="READY"&&!ready){
   ready=true;
-  send("INIT",{sessionId,mode:active.modes?.[modeIndex]==="本机双人"?"two":"ai",difficulty});
+  send("INIT",{sessionId,mode:active.modes?.[modeIndex]==="本机双人"?"two":"ai",difficulty,name:active.name,modes:active.modes||[],hasDifficulty:!!active.difficulty,difficultyLabels:active.difficultyLabels||["简单","中等","困难"]});
   send("PAUSE");
   paused=true;
   setGameState();
@@ -190,10 +191,12 @@ window.addEventListener("message",event=>{
   return;
  }
  if(m.sessionId!==sessionId)return;
- if(m.type==="HOTKEY"){if(m.payload?.action==="start")startOrResumeGame();else if(m.payload?.action==="pause")togglePause();return;}
+ if(m.type==="HOTKEY"){if(["toggle","pause","start"].includes(m.payload?.action))toggleGamePause();return;}
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
-if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
+if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}
+ if(m.type==="HELP_SOURCE"){helpSource={lines:m.payload?.lines||[],note:m.payload?.note||""};if(!$("helpPanel").classList.contains("hidden"))renderHelp();return;}
+ if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
  if(m.type==="STATE"){
   if(Number.isFinite(Number(m.payload?.score))){
    currentScore=Number(m.payload.score);
@@ -222,7 +225,7 @@ if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
 });
 function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:active.modes[modeIndex]==="本机双人"?"two":"ai"});newRound();}
 function setDifficulty(value){if(!active?.difficulty||!["easy","normal","hard"].includes(value)||value===difficulty)return;difficulty=value;renderGameControls();send("SET_DIFFICULTY",{difficulty});newRound();}
-function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?active.help:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
+function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?[...active.help,...(helpSource.lines.length?[["快捷键与鼠标",helpSource.lines.join("；")]]:[]),...(helpSource.note?[["游戏操作提醒",helpSource.note]]:[]),["统一操作","Enter 暂停/继续；游戏区域右键由游戏接管。"]]:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
 function openHelp(){renderHelp();$("helpPanel").classList.remove("hidden");}
 function closeHelp(){$("helpPanel").classList.add("hidden");}
 function dragHelp(){const panel=$("helpPanel"),header=$("helpHeader");let dragging=false,startX=0,startY=0,left=0,top=0;header.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;dragging=true;const r=panel.getBoundingClientRect();left=r.left;top=r.top;startX=e.clientX;startY=e.clientY;panel.style.left=left+"px";panel.style.top=top+"px";panel.style.right="auto";header.setPointerCapture(e.pointerId);});header.addEventListener("pointermove",e=>{if(!dragging)return;const x=Math.max(8,Math.min(window.innerWidth-panel.offsetWidth-8,left+e.clientX-startX));const y=Math.max(8,Math.min(window.innerHeight-48,top+e.clientY-startY));panel.style.left=x+"px";panel.style.top=y+"px";});header.addEventListener("pointerup",()=>dragging=false);header.addEventListener("pointercancel",()=>dragging=false);}
@@ -247,7 +250,7 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  $("modeControl").addEventListener("click",e=>{const b=e.target.closest("button[data-mode-index]");if(b)setMode(b.dataset.modeIndex);});
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
  document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));$("recentBrowse").addEventListener("click",()=>showLibrary("all"));
-$("helpButton").addEventListener("click",()=>{$("helpPanel").classList.contains("hidden")?openHelp():closeHelp();});$("helpClose").addEventListener("click",closeHelp);
+$("helpButton").addEventListener("click",()=>{openHelp();});$("helpClose").addEventListener("click",closeHelp);
 $("fullscreenButton").addEventListener("click",async()=>{try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}catch(e){toast("浏览器未允许全屏");}});
 $("settingsButton").addEventListener("click",openSettings);$("settingsClose").addEventListener("click",closeSettings);$("settingsDone").addEventListener("click",closeSettings);
 $("settingsBackdrop").addEventListener("click",e=>{if(e.target===$("settingsBackdrop"))closeSettings();});$("uiScale").addEventListener("change",e=>{settings.scale=e.target.value;write("settings",settings);applySettings();});
@@ -255,15 +258,15 @@ $("exportData").addEventListener("click",exportData);$("importData").addEventLis
 document.querySelectorAll("[data-ranking]").forEach(b=>b.addEventListener("click",()=>{rankingType=b.dataset.ranking;document.querySelectorAll("[data-ranking]").forEach(x=>{const on=x===b;x.classList.toggle("active",on);x.setAttribute("aria-selected",String(on));});renderRanking();}));
 document.addEventListener("click",e=>{if(shell.classList.contains("menu-open")&&!e.target.closest(".sidebar")&&!e.target.closest("#mobileMenu"))shell.classList.remove("menu-open");});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){closeHelp();closeSettings();}
+ if(e.key==="Escape"){closeSettings();}
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
  if(!active||!ready||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
- if(target&&target.closest("button,a,[role='button']"))return;
- e.preventDefault();if(e.key==="Enter")startOrResumeGame();else togglePause();
+ e.preventDefault();toggleGamePause();
 });
 
+document.addEventListener("contextmenu",e=>{if(e.target instanceof Element&&e.target.closest("#workspaceView"))e.preventDefault();},true);
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&ready&&!paused)pauseGame();});
 setInterval(()=>{if(session?.running)updateSessionDisplay();updateHomeClock();},1000);
 window.addEventListener("beforeunload",()=>{if(session?.running)persistSessionTime();persistStats();});
