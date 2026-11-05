@@ -150,6 +150,7 @@ function resume(){if(over)return;paused=false;reportTurn();if(mode==="ai"&&turn=
 function onKey(e){if(e.key==="Escape"){selected=null;legal=[];render();}if(e.key.toLowerCase()==="u"){e.preventDefault();undo();}}
 document.addEventListener("keydown",onKey);
 document.getElementById("flipButton").addEventListener("click",()=>{flip=!flip;render();});
+document.getElementById("undoButton").addEventListener("click",undo);
 GameBridge.register({
  init(payload){mode=payload.mode==="two"?"two":"ai";difficulty=payload.difficulty||"normal";newGame();},
  newGame,pause,resume,
