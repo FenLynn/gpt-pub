@@ -784,22 +784,10 @@ function play(game, seat, cards) {
     return { legal: false, reason: '压不过上家的' + (TYPE_NAMES[game.lastPlay.type] || '牌') };
   }
 
-  // 落地
-  const remove = new Map();
-  for (let i = 0; i < cards.length; i++) {
-    const r = rankOf(cards[i]);
-    remove.set(r, (remove.get(r) || 0) + 1);
-  }
-  const next = [];
-  const used = new Map();
-  const orig = game.hands[seat];
-  for (let i = 0; i < orig.length; i++) {
-    const r = rankOf(orig[i]);
-    const need = remove.get(r) || 0;
-    const got = used.get(r) || 0;
-    if (got < need) { used.set(r, got + 1); continue; }
-    next.push(orig[i]);
-  }
+  // Remove the exact physical cards selected, not arbitrary cards of the same rank.
+  // Rank-count removal could leave an already-played ID in hand and consume a different suit.
+  const selectedIds = new Set(cards);
+  const next = game.hands[seat].filter(id => !selectedIds.has(id));
   game.hands[seat] = next;
 
   for (let i = 0; i < cards.length; i++) {

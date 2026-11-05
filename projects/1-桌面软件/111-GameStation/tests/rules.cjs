@@ -251,6 +251,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await ddz.evaluate(([seat])=>window.DDZRules.play(window.__p111DDZGame,seat,[999]),[first])).legal,false);
   assert.equal((await ddz.evaluate(([seat,card])=>window.DDZRules.play(window.__p111DDZGame,seat,[card]),[first,lead])).legal,true);
   gs=await readGame();const pass1=gs.turn;
+  const physicalRemoval=await ddz.evaluate(()=>{
+    const R=window.DDZRules,g=R.createGame(77);R.deal(g);g.phase="playing";g.landlord=0;g.turn=0;
+    g.hands=[[0,1],[2],[3]];const result=R.play(g,0,[1]);
+    return {legal:result.legal,remaining:g.hands[0].slice(),played:g.played.slice()};
+  });
+  assert.equal(physicalRemoval.legal,true,"a selected physical card can be played");
+  assert.deepEqual(physicalRemoval.remaining,[0],"playing card ID 1 must leave card ID 0 in hand");
+  assert.deepEqual(physicalRemoval.played,[1],"the played-card history must record the exact ID selected");
   assert.equal((await ddz.evaluate(([seat])=>window.DDZRules.pass(window.__p111DDZGame,seat),[pass1])).legal,true);
   gs=await readGame();
   assert.equal((await ddz.evaluate(([seat])=>window.DDZRules.pass(window.__p111DDZGame,seat),[gs.turn])).legal,true);
