@@ -689,3 +689,17 @@ body{font-size:15px}
 @media(max-width:1120px){.quick-grid{gap:6px}.quick-grid button{padding:7px}}
 @media(max-width:820px){.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.home-main{grid-template-rows:auto minmax(140px,1fr) auto!important;gap:8px!important}.activity-panel{min-height:140px;padding:9px!important}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid button{height:42px}}
+
+
+/* R10.5 · mobile topbar becomes two intentional rows; controls must never spill over the game canvas */
+@media(max-width:620px){
+ :root{--topbar:88px}
+ .main-area{grid-template-rows:var(--topbar) minmax(0,1fr)!important}
+ .topbar{height:var(--topbar)!important;min-height:var(--topbar)!important;display:flex!important;flex-wrap:wrap!important;align-content:center!important;align-items:center!important;row-gap:4px!important;column-gap:5px!important;padding:5px 7px!important;overflow:hidden}
+ .topbar-left{order:0!important;flex:1 1 95px!important;min-width:0!important;height:32px}
+ .topbar-actions{order:1!important;flex:0 0 auto!important;margin-left:auto!important;height:32px}
+ .game-controls{order:2!important;flex:1 1 100%!important;width:100%!important;min-width:0!important;height:32px;justify-content:center!important;overflow-x:auto!important;overflow-y:hidden!important}
+ .segment-control{min-height:30px!important;height:30px!important;flex:none!important}
+ .segment-control button{height:24px!important;min-width:42px!important;padding:0 7px!important}
+ .sidebar .brand{height:52px!important;min-height:52px!important}
+}
