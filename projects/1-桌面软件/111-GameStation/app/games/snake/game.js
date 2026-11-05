@@ -46,8 +46,8 @@ function newGame(){
  stop();snake=[{x:11,y:12},{x:10,y:12},{x:9,y:12}];dir={x:1,y:0};queue=[];score=0;configure(difficulty);
  paused=false;over=false;food=placeFood();scoreEl.textContent="0";setStatus("游戏进行中");draw();canvas.focus();run();
 }
-function pause(){if(paused)return;paused=true;stop();setStatus("已暂停");draw();}
-function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();run();draw();}
+function pause(){if(paused)return;paused=true;setStatus("已暂停");draw();}
+function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();stop();run();draw();}
 function keydown(event){
  const key=event.key.length===1?event.key.toLowerCase():event.key;
  const map={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}};
