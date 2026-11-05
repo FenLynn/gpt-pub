@@ -415,7 +415,33 @@ const games = [
     const frameB = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
     assert.notEqual(frameA,frameB,"Tetris falling piece should render between grid steps");
     await page.keyboard.press("ArrowUp");
-    for(let i=0;i<8;i++)await page.keyboard.press("ArrowDown");
+    // Force a falling piece to the last legal row without hard-dropping.
+    // The old animation added a fractional row even when the floor blocked
+    // the next step, painting the piece below the board and snapping it up.
+    let grounded=false;
+    for(let i=0;i<20;i++){
+      const position=await tetris.locator("#canvas").evaluate(el=>el.dataset.pieceCanFall);
+      if(position==="false"){grounded=true;break;}
+      await page.keyboard.press("ArrowDown");
+    }
+    assert.ok(grounded,"Tetris soft drop must reach the last legal board row");
+    const floorSamples=[];
+    for(let i=0;i<6;i++){
+      floorSamples.push(await tetris.locator("#canvas").evaluate(el=>({
+        canFall:el.dataset.pieceCanFall,
+        visualBottom:Number(el.dataset.pieceVisualBottom),
+        logicalBottom:Number(el.dataset.pieceLogicalBottom),
+        fraction:Number(el.dataset.pieceRenderFraction)
+      })));
+      await page.waitForTimeout(25);
+    }
+    for(const sample of floorSamples){
+      assert.ok(sample.visualBottom<20,"Tetris visual blocks must stay above the bottom board boundary");
+      if(sample.canFall==="false"){
+        assert.equal(sample.fraction,0,"Tetris must stop interpolating at the floor or when blocked by locked blocks");
+        assert.equal(sample.visualBottom,sample.logicalBottom,"Grounded Tetris pieces may not sink then snap upward");
+      }
+    }
     await page.keyboard.press("Space");
     await page.waitForTimeout(80);
     const tetrisTop = await tetris.locator("#canvas").getAttribute("data-piece-top");
