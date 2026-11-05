@@ -408,9 +408,12 @@ const games = [
     const mobileToolbar = await page.evaluate(() => {
       const menu = document.querySelector("#mobileMenu").getBoundingClientRect();
       const controls = document.querySelector("#gameControls").getBoundingClientRect();
-      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsHeight: controls.height };
+      const topbar = document.querySelector(".topbar").getBoundingClientRect();
+      const workspace = document.querySelector(".workspace-view").getBoundingClientRect();
+      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsHeight: controls.height, topbarBottom:topbar.bottom,workspaceTop:workspace.top };
     });
     assert.ok(mobileToolbar.controlsHeight > 0 && mobileToolbar.controlsTop >= mobileToolbar.menuBottom - 2, "mobile mode controls must not cover the menu button");
+    assert.ok(mobileToolbar.topbarBottom <= mobileToolbar.workspaceTop + 1, "mobile topbar rows must not spill over the game workspace");
     await page.locator("#difficultyControl button[data-difficulty='hard']").click();
     const mobileMineFit = await mobileMines.locator(".mine-classic").evaluate(el => ({
       board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect()
