@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>超级玛丽 · GameStation</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./style.css"></head>
+<body data-game="mario">
+<main class="game-root game-layout mario-layout" id="game">
+ <aside class="game-guide">
+  <span class="game-guide-kicker">PIXEL PLATFORMER</span><h2>超级玛丽</h2>
+  <p>穿过平台、收集金币，踩过敌人并抵达关卡终点。</p>
+  <div class="key-instruction"><strong>A / D</strong><span>左右移动</span></div>
+  <div class="key-instruction"><strong>← / →</strong><span>左右移动</span></div>
+  <div class="key-instruction"><strong>Space</strong><span>跳跃</span></div>
+  <div class="key-instruction"><strong>Shift</strong><span>加速奔跑</span></div>
+  <div class="guide-note">原创像素角色与关卡素材，采用经典横版平台跳跃玩法。</div>
+ </aside>
+ <section class="game-main-board"><div class="canvas-panel"><canvas id="canvas" class="arcade-canvas" width="960" height="540" tabindex="0" aria-label="横版平台跳跃游戏"></canvas></div></section>
+ <aside class="game-tools">
+  <div class="game-status" id="status">准备出发</div>
+  <div class="side-score">
+   <div><span>世界</span><strong id="world">1-1</strong></div>
+   <div><span>金币</span><strong id="coins">0</strong></div>
+   <div><span>生命</span><strong id="lives">3</strong></div>
+   <div><span>得分</span><strong id="score">0</strong></div>
+  </div>
+  <div class="game-tool-note">踩中敌人可消灭它；从侧面碰到敌人会损失生命。抵达旗杆完成关卡。</div>
+ </aside>
+</main>
+<script src="../shared/bridge.js"></script><script src="./game.js"></script>
+</body></html>
