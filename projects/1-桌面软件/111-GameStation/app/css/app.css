@@ -732,3 +732,23 @@ body{font-size:15px}
  .topbar:has(#gameControls:not(.hidden)) .segment-control:before{display:none}
  .topbar:has(#gameControls:not(.hidden)) .segment-control button{height:24px;min-width:43px;padding:0 7px;font-size:10px}
 }
+
+
+/* R10.6 · compact home header; expand to two rows only while a game is open */
+@media(max-width:620px){
+ :root{--topbar:52px}
+ .app-shell{--topbar:52px}
+ .app-shell:has(#gameControls:not(.hidden)){--topbar:88px}
+ .main-area{grid-template-rows:var(--topbar) minmax(0,1fr)!important}
+ .topbar{height:var(--topbar)!important;min-height:var(--topbar)!important;display:flex!important;flex-wrap:nowrap!important;align-content:center!important;align-items:center!important;row-gap:4px!important;column-gap:5px!important;padding:5px 7px!important;overflow:hidden}
+ .topbar-left{order:0!important;flex:1 1 auto!important;min-width:0!important;height:32px}
+ .topbar-actions{order:1!important;flex:0 0 auto!important;margin-left:auto!important;height:32px}
+ .game-controls{order:2!important;flex:0 0 auto!important;width:auto!important;min-width:0!important;height:32px;justify-content:center!important;overflow-x:auto!important;overflow-y:hidden!important}
+ .app-shell:has(#gameControls:not(.hidden)) .topbar{flex-wrap:wrap!important;align-content:center!important}
+ .app-shell:has(#gameControls:not(.hidden)) .topbar-left{order:0!important;flex:1 1 95px!important}
+ .app-shell:has(#gameControls:not(.hidden)) .topbar-actions{order:1!important;flex:0 0 auto!important}
+ .app-shell:has(#gameControls:not(.hidden)) .game-controls{order:2!important;flex:1 1 100%!important;width:100%!important}
+ .segment-control{min-height:30px!important;height:30px!important;flex:none!important}
+ .segment-control button{height:24px!important;min-width:42px!important;padding:0 7px!important}
+ .sidebar .brand{height:52px!important;min-height:52px!important}
+}
