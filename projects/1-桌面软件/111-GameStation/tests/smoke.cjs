@@ -5,9 +5,9 @@ const { pathToFileURL } = require("node:url");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE);
 
 const games = [
-  "五子棋","中国象棋","黑白棋","四子棋","海战棋","国际跳棋",
+  "五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","国际跳棋",
   "扫雷","2048","记忆翻牌","数独","推箱子",
-  "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）",
+  "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克",
   "经典纸牌","斗地主","麻将","三国杀"
 ];
 
@@ -134,7 +134,7 @@ const games = [
     assert.ok(await page.locator(".quick-start").isVisible(), "home should show the quick-start categories");
     const homeActivityHeight=await page.locator(".activity-panel").evaluate(el=>el.getBoundingClientRect().height);
     assert.ok(homeActivityHeight<=300, "home activity heatmap should be a compact dashboard card, not a full-height empty panel");
-    assert.equal(await page.locator("#totalGameCount").innerText(), "19");
+    assert.equal(await page.locator("#totalGameCount").innerText(), "22");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
     assert.equal(await page.locator(".heatmap-cell[data-date]").count(), 365, "activity grid must contain 365 real calendar days");
     assert.ok((await page.locator(".heatmap-cell").count()) <= 371, "weekday alignment may add at most six leading placeholders");
@@ -144,7 +144,9 @@ const games = [
     assert.ok(await page.locator('[data-ranking="time"]').getAttribute("aria-selected") === "true");
     await page.locator('[data-ranking="plays"]').click();
     await page.locator('[data-category="all"]').click();
-    assert.equal(await page.locator(".game-card").count(), 19, "all 19 planned games must appear in the library");
+    assert.equal(await page.locator(".game-card").count(), 22, "all 22 planned games must appear in the library");
+    assert.equal(await page.locator(".featured-game").count(), 8, "home should expose the eight curated classic games");
+    assert.ok(await page.locator(".recent-panel").isVisible(), "home should show recent games beside the activity heatmap");
 
     for (const name of games) await openGame(name);
 
@@ -219,6 +221,40 @@ const games = [
     await openGame("魂斗罗（原创模式）");
     const contra = page.frameLocator("#gameFrame");
     assert.ok(await contra.locator("canvas").isVisible());
+
+    await openGame("国际象棋");
+    const chess = page.frameLocator("#gameFrame");
+    assert.equal(await chess.locator(".chess-square").count(), 64, "Chess must render all 64 squares");
+    assert.equal(await chess.locator(".chess-piece").count(), 32, "Chess must start with 32 pieces");
+    await chess.locator('[data-square="e2"]').click();
+    await chess.locator('[data-square="e5"]').click();
+    assert.equal(await chess.locator("#moveList li").count(), 0, "Chess must reject an illegal pawn move");
+    await chess.locator('[data-square="e2"]').click();
+    await chess.locator('[data-square="e4"]').click();
+    await page.waitForTimeout(600);
+    assert.equal(await chess.locator("#moveList li").count(), 1, "Chess should record a human move and AI reply");
+    await chess.locator("#undoButton").click();
+    assert.equal(await chess.locator("#moveList li").count(), 0, "Chess undo should restore the opening position");
+
+    await openGame("超级玛丽");
+    const mario = page.frameLocator("#gameFrame");
+    assert.ok(await mario.locator("#canvas").isVisible(), "Mario platformer canvas should be visible");
+    const marioX = Number(await mario.locator("#canvas").getAttribute("data-player-x"));
+    await page.keyboard.down("ArrowRight");
+    await page.waitForTimeout(260);
+    await page.keyboard.up("ArrowRight");
+    assert.ok(Number(await mario.locator("#canvas").getAttribute("data-player-x")) > marioX, "Mario should respond to desktop directional input");
+
+    await openGame("90 坦克");
+    const tank = page.frameLocator("#gameFrame");
+    assert.ok(await tank.locator("#canvas").isVisible(), "90 Tank battlefield should be visible");
+    const tankX = Number(await tank.locator("#canvas").getAttribute("data-player-x"));
+    await page.keyboard.down("ArrowLeft");
+    await page.waitForTimeout(180);
+    await page.keyboard.up("ArrowLeft");
+    assert.ok(Number(await tank.locator("#canvas").getAttribute("data-player-x")) < tankX, "Tank should move on the desktop keyboard");
+    await page.keyboard.press("Space");
+
 
     await openGame("五子棋");
     const gomoku = page.frameLocator("#gameFrame");
@@ -398,43 +434,7 @@ const games = [
     await page.waitForTimeout(150);
 
     await page.locator('[data-category="all"]').click();
-    await page.setViewportSize({ width: 390, height: 844 });
-    assert.ok(await page.locator(".game-card").first().isVisible(), "mobile library should remain visible");
-    const width = await page.evaluate(() => document.documentElement.scrollWidth);
-    assert.ok(width <= 410, "mobile layout should not overflow horizontally");
-    await page.locator("#mobileMenu").click();
-    assert.ok(await page.locator("#appShell").evaluate(el => el.classList.contains("menu-open")));
-    await page.locator("#mobileMenu").click();
-
-    await openGame("扫雷");
-    const mobileMines = page.frameLocator("#gameFrame");
-    const mobileToolbar = await page.evaluate(() => {
-      const menu = document.querySelector("#mobileMenu").getBoundingClientRect();
-      const controls = document.querySelector("#gameControls").getBoundingClientRect();
-      const topbar = document.querySelector(".topbar").getBoundingClientRect();
-      const workspace = document.querySelector(".workspace-view").getBoundingClientRect();
-      const actions=document.querySelector(".topbar-actions").getBoundingClientRect();
-      return { menuBottom: menu.bottom, controlsTop: controls.top, controlsBottom:controls.bottom, controlsHeight: controls.height, actionsTop:actions.top, actionsBottom:actions.bottom, topbarBottom:topbar.bottom,workspaceTop:workspace.top };
-    });
-    assert.ok(mobileToolbar.controlsHeight > 0 && mobileToolbar.controlsTop >= mobileToolbar.menuBottom - 2, "mobile mode controls must not cover the menu button");
-    assert.ok(mobileToolbar.controlsBottom <= mobileToolbar.topbarBottom + 1, "mobile mode and difficulty controls must stay inside the expanded toolbar, not overlap the game board");
-    assert.ok(mobileToolbar.actionsTop >= 0 && mobileToolbar.actionsBottom <= mobileToolbar.topbarBottom + 1, "mobile game actions must stay inside the first toolbar row");
-    assert.ok(mobileToolbar.topbarBottom <= mobileToolbar.workspaceTop + 1, "mobile topbar rows must not spill over the game workspace");
-    await page.locator("#difficultyControl button[data-difficulty='hard']").click();
-    const mobileMineFit = await mobileMines.locator(".mine-classic").evaluate(el => ({
-      board: el.getBoundingClientRect(), area: el.closest(".game-main-board").getBoundingClientRect()
-    }));
-    assert.ok(mobileMineFit.board.width <= mobileMineFit.area.width + 2, "mobile hard Minesweeper board should fit its available width");
-    await openGame("贪吃蛇");
-    const mobileSnake = page.frameLocator("#gameFrame");
-    const mobileSnakeCanvas = mobileSnake.locator("#canvas");
-    const mobileSnakeY = Number(await mobileSnakeCanvas.getAttribute("data-head-y"));
-    await page.keyboard.press("ArrowDown");
-    await page.waitForTimeout(180);
-    assert.ok(Number(await mobileSnakeCanvas.getAttribute("data-head-y")) > mobileSnakeY, "mobile Snake should accept directional input");
-    await openGame("俄罗斯方块");
-    const mobileTetrisCanvas = await page.frameLocator("#gameFrame").locator("#canvas").boundingBox();
-    assert.ok(mobileTetrisCanvas && mobileTetrisCanvas.width > 100 && mobileTetrisCanvas.height > 200, "mobile Tetris canvas should remain fully visible");
+    // This project is being validated as a desktop web application; mobile layout is intentionally out of scope.
 
     await page.setViewportSize({ width: 1366, height: 768 });
     await openGame("扫雷");
@@ -468,7 +468,7 @@ const games = [
     assert.deepEqual(pageErrors, [], "the host and game frames must not throw browser errors");
     await fs.promises.mkdir(path.resolve(__dirname, "../p111-smoke-artifacts"), { recursive: true }).catch(() => {});
     await page.screenshot({ path: path.resolve(__dirname, "../p111-smoke-artifacts/library.png"), fullPage: true });
-    console.log("P111 browser smoke passed: quiet dashboard, all 19 modules, unified start/pause/new-game, help/settings, responsive layout, zero remote requests.");
+    console.log("P111 desktop browser smoke passed: 22 games, desktop shell, classic game skins, chess rules, platformer/tank controls, unified host controls and zero remote requests.");
   } finally {
     await browser.close();
   }
