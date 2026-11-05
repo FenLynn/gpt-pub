@@ -97,13 +97,26 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await getMoves("black")).length,0);
   assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.terminal()),true);
   assert.match(await xiangqi.locator("#turnText").innerText(),/红方获胜.*困毙/);
-  // Repeat a checking position for the third time: perpetual checking move excluded.
-  await load([[4,0,"black","将"],[3,9,"red","帅"],[3,2,"red","车"]]);
-  const candidate={fx:3,fy:2,tx:4,ty:2};
-  assert.equal((await getMoves()).some(m=>m.fx===3&&m.fy===2&&m.tx===4&&m.ty===2),true);
-  await xiangqi.evaluate(m=>window.__p111XiangqiTest.seedCheckingRepetition(m,2),candidate);
-  assert.equal((await getMoves()).some(m=>m.fx===3&&m.fy===2&&m.tx===4&&m.ty===2),false,
-   "simplified perpetual-check guard must reject a third checking repetition");
+  // Moving the cannon screen away must not leave a second capture available.
+  await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,3,"black","卒"],[0,2,"black","车"]]);
+  const twoScreens=await xiangqi.evaluate(()=>window.__p111XiangqiTest.pseudo());
+  assert.equal(twoScreens.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,
+   "cannon may capture only the first enemy piece after exactly one screen");
+  // A blocker prevents the facing-generals rule; moving it off the file is illegal.
+  await load([[4,0,"black","将"],[4,9,"red","帅"],[4,5,"red","兵"]]);
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.faces()),false);
+  assert.equal((await getMoves()).some(m=>m.fx===4&&m.fy===5&&m.tx===4&&m.ty===4),false,
+   "a move that exposes the generals to each other is illegal");
+  // Xiangqi threefold cycle: the side that continuously checks loses; neutral repetition draws.
+  await load([[4,0,"black","将"],[3,9,"red","帅"],[4,2,"red","车"]],"black");
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.check("black")),true);
+  await xiangqi.evaluate(()=>window.__p111XiangqiTest.seedRepetition({redChecks:true,blackChecks:false}));
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.terminal()),true);
+  assert.match(await xiangqi.locator("#turnText").innerText(),/红方长将判负/);
+  await load([[4,0,"black","将"],[3,9,"red","帅"],[4,2,"red","车"]],"black");
+  await xiangqi.evaluate(()=>window.__p111XiangqiTest.seedRepetition({redChecks:false,blackChecks:false}));
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.terminal()),true);
+  assert.match(await xiangqi.locator("#turnText").innerText(),/循环局面和棋/);
   await xiangqi.close();
   assert.deepEqual(errors,[]);
   console.log("P111 chess rules fixtures: both castles, attacked transit, en passant, four promotions, mate/stalemate, insufficient material, 50/75 moves, repetition passed");

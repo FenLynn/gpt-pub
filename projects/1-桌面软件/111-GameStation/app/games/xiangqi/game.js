@@ -180,8 +180,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
     positionTrail=[
      {key,lastMover:null,gaveCheck:false},
      {key,lastMover:null,gaveCheck:false},
-     {key,lastMover:"red",gaveCheck:!!redChecks},
-     {key,lastMover:"black",gaveCheck:!!blackChecks},
+     {key:key+":intermediate",lastMover:"red",gaveCheck:!!redChecks},
      {key,lastMover:"black",gaveCheck:!!blackChecks}
     ];
    }
