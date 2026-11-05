@@ -286,6 +286,8 @@ const games = [
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
     assert.ok(await gomoku.locator(".stone").count() >= 2, "gomoku human and AI should both place a stone");
+    assert.ok(await gomoku.locator(".numbered-stone").count()>=2,"Gomoku reference stones should show their move numbers");
+    assert.equal(await gomoku.locator(".latest-stone").count(),1,"Gomoku should mark exactly one last move");
     await page.locator("#newGameButton").click();
     await page.waitForTimeout(100);
     assert.equal(await gomoku.locator(".stone").count(), 0, "host next-round command should reset the module");
@@ -306,7 +308,12 @@ const games = [
     assert.equal(await mines.locator(".mine-cell").count(), 256, "default Minesweeper level should be 16×16");
     assert.equal(await mines.locator("#counter").innerText(), "040", "classic mine counter should use three digits");
     const mineCounterStyle=await mines.locator("#counter").evaluate(el=>getComputedStyle(el).color);
-    assert.equal(mineCounterStyle,"rgb(231, 247, 255)","Windows 7 Minesweeper counter should use the blue LCD display, not the old red-on-black style");
+    assert.equal(mineCounterStyle,"rgb(245, 250, 255)","Windows 7 Minesweeper counter should use light digits on the blue LCD display");
+    const minesLayout=await mines.locator(".mine-classic").evaluate(el=>{
+      const grid=el.querySelector("#board").getBoundingClientRect(),footer=el.querySelector(".mine-bottom-panel").getBoundingClientRect();
+      return {gridBottom:grid.bottom,footerTop:footer.top,footerBottom:footer.bottom,frameBottom:el.getBoundingClientRect().bottom};
+    });
+    assert.ok(minesLayout.footerTop>=minesLayout.gridBottom-1 && minesLayout.footerBottom<=minesLayout.frameBottom+2,"Minesweeper reference-style counters and restart control belong BELOW the board");
     const mineTileStyle = await mines.locator(".mine-cell").first().evaluate(el => ({
       backgroundImage: getComputedStyle(el).backgroundImage,
       cellSize: getComputedStyle(el).width,
@@ -370,6 +377,7 @@ const games = [
     assert.equal(await xiangqi.locator("#turnText").innerText(), "黑方正在思考", "right rail should announce the side to move");
     await page.waitForTimeout(550);
     assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到红方走", "turn indicator should update after the AI move");
+    assert.equal(await xiangqi.locator("#moveList li").count(),2,"Xiangqi right-side move record should contain the player's move and AI reply");
     await page.locator("#modeControl button[data-mode-index='1']").click();
     await page.waitForTimeout(100);
     await xiangqi.locator(".xiangqi-cell").nth(82).click();
@@ -381,8 +389,10 @@ const games = [
     await xiangqi.locator(".xiangqi-cell").nth(27).click();
     await xiangqi.locator(".xiangqi-cell").nth(36).click();
     assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到红方走", "local Xiangqi should pass control back to red");
+    assert.equal(await xiangqi.locator("#moveList li").count(),2,"Xiangqi local dual-player moves should appear in the right-side record");
     await xiangqi.locator("#undoButton").click();
     assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到黑方走", "Xiangqi undo should restore the previous mover");
+    assert.equal(await xiangqi.locator("#moveList li").count(),1,"Xiangqi undo should also roll back the move record");
     assert.equal(await xiangqi.locator(".xiangqi-cell").nth(27).locator(".xiangqi-piece").innerText(), "卒", "Xiangqi undo must restore the captured board state");
     await page.locator("#modeControl button[data-mode-index='0']").click();
 
