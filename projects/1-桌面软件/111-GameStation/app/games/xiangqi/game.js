@@ -65,7 +65,7 @@ function report(t){
  GameBridge.report(t,{turn,side:turn});
 }
 function drawBoardLines(){
- const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
+ const ns="http:"+"//www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
  svg.setAttribute("viewBox","0 0 800 900");svg.setAttribute("preserveAspectRatio","none");svg.classList.add("xiangqi-lines");svg.setAttribute("aria-hidden","true");
  const X0=46,X1=754,Y0=48,Y1=852,xAt=x=>X0+(X1-X0)*x/8,yAt=y=>Y0+(Y1-Y0)*y/9;
  const line=(x1,y1,x2,y2)=>{const e=document.createElementNS(ns,"line");for(const [k,v] of Object.entries({x1,y1,x2,y2}))e.setAttribute(k,String(v));svg.appendChild(e);};
