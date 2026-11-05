@@ -1060,3 +1060,82 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  .chess-layout .game-main-board{background:linear-gradient(145deg,#dce5ed,#f3f6f8);border:1px solid #d2dee6;border-radius:12px}
  .chess-layout .chess-frame{filter:drop-shadow(0 8px 14px #26384c20)}
 }
+
+
+
+/* P111 R11.3 · final visual corrections from the 1440×1000 browser screenshots */
+@media(min-width:701px){
+ /* Keep coordinate labels in the reserved wood/board margin, not underneath the left rail. */
+ .gomoku-layout .gomoku-axis-y{left:0;top:4.2%;bottom:4.2%;width:4.2%;grid-template-rows:repeat(15,1fr);align-items:center;text-align:center}
+ .gomoku-layout .gomoku-axis-y span{padding:0;color:#6d5436;font-size:10px}
+ .chess-layout .chess-piece{font-size:clamp(42px,9cqh,82px)}
+ .chess-layout .chess-axis-y{left:-15px;width:15px;top:15px;bottom:15px;grid-template-rows:repeat(8,1fr);align-items:center;text-align:center;font-size:11px}
+ .chess-layout .chess-axis-y span{padding:0}
+ .chess-layout .move-panel #moveList:empty:after{content:"尚未开始走棋";display:grid;place-items:center;min-height:110px;color:#9aabb6;font-size:11px}
+ /* The high-specificity shared card-table flex rule must not override San Guo Sha's 3-row battlefield. */
+ .game-root.game-layout.card-table-layout.sanguosha-layout>.game-main-board .card-table-main{
+  position:relative;display:grid!important;grid-template-rows:150px minmax(0,1fr) 150px!important;
+  justify-content:stretch!important;gap:12px!important;padding:8px!important;overflow:hidden;
+  background:
+   radial-gradient(ellipse at 50% 42%,#82704f 0%,#67563d 58%,#493e2d 100%),
+   repeating-linear-gradient(12deg,#ffffff08 0 2px,#00000008 2px 5px);
+ }
+ .game-root.game-layout.card-table-layout.sanguosha-layout>.game-main-board .card-table-main:before{
+  content:"三国杀";position:absolute;z-index:0;left:50%;top:50%;transform:translate(-50%,-50%);
+  color:#ead4a6;font-family:"STKaiti","KaiTi",serif;font-size:clamp(48px,8cqh,78px);
+  font-weight:800;letter-spacing:12px;opacity:.12;pointer-events:none
+ }
+ .game-root.game-layout.card-table-layout.sanguosha-layout .opponents-row,
+ .game-root.game-layout.card-table-layout.sanguosha-layout .game-log-panel,
+ .game-root.game-layout.card-table-layout.sanguosha-layout .card-hand{position:relative;z-index:1}
+ .sanguosha-layout .player-chip:before{
+  content:""!important;height:82px;
+  background:
+   radial-gradient(ellipse at 50% 34%,#e8c79b 0 13%,transparent 14%),
+   radial-gradient(ellipse at 50% 18%,#302820 0 24%,transparent 25%),
+   radial-gradient(ellipse at 50% 89%,#314c4d 0 34%,transparent 35%),
+   linear-gradient(145deg,#c8b58d,#5f5a46);
+  box-shadow:inset 0 0 0 1px #e7d7b6,0 2px 4px #241a1055
+ }
+ .sanguosha-layout .player-chip:nth-child(2):before{
+  background:
+   radial-gradient(ellipse at 50% 34%,#edcba6 0 13%,transparent 14%),
+   radial-gradient(ellipse at 50% 17%,#372c28 0 25%,transparent 26%),
+   radial-gradient(ellipse at 50% 89%,#8b3d39 0 34%,transparent 35%),
+   linear-gradient(145deg,#d3b990,#6b5645)
+ }
+ .sanguosha-layout .player-chip:nth-child(3):before{
+  background:
+   radial-gradient(ellipse at 50% 34%,#d9b48a 0 13%,transparent 14%),
+   radial-gradient(ellipse at 50% 17%,#292c2b 0 25%,transparent 26%),
+   radial-gradient(ellipse at 50% 89%,#405e48 0 34%,transparent 35%),
+   linear-gradient(145deg,#b7a67f,#575b47)
+ }
+ .sanguosha-layout .player-chip:nth-child(4):before{
+  background:
+   radial-gradient(ellipse at 50% 34%,#edc9a1 0 13%,transparent 14%),
+   radial-gradient(ellipse at 50% 17%,#3b2b23 0 25%,transparent 26%),
+   radial-gradient(ellipse at 50% 89%,#394c6c 0 34%,transparent 35%),
+   linear-gradient(145deg,#c9b18b,#615344)
+ }
+ .sanguosha-layout .player-chip:after{
+  content:"";position:absolute;right:8px;top:8px;width:7px;height:7px;border-radius:50%;background:#d5b36d;box-shadow:0 0 0 2px #57432d55
+ }
+ .sanguosha-layout .game-log-panel{
+  grid-row:2!important;align-self:stretch;min-height:0;max-height:none!important;
+  display:flex;flex-direction:column;justify-content:flex-end;padding:14px 16px;
+  border:1px solid #b89a69;border-radius:8px;background:#29251eaa!important;color:#ead9b8!important;
+  font-family:"STKaiti","KaiTi",serif;font-size:13px;line-height:1.8
+ }
+ .sanguosha-layout .card-hand{grid-row:3!important;align-self:end;min-height:130px;max-height:150px;margin:0!important;padding:7px 4px 2px;border-top:1px solid #d5bd8c55}
+ .sanguosha-layout .card-hand .playing-card{height:clamp(88px,11vh,120px)}
+ /* Mahjong table center compass and subtle tile-wall motif */
+ .mahjong-layout .mahjong-area:after{
+  content:"北   東\A西   南";white-space:pre;position:absolute;z-index:1;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:82px;height:82px;display:grid;place-content:center;border:1px solid #cbb47d;border-radius:10px;
+  background:linear-gradient(145deg,#1c6955dd,#0c4d40dd);box-shadow:0 4px 14px #002b2455,inset 0 0 0 3px #cbb47d22;
+  color:#e0c991;font-family:"STKaiti","KaiTi",serif;font-size:13px;line-height:1.7;letter-spacing:3px;text-align:center;pointer-events:none
+ }
+ .mahjong-layout .mahjong-area:before{font-size:clamp(44px,7cqh,78px);opacity:.07}
+ .mahjong-layout .mahjong-area .mahjong-melds,.mahjong-layout .mahjong-area .mahjong-discards{z-index:2}
+}
