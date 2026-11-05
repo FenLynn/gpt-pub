@@ -1563,3 +1563,13 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  font-size:clamp(17px,3cqh,30px)!important
 }
 @media(prefers-reduced-motion:reduce){.game-root.gomoku-layout .stone.stone-arrived{animation:none!important}}
+
+
+/* R18: compact movement feedback. Motion is disabled for reduced-motion OS settings. */
+.reversi-layout .reversi-disc.just-flipped{animation:r18-disc-flip .27s ease-out both}
+@keyframes r18-disc-flip{0%{transform:scaleX(.08) rotateY(80deg)}50%{transform:scaleX(.77) rotateY(20deg)}100%{transform:scaleX(1) rotateY(0)}}
+.connect4-layout .connect4-disc.just-dropped{animation:r18-disc-drop .32s cubic-bezier(.23,.74,.27,1) both}
+@keyframes r18-disc-drop{0%{transform:translateY(var(--drop-travel,-300%)) scale(.93)}75%{transform:translateY(5%) scale(1.02)}100%{transform:translateY(0) scale(1)}}
+.checkers-layout .checkers-disc.just-hopped{animation:r18-checker-land .22s ease-out both}
+@keyframes r18-checker-land{from{transform:scale(.72) translateY(-10%);opacity:.7}to{transform:scale(1) translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.reversi-layout .reversi-disc.just-flipped,.connect4-layout .connect4-disc.just-dropped,.checkers-layout .checkers-disc.just-hopped{animation:none!important}}

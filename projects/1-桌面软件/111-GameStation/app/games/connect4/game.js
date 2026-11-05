@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[];
+const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastDrop=null;
 function copy(a){return a.map(r=>r.slice());}
 function save(){history.push({b:copy(b),turn,over});if(history.length>100)history.shift();}
 function undo(){if(!history.length)return;clearTimeout(timer);const count=mode==="ai"?(turn===1?2:1):1;let snap=null;for(let i=0;i<count&&history.length;i++)snap=history.pop();if(!snap)return;b=copy(snap.b);turn=snap.turn;over=false;paused=false;render();report("已撤销一步");if(mode==="ai"&&turn===2)scheduleAI();}
@@ -16,7 +16,7 @@ function render(){
   const slot=document.createElement("button");slot.type="button";slot.className="game-cell connect4-slot";
   slot.dataset.column=String(x);slot.setAttribute("aria-label",(x+1)+"列"+(b[y][x]===1?"红棋":b[y][x]===2?"黄棋":"空位"));
   const disc=document.createElement("span");
-  disc.className="connect4-disc "+(b[y][x]===1?"red":b[y][x]===2?"yellow":"empty");
+  disc.className="connect4-disc "+(b[y][x]===1?"red":b[y][x]===2?"yellow":"empty")+(lastDrop?.x===x&&lastDrop.y===y?" just-dropped":"");if(lastDrop?.x===x&&lastDrop.y===y)disc.style.setProperty("--drop-travel","-"+(y+1)*102+"%");
   disc.setAttribute("aria-hidden","true");slot.appendChild(disc);
   slot.addEventListener("click",()=>play(x));el.appendChild(slot);
  }
@@ -24,9 +24,9 @@ function render(){
  document.getElementById("yellow").textContent=b.flat().filter(v=>v===2).length;
 }
 function finish(p){over=true;const msg=p===1?"红方获胜":p===2?"黄方获胜":"平局";report(msg);GameBridge.send("GAME_OVER",{message:msg,score:b.flat().filter(v=>v===1).length,win:p===1});}
-function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const col=choose();if(col>=0){save();drop(b,col,2);}render();if(win(b,2)){finish(2);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=1;report("轮到你了");},difficulty==="easy"?220:320);}
-function play(c){if(paused||over||(mode==="ai"&&turn===2))return;if(b[0][c]!==0)return;save();if(drop(b,c,turn)<0)return;render();if(win(b,turn)){finish(turn);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=3-turn;report(turn===1?"红方回合":mode==="ai"?"AI 思考中":"黄方回合");if(mode==="ai"&&turn===2)scheduleAI();}
-function newGame(){clearTimeout(timer);history=[];b=Array.from({length:6},()=>Array(7).fill(0));turn=1;over=false;paused=false;render();report("红方先行");}
+function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const col=choose();if(col>=0){save();lastDrop={x:col,y:drop(b,col,2)};}render();if(win(b,2)){finish(2);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=1;report("轮到你了");},difficulty==="easy"?220:320);}
+function play(c){if(paused||over||(mode==="ai"&&turn===2))return;if(b[0][c]!==0)return;save();const row=drop(b,c,turn);if(row<0)return;lastDrop={x:c,y:row};render();if(win(b,turn)){finish(turn);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=3-turn;report(turn===1?"红方回合":mode==="ai"?"AI 思考中":"黄方回合");if(mode==="ai"&&turn===2)scheduleAI();}
+function newGame(){clearTimeout(timer);history=[];lastDrop=null;b=Array.from({length:6},()=>Array(7).fill(0));turn=1;over=false;paused=false;render();report("红方先行");}
 document.getElementById("undoButton").addEventListener("click",undo);
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;if(turn===2&&mode==="ai")scheduleAI();else report("继续游戏");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();

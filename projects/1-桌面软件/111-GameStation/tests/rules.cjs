@@ -11,6 +11,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await page.goto(src);
   await page.waitForFunction(()=>typeof window.__p111ChessTest?.loadFen==="function");
   const fen=async f=>page.evaluate(value=>window.__p111ChessTest.loadFen(value),f);
+  const profiles=await page.evaluate(()=>["easy","normal","hard"].map(level=>window.__p111ChessTest.aiProfile(level)));
+  assert.deepEqual(profiles.map(x=>x.depth),[0,2,3],"International chess must offer three genuinely different search depths");
+  assert.ok(profiles[2].width>profiles[1].width,"Hard AI must search more reply candidates");
   const move=async(from,to)=>{
    await page.locator('[data-square="'+from+'"]').click();
    await page.locator('[data-square="'+to+'"]').click();
