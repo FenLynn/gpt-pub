@@ -44,15 +44,70 @@ function update(dt,t){const p=params();if(keys.a||keys.ArrowLeft){player.x-=5.2*
  if(player.x>=STAGE_LENGTH-90&&boss){player.x=STAGE_LENGTH-90;}
  if(stageIntro>0)stageIntro-=dt/60;
 }
-function draw(){const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#172e45");g.addColorStop(.68,"#304c60");g.addColorStop(1,"#526c75");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);const par=(cameraX*.22)%180;ctx.fillStyle="#dce8e8";for(let i=0;i<7;i++){const x=i*180-par;ctx.fillRect(x,280,95,90);ctx.fillRect(x+28,250,38,30);}ctx.fillStyle="#314f53";ctx.fillRect(0,GROUND,W,H-GROUND);ctx.fillStyle="#6c8a70";for(let x=0;x<W;x+=42)ctx.fillRect(x,GROUND,26,4);
- for(const e of enemies){const x=e.x-cameraX;ctx.fillStyle=e.type==="tank"?"#b87c59":e.type==="turret"?"#9babb0":e.type==="flyer"?"#d0a66d":"#bd776e";ctx.fillRect(x,e.y,e.w,e.h);ctx.fillStyle="#26384a";ctx.fillRect(x+e.w*.58,e.y+7,6,5);if(e.hp<e.maxHp){ctx.fillStyle="#293c4c";ctx.fillRect(x,e.y-8,e.w,4);ctx.fillStyle="#d68d7b";ctx.fillRect(x,e.y-8,e.w*Math.max(0,e.hp/e.maxHp),4);}}
- if(boss){const x=boss.x-cameraX;ctx.fillStyle="#a95f59";ctx.fillRect(x,boss.y,boss.w,boss.h);ctx.fillStyle="#e2c28b";ctx.fillRect(x+12,boss.y+28,24,18);ctx.fillRect(x+70,boss.y+28,24,18);ctx.fillStyle="#253a4b";ctx.fillRect(x+20,boss.y+33,9,8);ctx.fillRect(x+78,boss.y+33,9,8);ctx.fillStyle="#263849";ctx.fillRect(x,boss.y-15,boss.w,7);ctx.fillStyle="#d67c71";ctx.fillRect(x,boss.y-15,boss.w*Math.max(0,boss.hp/boss.maxHp),7);}
- for(const b of bullets){ctx.fillStyle="#f0d59c";ctx.fillRect(b.x-cameraX,b.y,13,4);}for(const b of enemyShots){ctx.fillStyle="#e88e77";ctx.beginPath();ctx.arc(b.x-cameraX,b.y,b.r,0,Math.PI*2);ctx.fill();}
- for(const q of pickups){ctx.fillStyle=q.type==="grenade"?"#d7c18e":"#a4d3be";ctx.fillRect(q.x-cameraX-10,q.y-10,20,20);ctx.fillStyle="#243c4c";ctx.font="bold 12px sans-serif";ctx.textAlign="center";ctx.fillText(q.type==="grenade"?"G":q.type==="fan"?"F":q.type==="rapid"?"R":"P",q.x-cameraX,q.y+4);}
- for(const g of grenades){ctx.fillStyle="#e9c18b";ctx.beginPath();ctx.arc(g.x-cameraX,g.y,6,0,Math.PI*2);ctx.fill();}
- for(const e of explosions){ctx.strokeStyle="rgba(241,196,132,"+Math.max(0,e.life*2)+")";ctx.lineWidth=4;ctx.beginPath();ctx.arc(e.x-cameraX,e.y,e.r,0,Math.PI*2);ctx.stroke();}
- const px=player.x-cameraX;ctx.globalAlpha=player.inv>0&&Math.floor(player.inv*12)%2===0?.35:1;ctx.fillStyle="#91c4bf";ctx.fillRect(px,player.y+7,player.w,player.h-7);ctx.fillStyle="#e0bd8b";ctx.fillRect(px+(player.face>0?14:0),player.y,12,13);ctx.fillStyle="#293e50";ctx.fillRect(px+(player.face>0?22:-4),player.y+5,5,4);ctx.fillStyle="#536e83";ctx.fillRect(px+4,player.y+player.h-9,7,10);ctx.fillRect(px+15,player.y+player.h-9,7,10);ctx.globalAlpha=1;
- ctx.fillStyle="#ffffffaa";ctx.font="12px sans-serif";ctx.textAlign="left";ctx.fillText("ZONE "+stage+"   "+Math.round(player.x/STAGE_LENGTH*100)+"%",18,24);ctx.fillStyle="#273f52";ctx.fillRect(18,34,160,5);ctx.fillStyle="#a5cbb8";ctx.fillRect(18,34,160*Math.min(1,player.x/STAGE_LENGTH),5);if(stageIntro>0){ctx.fillStyle="#ffffffdd";ctx.font="600 25px sans-serif";ctx.textAlign="center";ctx.fillText("区域 "+stage,400,95);}if(paused||over){ctx.fillStyle="#15253699";ctx.fillRect(0,0,W,H);ctx.fillStyle="#fff";ctx.font="600 24px sans-serif";ctx.textAlign="center";ctx.fillText(over?"任务结束":"已暂停",400,225);}}
+function draw(){
+ ctx.save();ctx.imageSmoothingEnabled=false;
+ const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,"#4c8fbd");sky.addColorStop(.48,"#91c5d3");sky.addColorStop(1,"#d4d8b4");ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+ const mountain=(worldX,base,peak,width,shade)=>{
+  const x=worldX-cameraX*.16;if(x>W+width||x<-width)return;
+  ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-width*.55,base);ctx.lineTo(x,peak);ctx.lineTo(x+width*.55,base);ctx.closePath();ctx.fill();
+  ctx.fillStyle="#d9e7df";ctx.beginPath();ctx.moveTo(x-width*.18,peak+width*.18);ctx.lineTo(x,peak);ctx.lineTo(x+width*.15,peak+width*.2);ctx.lineTo(x+width*.04,peak+width*.16);ctx.lineTo(x-width*.02,peak+width*.28);ctx.closePath();ctx.fill();
+ };
+ for(let i=-1;i<8;i++){const wx=i*260+110;mountain(wx,285,68+(i%3)*24,245,i%2?"#607f8b":"#6d9298");mountain(wx+112,300,135+(i%2)*18,190,"#829fa0");}
+ // broken clouds, deliberately built from chunky pixels
+ for(let i=0;i<6;i++){const x=((i*177-cameraX*.28)%980+980)%980-90,y=58+(i%3)*37;ctx.fillStyle="#e8f2e6b8";ctx.fillRect(x+18,y,48,12);ctx.fillRect(x+7,y+12,78,12);ctx.fillRect(x+29,y-9,31,10);}
+ // far tree line
+ ctx.fillStyle="#416c4c";for(let i=-1;i<20;i++){const x=i*52-(cameraX*.42%52);const h=34+(i*17%31);ctx.fillRect(x,GROUND-105-h,11,h+105);ctx.fillRect(x-17,GROUND-112-h,45,28);ctx.fillRect(x-10,GROUND-132-h,30,24);ctx.fillRect(x-25,GROUND-91-h,55,23);}
+ // layered jungle canopy
+ for(let i=-1;i<12;i++){const x=i*88-(cameraX*.68%88),y=GROUND-100+(i%3)*8;ctx.fillStyle=i%2?"#245b35":"#2f713a";ctx.fillRect(x,y,75,32);ctx.fillRect(x+10,y-17,50,22);ctx.fillRect(x+20,y-31,30,18);ctx.fillStyle="#55934a";ctx.fillRect(x+6,y+3,18,7);ctx.fillRect(x+37,y-13,17,7);ctx.fillStyle="#173f31";ctx.fillRect(x+29,y+27,15,74);}
+ // rock shelf and grass lip
+ const groundY=GROUND;ctx.fillStyle="#253f35";ctx.fillRect(0,groundY,W,H-groundY);
+ ctx.fillStyle="#4c773c";ctx.fillRect(0,groundY-4,W,8);ctx.fillStyle="#82a94b";for(let x=0;x<W;x+=24){ctx.fillRect(x,groundY-7,15,4);ctx.fillRect(x+8,groundY-10,4,4);}
+ ctx.fillStyle="#795d3c";ctx.fillRect(0,groundY+5,W,H-groundY-5);
+ for(let y=groundY+9;y<H;y+=26){for(let x=-24;x<W+24;x+=48){const xx=x-((cameraX*.8)%48)+(y%2?20:0);ctx.fillStyle=(Math.floor(x/48+y/26)%3===0)?"#a17a4c":(Math.floor(x/48+y/26)%3===1)?"#8c6b43":"#6c583c";ctx.fillRect(xx,y,42,20);ctx.fillStyle="#4d4b36";ctx.fillRect(xx+4,y+15,34,3);}}
+ // waterfall and dark water at the beginning of the stage
+ if(cameraX<210){const edge=Math.max(0,120-cameraX*.45);ctx.fillStyle="#237caa";ctx.fillRect(0,GROUND+6,edge,H-GROUND-6);ctx.fillStyle="#62c0d0";for(let y=GROUND+12;y<H;y+=17)ctx.fillRect(0,y,edge,3);ctx.fillStyle="#c7e3d9";ctx.fillRect(edge-4,GROUND-3,7,13);}
+ // scattered stone highlights and grass tufts
+ for(let i=0;i<18;i++){const x=((i*71-cameraX*.95)%900+900)%900-40;ctx.fillStyle="#b18a57";ctx.fillRect(x,GROUND+19+(i%4)*22,14,4);ctx.fillStyle="#a3b95b";ctx.fillRect(x+8,GROUND-12-(i%3)*3,3,8);}
+ function soldier(x,y,face,coat,skin="#e8bd88",scale=1){
+  ctx.save();ctx.translate(x,y);ctx.scale(face,1);
+  const z=scale;ctx.fillStyle="#263b36";ctx.fillRect(3*z,32*z,7*z,10*z);ctx.fillRect(14*z,32*z,7*z,10*z);
+  ctx.fillStyle="#1d2930";ctx.fillRect(1*z,39*z,10*z,4*z);ctx.fillRect(13*z,39*z,10*z,4*z);
+  ctx.fillStyle=coat;ctx.fillRect(4*z,15*z,16*z,19*z);ctx.fillRect(1*z,18*z,5*z,12*z);ctx.fillRect(18*z,18*z,5*z,10*z);
+  ctx.fillStyle=skin;ctx.fillRect(7*z,4*z,12*z,12*z);
+  ctx.fillStyle="#354a3d";ctx.fillRect(6*z,1*z,14*z,5*z);ctx.fillRect(4*z,5*z,4*z,3*z);
+  ctx.fillStyle="#17242b";ctx.fillRect(16*z,8*z,4*z,3*z);
+  ctx.fillStyle="#aeb8a4";ctx.fillRect(18*z,18*z,12*z,4*z);ctx.fillStyle="#25333a";ctx.fillRect(26*z,17*z,8*z,3*z);
+  ctx.restore();
+ }
+ function tankSprite(x,y,w,h,color){
+  ctx.fillStyle="#263d37";ctx.fillRect(x+2,y+h-9,w-4,9);ctx.fillStyle="#6e7c50";for(let k=0;k<4;k++)ctx.fillRect(x+6+k*9,y+h-7,5,5);
+  ctx.fillStyle=color;ctx.fillRect(x+5,y+8,w-10,h-17);ctx.fillRect(x+w*.3,y+1,w*.4,13);
+  ctx.fillStyle="#d5c58a";ctx.fillRect(x+w*.48,y-4,w*.36,5);ctx.fillStyle="#1d2a2a";ctx.fillRect(x+w*.65,y-5,w*.28,3);
+ }
+ for(const e of enemies){
+  const x=Math.round(e.x-cameraX),y=Math.round(e.y);
+  if(e.type==="walker")soldier(x,y, -1,"#a44f3d","#dfb17b",1);
+  else if(e.type==="turret"){ctx.fillStyle="#344c54";ctx.fillRect(x+4,y+17,e.w-8,e.h-17);ctx.fillStyle="#82918a";ctx.fillRect(x+9,y+7,e.w-18,15);ctx.fillStyle="#25343a";ctx.fillRect(x-3,y+10,e.w+10,6);ctx.fillStyle="#b8c2a7";ctx.fillRect(x+9,y+6,5,5);}
+  else if(e.type==="tank")tankSprite(x,y,e.w,e.h,"#a16a4c");
+  else{ctx.fillStyle="#3d5960";ctx.fillRect(x+4,y+7,e.w-8,10);ctx.fillStyle="#b9a66f";ctx.fillRect(x+12,y,e.w-24,12);ctx.fillStyle="#253b46";ctx.fillRect(x-4,y+10,e.w+8,4);ctx.fillRect(x+e.w/2-2,y-5,5,8);}
+  if(e.hp<e.maxHp){ctx.fillStyle="#1d342e";ctx.fillRect(x,y-9,e.w,4);ctx.fillStyle="#e0a05e";ctx.fillRect(x,y-9,e.w*Math.max(0,e.hp/e.maxHp),4);}
+ }
+ if(boss){const x=Math.round(boss.x-cameraX),y=Math.round(boss.y);tankSprite(x,y,boss.w,boss.h,"#865044");ctx.fillStyle="#e3c17e";ctx.fillRect(x+18,y+27,22,20);ctx.fillRect(x+65,y+27,22,20);ctx.fillStyle="#182b35";ctx.fillRect(x+25,y+33,8,7);ctx.fillRect(x+73,y+33,8,7);ctx.fillStyle="#1c3039";ctx.fillRect(x,y-14,boss.w,7);ctx.fillStyle="#e35d50";ctx.fillRect(x,y-14,boss.w*Math.max(0,boss.hp/boss.maxHp),7);}
+ for(const b of bullets){ctx.fillStyle="#ffe7a2";ctx.fillRect(Math.round(b.x-cameraX),Math.round(b.y),13,4);ctx.fillStyle="#fff";ctx.fillRect(Math.round(b.x-cameraX)+2,Math.round(b.y),6,2);}
+ for(const b of enemyShots){ctx.fillStyle="#f07856";ctx.fillRect(Math.round(b.x-cameraX)-3,Math.round(b.y)-3,7,7);ctx.fillStyle="#ffd19a";ctx.fillRect(Math.round(b.x-cameraX)-1,Math.round(b.y)-1,3,3);}
+ for(const q of pickups){ctx.fillStyle="#e8d59a";ctx.fillRect(q.x-cameraX-10,q.y-10,20,20);ctx.fillStyle="#2b493e";ctx.font="bold 12px monospace";ctx.textAlign="center";ctx.fillText(q.type==="grenade"?"G":q.type==="fan"?"F":q.type==="rapid"?"R":"P",q.x-cameraX,q.y+4);}
+ for(const g of grenades){ctx.fillStyle="#e9c18b";ctx.fillRect(g.x-cameraX-5,g.y-5,10,10);ctx.fillStyle="#fff0c4";ctx.fillRect(g.x-cameraX-2,g.y-5,4,3);}
+ for(const e of explosions){ctx.strokeStyle="rgba(255,204,126,"+Math.max(0,e.life*2)+")";ctx.lineWidth=4;ctx.beginPath();ctx.arc(e.x-cameraX,e.y,e.r,0,Math.PI*2);ctx.stroke();ctx.fillStyle="#f2a35c55";ctx.fillRect(e.x-cameraX-e.r/2,e.y-e.r/2,e.r,e.r);}
+ const px=Math.round(player.x-cameraX),py=Math.round(player.y);
+ ctx.globalAlpha=player.inv>0&&Math.floor(player.inv*12)%2===0?.35:1;soldier(px,py,player.face,"#316a70","#e7bf8d",1);ctx.globalAlpha=1;
+ // Pixel-art HUD strip
+ ctx.fillStyle="#102a34d9";ctx.fillRect(0,0,W,43);ctx.fillStyle="#e9d59f";ctx.font="bold 14px monospace";ctx.textAlign="left";ctx.fillText("CONTRA  //  ZONE "+stage,16,19);ctx.font="11px monospace";ctx.fillStyle="#d2e4c4";ctx.fillText("MISSION "+Math.round(player.x/STAGE_LENGTH*100)+"%",16,34);
+ ctx.fillStyle="#28453e";ctx.fillRect(190,17,190,7);ctx.fillStyle="#e2b86d";ctx.fillRect(190,17,190*Math.min(1,player.x/STAGE_LENGTH),7);
+ ctx.fillStyle="#f4e8c9";ctx.font="bold 12px monospace";ctx.fillText("SCORE "+String(score).padStart(6,"0"),W-210,19);ctx.fillText("LIFE "+lives+"   G "+grenadeCount,W-210,34);
+ if(stageIntro>0){ctx.fillStyle="#0c1d26a8";ctx.fillRect(230,70,340,58);ctx.strokeStyle="#d5b477";ctx.strokeRect(230,70,340,58);ctx.fillStyle="#f5e6bd";ctx.font="bold 25px monospace";ctx.textAlign="center";ctx.fillText("AREA "+stage,400,108);}
+ if(paused||over){ctx.fillStyle="#102330a8";ctx.fillRect(0,43,W,H-43);ctx.fillStyle="#f5e6bd";ctx.font="bold 27px monospace";ctx.textAlign="center";ctx.fillText(over?"MISSION COMPLETE":"PAUSED",400,225);}
+ ctx.restore();
+}
 function tick(t){if(paused||over)return;const dt=Math.min((t-last)/16.67,2.2);last=t;update(dt,t);draw();if(!paused&&!over)raf=requestAnimationFrame(tick);}
 function pause(){paused=true;cancelAnimationFrame(raf);report("已暂停");draw();}
 function resume(){if(over)return;cancelAnimationFrame(raf);paused=false;last=performance.now();report("继续行动");raf=requestAnimationFrame(tick);draw();}
