@@ -5,7 +5,7 @@ const scoreEl=document.getElementById("score"),linesEl=document.getElementById("
 const COLS=10,ROWS=20,S=30;
 const SHAPES=[[[1,1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1],[1,1]],[[0,1,1],[1,1,0]],[[0,1,0],[1,1,1]],[[1,1,0],[0,1,1]]];
 const COLORS=["#29c4e8","#4969ef","#f28a2e","#f1cf3d","#39bd59","#b64be0","#e94454"];
-let grid,piece,score=0,lines=0,paused=true,over=false,rafId=null,speed=480,baseSpeed=480,difficulty="normal",lastFrame=0,dropAccumulator=0;
+let grid,piece,score=0,lines=0,paused=true,over=false,rafId=null,speed=480,baseSpeed=480,difficulty="normal",lastFrame=0,dropAccumulator=0,roundSerial=0;
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score,lines});}
 function randomPiece(){const index=Math.floor(Math.random()*SHAPES.length),shape=SHAPES[index].map(row=>row.slice());return{shape,x:Math.floor(COLS/2)-Math.ceil(shape[0].length/2),y:0,color:COLORS[index]};}
 function rotate(matrix){return matrix[0].map((_,index)=>matrix.map(row=>row[index]).reverse());}
@@ -90,7 +90,7 @@ function lock(){
  updateScore();draw();
 }
 function configure(value){difficulty=value||"normal";baseSpeed=difficulty==="easy"?650:difficulty==="hard"?300:480;}
-function newGame(){stop();grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;dropAccumulator=0;piece=randomPiece();updateScore();setStatus("游戏进行中");draw();canvas.focus();run();}
+function newGame(){stop();roundSerial++;canvas.dataset.roundSerial=String(roundSerial);grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;dropAccumulator=0;piece=randomPiece();updateScore();setStatus("游戏进行中");draw();canvas.focus();run();}
 function pause(){if(paused)return;paused=true;setStatus("已暂停");stop();draw();}
 function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();run();draw();}
 function move(dx,dy){if(paused||over||!piece)return;const next={...piece,x:piece.x+dx,y:piece.y+dy};if(!collision(next)){piece=next;if(dy>0){dropAccumulator=0;score++;updateScore();}draw();}else if(dy>0)lock();}

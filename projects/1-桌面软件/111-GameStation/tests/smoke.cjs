@@ -491,10 +491,20 @@ const games = [
       window.__p111OriginalRandom = Math.random;
       window.Math.random = () => 0.5; // SHAPES[3] = O piece
     });
+    // NEW_GAME and RESUME cross the iframe boundary asynchronously. A per-round
+    // serial prevents the previous round's identical y=0/unpaused state from
+    // satisfying the readiness check before the host messages arrive.
+        const previousTetrisRound=Number(await tetris.locator("#canvas").getAttribute("data-round-serial")||"0");
     await page.locator("#newGameButton").click();
-    // NEW_GAME and RESUME cross the iframe boundary asynchronously. Wait for
-    // the resumed, freshly spawned piece before sending deterministic inputs.
     let freshTetrisReady=false;
+    for(let attempt=0;attempt<40;attempt++){
+      const roundSerial=Number(await tetris.locator("#canvas").getAttribute("data-round-serial")||"0");
+      const pausedState=await tetris.locator("#canvas").getAttribute("data-paused");
+      const pieceY=await tetris.locator("#canvas").getAttribute("data-piece-y");
+      if(roundSerial>previousTetrisRound&&pausedState==="false"&&pieceY==="0"){freshTetrisReady=true;break;}
+      await page.waitForTimeout(25);
+    }
+    assert.ok(freshTetrisReady,"Tetris must observe a new round serial and completed RESUME before deterministic hard drops");
     for(let attempt=0;attempt<40;attempt++){
       const scoreText=(await tetris.locator("#score").innerText()).trim();
       const pausedState=await tetris.locator("#canvas").getAttribute("data-paused");
