@@ -65,11 +65,16 @@ const games = [
         const guide=root.querySelector(".game-guide"),tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board");
         const rr=root.getBoundingClientRect(),tr=tools?.getBoundingClientRect(),mr=main?.getBoundingClientRect();
         const ts=tools?getComputedStyle(tools):null,ms=main?getComputedStyle(main):null;
-        return {guide:guide?getComputedStyle(guide).display:"absent",tools:ts?.display||"absent",toolsVisibility:ts?.visibility||"absent",toolsOpacity:ts?.opacity||"0",toolsText:tools?.innerText?.slice(0,90)||"",main:mr?.width||0,mainRight:mr?.right||0,toolsX:tr?.x||0,toolsWidth:tr?.width||0,toolsRight:tr?.right||0,rootRight:rr.right,columns:getComputedStyle(root).gridTemplateColumns,rootDisplay:getComputedStyle(root).display,scroll:document.documentElement.scrollHeight};
+        return {guide:guide?getComputedStyle(guide).display:"absent",tools:ts?.display||"absent",toolsVisibility:ts?.visibility||"absent",toolsOpacity:ts?.opacity||"0",toolsText:tools?.innerText?.slice(0,90)||"",main:mr?.width||0,mainLeft:mr?.left||0,mainTop:mr?.top||0,mainBottom:mr?.bottom||0,mainRight:mr?.right||0,toolsX:tr?.x||0,toolsTop:tr?.top||0,toolsBottom:tr?.bottom||0,toolsWidth:tr?.width||0,toolsRight:tr?.right||0,rootLeft:rr.left,rootTop:rr.top,rootBottom:rr.bottom,rootRight:rr.right,columns:getComputedStyle(root).gridTemplateColumns,rootDisplay:getComputedStyle(root).display,scroll:document.documentElement.scrollHeight,scrollWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth,viewportHeight:innerHeight};
       });
       assert.notEqual(zones.tools,"none",name+" right-side game actions must remain visible");
       assert.ok(zones.toolsWidth>150&&zones.toolsRight<=zones.rootRight+2&&zones.toolsVisibility==="visible"&&Number(zones.toolsOpacity)>.1,name+" right rail must be visible, occupy real width and remain inside the game root; "+JSON.stringify(zones));
-      if(page.viewportSize().width>700)assert.ok(zones.mainRight<=zones.toolsX+2,name+" main board must not overlap the right rail; "+JSON.stringify(zones));
+      if(page.viewportSize().width>700){
+        assert.ok(zones.mainRight<=zones.toolsX+2,name+" main board must not overlap the right rail; "+JSON.stringify(zones));
+        assert.ok(zones.mainTop>=zones.rootTop-1&&zones.mainBottom<=zones.rootBottom+2,name+" main board must remain vertically inside the game workspace; "+JSON.stringify(zones));
+        assert.ok(zones.toolsTop>=zones.rootTop-1&&zones.toolsBottom<=zones.rootBottom+2,name+" right controls must remain vertically inside the game workspace; "+JSON.stringify(zones));
+        assert.ok(zones.scrollWidth<=zones.viewportWidth+2,name+" must not introduce desktop horizontal page overflow; "+JSON.stringify(zones));
+      }
       if(name==="经典纸牌")console.log("SOLITAIRE_LAYOUT "+JSON.stringify(zones));
       if(zones.guide!=="absent"&&page.viewportSize().width>700)assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible on desktop");
       assert.ok(zones.main>250,name+" central board must retain priority workspace width");
@@ -526,6 +531,11 @@ const games = [
     await openGame("五子棋");
     const gomoku1366 = await page.frameLocator("#gameFrame").locator(".gomoku-board").boundingBox();
     assert.ok(gomoku1366 && Math.abs(gomoku1366.width-gomoku1366.height)<1 && gomoku1366.width > 500, "1366×768 Gomoku should remain square and fill the center area");
+
+    // Full second-resolution pass: every game must retain its board, left
+    // guide (where applicable), right controls, and non-overlapping rails.
+    // openGame() also records one real-browser screenshot per game at 1366×768.
+    for (const name of games) await openGame(name);
 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.locator("#settingsButton").click();
