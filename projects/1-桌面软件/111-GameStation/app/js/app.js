@@ -23,7 +23,7 @@ const games=[
 ];
 const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"街机",card:"卡牌"};
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
-const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg>'};
+const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
 function read(key,fallback){try{const v=JSON.parse(localStorage.getItem(storePrefix+key));return v===null||v===undefined?fallback:v;}catch(e){return fallback;}}
 function write(key,value){try{localStorage.setItem(storePrefix+key,JSON.stringify(value));return true;}catch(e){return false;}}
 function normalizeStats(raw){const out={},known=new Set(games.map(g=>g.id));if(!raw||typeof raw!=="object"||Array.isArray(raw))return out;for(const [id,value] of Object.entries(raw)){if(!known.has(id)||!value||typeof value!=="object"||Array.isArray(value))continue;const days={};if(value.days&&typeof value.days==="object"&&!Array.isArray(value.days))for(const [day,ms] of Object.entries(value.days)){const n=Number(ms);if(/^\d{4}-\d{2}-\d{2}$/.test(day)&&Number.isFinite(n)&&n>0)days[day]=Math.min(n,86400000);}const plays=Math.max(0,Math.floor(Number(value.plays)||0));out[id]={plays,wins:Math.min(plays,Math.max(0,Math.floor(Number(value.wins)||0))),totalMs:Math.max(0,Number(value.totalMs)||0),bestScore:Math.max(0,Number(value.bestScore)||0),lastPlayed:/^\d{4}-\d{2}-\d{2}$/.test(String(value.lastPlayed||""))?String(value.lastPlayed):"",days};}return out;}
@@ -42,6 +42,7 @@ function applySettings(){document.documentElement.style.setProperty("--ui-scale"
 function updateHomeClock(){
  const now=new Date(),key=dateKey(now);
  $("homeDate").textContent=(now.getMonth()+1)+"月"+now.getDate()+"日 · 星期"+["日","一","二","三","四","五","六"][now.getDay()];
+ $("homeTime").textContent=now.toLocaleTimeString("zh-CN",{hour:"2-digit",minute:"2-digit",hour12:false});
  if(key!==lastHomeDay){lastHomeDay=key;renderHeatmap();renderRanking();}
  const today=Object.values(stats).reduce((sum,s)=>sum+Number(s.days?.[key]||0),0);
  $("todaySummary").textContent=today?"今天 "+fmtDuration(today):"今日尚无记录";
@@ -106,7 +107,7 @@ function setGameState(){
  const finished=!!session?.finished,startLabel=started?"结束":"开始",pauseLabel=started&&!finished&&paused?"继续":"暂停";
  $("startButton").innerHTML=started?icons.stop:icons.play;$("startButton").setAttribute("aria-label",startLabel);$("startButton").title=startLabel;
  $("startButton").classList.toggle("end-action",started);$("startButton").disabled=!ready||finished||(!started&&!paused);
- $("pauseButton").innerHTML=started&&!finished&&paused?icons.play:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;
+ $("pauseButton").innerHTML=started&&!finished&&paused?icons.resume:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;$("pauseButton").classList.toggle("continue-action",started&&!finished&&paused);
  $("pauseButton").disabled=!ready||!started||finished;
  $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
 }
@@ -161,7 +162,7 @@ window.addEventListener("message",event=>{
   return;
  }
  if(m.sessionId!==sessionId)return;
- if(m.type==="HOTKEY"){if(m.payload?.action==="toggle")toggleGamePause();return;}
+ if(m.type==="HOTKEY"){if(m.payload?.action==="start")startOrResumeGame();else if(m.payload?.action==="pause")togglePause();return;}
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
@@ -232,7 +233,7 @@ document.addEventListener("keydown",e=>{
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
  if(!active||!ready||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
  if(target&&target.closest("button,a,[role='button']"))return;
- e.preventDefault();toggleGamePause();
+ e.preventDefault();if(e.key==="Enter")startOrResumeGame();else togglePause();
 });
 
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&ready&&!paused)pauseGame();});
