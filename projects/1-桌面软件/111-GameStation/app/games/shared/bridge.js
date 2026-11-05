@@ -102,7 +102,7 @@ function isGameplayKey(key){return key===" "||key.startsWith("Arrow")||/^[a-z0-9
 function stopCapturedEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();}
 function handleHostShortcut(event){
  if(disposed||!sessionId||!event.isTrusted||event.repeat||isEditableTarget(event.target))return;
- if(event.key==="Enter"){stopCapturedEvent(event);send("HOTKEY",{action:"start"});return;}if(event.key.toLowerCase()==="p"){stopCapturedEvent(event);send("HOTKEY",{action:"pause"});return;}
+ if(event.key==="Enter"||event.key.toLowerCase()==="p"){stopCapturedEvent(event);send("HOTKEY",{action:"toggle"});return;}
  if(timerPaused&&isGameplayKey(event.key)){
   stopCapturedEvent(event);
   pendingKey={key:event.key,code:event.code,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,altKey:event.altKey,metaKey:event.metaKey};
@@ -110,7 +110,7 @@ function handleHostShortcut(event){
  }
 }
 function handlePointerActivity(event){
- if(disposed||!sessionId||!timerPaused||activityPending||isEditableTarget(event.target))return;
+ if(disposed||!sessionId||!timerPaused||activityPending||isEditableTarget(event.target)||(event.target instanceof Element&&event.target.closest(".gs-hud,.game-tools")))return;
  activityPending=true;send("ACTIVITY");
 }
 window.addEventListener("keydown",handleHostShortcut,true);
@@ -141,7 +141,7 @@ window.addEventListener("message",event=>{
   suspendTimers();safeCall("loadState",m.payload||{});safePause();
  }else if(m.type==="SET_RAIL"){
   const root=document.querySelector(".game-root");
-  root?.classList.toggle("rail-collapsed",!!m.payload?.collapsed);
+  root?.classList.remove("rail-collapsed");
   window.dispatchEvent(new Event("resize"));
  }else if(m.type==="DISPOSE"){
   suspendTimers();safeCall("dispose");disposeTimers();
