@@ -560,7 +560,7 @@ const games = [
     assert.equal(sanguoshaLayout.handRow,"3","San Guo Sha hand cards should remain at the bottom of the table");
     const sanguoshaHp = async seat => {
       const text = await sanguosha.locator(`#players [data-seat="${seat}"]`).innerText();
-      const match = text.match(/♥\\s*(\\d+)\\/\\d+/);
+      const match = text.match(/♥\s*(\d+)\/\d+/);
       assert.ok(match, "Sanguosha player " + seat + " should expose a readable HP value: " + text);
       return Number(match[1]);
     };
