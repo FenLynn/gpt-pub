@@ -97,5 +97,38 @@ function newGame(){clearTimeout(timer);wall=makeWall();hands=[[],[],[],[]];for(l
 document.getElementById("kongBar").addEventListener("click",e=>{const b=e.target.closest("[data-kong-kind]");if(!b)return;const kind=b.dataset.kongKind,type=Number(b.dataset.kongType);if(kind==="concealed")declareConcealedKong(0,type);else{const option=kongOptions(0).find(x=>x.kind==="added"&&x.type===type);if(option)declareAddedKong(0,type,option.meldIndex);}});
 document.getElementById("drawButton").onclick=drawHuman;document.getElementById("huButton").onclick=huHuman;document.getElementById("claimHu").onclick=()=>{if(pendingKong){pendingKong=null;finish(0,"抢杠胡");}else executeClaim(0,"hu",humanClaims);};document.getElementById("claimKong").onclick=()=>executeClaim(0,"kong",humanClaims);document.getElementById("claimPong").onclick=()=>executeClaim(0,"pong",humanClaims);document.getElementById("claimChi").onclick=()=>executeClaim(0,"chi",humanClaims);document.getElementById("claimPass").onclick=passClaim;
 document.getElementById("applyRules").onclick=()=>{rules={chi:document.getElementById("ruleChi").checked,sevenPairs:document.getElementById("ruleSevenPairs").checked,kong:document.getElementById("ruleKong").checked};report("规则已应用于当前对局");render();};
+if(new URLSearchParams(location.search).has("p111Test")){
+ window.__p111MahjongTest={
+  wall(){return makeWall().map(t=>t.type);},
+  canHu(types,meldCount=0){return canHu(types,meldCount);},
+  loadState(state){
+   clearTimeout(timer);
+   hands=(state.hands||[[],[],[],[]]).map((types,seat)=>types.map((type,i)=>({id:10000+seat*100+i,type})));
+   wall=(state.wallTypes||[]).map((type,i)=>({id:20000+i,type}));
+   discards=[[],[],[],[]];melds=(state.melds||[[],[],[],[]]).map(ms=>ms.map(m=>({kind:m.kind,tiles:m.tiles.slice()})));
+   current=state.current??0;phase=state.phase||"discard";pending=null;pendingKong=null;claimQueue=[];humanClaims=null;
+   paused=!!state.paused;over=false;selfHuAllowed=state.selfHuAllowed!==false;
+   rules={...rules,...(state.rules||{})};
+   if(state.pendingSeat!==undefined&&state.pendingType!==undefined){
+    const tile={id:30000,type:state.pendingType};pending={seat:state.pendingSeat,tile};discards[state.pendingSeat].push(tile);phase="claim";
+   }
+   render();
+  },
+  options(seat,type){return optionsFor(seat,{type});},
+  buildClaims(){buildClaims();},
+  queue(){return claimQueue.map(q=>({seat:q.seat,priority:q.priority,hu:!!q.opts.hu,kong:!!q.opts.kong,pong:!!q.opts.pong,chi:q.opts.chi}));},
+  executeClaim(seat,action,opts={}){executeClaim(seat,action,opts);},
+  drawHuman,
+  discardHuman,
+  kongOptions(seat=0){return kongOptions(seat);},
+  concealedKong(seat,type){return declareConcealedKong(seat,type);},
+  addedKong(seat,type,index){return declareAddedKong(seat,type,index);},
+  setRules(next){rules={...rules,...next};render();},
+  state(){return{wall:wall.length,hands:hands.map(h=>h.map(t=>t.type)),handIds:hands.map(h=>h.map(t=>t.id)),
+   melds:melds.map(ms=>ms.map(m=>({kind:m.kind,tiles:m.tiles.slice()}))),discards:discards.map(ds=>ds.map(t=>t.type)),
+   current,phase,pending:pending?{seat:pending.seat,type:pending.tile.type}:null,pendingKong:pendingKong?{seat:pendingKong.seat,type:pendingKong.tile.type}:null,
+   claimQueue:this.queue(),humanClaims,paused,over,selfHuAllowed,rules:{...rules}};}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");render();},resume(){paused=false;render();if(pendingKong)resolveKongClaims();else scheduleAI();},setDifficulty(v){difficulty=v||"normal";},setOptions(v){rules={...rules,...v};},dispose(){paused=true;clearTimeout(timer);}});
 })();
