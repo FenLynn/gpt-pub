@@ -135,7 +135,8 @@ const games = [
     assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束");
     assert.equal(await page.locator("#startButton").isDisabled(), true, "end action should lock after the round ends");
     await page.locator("#newGameButton").click();
-    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "开始", "next round should reset the toolbar state");
+    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "next round should reset and immediately start a playable new round");
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停", "next round should not remain paused");
 
     await openGame("记忆翻牌");
     const memory = page.frameLocator("#gameFrame");
@@ -148,6 +149,12 @@ const games = [
     const connect4 = page.frameLocator("#gameFrame");
     await connect4.locator(".game-cell").first().click();
     assert.equal(await connect4.locator("#red").innerText(), "1");
+    await page.locator("#modeControl button[data-mode-index='1']").click();
+    await connect4.locator(".game-cell").nth(0).click();
+    assert.equal(await connect4.locator("#status").textContent(), "黄方回合", "local Connect Four must announce the human yellow player, not AI");
+    await connect4.locator(".game-cell").nth(1).click();
+    assert.equal(await connect4.locator("#yellow").innerText(), "1", "local Connect Four yellow player must be able to move");
+    await page.locator("#modeControl button[data-mode-index='0']").click();
 
     await openGame("海战棋");
     const battleship = page.frameLocator("#gameFrame");
@@ -185,7 +192,7 @@ const games = [
     await page.locator("#modeControl button[data-mode-index='1']").click();
     assert.equal(await page.locator("#modeControl button[aria-pressed='true']").innerText(), "本机双人");
     await page.locator("#modeControl button[data-mode-index='0']").click();
-    await page.locator("#startButton").click();
+    assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "mode switch should start a new playable round");
     const gomokuBoardBox = await gomoku.locator(".gomoku-board").boundingBox();
     assert.ok(gomokuBoardBox && Math.abs(gomokuBoardBox.width-gomokuBoardBox.height)<1, "Gomoku board must remain square while filling the available area");
     const gomokuCellBox = await gomoku.locator(".gomoku-cell").nth(112).boundingBox();
@@ -255,7 +262,7 @@ const games = [
     }
     console.log("MINES_RANDOM_CALLS "+mineRandomCalls);
     assert.ok(mineRandomCalls >= 40, "Minesweeper deterministic seed should be used when rebuilding the board");
-    await page.locator("#startButton").click();
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"), "暂停", "seeded new Minesweeper round should already be running");
     await mines.locator(".mine-cell").nth(56).click();
     assert.equal(await mines.locator(".mine-cell").nth(56).getAttribute("data-n"), "1", "deterministic cell should show one adjacent mine");
     await mines.locator(".mine-cell").nth(39).click({button:"right"});
