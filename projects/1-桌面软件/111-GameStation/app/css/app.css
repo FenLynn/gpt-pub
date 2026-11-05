@@ -676,3 +676,16 @@ body{font-size:15px}
 @media(max-width:620px){
  .topbar .round-actions .top-action{width:31px!important;min-width:31px;height:31px;padding:0!important}
 }
+
+
+/* R10.2 · restore the intentionally designed quick-start strip and balance the home grid */
+.home-main{grid-template-rows:auto minmax(190px,1fr) auto!important;align-content:stretch!important;gap:13px!important}
+.quick-start,.quick-start-section,.quick-start-grid{display:block!important;min-width:0}
+.quick-start{display:grid!important;grid-template-rows:auto auto;align-content:start;gap:8px;min-height:0}
+.quick-grid{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;min-width:0}
+.quick-grid button{display:flex!important;min-width:0}
+.activity-panel{height:auto!important;min-height:190px;justify-content:flex-start!important;padding:15px 17px!important}
+.activity-panel .heatmap-layout{margin-top:auto!important;margin-bottom:auto!important}
+@media(max-width:1120px){.quick-grid{gap:6px}.quick-grid button{padding:7px}}
+@media(max-width:820px){.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.home-main{grid-template-rows:auto minmax(140px,1fr) auto!important;gap:8px!important}.activity-panel{min-height:140px;padding:9px!important}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid button{height:42px}}
