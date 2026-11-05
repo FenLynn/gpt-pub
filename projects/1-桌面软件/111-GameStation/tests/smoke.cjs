@@ -61,10 +61,14 @@ const names=[
     modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
     selectCount:el.querySelectorAll("#gs-hud select").length,
     guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",
+    urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","pendingActions"].some(id=>{const q=el.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
     viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth};
   });
   assert.equal(v.guide,"none",name+" help hints must remain hidden until Help is opened");
-  assert.equal(v.tools,"none",name+" game tools must remain closed by default");
+  if(v.urgent)await frame.locator(".game-tools").waitFor({state:"visible",timeout:1500});
+  const toolsDisplay=await frame.locator(".game-tools").evaluate(el=>getComputedStyle(el).display);
+  assert.equal(toolsDisplay,v.urgent?"flex":"none",name+" game tools open only for mandatory response controls");
+  assert.equal(await frame.locator("#gs-tools").getAttribute("aria-expanded"),String(v.urgent),name+" tool toggle reflects automatic response visibility");
   assert.ok(v.main.width>=v.root.width*.97,name+" main board must use almost full iframe width: "+JSON.stringify(v));
   assert.ok(v.main.height>=v.root.height-58,name+" game stage must use available height: "+JSON.stringify(v));
   assert.ok(v.hud.width>=v.root.width*.97,name+" unified toolbar must span the game width");
