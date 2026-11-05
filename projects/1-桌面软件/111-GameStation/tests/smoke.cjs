@@ -300,13 +300,23 @@ const games = [
       const r=el.getBoundingClientRect();return {width:r.width,height:r.height};
     });
     assert.ok(gomokuBoardBox.width>200 && Math.abs(gomokuBoardBox.width-gomokuBoardBox.height)<1, "Gomoku board must remain square while filling the available area");
-    const gomokuCellGeometry = await gomoku.locator(".gomoku-cell").nth(112).evaluate(el=>{
+    const gomokuCell = gomoku.locator(".gomoku-cell").nth(112);
+    const gomokuCellReady = await gomokuCell.evaluate(async el=>{
+      // The iframe can report its first visible frame before ResizeObserver has
+      // delivered the board-area size. Wait a bounded number of paint frames
+      // for the real 15×15 hit targets, rather than sampling a transient 0×0 cell.
+      for(let i=0;i<30;i++){
+        const r=el.getBoundingClientRect(),style=getComputedStyle(el);
+        if(el.isConnected&&r.width>10&&r.height>10&&style.display!=="none"&&style.visibility==="visible")return true;
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+      }
+      return false;
+    });
+    const gomokuCellGeometry = await gomokuCell.evaluate(el=>{
       const r=el.getBoundingClientRect(),style=getComputedStyle(el);
       return {connected:el.isConnected,width:r.width,height:r.height,display:style.display,visibility:style.visibility};
     });
-    assert.ok(gomokuCellGeometry.connected && gomokuCellGeometry.width>10 && gomokuCellGeometry.height>10
-      && gomokuCellGeometry.display!=="none" && gomokuCellGeometry.visibility==="visible",
-      "Gomoku intersections must have visible, nonzero geometry inside the visible iframe");
+    assert.ok(gomokuCellReady,"Gomoku intersections must acquire visible, nonzero geometry after the iframe's initial layout; "+JSON.stringify(gomokuCellGeometry));
     await gomoku.locator(".gomoku-cell").nth(112).click();
     await page.waitForTimeout(450);
     assert.ok(await gomoku.locator(".stone").count() >= 2, "gomoku human and AI should both place a stone");
