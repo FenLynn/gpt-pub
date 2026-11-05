@@ -806,3 +806,229 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
 .gomoku-layout .gomoku-board{grid-template-columns:repeat(15,minmax(0,1fr))!important;grid-template-rows:repeat(15,minmax(0,1fr))!important;background-color:#e8cf9f;background-image:radial-gradient(circle at 21.428% 21.428%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 50% 21.428%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 78.572% 21.428%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 21.428% 50%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 50% 50%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 78.572% 50%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 21.428% 78.572%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 50% 78.572%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 78.572% 78.572%,#92754f 0 2.4px,transparent 2.8px),radial-gradient(circle at 35% 25%,#f0dfc1,#e4c99d 75%)}
 .gomoku-layout .gomoku-cell{display:block;width:100%;height:100%;min-width:0;min-height:0;cursor:pointer}
 .gomoku-layout .gomoku-cell:focus-visible{outline:2px solid #5a8bb2;outline-offset:-3px;border-radius:3px}
+
+
+
+/* P111 R11 · desktop game skins rebuilt against the supplied classic-game references */
+@media(min-width:701px){
+ .game-root.game-layout{
+  grid-template-columns:minmax(158px,180px) minmax(0,1fr) minmax(198px,228px)!important;
+  gap:13px!important;padding:13px!important;background:#edf2f5!important
+ }
+ .game-root.game-layout>.game-guide,.game-root.game-layout>.game-tools{
+  border:1px solid #dce6ec;border-radius:13px;background:#ffffffeb;
+  box-shadow:0 3px 12px #28485e08
+ }
+ .game-root.game-layout>.game-guide{padding:15px 13px}
+ .game-root.game-layout>.game-tools{padding:14px 12px}
+ .game-guide-kicker{font-size:9px;letter-spacing:1.4px;color:#8099a8}
+ .game-guide h2{font-size:16px;color:#36566d}
+ .game-guide p{font-size:13px;color:#718999}
+ .guide-note,.game-tool-note{background:#f7fafc;border-color:#e3ebf0;color:#7b909e}
+ .game-root.game-layout .game-status{border-color:#dce7ed;background:#f8fbfc;color:#3d5c72}
+ .game-root.game-layout .game-tools .game-btn{height:38px;min-height:38px;border-radius:9px;font-size:13px}
+ .game-root.game-layout .game-tools .game-btn.primary{background:#e7f3f9;border-color:#c9dfea;color:#246f9e}
+ .game-root.game-layout .game-tools .game-btn:hover:not(:disabled){background:#f2f8fb;border-color:#b9d2e0}
+
+ /* Windows 7 blue Minesweeper */
+ .minesweeper-layout .game-main-board{
+  display:grid;place-items:center;padding:16px!important;border:1px solid #9db9cf;border-radius:12px;
+  background:linear-gradient(145deg,#d9e7f0 0%,#b8cad8 48%,#dce7ed 100%);
+  box-shadow:inset 0 1px 0 #ffffffd9,0 8px 22px #29475d16
+ }
+ .minesweeper-layout .mine-classic{
+  gap:10px;padding:11px;border:1px solid #8daec7;border-radius:9px;
+  background:linear-gradient(180deg,#e9f3fa 0%,#c9dce9 100%);
+  box-shadow:inset 0 1px 0 #fff, inset 0 -2px 4px #6e8fa51f,0 6px 16px #2d50651c
+ }
+ .minesweeper-layout .mine-top-panel{
+  height:55px;padding:6px 9px;border:1px solid #9bb6ca;border-radius:7px;
+  background:linear-gradient(180deg,#eaf4fb 0%,#d1e1ed 100%);
+  box-shadow:inset 0 1px 2px #fff,inset 0 -1px 2px #4d6d851f
+ }
+ .minesweeper-layout .mine-counter{
+  width:64px;height:39px;border:2px solid #7394ad;border-radius:5px;
+  background:linear-gradient(180deg,#174a73 0%,#0c3155 100%);
+  color:#e7f7ff;font-family:Consolas,"Courier New",monospace;font-size:27px;font-weight:800;
+  letter-spacing:1px;text-shadow:0 0 7px #b8eaff88;
+  box-shadow:inset 0 2px 5px #071c31,0 1px 0 #fff
+ }
+ .minesweeper-layout .mine-face{
+  width:40px;height:40px;border:2px solid #91aec4;border-radius:50%;
+  background:radial-gradient(circle at 32% 25%,#fff 0%,#e8f2f8 42%,#a9c5d8 100%);
+  color:#344f65;font-size:23px;line-height:1;
+  box-shadow:inset 0 1px 0 #fff,0 2px 3px #365a7429
+ }
+ .minesweeper-layout .mine-face:active{transform:translateY(1px);box-shadow:inset 0 2px 4px #345b7738}
+ .minesweeper-layout .mine-grid{
+  --mine-cell-size:clamp(22px,3.05vh,43px);
+  gap:2px;padding:7px;border:1px solid #7e9eb7;border-radius:5px;
+  background:linear-gradient(145deg,#b7d0e1,#d5e4ed);
+  box-shadow:inset 0 2px 4px #3a5c742b,0 1px 0 #fff
+ }
+ .minesweeper-layout .mine-cell{
+  border:1px solid #4d86b4;border-radius:2px;
+  background:linear-gradient(135deg,#f4fbff 0%,#c4e2f7 36%,#76b2df 100%);
+  box-shadow:inset 2px 2px 1px #ffffffed,inset -2px -2px 2px #285d8e77,0 1px 1px #315a792b;
+  color:#203e5b;font-family:"Segoe UI",Arial,sans-serif;font-weight:850
+ }
+ .minesweeper-layout .mine-cell:hover:not(.open){background:linear-gradient(135deg,#fff 0%,#d9efff 36%,#91c4e9 100%);border-color:#3c79ab}
+ .minesweeper-layout .mine-cell:active:not(.open){background:linear-gradient(135deg,#8ab8da,#c8e3f5);box-shadow:inset 2px 2px 3px #24547d77}
+ .minesweeper-layout .mine-cell.open{border:1px solid #b6c7d2;border-radius:1px;background:linear-gradient(145deg,#f5f7f8,#e5ebef);box-shadow:inset 0 0 0 1px #fff}
+ .minesweeper-layout .mine-cell.flag{color:#d62f35;text-shadow:0 1px 0 #fff}
+ .minesweeper-layout .mine-cell.mine{border-color:#c78a86;background:linear-gradient(145deg,#f5e4e2,#e7c5c2);color:#a82d2d}
+ .minesweeper-layout .mine-side-stats>div{padding:10px 11px}
+
+ /* Tournament-style wooden Gomoku board with star points and glass stones */
+ .gomoku-layout .game-main-board{overflow:visible}
+ .gomoku-layout .gomoku-board{
+  position:relative;overflow:visible;
+  width:min(100cqw,calc(100cqh - 34px))!important;height:min(100cqw,calc(100cqh - 34px))!important;
+  padding:4.2%!important;border:3px solid #8c6336!important;border-radius:4px;
+  background-color:#e7c98f!important;
+  background-image:
+   repeating-linear-gradient(0deg,transparent 0 19px,#8b6334 19px 20px,transparent 20px 40px),
+   repeating-linear-gradient(90deg,transparent 0 19px,#8b6334 19px 20px,transparent 20px 40px),
+   repeating-linear-gradient(3deg,#f2dba9 0 4px,#e7c98f 4px 8px,#efd5a0 8px 12px);
+  box-shadow:inset 0 0 0 2px #f4dfb7, inset 0 0 22px #8b633422,0 12px 28px #50381f30
+ }
+ .gomoku-layout .gomoku-cell:before,.gomoku-layout .gomoku-cell:after{background:#75532e;opacity:.88}
+ .gomoku-layout .stone{width:78%;height:78%;border:1px solid #17191b;box-shadow:0 2px 3px #1c160e55,0 5px 8px #241b1255}
+ .gomoku-layout .stone.black{background:radial-gradient(circle at 31% 25%,#85898c 0%,#34383c 24%,#101214 72%,#050607 100%);border-color:#252729}
+ .gomoku-layout .stone.white{background:radial-gradient(circle at 31% 24%,#fff 0%,#f8f8f5 34%,#c9cdd0 82%,#aeb5b9 100%);border-color:#a8afb3;box-shadow:0 2px 3px #1c160e44,0 5px 8px #241b1244}
+ .gomoku-layout .stone:after{content:"";position:absolute;left:21%;top:14%;width:25%;height:14%;border-radius:50%;background:#ffffff80;filter:blur(1px)}
+ .gomoku-axis-x,.gomoku-axis-y{position:absolute;display:grid;pointer-events:none;color:#6d5436;font-family:Georgia,serif;font-size:11px;font-weight:650}
+ .gomoku-axis-x{left:4.2%;right:4.2%;bottom:-23px;grid-template-columns:repeat(15,1fr);text-align:center}
+ .gomoku-axis-y{left:-23px;top:4.2%;bottom:4.2%;grid-template-rows:repeat(15,1fr);align-items:center;text-align:right}
+ .gomoku-axis-y span{padding-right:4px}
+
+ /* Chinese Xiangqi: wood grain, framed board and raised circular pieces */
+ .xiangqi-layout .game-main-board{overflow:visible}
+ .xiangqi-layout .xiangqi-board{
+  border:7px solid #80552e!important;border-radius:3px;
+  background-color:#e9c98d!important;
+  background-image:
+   repeating-linear-gradient(0deg,#f0d9aa 0 7px,#e7c68c 7px 14px,#edcf99 14px 22px),
+   linear-gradient(90deg,#ffffff18,#8d5f2d18 50%,#ffffff18);
+  box-shadow:inset 0 0 0 2px #f4dfb4,0 10px 24px #54381f40
+ }
+ .xiangqi-layout .xiangqi-lines line,.xiangqi-layout .xiangqi-lines path{stroke:#76512d;stroke-width:2.2}
+ .xiangqi-layout .xiangqi-lines .xiangqi-border{stroke:#76512d;stroke-width:3.4}
+ .xiangqi-layout .xiangqi-river-label{fill:#986a3d;font-size:34px;font-weight:700}
+ .xiangqi-layout .xiangqi-piece{
+  width:88%;height:88%;border:3px solid #a57945;
+  background:radial-gradient(circle at 31% 24%,#fff8e5 0%,#f3dfb6 48%,#d8b47c 100%);
+  box-shadow:0 3px 4px #4c2f1755,0 6px 9px #51331f33,inset 0 0 0 2px #fff9e6;
+  font-family:"STKaiti","KaiTi","Noto Serif CJK SC",serif;font-weight:800;
+  text-shadow:0 1px 0 #fff8e7
+ }
+ .xiangqi-layout .xiangqi-piece.red{color:#bd332d;border-color:#a56c42}
+ .xiangqi-layout .xiangqi-piece.black{color:#26343b;border-color:#987044}
+
+ /* Tetris: high-saturation arcade frame; blocks are beveled in the canvas renderer */
+ .tetris-layout .game-main-board{background:linear-gradient(145deg,#d9e4ec,#edf2f5);border:1px solid #d2dee6;border-radius:12px;padding:10px}
+ .tetris-layout .arcade-canvas{
+  border:2px solid #243c52;border-radius:7px;background:#111f35;
+  box-shadow:0 12px 26px #122a3d38, inset 0 0 0 1px #ffffff10
+ }
+ .tetris-layout .game-tools{background:#fff;border-color:#d9e5eb}
+ .tetris-layout .tetris-metrics{border-color:#dce6ec}
+ .tetris-layout .tetris-metrics strong{font-size:17px}
+
+ /* Klondike desktop table: restrained card size, felt, ornate blue card backs */
+ .solitaire-layout .game-main-board{
+  padding:14px!important;border:8px solid #6b4a2c!important;border-radius:10px!important;
+  background:radial-gradient(ellipse at 50% 38%,#08783d 0%,#056333 55%,#034d29 100%)!important;
+  box-shadow:inset 0 0 0 2px #b58a52,inset 0 0 0 5px #3b6d49,0 10px 24px #263e302e
+ }
+ .solitaire-layout .solitaire-table{width:100%;height:100%;display:grid;place-items:center;overflow:hidden}
+ .solitaire-layout #board{max-width:100%;max-height:100%}
+ .solitaire-layout .card{border-radius:7px;filter:drop-shadow(0 2px 2px #001b102e)}
+ .solitaire-layout .card-front{border:1px solid #aeb5b8;border-radius:7px;background:linear-gradient(145deg,#fff 0%,#f9faf8 100%)}
+ .solitaire-layout .card-back{
+  border:3px solid #f7fbff;border-radius:7px;
+  background-color:#174b86;
+  background-image:
+   repeating-linear-gradient(45deg,#ffffff20 0 2px,transparent 2px 7px),
+   repeating-linear-gradient(-45deg,#ffffff1a 0 2px,transparent 2px 7px),
+   linear-gradient(135deg,#275fa0,#123b70);
+  box-shadow:inset 0 0 0 2px #a9c5e2,inset 0 0 0 5px #244d7b,0 2px 4px #001b1044
+ }
+ .solitaire-layout .pile-placeholder{border:2px solid #a8d3b36b;border-radius:7px;background:#ffffff08}
+ .solitaire-layout .foundation-placeholder:after{color:#a6d3b15c}
+ .solitaire-layout .game-tools{background:#fff}
+
+ /* Mahjong: deep green felt, ivory tiles and four clear seats */
+ .mahjong-layout .game-main-board{
+  padding:14px!important;border:8px solid #67472b!important;border-radius:13px!important;
+  background:radial-gradient(ellipse at 50% 42%,#137c65 0%,#0c6b58 56%,#075342 100%)!important;
+  box-shadow:inset 0 0 0 2px #c4a56a,inset 0 0 0 5px #285f4c,0 10px 25px #173c302c
+ }
+ .mahjong-layout .card-table-main{padding:10px;border:1px solid #bda36f;border-radius:9px;background:#0b6a56aa}
+ .mahjong-layout .opponents-row{min-height:58px;border:1px solid #c9b17a;border-radius:8px;background:#174f43a8}
+ .mahjong-layout .opponents-row .metric-pill{min-height:38px;padding:6px 12px;border:1px solid #c7b27f;border-radius:7px;background:linear-gradient(145deg,#f8f1d9,#e4d5ac);color:#53624e;font-size:12px}
+ .mahjong-layout .opponents-row .metric-pill strong{color:#235c4b}
+ .mahjong-layout .mahjong-area{position:relative;flex:1;min-height:0;justify-content:center;border:1px solid #d0b77e;border-radius:9px;background:radial-gradient(ellipse,#0d765eaa,#07513fbb);box-shadow:inset 0 0 28px #002d2488}
+ .mahjong-layout .mahjong-area:before{content:"麻雀";position:absolute;inset:0;display:grid;place-items:center;color:#d8c18d;font-family:"STKaiti","KaiTi",serif;font-size:clamp(48px,8cqh,96px);font-weight:800;letter-spacing:12px;opacity:.12;pointer-events:none}
+ .mahjong-layout .mahjong-melds,.mahjong-layout .mahjong-discards{position:relative;z-index:1}
+ .mahjong-layout .tile-mini,.mahjong-layout .tile-card{
+  border:1px solid #b8a16e;border-radius:4px;
+  background:linear-gradient(145deg,#fffef4 0%,#f1e8cf 65%,#d9c79e 100%);
+  color:#276c4e;box-shadow:0 2px 3px #002d244d,inset 0 1px #fff
+ }
+ .mahjong-layout .mahjong-hand{min-height:78px;padding:6px 4px 9px}
+ .mahjong-layout .mahjong-hand .tile-card{flex-basis:clamp(38px,3.1vw,48px);width:clamp(38px,3.1vw,48px);height:clamp(58px,7.4vh,76px);font-size:clamp(18px,2vh,23px)}
+ .mahjong-layout .game-tools{background:#fff;border-color:#d9e5eb}
+
+ /* San Guo Sha: parchment battlefield, portrait-like hero cards and a broad hand */
+ .sanguosha-layout .game-main-board{
+  padding:14px!important;border:8px solid #59402b!important;border-radius:12px!important;
+  background:
+   radial-gradient(ellipse at 48% 38%,#9a8663 0%,#766346 52%,#51452f 100%)!important;
+  box-shadow:inset 0 0 0 2px #b99b69,inset 0 0 0 5px #3c382a,0 10px 25px #332a1e40
+ }
+ .sanguosha-layout .card-table-main{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:12px;padding:6px;overflow:hidden}
+ .sanguosha-layout .opponents-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:stretch;padding:0;border:0;background:transparent}
+ .sanguosha-layout .player-chip{
+  position:relative;min-width:0;min-height:138px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
+  gap:5px;padding:7px;border:2px solid #b49a6d;border-radius:7px;
+  background:linear-gradient(145deg,#e5d4ad 0%,#b8a27a 100%);
+  color:#3d3023;box-shadow:0 4px 9px #21170f55,inset 0 0 0 2px #f1e4c5;
+  overflow:hidden;text-align:left
+ }
+ .sanguosha-layout .player-chip:before{
+  content:"將";height:77px;flex:none;display:grid;place-items:center;
+  border:1px solid #6b5a3e;border-radius:4px;
+  background:radial-gradient(circle at 50% 28%,#c7b28a 0%,#78694e 45%,#3f4436 100%);
+  color:#e7d3a6;font-family:"STKaiti","KaiTi",serif;font-size:38px;font-weight:800;
+  text-shadow:0 2px 4px #1b1710
+ }
+ .sanguosha-layout .player-chip strong{color:#392c1e;font-size:13px;font-weight:800}
+ .sanguosha-layout .player-chip span{display:inline-block;color:#57452f;font-size:10px}
+ .sanguosha-layout .player-chip.active{border-color:#a43c2e;background:linear-gradient(145deg,#f1d7b0,#c8a176);box-shadow:0 0 0 2px #a43c2e66,0 4px 10px #21170f55}
+ .sanguosha-layout .player-chip:nth-child(2):before{content:"主"}
+ .sanguosha-layout .player-chip:nth-child(3):before{content:"軍"}
+ .sanguosha-layout .player-chip:nth-child(4):before{content:"將"}
+ .sanguosha-layout .game-log-panel{
+  grid-row:2;align-self:stretch;min-height:0;max-height:none;padding:12px 14px;
+  border:1px solid #c4aa79;border-radius:8px;background:#2c2a23a8;color:#eee0bf;
+  font-family:"STKaiti","KaiTi",serif;font-size:13px;line-height:1.8
+ }
+ .sanguosha-layout .card-hand{
+  grid-row:3;min-height:112px;max-height:156px;align-items:flex-end;justify-content:center;
+  gap:7px;padding:8px 5px 5px;border-top:1px solid #d3b98755
+ }
+ .sanguosha-layout .card-hand .playing-card{
+  flex:0 0 clamp(58px,5.2vw,76px);width:clamp(58px,5.2vw,76px);height:clamp(86px,10vh,116px);
+  border:2px solid #b5a27c;border-radius:6px;background:linear-gradient(145deg,#f8f0d9,#d8c69e);
+  color:#3c3327;font-family:"STKaiti","KaiTi",serif;font-size:clamp(15px,1.6vh,19px);
+  box-shadow:0 4px 7px #1e170f66
+ }
+ .sanguosha-layout .card-hand .playing-card.red{color:#b72e2e}
+ .sanguosha-layout .card-hand .playing-card.selected{transform:translateY(-12px);outline:2px solid #f0d18b}
+ .sanguosha-layout .game-tools{background:#fff;border-color:#d9e5eb}
+
+ /* Contra original 8-bit side-scroller canvas */
+ .contra-layout .game-main-board{background:linear-gradient(145deg,#dbe4e9,#edf2f4);border:1px solid #d3dfe6;border-radius:12px;padding:10px}
+ .contra-layout .arcade-canvas{border:3px solid #182d3b;border-radius:4px;box-shadow:0 12px 26px #182d3b35;image-rendering:pixelated}
+}
