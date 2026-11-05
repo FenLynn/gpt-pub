@@ -68,6 +68,43 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await page.locator("#drawClaimButton").isEnabled(),true);
   await page.locator("#drawClaimButton").click();
   assert.match(await page.locator("#turnText").innerText(),/三次重复/);
+  const xiangqi=await browser.newPage({viewport:{width:1100,height:850}});
+  xiangqi.on("pageerror",err=>errors.push("Xiangqi: "+err.message));
+  await xiangqi.goto(pathToFileURL(path.resolve(__dirname,"../app/games/xiangqi/index.html")).href+"?p111Test=1");
+  await xiangqi.waitForFunction(()=>typeof window.__p111XiangqiTest?.loadPosition==="function");
+  const load=(pieces,side="red")=>xiangqi.evaluate(([p,s])=>window.__p111XiangqiTest.loadPosition(p,s),[pieces,side]);
+  const getMoves=(side="red")=>xiangqi.evaluate(s=>window.__p111XiangqiTest.legal(s),side);
+  const base=[[4,0,"black","将"],[4,9,"red","帅"],[4,6,"red","兵"]];
+  // The horse may not jump over an occupied straight-leg square.
+  await load([...base,[4,7,"red","马"]]);
+  const h=await getMoves();
+  assert.equal(h.some(m=>m.fx===4&&m.fy===7&&m.tx===5&&m.ty===5),false,"horse must not jump over the leg at (4,6)");
+  assert.equal(h.some(m=>m.fx===4&&m.fy===7&&m.tx===6&&m.ty===6),true,"unblocked horse jump remains legal");
+  // Cannon captures only with exactly one screen.
+  await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"black","车"]]);
+  const cannon=await getMoves();
+  assert.equal(cannon.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),true,"screen permits cannon capture");
+  await load([...base,[0,7,"red","炮"],[0,2,"black","车"]]);
+  const noScreen=await getMoves();
+  assert.equal(noScreen.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"screenless cannon capture must be illegal");
+  // Opposing generals on an empty shared file are mutually checking.
+  await load([[4,0,"black","将"],[4,9,"red","帅"]]);
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.faces()),true);
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.check("red")),true);
+  // Xiangqi no-move position is a loss (困毙), not a western-chess stalemate draw.
+  await load([...base,[3,1,"red","车"],[5,1,"red","车"]],"black");
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.check("black")),false);
+  assert.equal((await getMoves("black")).length,0);
+  assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.terminal()),true);
+  assert.match(await xiangqi.locator("#turnText").innerText(),/红方获胜.*困毙/);
+  // Repeat a checking position for the third time: perpetual checking move excluded.
+  await load([[4,0,"black","将"],[3,9,"red","帅"],[3,2,"red","车"]]);
+  const candidate={fx:3,fy:2,tx:4,ty:2};
+  assert.equal((await getMoves()).some(m=>m.fx===3&&m.fy===2&&m.tx===4&&m.ty===2),true);
+  await xiangqi.evaluate(m=>window.__p111XiangqiTest.seedCheckingRepetition(m,2),candidate);
+  assert.equal((await getMoves()).some(m=>m.fx===3&&m.fy===2&&m.tx===4&&m.ty===2),false,
+   "simplified perpetual-check guard must reject a third checking repetition");
+  await xiangqi.close();
   assert.deepEqual(errors,[]);
   console.log("P111 chess rules fixtures: both castles, attacked transit, en passant, four promotions, mate/stalemate, insufficient material, 50/75 moves, repetition passed");
  }finally{await browser.close();}
