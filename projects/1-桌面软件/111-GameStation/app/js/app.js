@@ -36,7 +36,7 @@ function dateKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2
 function fmtDuration(ms){const sec=Math.floor(Math.max(0,ms)/1000),h=Math.floor(sec/3600),m=Math.floor(sec%3600/60);return h?h+"小时"+m+"分":m+"分";}
 function fmtClock(ms){const sec=Math.floor(ms/1000),m=Math.floor(sec/60),s=sec%60;return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function toast(message){if(active){send("HUD_NOTICE",{message});return;}const el=$("toast");el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
+function toast(message){const el=$("toast");if(active){el.classList.remove("show");send("HUD_NOTICE",{message});return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[])));
 let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null,helpSource={lines:[],note:""};
 function statFor(id){if(!stats[id])stats[id]={plays:0,wins:0,totalMs:0,bestScore:0,lastPlayed:"",days:{}};const s=stats[id];s.plays=Number(s.plays)||0;s.wins=Number(s.wins)||0;s.totalMs=Number(s.totalMs)||0;s.bestScore=Number(s.bestScore)||0;s.days=s.days||{};return s;}

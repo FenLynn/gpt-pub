@@ -121,7 +121,7 @@ const names=[
      });
      assert.equal(notice.inside,true,"important notices must float inside the game stage");
      assert.ok(notice.top>=notice.mainTop&&notice.bottom<=notice.mainBottom,"in-game notice must stay inside the play area");
-     assert.equal(await page.locator("#toast").isVisible(),false,"game notices must not use an external popup");
+     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"game notices must not activate the external popup");
      await page.waitForTimeout(2500);
      assert.equal(await frame.locator("#gs-notice").isVisible(),false,"transient notice must disappear without blocking play");
      noticeChecked=true;
