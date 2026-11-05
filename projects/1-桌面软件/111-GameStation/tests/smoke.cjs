@@ -51,7 +51,7 @@ const names=[
   const v=await frame.locator("#game").evaluate(el=>{
    const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,top:r.top};};
    const main=el.querySelector(".game-main-board"),guide=el.querySelector(".game-guide"),tools=el.querySelector(".game-tools"),hud=el.querySelector("#gs-hud");
-   const surface=el.querySelector(".arcade-canvas")||el.querySelector(".gomoku-board")||el.querySelector(".xiangqi-board")||
+   const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||el.querySelector(".xiangqi-board")||
     el.querySelector(".chess-frame")||el.querySelector(".fleet-boards")||el.querySelector(".mine-classic")||
     el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const time=el.querySelector("#gs-hud-time");
@@ -82,7 +82,7 @@ const names=[
    el.dispatchEvent(e);return e.defaultPrevented;
   });
   assert.ok(captured,name+" must prevent the browser context menu in the game area");
-  const filename=name.replace(/[^\\p{L}\\p{N}-]+/gu,"-")+"-"+width+"x"+height+".png";
+  const filename=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+width+"x"+height+".png";
   await page.screenshot({path:path.join(artifacts,"games",filename)});
  }
  try{

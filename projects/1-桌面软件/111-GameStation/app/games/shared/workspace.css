@@ -216,7 +216,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  display:block!important;width:min(100cqw,100cqh)!important;height:min(100cqw,100cqh)!important;
  max-width:100%!important;max-height:100%!important;aspect-ratio:1!important;object-fit:contain!important
 }
-.pong-layout .arcade-canvas,.contra-layout .arcade-canvas,.mario-layout .arcade-canvas{
+.pong-layout .arcade-canvas,.contra-layout .arcade-canvas,.contra-layout canvas,.mario-layout .arcade-canvas{
  display:block!important;width:min(100cqw,calc(100cqh * 16 / 9))!important;
  height:min(100cqh,calc(100cqw * 9 / 16))!important;max-width:100%!important;max-height:100%!important;
  aspect-ratio:16/9!important;object-fit:contain!important
