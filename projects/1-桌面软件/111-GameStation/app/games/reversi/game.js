@@ -1,8 +1,10 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null;
+const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[];
 const dirs=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 function copy(a){return a.map(r=>r.slice());}
+function save(){history.push({b:copy(b),turn,over});if(history.length>100)history.shift();}
+function undo(){if(!history.length)return;clearTimeout(timer);const count=mode==="ai"?(turn===1?2:1):1;let snap=null;for(let i=0;i<count&&history.length;i++)snap=history.pop();if(!snap)return;b=copy(snap.b);turn=snap.turn;over=false;paused=false;render();report("已撤销一步");if(mode==="ai"&&turn===2)scheduleAI();}
 function moves(a,p){const out=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++)if(!a[y][x]){let flips=[];for(const [dx,dy] of dirs){let xx=x+dx,yy=y+dy,line=[];while(xx>=0&&xx<8&&yy>=0&&yy<8&&a[yy][xx]===3-p){line.push([xx,yy]);xx+=dx;yy+=dy;}if(line.length&&xx>=0&&xx<8&&yy>=0&&yy<8&&a[yy][xx]===p)flips.push(...line);}if(flips.length)out.push({x,y,flips});}return out;}
 function apply(a,m,p){a[m.y][m.x]=p;m.flips.forEach(([x,y])=>a[y][x]=p);}
 function counts(a){let black=0,white=0;for(const row of a)for(const v of row){if(v===1)black++;if(v===2)white++;}return [black,white];}
@@ -31,10 +33,11 @@ function render(){
  document.getElementById("black").textContent=black;document.getElementById("white").textContent=white;
 }
 function finish(){over=true;const [black,white]=counts(b),msg=black===white?"平局":black>white?"黑棋获胜":"白棋获胜";report(msg+" · "+black+":"+white);GameBridge.send("GAME_OVER",{message:msg,score:black,win:black>white});}
-function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const m=choose();if(m)apply(b,m,2);turn=1;next();},difficulty==="easy"?240:360);}
+function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const m=choose();if(m){save();apply(b,m,2);}turn=1;next();},difficulty==="easy"?240:360);}
 function next(){if(over||paused)return;const list=moves(b,turn);if(!list.length){if(!moves(b,3-turn).length){finish();return;}turn=3-turn;report((turn===1?"黑棋":"白棋")+"无合法步，自动跳过");render();if(mode==="ai"&&turn===2)scheduleAI();return;}render();report(turn===1?"黑棋回合":"白棋回合");if(mode==="ai"&&turn===2)scheduleAI();}
-function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const m=moves(b,turn).find(v=>v.x===x&&v.y===y);if(!m)return;apply(b,m,turn);turn=3-turn;next();}
-function newGame(){clearTimeout(timer);b=Array.from({length:8},()=>Array(8).fill(0));b[3][3]=b[4][4]=2;b[3][4]=b[4][3]=1;turn=1;paused=false;over=false;render();report("黑棋先行");}
+function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const m=moves(b,turn).find(v=>v.x===x&&v.y===y);if(!m)return;save();apply(b,m,turn);turn=3-turn;next();}
+function newGame(){clearTimeout(timer);history=[];b=Array.from({length:8},()=>Array(8).fill(0));b[3][3]=b[4][4]=2;b[3][4]=b[4][3]=1;turn=1;paused=false;over=false;render();report("黑棋先行");}
 
+document.getElementById("undoButton").addEventListener("click",undo);
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;next();},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
