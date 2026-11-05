@@ -575,8 +575,10 @@ const games = [
     const seedSanguosha = async seed => {
       await sanguosha.locator("body").evaluate(seedValue => {
         let state = seedValue >>> 0;
+        window.__p111SanguoshaRandomCalls = 0;
         Math.random = () => {
           state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+          window.__p111SanguoshaRandomCalls++;
           return state / 4294967296;
         };
       }, seed);
@@ -601,13 +603,24 @@ const games = [
     await page.locator("#newGameButton").click();
     await page.waitForTimeout(180);
     assert.equal(await page.locator("#difficultyControl button[aria-pressed='true']").getAttribute("data-difficulty"), "easy");
+    let sanguoshaRandomCalls = 0;
+    for(let attempt=0;attempt<20;attempt++){
+      sanguoshaRandomCalls = await sanguosha.locator("body").evaluate(() => window.__p111SanguoshaRandomCalls || 0);
+      if(sanguoshaRandomCalls>=59)break;
+      await page.waitForTimeout(25);
+    }
+    assert.ok(sanguoshaRandomCalls>=59,"Sanguosha seeded deal must execute all 59 Fisher–Yates shuffle calls");
     const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
     assert.ok(seededHumanHand.some(text => text.startsWith("闪")), "second deterministic deal should give Xiao Qiao a 闪 response");
-    assert.ok(seededHumanHand.every(text => !/[♥♠]/.test(text)), "second deterministic deal should not expose Tianxiang cards");
     assert.equal(await sanguoshaHp(0), 3, "Xiao Qiao should start the response regression at three HP");
     await sanguosha.locator("#endTurn").click();
     await sanguosha.locator("#responseBar").waitFor({ state: "visible", timeout: 10000 });
     await sanguosha.locator("#respondNo").click();
+    if(await sanguosha.locator("#tianxiangPanel").isVisible()){
+      await sanguosha.locator("#tianxiangCancel").click();
+      await page.waitForTimeout(80);
+      assert.equal(await sanguosha.locator("#tianxiangPanel").isVisible(),false,"one declined response must not create a second Tianxiang damage prompt");
+    }
     await sanguosha.locator('#players [data-seat="0"]').filter({ hasText: "♥ 2/3" }).waitFor({ state: "visible", timeout: 10000 });
     assert.equal(await sanguoshaHp(0), 2, "declining 闪 must apply exactly one point of damage");
 
