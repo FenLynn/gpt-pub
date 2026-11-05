@@ -165,7 +165,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
  configure("normal");newGame();
  window.__p111MineTest={
   forceFlag(index){if(cells[index]){cells[index].flag=true;render();}},
-  forceMine(index){cells.forEach(cell=>{cell.open=false;cell.flag=false;});if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}},
+  forceMine(index){cells.forEach(cell=>{cell.open=false;cell.mine=false;});if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}},
   cellSize(){return Number(boardEl.dataset.cellSize)||0;}
  };
 }

@@ -56,7 +56,7 @@ const names=[
     el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const time=el.querySelector("#gs-hud-time");
    const row=[...el.querySelectorAll("#gs-hud-time,#gs-start,#gs-pause,#gs-next,#gs-tools,#gs-help,#gs-mode,#gs-difficulty")]
-    .filter(x=>x&&!x.hidden&&getComputedStyle(x).display!=="none").map(box);
+    .filter(x=>x&&!x.hidden&&getComputedStyle(x).display!=="none").map(x=>{const r=box(x);return{...r,centerY:r.y+r.height/2};});
    return {root:box(el),main:box(main),surface:box(surface),hud:box(hud),time:box(time),row,
     modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
     selectCount:el.querySelectorAll("#gs-hud select").length,
@@ -72,7 +72,7 @@ const names=[
   assert.equal(v.selectCount,0,name+" mode/difficulty must not use native dropdowns");
   if(v.modeButtons)assert.ok(v.modeButtons>=2,name+" mode selector must be segmented buttons");
   if(v.difficultyButtons)assert.ok(v.difficultyButtons>=2,name+" difficulty selector must be segmented buttons");
-  assert.ok(v.row.length>=5&&Math.max(...v.row.map(x=>x.y))-Math.min(...v.row.map(x=>x.y))<=2,name+" toolbar controls must share one horizontal row");
+  assert.ok(v.row.length>=5&&Math.max(...v.row.map(x=>x.centerY))-Math.min(...v.row.map(x=>x.centerY))<=2,name+" toolbar controls must share one horizontal row");
   assert.ok(v.surface.height>=v.main.height*.72,name+" primary game surface must use the available height: "+JSON.stringify(v));
   assert.ok(v.surface.top>=v.main.top-1&&v.surface.bottom<=v.main.bottom+1,name+" primary surface must remain inside the padded game stage");
   assert.ok(v.main.bottom<=v.root.bottom+1,name+" stage bottom must stay visible");
