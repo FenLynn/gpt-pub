@@ -64,10 +64,13 @@ const games = [
       const zones=await page.frameLocator("#gameFrame").locator("#game").evaluate(root=>{
         const guide=root.querySelector(".game-guide"),tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board");
         const rr=root.getBoundingClientRect(),tr=tools?.getBoundingClientRect(),mr=main?.getBoundingClientRect();
-        return {guide:guide?getComputedStyle(guide).display:"absent",tools:tools?getComputedStyle(tools).display:"absent",main:mr?.width||0,toolsWidth:tr?.width||0,toolsRight:tr?.right||0,rootRight:rr.right,columns:getComputedStyle(root).gridTemplateColumns,scroll:document.documentElement.scrollHeight};
+        const ts=tools?getComputedStyle(tools):null,ms=main?getComputedStyle(main):null;
+        return {guide:guide?getComputedStyle(guide).display:"absent",tools:ts?.display||"absent",toolsVisibility:ts?.visibility||"absent",toolsOpacity:ts?.opacity||"0",toolsText:tools?.innerText?.slice(0,90)||"",main:mr?.width||0,mainRight:mr?.right||0,toolsX:tr?.x||0,toolsWidth:tr?.width||0,toolsRight:tr?.right||0,rootRight:rr.right,columns:getComputedStyle(root).gridTemplateColumns,rootDisplay:getComputedStyle(root).display,scroll:document.documentElement.scrollHeight};
       });
       assert.notEqual(zones.tools,"none",name+" right-side game actions must remain visible");
-      assert.ok(zones.toolsWidth>150&&zones.toolsRight<=zones.rootRight+2,name+" right rail must have real width and remain inside the game root; "+JSON.stringify(zones));
+      assert.ok(zones.toolsWidth>150&&zones.toolsRight<=zones.rootRight+2&&zones.toolsVisibility==="visible"&&Number(zones.toolsOpacity)>.1,name+" right rail must be visible, occupy real width and remain inside the game root; "+JSON.stringify(zones));
+      if(page.viewportSize().width>700)assert.ok(zones.mainRight<=zones.toolsX+2,name+" main board must not overlap the right rail; "+JSON.stringify(zones));
+      if(name==="经典纸牌")console.log("SOLITAIRE_LAYOUT "+JSON.stringify(zones));
       if(zones.guide!=="absent"&&page.viewportSize().width>700)assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible on desktop");
       assert.ok(zones.main>250,name+" central board must retain priority workspace width");
       await page.waitForFunction(() => {
