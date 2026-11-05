@@ -887,3 +887,37 @@ body{font-size:15px}
  .ranking-empty:before{content:"♔";width:52px;height:52px;display:grid;place-items:center;border:1px solid #dce7ed;border-radius:15px;background:#edf4f8;color:#7b9aae;font-family:Georgia,serif;font-size:30px;box-shadow:inset 0 1px #fff}
  .ranking-empty:after{content:"完成一局后，成绩和游玩记录会自动出现在这里";max-width:210px;color:#9aaab4;font-size:11px}
 }
+
+/* P111 R16 · game owns the entire main view, fixed side controls removed. */
+#workspaceView{padding:0!important;overflow:hidden!important;background:#eaf2f8!important}
+#workspaceView #gameStage{width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+ margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:hidden!important}
+#workspaceView #gameFrame{width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;border:0!important;display:block!important}
+.main-area:has(#workspaceView:not(.hidden)) #gameControls,
+.main-area:has(#workspaceView:not(.hidden)) #gameActions,
+.main-area:has(#workspaceView:not(.hidden)) #railToggleButton{display:none!important}
+#helpPanel:not(.hidden){position:fixed!important;z-index:100!important;right:20px;top:70px;left:auto;
+ width:min(390px,calc(100vw - 30px));max-height:min(72vh,670px);display:flex!important;
+ flex-direction:column;overflow:hidden;box-shadow:0 18px 44px #1e405d4a}
+#helpHeader{cursor:move;touch-action:none;flex:none;user-select:none}
+#helpContent{min-height:0;overflow:auto;overscroll-behavior:contain}
+#libraryView{overflow:auto!important;scrollbar-width:thin}
+/* Smaller library cards: no giant blank row-height caused by inherited 1fr grid. */
+#gameGrid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(225px,1fr))!important;
+ grid-template-rows:none!important;grid-auto-rows:92px!important;align-content:start!important;
+ justify-content:start!important;gap:12px!important;min-height:0!important;height:auto!important}
+#gameGrid>.game-card{width:100%!important;height:92px!important;min-height:92px!important;
+ max-height:92px!important;padding:12px 14px!important;align-self:start!important;justify-content:flex-start!important}
+#gameGrid .game-card-icon{flex:0 0 44px}
+#gameGrid .game-card-title{font-size:15px}
+/* Hero copy always stays above decorative illustration. */
+.home-hero{isolation:isolate;overflow:hidden!important}
+.home-hero .hero-copy{position:relative;z-index:2;min-width:0;max-width:min(620px,65%)!important;overflow:visible!important}
+.home-hero h1,.home-hero .date-line,.home-hero .hero-description{overflow-wrap:anywhere;white-space:normal;max-width:100%}
+.home-hero .home-art{z-index:1;pointer-events:none;opacity:.38!important}
+@media(max-width:1100px){.home-hero .hero-copy{max-width:80%!important}.home-hero .home-art{opacity:.18!important}}
+@media(max-width:860px){.home-hero .hero-copy{max-width:100%!important}.home-hero .home-art{display:none!important}}
+@media(max-width:700px){#gameGrid{grid-template-columns:repeat(auto-fill,minmax(165px,1fr))!important;
+ grid-auto-rows:76px!important;gap:8px!important}
+ #gameGrid>.game-card{height:76px!important;min-height:76px!important;max-height:76px!important}
+ .home-hero .hero-copy{max-width:100%!important}}
