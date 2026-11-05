@@ -170,6 +170,12 @@ if(new URLSearchParams(location.search).has("p111Test")){
   setHp(seat,hp){players[seat].hp=hp;players[seat].alive=true;render();},
   setTurn(seat=0){current=seat;phase="play";usedKill=false;usedWine=false;selected=null;targetMode=false;pendingResponse=null;pendingSave=null;pendingTianxiang=null;render();},
   canPlay(type,seat=0){const d=defs.find(x=>x[1]===type);return !!d&&cardPlayable(seat,{id:-1,name:d[0],type,suit:"heart",rank:7});},
+  play(type,target=1){
+   const d=defs.find(x=>x[1]===type),card=d&&findCard(0,d[0]);if(!card)return false;
+   selected=card;targetMode=["kill","duel","dismantle","steal"].includes(type);
+   if(targetMode)useOnTarget(target);else playHuman();return true;
+  },
+  setDifficulty(v){difficulty=v;},
   flags(){return{usedKill,usedWine,current,phase};},
   damage(target,amount,source=-1){damage(target,amount,source,()=>{});render();},
   response(target,kind,source=1){requestResponse(target,kind,source,()=>{});render();},
