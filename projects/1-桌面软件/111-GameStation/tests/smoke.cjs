@@ -5,7 +5,7 @@ const path=require("node:path");
 const {pathToFileURL}=require("node:url");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
 const names=[
-"五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","国际跳棋","中国跳棋","飞行棋",
+"五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋",
 "扫雷","2048","记忆翻牌","数独","推箱子",
 "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克",
 "经典纸牌","斗地主","麻将","三国杀"
