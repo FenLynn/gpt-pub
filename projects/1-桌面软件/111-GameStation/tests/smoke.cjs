@@ -102,7 +102,8 @@ const games = [
     assert.ok(await page.locator(".home-hero").isVisible(), "home should show the redesigned hero");
     assert.equal(await page.locator("#totalGameCount").innerText(), "19");
     assert.equal(await page.locator("[data-home-category]").count(), 4, "home quick-start should expose all four game categories");
-    assert.equal(await page.locator(".heatmap-cell").count(), 371, "one-year activity grid should contain 53×7 cells");
+    assert.equal(await page.locator(".heatmap-cell[data-date]").count(), 365, "activity grid must contain 365 real calendar days");
+    assert.ok((await page.locator(".heatmap-cell").count()) <= 371, "weekday alignment may add at most six leading placeholders");
     await page.locator('[data-ranking="time"]').click();
     assert.ok(await page.locator('[data-ranking="time"]').getAttribute("aria-selected") === "true");
     await page.locator('[data-ranking="plays"]').click();
