@@ -271,3 +271,8 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  100%{opacity:0;transform:translateY(-5px)}
 }
 .game-root.gs-notice-lane>.game-main-board{padding-top:56px!important}
+
+
+/* Specific card-table layouts had an older zero-padding rule; notification lane must outrank it. */
+.game-root.game-layout.solitaire-layout.gs-notice-lane>.game-main-board,
+.game-root.game-layout.card-table-layout.gs-notice-lane>.game-main-board{padding-top:56px!important}

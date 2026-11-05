@@ -80,7 +80,7 @@ const names=[
   assert.ok(v.row.length>=5&&Math.max(...v.row.map(x=>x.centerY))-Math.min(...v.row.map(x=>x.centerY))<=2,name+" toolbar controls must share one horizontal row");
   assert.ok(v.surface.height>=v.main.height*(v.isBattleship?.62:.72),name+" primary game surface must use the available height: "+JSON.stringify(v));
   const overlap=v.notice.x<v.surface.right&&v.notice.right>v.surface.x&&v.notice.y<v.surface.bottom&&v.notice.bottom>v.surface.y;
-  assert.equal(overlap,false,name+" floating notice must not cover the primary game surface");
+  assert.equal(overlap,false,name+" floating notice must not cover the primary game surface: "+JSON.stringify({notice:v.notice,surface:v.surface,main:v.main}));
   assert.ok(v.surface.top>=v.main.top-1&&v.surface.bottom<=v.main.bottom+1,name+" primary surface must remain inside the padded game stage");
   assert.ok(v.main.bottom<=v.root.bottom+1,name+" stage bottom must stay visible");
   assert.ok(v.overflow<=v.viewport.width+2,name+" must not scroll horizontally");
