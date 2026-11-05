@@ -345,7 +345,7 @@ const games = [
 
     await openGame("俄罗斯方块");
     const tetris = page.frameLocator("#gameFrame");
-    assert.equal(await tetris.locator(".key-instruction").count(), 5, "Tetris should show the keyboard guide on the left");
+    assert.equal(await tetris.locator(".key-instruction").count(), 6, "Tetris should show separate gameplay and shared-control shortcuts on the left");
     assert.ok(await tetris.locator(".game-guide").isVisible(), "Tetris keyboard guide should be visible in the left rail");
     assert.ok(await tetris.locator("#score").isVisible());
     const frameA = await tetris.locator("#canvas").evaluate(canvas=>canvas.toDataURL());
