@@ -10,7 +10,26 @@ function evaluate(a,root){const [black,white]=counts(a),disc=(root===1?black-whi
 function search(a,p,depth,alpha,beta,root){const ms=moves(a,p);if(!ms.length){const other=moves(a,3-p);if(!other.length){const [black,white]=counts(a);return (root===1?black-white:white-black)*1000;}if(depth<=0)return evaluate(a,root);return search(a,3-p,depth-1,alpha,beta,root);}if(depth<=0)return evaluate(a,root);const maximizing=p===root;ms.sort((m,n)=>{const val=m=>((m.x===0||m.x===7)&&(m.y===0||m.y===7)?100:0)+m.flips.length;return val(n)-val(m);});let best=maximizing?-Infinity:Infinity;for(const m of ms){const c=copy(a);apply(c,m,p);const v=search(c,3-p,depth-1,alpha,beta,root);if(maximizing){best=Math.max(best,v);alpha=Math.max(alpha,best);}else{best=Math.min(best,v);beta=Math.min(beta,best);}if(beta<=alpha)break;}return best;}
 function choose(){const list=moves(b,2);if(!list.length)return null;if(difficulty==="easy")return list[Math.floor(Math.random()*list.length)];const depth=difficulty==="hard"?4:2;let best=-Infinity,choices=[];for(const m of list){const c=copy(b);apply(c,m,2);const v=search(c,1,depth-1,-Infinity,Infinity,2);if(v>best){best=v;choices=[m];}else if(v===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
 function report(t){status.textContent=t;const [black,white]=counts(b);GameBridge.report(t,{score:black,white});}
-function render(){el.innerHTML="";const valid=moves(b,turn);for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=document.createElement("button");q.className="game-cell";q.style.width="clamp(35px,7.5vw,58px)";q.style.height="clamp(35px,7.5vw,58px)";q.style.background="#247a63";q.style.borderColor="#16614f";q.style.borderRadius="3px";if(b[y][x]){q.classList.add(b[y][x]===1?"dark-piece":"light-piece");q.style.width="clamp(27px,5.7vw,43px)";q.style.height="clamp(27px,5.7vw,43px)";}else if(valid.some(m=>m.x===x&&m.y===y)){q.innerHTML='<span style="width:8px;height:8px;border-radius:50%;background:#b7e5c6"></span>';}q.onclick=()=>play(x,y);el.appendChild(q);}const [black,white]=counts(b);document.getElementById("black").textContent=black;document.getElementById("white").textContent=white;}
+function render(){
+ el.innerHTML="";
+ const valid=new Set(moves(b,turn).map(m=>m.y*8+m.x));
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+  const cell=document.createElement("button");cell.type="button";
+  cell.className="game-cell reversi-square";
+  cell.dataset.x=String(x);cell.dataset.y=String(y);
+  const v=b[y][x];
+  if(v){
+   const disc=document.createElement("span");disc.className="reversi-disc "+(v===1?"black":"white");
+   disc.setAttribute("aria-hidden","true");cell.appendChild(disc);
+  }else if(valid.has(y*8+x)){
+   cell.classList.add("legal");const hint=document.createElement("span");hint.className="reversi-move-hint";hint.setAttribute("aria-hidden","true");cell.appendChild(hint);
+  }
+  cell.setAttribute("aria-label",(x+1)+"列"+(y+1)+"行"+(v?(v===1?"黑棋":"白棋"):valid.has(y*8+x)?"可落子":"空位"));
+  cell.addEventListener("click",()=>play(x,y));el.appendChild(cell);
+ }
+ const [black,white]=counts(b);
+ document.getElementById("black").textContent=black;document.getElementById("white").textContent=white;
+}
 function finish(){over=true;const [black,white]=counts(b),msg=black===white?"平局":black>white?"黑棋获胜":"白棋获胜";report(msg+" · "+black+":"+white);GameBridge.send("GAME_OVER",{message:msg,score:black,win:black>white});}
 function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const m=choose();if(m)apply(b,m,2);turn=1;next();},difficulty==="easy"?240:360);}
 function next(){if(over||paused)return;const list=moves(b,turn);if(!list.length){if(!moves(b,3-turn).length){finish();return;}turn=3-turn;report((turn===1?"黑棋":"白棋")+"无合法步，自动跳过");render();if(mode==="ai"&&turn===2)scheduleAI();return;}render();report(turn===1?"黑棋回合":"白棋回合");if(mode==="ai"&&turn===2)scheduleAI();}
