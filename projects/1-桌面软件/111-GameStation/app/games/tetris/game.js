@@ -31,15 +31,15 @@ function block(x,y,color,alpha=1){
  }
  ctx.restore();
 }
-function ghostPiece(){let y=piece.y;while(!collision({...piece,y:y+1}))y++;return y;}
+// The reference game does not draw a second translucent piece at the bottom.
+// Keep one visible falling piece only, to avoid a misleading phantom landing.
 function draw(){
  const bg=ctx.createLinearGradient(0,0,canvas.width,canvas.height);bg.addColorStop(0,"#0c1c32");bg.addColorStop(.55,"#152b47");bg.addColorStop(1,"#0a182b");ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.strokeStyle="#ffffff12";ctx.lineWidth=1;
  for(let x=1;x<COLS;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,canvas.height);ctx.stroke();}
  for(let y=1;y<ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(canvas.width,y*S);ctx.stroke();}
  for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(grid[y][x])block(x,y,grid[y][x]);
  if(piece){
-  const ghostY=ghostPiece();
-  for(let y=0;y<piece.shape.length;y++)for(let x=0;x<piece.shape[y].length;x++)if(piece.shape[y][x])block(piece.x+x,ghostY+y,"#d6e5ee",.18);
+  canvas.dataset.ghostVisible="false";
   // Only interpolate when the *whole* piece can legally move one grid row.
   // Previously the fractional render offset continued even when collision()
   // blocked the next step. It drew the piece below the floor/stack and then
