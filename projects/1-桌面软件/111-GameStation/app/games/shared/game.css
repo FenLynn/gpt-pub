@@ -1398,3 +1398,31 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  .battleship-layout .fleet-board .game-cell{border:1px solid #a0c1d5!important;border-radius:2px!important}
  .battleship-layout .fleet-title{font-size:14px;font-weight:800;color:#3c7191}
 }
+
+
+
+/* P111 R13.1 · classical Klondike placement: stock/foundations anchored at table top */
+@media(min-width:701px){
+ .game-root.game-layout.solitaire-layout>.game-main-board .solitaire-table{
+  display:grid!important;place-items:start center!important;align-content:start!important;
+  justify-items:center!important;padding:clamp(25px,4cqh,48px) 10px 12px!important;
+  overflow:hidden!important;width:100%!important;height:100%!important;
+ }
+ .game-root.game-layout.solitaire-layout>.game-main-board #board{
+  justify-self:center!important;align-self:start!important;
+  margin:0 auto!important;position:relative!important;
+  transform:none!important;overflow:visible!important
+ }
+ .solitaire-layout #board.instant-deal .card,
+ .solitaire-layout #board.instant-deal .card-inner{transition:none!important;animation:none!important}
+ .solitaire-layout #board .card{
+  transition:left .14s ease-out,top .14s ease-out,box-shadow .16s!important
+ }
+ .solitaire-layout #board .card-inner{transition:transform .22s ease-out}
+ .solitaire-layout #board .card-back{
+  border:3px solid #f4faff;border-radius:7px;
+  box-shadow:inset 0 0 0 2px #b3cee2,inset 0 0 0 4px #30568c,0 3px 5px #001b1233
+ }
+ .solitaire-layout #board .card-front{border:1px solid #c7ced2;box-shadow:0 3px 5px #001b122e}
+ .solitaire-layout #board .pile-placeholder{border:2px solid #d7e8e48a;background:#004c2b26}
+}
