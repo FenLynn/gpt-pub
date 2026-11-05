@@ -139,7 +139,7 @@ function setup(){
  const alerts=alertIds.map(id=>document.getElementById(id)).filter(Boolean);
  if(side&&alerts.length){
   const sync=()=>{
-   const urgent=alerts.some(el=>el.offsetHeight>0&&getComputedStyle(el).visibility!=="hidden"&&getComputedStyle(el).display!=="none");
+   const urgent=alerts.some(el=>getComputedStyle(el).visibility!=="hidden"&&getComputedStyle(el).display!=="none"&&!el.hidden);
    if(urgent){setExpanded(true);showNotice("请处理当前游戏操作",false);}
   };
   alerts.forEach(el=>new MutationObserver(sync).observe(el,{childList:true,subtree:true,attributes:true}));
