@@ -62,7 +62,7 @@ const names=[
     isBattleship:el.classList.contains("battleship-layout"),notice:box(el.querySelector("#gs-notice")),
     selectCount:el.querySelectorAll("#gs-hud select").length,
     guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",
-    urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","pendingActions"].some(id=>{const q=el.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
+    urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","playControls","actionPanel","gameControls","pendingActions"].some(id=>{const q=tools?.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
     viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth};
   });
   assert.equal(v.guide,"none",name+" help hints must remain hidden until Help is opened");

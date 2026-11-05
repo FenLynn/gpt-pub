@@ -10,7 +10,7 @@ sheet.href="../shared/workspace.css";
 document.head.appendChild(sheet);
 root.classList.remove("rail-collapsed");
 root.dataset.workspace="r17";
-let hud=null,menu=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false;
+let hud=null,menu=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null;
 function send(action,detail={}){window.GameBridge?.send("CONTROL",{action,...detail});}
 function setExpanded(open){
  const side=root.querySelector(".game-tools");
@@ -142,7 +142,7 @@ function setup(){
   const button=event.target.closest("button[data-action]");
   if(!button)return;
   const action=button.dataset.action;
-  if(action==="tools"){setExpanded(!root.classList.contains("gs-tools-open"));return;}
+  if(action==="tools"){autoToolsOpen=false;setExpanded(!root.classList.contains("gs-tools-open"));return;}
   if(action==="help")send("help");
   else if(action==="pause")send("toggle");
   else send(action);
@@ -159,14 +159,22 @@ function setup(){
   });
   statusNodes.forEach(node=>observer.observe(node,{childList:true,characterData:true,subtree:true}));
  }
- const alertIds=["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","pendingActions"];
- const alerts=alertIds.map(id=>document.getElementById(id)).filter(Boolean);
+ const alertIds=["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","playControls","actionPanel","gameControls","pendingActions"];
+ const alerts=alertIds.map(id=>side?.querySelector("#"+id)).filter(Boolean);
  if(side&&alerts.length){
+  const active=el=>!el.hidden&&getComputedStyle(el).visibility!=="hidden"&&getComputedStyle(el).display!=="none";
   const sync=()=>{
-   const urgent=alerts.some(el=>getComputedStyle(el).visibility!=="hidden"&&getComputedStyle(el).display!=="none"&&!el.hidden);
-   if(urgent){setExpanded(true);showNotice("请处理当前游戏操作",false);}
+   const urgent=alerts.some(active);
+   if(urgent&&!root.classList.contains("gs-tools-open")){
+    autoToolsOpen=true;setExpanded(true);
+    showNotice("请处理当前游戏操作",false);
+   }else if(!urgent&&autoToolsOpen){
+    autoToolsOpen=false;setExpanded(false);
+   }
   };
+  syncUrgentTools=sync;
   alerts.forEach(el=>new MutationObserver(sync).observe(el,{childList:true,subtree:true,attributes:true}));
+  sync();
  }
 }
 function initHud(payload){
@@ -207,6 +215,7 @@ function updateHud(payload){
  next.disabled=!state.ready;
  hud.querySelector("#gs-hud-time").textContent=state.elapsed||"00:00";
  renderOptions();
+ syncUrgentTools?.();
  root.dataset.gsPaused=String(paused);
  if(finished)showNotice("本局结束",true);
  else if(started&&paused)showNotice("已暂停",true);

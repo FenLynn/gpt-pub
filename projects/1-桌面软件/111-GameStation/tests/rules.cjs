@@ -176,7 +176,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await sg.waitForTimeout(30);
   assert.equal((await api()).players[1].hp,1,"AI self-rescue with 酒");
   assert.equal((await api()).players[1].alive,true);
-  // 小乔's 红颜 turns spades into hearts for 天香; damage transfers and target draws.
+  // 小乔's 红颜 turns spades into hearts for 天香; target starts at 3/4 HP, takes 1 damage, then draws 2 cards for 2 lost HP.
   for(let i=0;i<4;i++)await call("clearHand",i);
   await call("addCard",0,"kill","spade");await call("setHp",0,3);await call("setHp",2,3);
   const targetHandBefore=(await api()).players[2].hand.length;
@@ -187,7 +187,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const skillState=await api();
   assert.equal(skillState.players[0].hp,3,"天香 prevents damage to 小乔");
   assert.equal(skillState.players[2].hp,2,"天香 transfers the damage");
-  assert.equal(skillState.players[2].hand.length,targetHandBefore+1,"天香 target draws based on lost HP");
+  assert.equal(skillState.players[2].hand.length,targetHandBefore+2,"天香 target draws two cards for 4 max HP minus 2 remaining HP");
   await sg.close();
   const ddz=await browser.newPage({viewport:{width:1100,height:850}});
   ddz.on("pageerror",err=>errors.push("Dou Dizhu: "+err.message));
