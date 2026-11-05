@@ -1573,3 +1573,23 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
 .checkers-layout .checkers-disc.just-hopped{animation:r18-checker-land .22s ease-out both}
 @keyframes r18-checker-land{from{transform:scale(.72) translateY(-10%);opacity:.7}to{transform:scale(1) translateY(0);opacity:1}}
 @media(prefers-reduced-motion:reduce){.reversi-layout .reversi-disc.just-flipped,.connect4-layout .connect4-disc.just-dropped,.checkers-layout .checkers-disc.just-hopped{animation:none!important}}
+
+
+/* R18 · Chinese Checkers: crisp 121-hole star; local SVG tokens and two-player modes. */
+.chinese-checkers-layout #board.star-checkers-board{
+ display:block;width:min(100cqw,calc(100cqh * 10 / 9))!important;
+ height:min(100cqh,calc(100cqw * 9 / 10))!important;max-width:100%;max-height:100%;
+ aspect-ratio:10/9;overflow:visible;filter:drop-shadow(0 9px 15px #32465c30)
+}
+.chinese-checkers-layout .game-main-board{background:radial-gradient(circle at 50% 44%,#fbf2df,#e8d3ac 86%)!important}
+.chinese-checkers-layout .star-center{fill:#f4e7cc;stroke:#e7cfaa;stroke-width:4}
+.chinese-checkers-layout .star-hole{fill:#fff9ec;stroke:#9d856b;stroke-width:2.5;cursor:pointer;transition:fill .12s,stroke .12s}
+.chinese-checkers-layout .star-hole.arm-0{fill:#f8d0c7}.chinese-checkers-layout .star-hole.arm-3{fill:#cadef2}
+.chinese-checkers-layout .star-hole.arm-1,.chinese-checkers-layout .star-hole.arm-4{fill:#e3eccc}
+.chinese-checkers-layout .star-hole.arm-2,.chinese-checkers-layout .star-hole.arm-5{fill:#eee1c2}
+.chinese-checkers-layout .star-hole.target{fill:#a5dfb9!important;stroke:#288660;stroke-width:5}
+.chinese-checkers-layout .star-hole.picked{stroke:#eaa642;stroke-width:6}
+.chinese-checkers-layout .star-hole:focus-visible{stroke:#3b7ca6;stroke-width:5;outline:none}
+.chinese-checkers-layout .star-token{stroke-width:3;filter:drop-shadow(1px 3px 3px #263e584c)}
+.chinese-checkers-layout .star-token.token-0{fill:#dc6458;stroke:#a73a3e}
+.chinese-checkers-layout .star-token.token-1{fill:#609bd2;stroke:#32669d}

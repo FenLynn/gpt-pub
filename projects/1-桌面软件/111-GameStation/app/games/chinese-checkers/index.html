@@ -1,0 +1,6 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>中国跳棋</title><link rel="stylesheet" href="../shared/game.css"></head><body data-game="chinese-checkers">
+<main class="game-root game-layout chinese-checkers-layout" id="game">
+<aside class="game-guide"><h2>中国跳棋</h2><p>轮流移动十枚棋子，率先将全部棋子迁入对面三角营地者获胜。可以跨过相邻棋子连续跳跃，不吃棋。</p></aside>
+<section class="game-main-board"><div class="board-wrap"><svg id="board" class="star-checkers-board" viewBox="0 0 1000 900" role="group" aria-label="121 孔六角星形中国跳棋"></svg></div></section>
+<aside class="game-tools"><div class="game-tools-heading">对局</div><div id="status" class="game-status" aria-live="polite">准备开始</div><button id="undoButton" class="game-btn">悔棋</button><div class="game-tool-note">点击棋子，选择高亮目标；可从六方向邻格走一步，或隔子连续跳跃。三档 AI 采用不同策略。</div></aside>
+</main><script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js"></script></body></html>
