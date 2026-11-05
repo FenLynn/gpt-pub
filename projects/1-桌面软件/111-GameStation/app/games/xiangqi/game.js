@@ -179,7 +179,9 @@ if(new URLSearchParams(location.search).has("p111Test")){
     const key=keyPosition(board,turn);
     positionTrail=[
      {key,lastMover:null,gaveCheck:false},
+     {key,lastMover:null,gaveCheck:false},
      {key,lastMover:"red",gaveCheck:!!redChecks},
+     {key,lastMover:"black",gaveCheck:!!blackChecks},
      {key,lastMover:"black",gaveCheck:!!blackChecks}
     ];
    }
