@@ -1032,3 +1032,31 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  .contra-layout .game-main-board{background:linear-gradient(145deg,#dbe4e9,#edf2f4);border:1px solid #d3dfe6;border-radius:12px;padding:10px}
  .contra-layout .arcade-canvas{border:3px solid #182d3b;border-radius:4px;box-shadow:0 12px 26px #182d3b35;image-rendering:pixelated}
 }
+
+
+
+/* P111 R11.2 · keep board annotations visible and align the Gomoku star points to its 15×15 intersections */
+@media(min-width:701px){
+ .game-root.game-layout.gomoku-layout>.game-main-board,
+ .game-root.game-layout.xiangqi-layout>.game-main-board,
+ .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
+ .gomoku-layout .gomoku-board{
+  background-color:#e8ca91!important;
+  background-image:
+   radial-gradient(circle at 25.6% 25.6%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 50% 25.6%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 74.4% 25.6%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 25.6% 50%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 50% 50%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 74.4% 50%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 25.6% 74.4%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 50% 74.4%,#795a36 0 2.3px,transparent 2.8px),
+   radial-gradient(circle at 74.4% 74.4%,#795a36 0 2.3px,transparent 2.8px),
+   repeating-linear-gradient(2deg,#f0d7a8 0 7px,#e7c990 7px 14px,#efd4a0 14px 21px),
+   linear-gradient(135deg,#f2d9a7,#dfbd80)!important;
+  background-blend-mode:normal;
+ }
+ .gomoku-layout .gomoku-cell:before,.gomoku-layout .gomoku-cell:after{background:#74512c!important;opacity:.9}
+ .chess-layout .game-main-board{background:linear-gradient(145deg,#dce5ed,#f3f6f8);border:1px solid #d2dee6;border-radius:12px}
+ .chess-layout .chess-frame{filter:drop-shadow(0 8px 14px #26384c20)}
+}
