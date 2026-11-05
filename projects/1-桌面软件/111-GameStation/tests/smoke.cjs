@@ -75,13 +75,19 @@ const games = [
         return !el || (el.classList.contains("done") && Number(getComputedStyle(el).opacity)<0.05);
       });
       await page.evaluate(()=>{
-        document.querySelector("#toast")?.remove();
-        document.querySelector("#stageLoading")?.remove();
+        const toast=document.querySelector("#toast"),loading=document.querySelector("#stageLoading");
+        if(toast){toast.classList.remove("show");toast.style.visibility="hidden";}
+        if(loading)loading.style.visibility="hidden";
       });
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
       const viewport=page.viewportSize();
       const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
       await page.screenshot({path:path.resolve(__dirname,"../p111-smoke-artifacts/games/"+screenshotName+".png")});
+      await page.evaluate(()=>{
+        const toast=document.querySelector("#toast"),loading=document.querySelector("#stageLoading");
+        if(toast)toast.style.visibility="";
+        if(loading)loading.style.visibility="";
+      });
       await page.keyboard.press("p");
       await page.waitForFunction(() => document.querySelector("#pauseButton")?.getAttribute("aria-label") === "继续");
       assert.equal(await page.locator("#startButton").getAttribute("aria-label"), "结束", "pause must not change the start/end action");
