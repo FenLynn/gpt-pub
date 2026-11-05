@@ -29,7 +29,7 @@ function hit(){if(invuln>0||over)return;lives--;invuln=1.6;player.vx=-player.fac
 function finish(win,message){over=true;paused=true;cancelAnimationFrame(raf);report(message);GameBridge.send("GAME_OVER",{message,score,win});draw();}
 function update(dt){
  const c=cfg(),oldBottom=player.y+player.h;
- const left=keys.a||keys.ArrowLeft,right=keys.d||keys.ArrowRight,run=keys.Shift;
+ const left=keys.a||keys.arrowleft,right=keys.d||keys.arrowright,run=keys.Shift;
  const target=(right?1:0)-(left?1:0);if(target){player.vx=target*c.speed*(run?1.35:1);player.face=target;}else player.vx*=Math.pow(.72,dt);
  player.x=Math.max(0,Math.min(WORLD-player.w,player.x+player.vx*dt));
  if(keys.jump&&player.onGround){player.vy=-12.2;player.onGround=false;keys.jump=false;}
