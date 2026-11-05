@@ -558,8 +558,45 @@ const games = [
     assert.equal(sanguoshaLayout.display,"grid","San Guo Sha should use a dedicated battlefield layout");
     assert.equal(sanguoshaLayout.logRow,"2","San Guo Sha battle log should occupy the central play area");
     assert.equal(sanguoshaLayout.handRow,"3","San Guo Sha hand cards should remain at the bottom of the table");
+    const sanguoshaHp = async seat => {
+      const text = await sanguosha.locator(`#players [data-seat="${seat}"]`).innerText();
+      const match = text.match(/♥\\s*(\\d+)\\/\\d+/);
+      assert.ok(match, "Sanguosha player " + seat + " should expose a readable HP value: " + text);
+      return Number(match[1]);
+    };
+    const seedSanguosha = async seed => {
+      await sanguosha.locator("body").evaluate(seedValue => {
+        let state = seedValue >>> 0;
+        Math.random = () => {
+          state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+          return state / 4294967296;
+        };
+      }, seed);
+    };
+
+    // AI without a response card: one Kill must cause exactly one point of damage.
+    await seedSanguosha(1);
+    await page.locator("#newGameButton").click();
+    assert.ok((await sanguosha.locator(".playing-card").allInnerTexts()).some(text => text.startsWith("杀")), "seeded Xiao Qiao hand should contain a Kill");
+    assert.equal(await sanguoshaHp(2), 4, "AI 2 should start at four HP");
+    await sanguosha.locator(".playing-card").filter({ hasText: /^杀/ }).first().click();
+    await sanguosha.locator("#targetPanel [data-target='2']").click();
+    await page.waitForTimeout(60);
+    assert.equal(await sanguoshaHp(2), 3, "an AI without 闪 must lose exactly one HP to 杀, not two");
+
+    // Human has 闪 but chooses not to respond: the caller must still apply damage only once.
+    await seedSanguosha(437727);
+    await page.locator("#difficultyControl button[data-difficulty='easy']").click();
+    const seededHumanHand = await sanguosha.locator(".playing-card").allInnerTexts();
+    assert.ok(seededHumanHand.some(text => text.startsWith("闪")), "second deterministic deal should give Xiao Qiao a 闪 response");
+    assert.ok(seededHumanHand.every(text => !/[♥♠]/.test(text)), "second deterministic deal should not expose Tianxiang cards");
+    assert.equal(await sanguoshaHp(0), 3, "Xiao Qiao should start the response regression at three HP");
     await sanguosha.locator("#endTurn").click();
-    await page.waitForTimeout(150);
+    await sanguosha.locator("#responseBar").waitFor({ state: "visible", timeout: 10000 });
+    await sanguosha.locator("#respondNo").click();
+    await sanguosha.locator('#players [data-seat="0"]').filter({ hasText: "♥ 2/3" }).waitFor({ state: "visible", timeout: 10000 });
+    assert.equal(await sanguoshaHp(0), 2, "declining 闪 must apply exactly one point of damage");
+
 
     await page.locator('[data-category="all"]').click();
     // This project is being validated as a desktop web application; mobile layout is intentionally out of scope.

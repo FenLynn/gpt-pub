@@ -41,8 +41,26 @@ function applyDamageNow(target,amount,source,done){const p=players[target];if(!p
 function damage(target,amount,source,done){if(target===0&&players[0].alive){const hearts=players[0].hand.filter(c=>heartCard(c,0));if(hearts.length){pendingTianxiang={amount,source,done,hearts};render();log("天香：可以转移伤害");return;}}applyDamageNow(target,amount,source,done);}
 function resolveTianxiang(cardId,target){if(!pendingTianxiang||paused)return;const p=pendingTianxiang,card=removeCard(0,cardId);if(!card)return;pendingTianxiang=null;discardPile.push(card);applyDamageNow(target,p.amount,p.source,()=>{if(players[target].alive){drawCards(target,Math.max(0,players[target].maxHp-players[target].hp));log("天香：目标摸牌");}p.done?.();});render();}
 function cancelTianxiang(){if(!pendingTianxiang||paused)return;const p=pendingTianxiang;pendingTianxiang=null;applyDamageNow(0,p.amount,p.source,p.done);render();}
-function requestResponse(target,kind,source,done){const p=players[target],card=findCard(target,kind);if(!p.alive){done(false);return;}if(target===0){if(card){pendingResponse={target,kind,source,done,card};document.getElementById("responseText").textContent="需要响应："+kind;render();}else damage(target,1,source,()=>done(false));return;}const use=card&&(difficulty==="hard"||difficulty==="normal"&&Math.random()>.22||difficulty==="easy"&&Math.random()>.6);if(use){removeCard(target,card.id);discardPile.push(card);log("AI "+target+" 使用 "+kind+" 响应");done(true);}else damage(target,1,source,()=>done(false));}
-function respondHuman(use){if(!pendingResponse||paused)return;const p=pendingResponse;pendingResponse=null;if(use){removeCard(0,p.card.id);discardPile.push(p.card);log("你使用 "+p.kind+" 响应");p.done(true);}else{damage(0,1,p.source,()=>p.done(false));}render();}
+// Response resolution reports whether a card was consumed; the effect caller owns damage.
+function requestResponse(target,kind,source,done){
+ const p=players[target],card=findCard(target,kind);
+ if(!p.alive){done(false);return;}
+ if(target===0){
+  if(card){pendingResponse={target,kind,source,done,card};document.getElementById("responseText").textContent="需要响应："+kind;render();}
+  else done(false);
+  return;
+ }
+ const use=card&&(difficulty==="hard"||difficulty==="normal"&&Math.random()>.22||difficulty==="easy"&&Math.random()>.6);
+ if(use){removeCard(target,card.id);discardPile.push(card);log("AI "+target+" 使用 "+kind+" 响应");done(true);}
+ else done(false);
+}
+function respondHuman(use){
+ if(!pendingResponse||paused)return;
+ const p=pendingResponse;pendingResponse=null;
+ if(use){removeCard(0,p.card.id);discardPile.push(p.card);log("你使用 "+p.kind+" 响应");p.done(true);}
+ else p.done(false);
+ render();
+}
 function heal(seat,n){const p=players[seat];if(!p.alive)return;const old=p.hp;p.hp=Math.min(p.maxHp,p.hp+n);if(p.hp>old)log((seat===0?"小乔":seat===lordSeat?"主公":"AI "+seat)+" 回复体力");}
 function randomCard(seat){const h=players[seat].hand;if(!h.length)return null;return h[Math.floor(Math.random()*h.length)];}
 function discardRandom(seat){const c=randomCard(seat);if(c){removeCard(seat,c.id);discardPile.push(c);}}
