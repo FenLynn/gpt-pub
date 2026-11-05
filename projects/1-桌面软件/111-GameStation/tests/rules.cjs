@@ -168,7 +168,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await api()).players[2].alive,true);
   // AI may use 酒 only to save itself when dying.
   for(let i=0;i<4;i++)await call("clearHand",i);
-  await call("addCard",1,"wine","club");await call("setHp",1,1);await call("damage",1,2,2);
+  await call("addCard",1,"wine","club");await call("setHp",1,2);await call("damage",1,2,2);
   await sg.waitForTimeout(30);
   assert.equal((await api()).players[1].hp,1,"AI self-rescue with 酒");
   assert.equal((await api()).players[1].alive,true);
