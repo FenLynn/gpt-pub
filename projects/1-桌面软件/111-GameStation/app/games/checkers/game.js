@@ -12,7 +12,26 @@ function evaluate(a,p){let score=0;for(let y=0;y<8;y++)for(let x=0;x<8;x++){cons
 function choose(ms){if(!ms.length)return null;if(difficulty==="easy")return ms[Math.floor(Math.random()*ms.length)];let best=-Infinity,choices=[];for(const m of ms){const n=clone(b),result=apply(n,m);let value=evaluate(n,2)+(result.capture?16:0)+(result.promoted?35:0)+(m.tx>=2&&m.tx<=5?3:0);if(difficulty==="hard"){const replies=moves(n,1);let worst=Infinity;for(const r of replies){const q=clone(n);apply(q,r);worst=Math.min(worst,evaluate(q,2));}if(replies.length)value=worst+(result.capture?14:0)+(result.promoted?30:0);}value+=Math.random()*.02;if(value>best){best=value;choices=[m];}else if(value===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
 function report(t){status.textContent=t;GameBridge.report(t,{score:counts(b)[0]});}
 function finishIfNeeded(){const [red,black]=counts(b);if(!red||!moves(b,1).length){over=true;report("黑方获胜");GameBridge.send("GAME_OVER",{message:"黑方获胜",score:black,win:false});return true;}if(!black||!moves(b,2).length){over=true;report("红方获胜");GameBridge.send("GAME_OVER",{message:"红方获胜",score:red,win:true});return true;}return false;}
-function render(){el.innerHTML="";const targets=new Set(legal.map(m=>m.tx+","+m.ty));for(let y=0;y<8;y++)for(let x=0;x<8;x++){const q=document.createElement("button");q.className="game-cell";q.style.width="clamp(35px,6.8vw,54px)";q.style.height="clamp(35px,6.8vw,54px)";q.style.borderRadius="2px";q.style.background=(x+y)%2?"#8b9aaf":"#e9edf2";if(selected&&selected.x===x&&selected.y===y)q.style.outline="2px solid #4e9b78";if(targets.has(x+","+y))q.style.boxShadow="inset 0 0 0 3px #73b99b";const v=b[y][x];if(v){q.textContent=(v===3||v===4)?"♛":"";q.style.width="clamp(28px,5.3vw,42px)";q.style.height="clamp(28px,5.3vw,42px)";q.style.borderRadius="50%";q.style.background=side(v)===1?"radial-gradient(circle at 30% 25%,#f5a69a,#bd554e)":"radial-gradient(circle at 30% 25%,#596a80,#26354a)";q.style.border="2px solid #ffffffb0";q.style.color="#fff";}q.onclick=()=>click(x,y);el.appendChild(q);}const [r,k]=counts(b);document.getElementById("red").textContent=r;document.getElementById("black").textContent=k;}
+function render(){
+ el.innerHTML="";
+ const targets=new Set(legal.map(m=>m.tx+","+m.ty));
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+  const cell=document.createElement("button");cell.type="button";
+  cell.className="game-cell checkers-square "+((x+y)%2?"dark":"light");
+  const v=b[y][x];
+  if(selected&&selected.x===x&&selected.y===y)cell.classList.add("selected");
+  if(targets.has(x+","+y))cell.classList.add("valid");
+  if(v){
+   const checker=document.createElement("span");
+   checker.className="checkers-disc "+(side(v)===1?"red":"black")+(v===3||v===4?" king":"");
+   if(v===3||v===4)checker.textContent="♛";
+   checker.setAttribute("aria-hidden","true");cell.appendChild(checker);
+  }
+  cell.setAttribute("aria-label",(x+1)+"列"+(y+1)+"行"+(v?((side(v)===1?"红":"黑")+(v>2?"王棋":"方棋")):"空位"));
+  cell.addEventListener("click",()=>click(x,y));el.appendChild(cell);
+ }
+ const [r,k]=counts(b);document.getElementById("red").textContent=r;document.getElementById("black").textContent=k;
+}
 function switchTurn(){continuing=null;selected=null;legal=[];turn=3-turn;if(finishIfNeeded())return;if(mode==="ai"&&turn===2){report("黑方思考中");scheduleAI();}else{legal=moves(b,turn);render();report(turn===1?"红方回合":"黑方回合");}}
 function afterStep(m,result){if(result.capture&&!result.promoted){const more=pieceMoves(b,m.tx,m.ty).filter(x=>x.capture);if(more.length){continuing={x:m.tx,y:m.ty};selected=continuing;legal=more;render();report(turn===1?"必须继续吃子":"AI 连续吃子");if(turn===2)scheduleAI(true);return;}}switchTurn();}
 function scheduleAI(chain){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const ms=chain&&continuing?pieceMoves(b,continuing.x,continuing.y).filter(m=>m.capture):moves(b,2);if(!ms.length){switchTurn();return;}const m=choose(ms),result=apply(b,m);afterStep(m,result);},difficulty==="easy"?220:360);}
