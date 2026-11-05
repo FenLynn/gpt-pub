@@ -494,7 +494,15 @@ const games = [
     await page.locator("#newGameButton").click();
     // NEW_GAME and RESUME cross the iframe boundary asynchronously. Wait for
     // the resumed, freshly spawned piece before sending deterministic inputs.
-    await tetris.locator('#canvas[data-paused="false"][data-piece-y="0"]').waitFor({ state: "attached", timeout: 3000 });
+    let freshTetrisReady=false;
+    for(let attempt=0;attempt<40;attempt++){
+      const scoreText=(await tetris.locator("#score").innerText()).trim();
+      const pausedState=await tetris.locator("#canvas").getAttribute("data-paused");
+      const pieceY=await tetris.locator("#canvas").getAttribute("data-piece-y");
+      if(scoreText==="0"&&pausedState==="false"&&pieceY==="0"){freshTetrisReady=true;break;}
+      await page.waitForTimeout(25);
+    }
+    assert.ok(freshTetrisReady,"Tetris must finish NEW_GAME and RESUME before deterministic hard drops");
     for(let i=0;i<3;i++){
       const before=Number(await tetris.locator("#score").innerText());
       await tetris.locator("#canvas").press("Space");
