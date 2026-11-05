@@ -100,7 +100,8 @@ document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111StarTest={
-  count:()=>nodes.size,arms:()=>arms.map(a=>a.length),state:()=>({pieces:pieces.size,turn,over,red:own(0).length,blue:own(1).length}),
+  count:()=>nodes.size,arms:()=>arms.map(a=>a.length),state:()=>({pieces:pieces.size,turn,over,red:own(0).length,blue:own(1).length,positions:[...pieces.entries()]}),
+  setPieces:entries=>{pieces=new Map(entries);turn=0;paused=false;over=false;history=[];selected=null;targets.clear();draw();},undo,
   moves:seat=>allMoves(seat),move:m=>apply(m),aiProfile,mode:v=>{mode=v;},difficulty:v=>{difficulty=v;}
  };
 }

@@ -149,7 +149,8 @@ if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111FlightTest={
   track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),
-  setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},setPawns:v=>{pawns=v.map(r=>r.slice());draw();}
+  setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},undo,
+  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;paused=false;over=false;history=[];draw();}
  };
 }
 GameBridge.register({
