@@ -492,8 +492,16 @@ const games = [
       window.Math.random = () => 0.5; // SHAPES[3] = O piece
     });
     await page.locator("#newGameButton").click();
-    await tetris.locator("#canvas").evaluate(el=>el.focus());
-    for(let i=0;i<3;i++)await page.keyboard.press("Space");
+    // NEW_GAME and RESUME cross the iframe boundary asynchronously. Wait for
+    // the resumed, freshly spawned piece before sending deterministic inputs.
+    await tetris.locator('#canvas[data-paused="false"][data-piece-y="0"]').waitFor({ state: "attached", timeout: 3000 });
+    for(let i=0;i<3;i++){
+      const before=Number(await tetris.locator("#score").innerText());
+      await tetris.locator("#canvas").press("Space");
+      const after=Number(await tetris.locator("#score").innerText());
+      assert.ok(after>before,"Tetris hard drop "+(i+1)+" should lock a piece and increase the score");
+    }
+    assert.equal(Number(await tetris.locator("#score").innerText()),96,"three deterministic O-piece drops should create a six-row stack");
     let stackGrounded=false;
     for(let i=0;i<20;i++){
       const canFall=await tetris.locator("#canvas").getAttribute("data-piece-can-fall");
