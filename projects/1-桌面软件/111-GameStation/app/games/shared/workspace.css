@@ -1,0 +1,95 @@
+/* P111 R16 · one full-height game surface instead of a fixed three-column dashboard. */
+html,body,body[data-game],#game{width:100%;height:100%;margin:0;overflow:hidden;background:#eaf2f8!important}
+.game-root.game-layout,.game-root.game-layout.card-table-layout,.game-root.game-layout.solitaire-layout,
+.game-root.game-layout.rail-collapsed,.game-root.game-layout.card-table-layout.rail-collapsed{
+position:relative!important;display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+grid-template-rows:52px minmax(0,1fr)!important;gap:0!important;padding:0!important;margin:0!important;
+height:100%!important;min-height:0!important;max-height:100%!important;width:100%!important;
+overflow:hidden!important;background:#eaf2f8!important;align-items:stretch!important;justify-items:stretch!important}
+.game-root.game-layout>.game-guide{display:none!important}
+.game-root.game-layout>.game-main-board,.game-root.game-layout.rail-collapsed>.game-main-board{
+grid-column:1!important;grid-row:2!important;width:100%!important;height:100%!important;
+min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;
+margin:0!important;padding:0!important;display:grid!important;place-items:center!important;
+overflow:hidden!important;position:relative!important;container-type:size!important;container-name:playarea!important;
+border:0!important;border-radius:0!important;box-shadow:none!important}
+.game-root.game-layout>.game-main-board>.board-wrap,
+.game-root.game-layout>.game-main-board>.canvas-panel,
+.game-root.game-layout>.game-main-board>.game-panel{
+width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;
+min-width:0!important;min-height:0!important;display:grid!important;place-items:center!important;
+margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+box-shadow:none!important;overflow:hidden!important;background:transparent!important}
+.game-root.game-layout>.game-tools{
+position:absolute!important;z-index:31!important;top:60px!important;right:10px!important;left:auto!important;bottom:auto!important;
+grid-column:auto!important;grid-row:auto!important;display:none!important;
+width:min(345px,calc(100% - 20px))!important;height:auto!important;min-height:0!important;
+max-height:calc(100% - 73px)!important;padding:13px!important;margin:0!important;gap:9px!important;
+border:1px solid #cadce7!important;border-radius:12px!important;background:#fffffffa!important;
+box-shadow:0 14px 40px #203f5666!important;overflow-x:hidden!important;overflow-y:auto!important;
+backdrop-filter:blur(12px)}
+.game-root.game-layout.gs-tools-open>.game-tools,
+.game-root.game-layout.gs-tools-open.rail-collapsed>.game-tools{display:flex!important;flex-direction:column!important}
+.game-root.game-layout .game-tool-note,.game-root.game-layout .game-guide-kicker{display:none!important}
+.gs-hud{
+grid-column:1!important;grid-row:1!important;position:relative;z-index:35;display:flex;align-items:center;
+gap:12px;width:100%;height:52px;min-width:0;padding:0 clamp(10px,1.5vw,22px);
+border-bottom:1px solid #d5e4ee;background:#f7fafde8;color:#33536a;font-size:12px;user-select:none}
+.gs-hud-left{flex:0 1 auto;display:flex;align-items:center;gap:11px;min-width:0;max-width:36%}
+.gs-hud-name{font-size:14px;color:#23465d;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gs-hud-status{font-size:11px;color:#6e8596;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gs-hud-controls{display:flex;align-items:center;gap:6px;min-width:0;margin-left:auto}
+.gs-hud-options{display:flex;gap:6px;min-width:0}
+.gs-hud-select{height:30px;max-width:110px;min-width:0;padding:0 8px;border:1px solid #d5e2ea;
+border-radius:7px;background:#fff;color:#46647b;font-size:11px;font-weight:680}
+.gs-hud-time{font:700 13px/1 Consolas,"Segoe UI",monospace;color:#496c82;white-space:nowrap;
+padding:0 8px;font-variant-numeric:tabular-nums}
+.gs-hud-button{height:31px;flex:none;min-width:44px;padding:0 10px;border:1px solid #d6e3eb;
+border-radius:8px;background:white;color:#426680;font-size:12px;font-weight:740}
+.gs-hud-button:hover:not(:disabled){background:#edf6fb;border-color:#a7c9dd}
+.gs-hud-button[data-action="pause"]{border-color:#b5d5e5;background:#e6f3fb;color:#246f9d}
+.gs-hud-button[data-action="start"].is-running{border-color:#edc5c0;background:#fff1ed;color:#a95249}
+.gs-hud-button:disabled{opacity:.45;cursor:not-allowed}
+.gs-hud-button[aria-expanded="true"]{background:#dceffb;color:#1d6c99}
+.gs-hud-button[hidden]{display:none!important}
+.game-root.game-layout .game-tools .game-btn{width:100%;min-height:33px}
+.game-root.game-layout.card-table-layout>.game-main-board,
+.game-root.game-layout.solitaire-layout>.game-main-board{
+border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important}
+.game-root.game-layout.card-table-layout .card-table-main{width:100%;height:100%;min-height:0;min-width:0}
+.tetris-layout .arcade-canvas{width:auto!important;height:min(100cqh,calc(100cqw * 2))!important;
+max-width:100%!important;max-height:100%!important;aspect-ratio:1/2!important;object-fit:contain!important}
+.snake-layout .arcade-canvas{width:min(100cqw,100cqh)!important;height:min(100cqw,100cqh)!important;max-height:100%!important}
+.pong-layout .arcade-canvas,.contra-layout .arcade-canvas,
+.mario-layout .arcade-canvas,.tank-layout .arcade-canvas{
+display:block!important;width:min(100cqw,calc(100cqh * 16 / 9))!important;
+height:min(100cqh,calc(100cqw * 9 / 16))!important;max-width:100%!important;
+max-height:100%!important;aspect-ratio:16/9!important;object-fit:contain!important}
+.mario-layout .canvas-panel,.tank-layout .canvas-panel{border:0!important;box-shadow:none!important;background:transparent!important}
+.minesweeper-layout .game-main-board{overflow:hidden!important}
+.minesweeper-layout .mine-classic{
+width:max-content!important;height:max-content!important;max-width:100%!important;max-height:100%!important;
+display:flex!important;flex-direction:column!important;padding:8px!important;gap:6px!important;
+margin:0 auto!important;overflow:hidden!important;box-sizing:border-box!important}
+.minesweeper-layout .mine-grid{
+width:max-content!important;height:max-content!important;min-height:0!important;max-width:100%!important;
+max-height:none!important;flex:none!important;overflow:hidden!important;margin:0!important;
+grid-template-columns:repeat(var(--cols,16),var(--mine-cell-size))!important;grid-auto-rows:var(--mine-cell-size)!important}
+.minesweeper-layout .mine-cell{
+width:var(--mine-cell-size)!important;height:var(--mine-cell-size)!important;min-width:0!important;
+min-height:0!important;aspect-ratio:1!important}
+.minesweeper-layout .mine-bottom-panel{
+flex:0 0 44px!important;height:44px!important;min-height:44px!important;width:100%!important;
+padding:2px 4px!important;order:2!important;overflow:visible!important}
+.minesweeper-layout #board{order:1!important}
+@media(max-width:1150px){
+.gs-hud{gap:6px;padding:0 8px}.gs-hud-left{max-width:22%}.gs-hud-select{max-width:82px;padding:0 4px}
+.gs-hud-status{display:none}.gs-hud-button{padding:0 7px;min-width:40px}}
+@media(max-width:700px){
+.game-root.game-layout,.game-root.game-layout.card-table-layout,.game-root.game-layout.solitaire-layout{
+grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1fr)!important}
+.gs-hud{height:44px;padding:0 5px;gap:4px}.gs-hud-name{font-size:11px}.gs-hud-left{max-width:15%}
+.gs-hud-controls{gap:3px}.gs-hud-options{gap:3px}.gs-hud-time{display:none}
+.gs-hud-select{height:27px;max-width:65px;font-size:10px}
+.gs-hud-button{height:27px;min-width:34px;padding:0 5px;font-size:10px}
+.game-root.game-layout>.game-tools{top:50px!important;max-height:calc(100% - 60px)!important}}
