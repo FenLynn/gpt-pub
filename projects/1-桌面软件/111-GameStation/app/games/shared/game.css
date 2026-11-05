@@ -1139,3 +1139,62 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
  .mahjong-layout .mahjong-area:before{font-size:clamp(44px,7cqh,78px);opacity:.07}
  .mahjong-layout .mahjong-area .mahjong-melds,.mahjong-layout .mahjong-area .mahjong-discards{z-index:2}
 }
+
+
+
+/* R12 · reference-faithful Windows 7 blue Minesweeper, counters BELOW the board */
+@media(min-width:701px){
+ .minesweeper-layout .game-main-board{padding:clamp(8px,1.2vw,16px)!important}
+ .minesweeper-layout .mine-classic{
+  display:flex;flex-direction:column;gap:10px;
+  padding:12px 12px 8px;border-radius:5px;
+  background:linear-gradient(110deg,#cad9e7,#e2ebf3 50%,#c9d7e4);
+  border:1px solid #869fb3;box-shadow:inset 0 1px #fff,0 8px 20px #1f3e5838;
+  overflow:hidden;max-width:100%;max-height:100%;
+ }
+ .minesweeper-layout .mine-grid{
+  order:1;flex:none;margin:0 auto;
+  padding:4px;gap:1px;border:2px solid #365778;border-radius:0;
+  background:#30588f;box-shadow:inset 0 0 0 1px #9eb4c7,0 2px 5px #34526a33;
+  max-height:calc(100% - 63px)
+ }
+ .minesweeper-layout .mine-cell{
+  border:1px solid #2e5b9f;border-radius:1px;
+  background:linear-gradient(145deg,#daf0fd 0%,#9cd2ef 34%,#438ed9 73%,#3265bd 100%);
+  box-shadow:inset 1px 1px #f4faff,inset -2px -2px #174b985e;
+  text-shadow:0 1px #ffffffac;
+ }
+ .minesweeper-layout .mine-cell:hover:not(.open){background:linear-gradient(145deg,#f4fcff 0%,#c1e6fa 35%,#5aa1eb 83%,#3e6cc5 100%)}
+ .minesweeper-layout .mine-cell.open{
+  background:linear-gradient(150deg,#fbfcff 0%,#e0e7ef 100%);
+  border:1px solid #91a7bb;box-shadow:inset 0 0 0 1px #f3f8fd;filter:none
+ }
+ .minesweeper-layout .mine-cell.flag{color:#d82d2e;font-weight:850;text-shadow:1px 1px #fff}
+ .minesweeper-layout .mine-bottom-panel{
+  order:2;flex:none;height:45px;min-height:45px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  padding:3px 5px!important;border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important
+ }
+ .minesweeper-layout .mine-bottom-stat{display:flex;align-items:center;gap:9px}
+ .minesweeper-layout .mine-bottom-panel .mine-counter{
+  width:60px;height:34px;border:2px solid #a8bdcf;border-radius:7px;
+  background:linear-gradient(180deg,#11395e 0%,#256297 49%,#0d3155 100%);
+  color:#f5faff;font:700 25px/30px "Consolas","Segoe UI",monospace;
+  text-align:center;letter-spacing:1px;
+  box-shadow:inset 0 1px 4px #092c50,0 1px 3px #516f9d55;
+  text-shadow:0 1px 2px #071f43
+ }
+ .minesweeper-layout .mine-bottom-panel .mine-medallion{
+  display:grid;place-items:center;width:33px;height:33px;flex:none;
+  border:2px solid #a2b8c9;border-radius:50%;
+  background:radial-gradient(circle at 36% 27%,#fff 0%,#dae5ec 49%,#9fb3c3 100%);
+  color:#415e78;font-size:21px;font-weight:800;
+  box-shadow:inset 0 0 0 2px #f8fcff,0 1px 3px #3c597b4d
+ }
+ .minesweeper-layout .mine-bottom-panel .mine-face{
+  width:34px;height:34px;border:2px solid #9bb5c8;border-radius:50%;
+  background:radial-gradient(circle at 36% 27%,#fff,#d7e6f0 61%,#95acbd);
+  font-size:20px;box-shadow:inset 0 0 0 2px #fff,0 2px 4px #4c668035
+ }
+}
