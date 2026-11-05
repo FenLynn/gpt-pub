@@ -156,6 +156,12 @@ function isConsecutive(ranks) {
 function classify(cards) {
   const n = cards.length;
   if (n === 0) return null;
+  const seenIds = new Set();
+  for (let i = 0; i < n; i++) {
+    const id = cards[i];
+    if (!Number.isInteger(id) || id < 0 || id >= DECK_SIZE || seenIds.has(id)) return null;
+    seenIds.add(id);
+  }
 
   const cnt = new Int8Array(RANK_COUNT);
   let maxRank = -1;
@@ -735,7 +741,7 @@ function nextBid(game, seat, score) {
 
 /** 定地主：发底牌、地主首出 */
 function startPlay(game) {
-  if (game.landlord < 0) return false;
+  if (game.phase !== "bidding" || game.landlord < 0 || game.bids.every((b) => b === null)) return false;
   game.hands[game.landlord] = sortHand(game.hands[game.landlord].concat(game.bottom));
   game.phase = 'playing';
   game.turn = game.landlord;
@@ -754,6 +760,17 @@ function play(game, seat, cards) {
   if (game.over) return { legal: false, reason: '对局已结束' };
   if (seat !== game.turn) return { legal: false, reason: '还没轮到你出牌' };
   if (!cards || cards.length === 0) return { legal: false, reason: '请选择要出的牌' };
+
+  // Exact card-id membership and uniqueness: rank counts alone must not allow
+  // the same physical card to be submitted twice.
+  const seenIds = new Set();
+  for (let i = 0; i < cards.length; i++) {
+    const id = cards[i];
+    if (!Number.isInteger(id) || id < 0 || id >= DECK_SIZE || seenIds.has(id) || !game.hands[seat].includes(id)) {
+      return { legal: false, reason: "所选牌不存在或重复" };
+    }
+    seenIds.add(id);
+  }
 
   // 手牌包含校验
   const have = countsOf(game.hands[seat]);
