@@ -72,7 +72,7 @@ function bulletHitTank(b,t){
 function update(dt){
  const c=cfg();
  if(player.alive){
-  const want=keys.ArrowUp||keys.w?"up":keys.ArrowDown||keys.s?"down":keys.ArrowLeft||keys.a?"left":keys.ArrowRight||keys.d?"right":null;
+  const want=keys.arrowup||keys.w?"up":keys.arrowdown||keys.s?"down":keys.arrowleft||keys.a?"left":keys.arrowright||keys.d?"right":null;
   if(want){player.dir=want;moveTimer+=dt;if(moveTimer>=.12){move(player,want);moveTimer=0;}}
   else moveTimer=0;
   fireTimer+=dt;if(keys.fire&&fireTimer>.38){fire(player);fireTimer=0;}
