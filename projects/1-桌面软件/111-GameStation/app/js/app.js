@@ -230,7 +230,7 @@ document.addEventListener("keydown",e=>{
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
- if(!active||!ready||e.repeat||editable||e.key!=="Enter")return;
+ if(!active||!ready||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
  if(target&&target.closest("button,a,[role='button']"))return;
  e.preventDefault();toggleGamePause();
 });

@@ -102,7 +102,7 @@ function isGameplayKey(key){return key===" "||key.startsWith("Arrow")||/^[a-z0-9
 function stopCapturedEvent(event){event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();}
 function handleHostShortcut(event){
  if(disposed||!sessionId||!event.isTrusted||event.repeat||isEditableTarget(event.target))return;
- if(event.key==="Enter"){stopCapturedEvent(event);send("HOTKEY",{action:"toggle"});return;}
+ if(event.key==="Enter"||event.key.toLowerCase()==="p"){stopCapturedEvent(event);send("HOTKEY",{action:"toggle"});return;}
  if(timerPaused&&isGameplayKey(event.key)){
   stopCapturedEvent(event);
   pendingKey={key:event.key,code:event.code,shiftKey:event.shiftKey,ctrlKey:event.ctrlKey,altKey:event.altKey,metaKey:event.metaKey};
