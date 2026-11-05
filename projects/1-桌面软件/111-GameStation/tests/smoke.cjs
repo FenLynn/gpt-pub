@@ -182,6 +182,7 @@ const games = [
     await openGame("记忆翻牌");
     const memory = page.frameLocator("#gameFrame");
     assert.equal(await memory.locator(".game-cell").count(), 16);
+    assert.equal(await memory.locator(".memory-card.face-down").count(),16,"memory cards should have blue card backs");
     await memory.locator(".game-cell").nth(0).click();
     await memory.locator(".game-cell").nth(1).click();
     assert.equal(await memory.locator("#moves").innerText(), "1");
@@ -215,6 +216,8 @@ const games = [
     await openGame("海战棋");
     const battleship = page.frameLocator("#gameFrame");
     assert.equal(await battleship.locator("#enemy .game-cell").count(), 100);
+    assert.equal(await battleship.locator("#own .sea-cell").count(),100,"player naval grid must contain 100 styled cells");
+    assert.ok(await battleship.locator("#own .sea-cell.ship").count()>0,"visible fleet must use its own steel hull palette");
     await battleship.locator("#enemy .game-cell").first().click();
 
     await openGame("数独");
@@ -415,6 +418,8 @@ const games = [
     await openGame("经典纸牌");
     const solitaire = page.frameLocator("#gameFrame");
     assert.equal(await solitaire.locator("#board .card").count(), 52);
+    const solitaireStockY=await solitaire.locator("#ph-stock").evaluate(el=>el.getBoundingClientRect().top-el.closest(".solitaire-table").getBoundingClientRect().top);
+    assert.ok(solitaireStockY>=0&&solitaireStockY<145,"Klondike stock must stay near the TOP of the felt table");
     const solitaireCardWidth=await solitaire.locator("#board .card").first().evaluate(el=>el.getBoundingClientRect().width);
     assert.ok(solitaireCardWidth>=65&&solitaireCardWidth<=90,"Klondike cards should retain classic desktop proportions rather than expand across the whole table");
     await solitaire.locator("#board .card[style*='z-index: 33']").click({force:true});
