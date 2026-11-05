@@ -118,7 +118,7 @@ function draw(){
   ctx.strokeStyle="#ffffff0c";ctx.lineWidth=1;ctx.strokeRect(px+.5,py+.5,T-1,T-1);
  }
  // Base insignia
- const bx=(base.x+.5)*T,by=(base.y+.5)*T;ctx.fillStyle=baseAlive?"#c6a44e":"#4a3b30";ctx.fillRect(bx-15,by-15,30,30);ctx.fillStyle=baseAlive?"#f3d783":"#79685a";ctx.font="bold 25px serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(baseAlive?"★":"×",bx,by+1);
+ const bx=(base.x+.5)*T,by=(base.y+.5)*T;ctx.fillStyle=baseAlive?"#c6a44e":"#4a3b30";ctx.fillRect(bx-15,by-15,30,30);if(baseAlive){ctx.fillStyle="#f6dc91";ctx.fillRect(bx-13,by-3,8,4);ctx.fillRect(bx+5,by-3,8,4);ctx.fillRect(bx-9,by-7,7,4);ctx.fillRect(bx+2,by-7,7,4);ctx.fillRect(bx-4,by-10,8,15);ctx.fillRect(bx-2,by-14,4,5);ctx.fillRect(bx+3,by-12,6,3);ctx.fillRect(bx-5,by+5,3,5);ctx.fillRect(bx+2,by+5,3,5);}else{ctx.fillStyle="#79685a";ctx.fillRect(bx-9,by-2,18,4);ctx.fillRect(bx-2,by-9,4,18);}
  enemies.forEach(drawTank);if(player.alive)drawTank(player);
  bullets.forEach(b=>{ctx.fillStyle=b.enemy?"#ff8158":"#ffe49a";ctx.fillRect(b.x-3,b.y-3,6,6);ctx.fillStyle="#fff";ctx.fillRect(b.x-1,b.y-1,2,2);});
  ctx.fillStyle="#09130f";ctx.fillRect(0,0,W,25);ctx.fillStyle="#e6d69b";ctx.font="bold 12px monospace";ctx.textAlign="left";ctx.fillText("TANK BATTLE  /  01",9,17);ctx.textAlign="right";ctx.fillText("ENEMY "+kills+"/"+MAX_KILLS+"   LIFE "+lives,W-9,17);
