@@ -500,7 +500,12 @@ const games = [
       if(canFall==="false"){stackGrounded=true;break;}
       await page.keyboard.press("ArrowDown");
     }
-    assert.ok(stackGrounded,"Tetris must detect collision with a locked stack, not only the floor");
+    const stackDiagnostic=await tetris.locator("#canvas").evaluate(el=>({
+      canFall:el.dataset.pieceCanFall,pieceY:el.dataset.pieceY,pieceTop:el.dataset.pieceTop,
+      visualBottom:el.dataset.pieceVisualBottom,logicalBottom:el.dataset.pieceLogicalBottom,
+      fraction:el.dataset.pieceRenderFraction,score:document.querySelector("#score")?.textContent
+    }));
+    assert.ok(stackGrounded,"Tetris must detect collision with a locked stack, not only the floor; "+JSON.stringify(stackDiagnostic));
     const stackState=await tetris.locator("#canvas").evaluate(el=>({
       canFall:el.dataset.pieceCanFall,
       visualBottom:Number(el.dataset.pieceVisualBottom),
