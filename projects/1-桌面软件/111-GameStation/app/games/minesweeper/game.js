@@ -5,7 +5,7 @@ const boardEl=document.getElementById("board"),status=document.getElementById("s
 const timerEl=document.getElementById("timer"),levelEl=document.getElementById("level"),openedEl=document.getElementById("openedCount"),remainingEl=document.getElementById("remaining"),face=document.getElementById("reset");
 const gameArea=document.querySelector(".game-main-board");
 let cells=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,timerId=null,resizeObserver=null;
-function formatCounter(value){const n=String(value);return n.length>=3?n.slice(-3):n.padStart(3,"0");}
+function formatCounter(value){const n=Math.trunc(Number(value)||0);if(n<0)return "-"+String(Math.min(99,Math.abs(n))).padStart(2,"0");return String(Math.min(999,n)).padStart(3,"0");}
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score:opened,remaining:MINES-flags});}
 function fitBoard(){
  const rect=gameArea.getBoundingClientRect();
