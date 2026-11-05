@@ -538,6 +538,7 @@ const games = [
     await openGame("三国杀");
     const sanguosha = page.frameLocator("#gameFrame");
     assert.equal(await sanguosha.locator(".playing-card").count(), 6, "Xiao Qiao should start with four cards plus two for the first turn");
+    assert.deepEqual(await sanguosha.locator("#gameLog > div").allInnerTexts(),["你的回合"],"Sanguosha battle history must not record host pause/resume events or duplicate the opening turn");
     const sanguoshaLayout=await sanguosha.locator(".card-table-main").evaluate(el=>({display:getComputedStyle(el).display,logRow:getComputedStyle(el.querySelector(".game-log-panel")).gridRowStart,handRow:getComputedStyle(el.querySelector(".card-hand")).gridRowStart}));
     assert.equal(sanguoshaLayout.display,"grid","San Guo Sha should use a dedicated battlefield layout");
     assert.equal(sanguoshaLayout.logRow,"2","San Guo Sha battle log should occupy the central play area");
