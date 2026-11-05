@@ -18,9 +18,9 @@ function chooseAI(){const list=candidates();if(difficulty==="easy"){const scored
 function finish(p){over=true;const msg=p===1?"黑棋获胜！":"白棋获胜！";setStatus(msg);GameBridge.send("GAME_OVER",{message:p===1?"黑棋获胜":"白棋获胜",score:history.length,win:p===1});}
 function place(x,y,p){if(board[y][x]||over)return false;board[y][x]=p;history.push({x,y,p});render();if(winAt(x,y,p)){finish(p);return true;}if(history.length===N*N){over=true;setStatus("平局");GameBridge.send("GAME_OVER",{message:"平局",score:history.length,win:false});return true;}return true;}
 function scheduleAI(){clearTimeout(aiTimer);if(paused||over||mode!=="ai"||turn!==-1)return;aiTimer=setTimeout(()=>{if(paused||over||turn!==-1)return;const [x,y]=chooseAI();place(x,y,-1);turn=1;if(!over)setStatus("轮到你了 · 黑棋");},difficulty==="easy"?240:difficulty==="normal"?360:480);}
-function play(x,y){if(paused||over||turn!==1)return;if(!place(x,y,1))return;if(mode==="ai"){turn=-1;setStatus("AI 思考中");scheduleAI();}else{turn=-1;setStatus("轮到白棋");}}
+function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const playing=turn;if(!place(x,y,playing))return;if(over)return;turn=-playing;if(mode==="ai"){setStatus("AI 思考中");scheduleAI();}else setStatus(turn===1?"轮到黑棋":"轮到白棋");}
 function newGame(){clearTimeout(aiTimer);for(let y=0;y<N;y++)board[y].fill(0);history=[];turn=1;over=false;paused=false;render();setStatus(mode==="ai"?"你执黑棋，请落子":"黑棋先行");}
-function undo(){if(!history.length||over)return;clearTimeout(aiTimer);const count=mode==="ai"?Math.min(turn===-1?1:2,history.length):1;for(let i=0;i<count;i++){const m=history.pop();board[m.y][m.x]=0;}turn=1;render();setStatus("已悔棋");}
+function undo(){if(!history.length||over||paused)return;clearTimeout(aiTimer);const count=mode==="ai"?Math.min(turn===-1?1:2,history.length):1;let lastSide=1;for(let i=0;i<count;i++){const m=history.pop();board[m.y][m.x]=0;lastSide=m.p;}turn=mode==="ai"?1:lastSide;render();setStatus("已悔棋 · "+(turn===1?"轮到黑棋":"轮到白棋"));}
 undoButton.addEventListener("click",undo);
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(fitBoard);boardObserver.observe(boardArea);}

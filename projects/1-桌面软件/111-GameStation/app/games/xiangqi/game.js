@@ -53,6 +53,7 @@ function search(b,side,depth,alpha,beta,ply){if(!findGeneral(b,"red"))return -10
 function chooseAI(){const ms=legalMoves(board,"black");if(!ms.length)return null;const depth=difficulty==="easy"?1:difficulty==="hard"?3:2;let best=Infinity,choices=[];for(const m of ms){const n=clone(board),captured=apply(n,m);let v=search(n,"red",depth-1,-Infinity,Infinity,1);if(captured)v-=0.01;if(v<best){best=v;choices=[m];}else if(v===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
 function report(t){
  status.textContent=t;
+ document.getElementById("undoButton").disabled=!history.length||paused||over;
  if(turnText&&turnDot){
   const terminal=/获胜|困毙/.test(t)&&over,winner=/红方/.test(t)?"red":"black",side=terminal?winner:turn==="red"?"red":"black";
   turnDot.className="turn-dot "+side;
@@ -104,10 +105,10 @@ function render(){
  el.dataset.pieceCount=String(board.flat().filter(Boolean).length);
  fitBoard();
 }
-function endIfNeeded(){const king=findGeneral(board,turn);if(!king){over=true;const winner=opposite(turn);report(winner==="red"?"红方获胜":"黑方获胜");GameBridge.send("GAME_OVER",{message:winner==="red"?"红方获胜":"黑方获胜",score:winner==="red"?1:0,win:winner==="red"});return true;}const ms=legalMoves(board,turn);if(!ms.length){over=true;const winner=opposite(turn);report(winner==="red"?"红方获胜 · 困毙":"黑方获胜 · 困毙");GameBridge.send("GAME_OVER",{message:winner==="red"?"红方获胜":"黑方获胜",score:winner==="red"?1:0,win:winner==="red"});return true;}return false;}
+function endIfNeeded(){const king=findGeneral(board,turn);if(!king){over=true;const winner=opposite(turn);report(winner==="red"?"红方获胜":"黑方获胜");GameBridge.send("GAME_OVER",{message:winner==="red"?"红方获胜":"黑方获胜",score:winner==="red"?1:0,win:winner==="red"});return true;}const ms=legalMoves(board,turn);if(!ms.length){over=true;const winner=opposite(turn);const label=winner==="red"?"红方":"黑方",reason=inCheck(board,turn)?"将死":"困毙";report(label+"获胜 · "+reason);GameBridge.send("GAME_OVER",{message:label+"获胜 · "+reason,score:winner==="red"?1:0,win:winner==="red"});return true;}return false;}
 function scheduleAI(){clearTimeout(aiTimer);if(paused||over||mode!=="ai"||turn!=="black")return;aiTimer=setTimeout(()=>{if(paused||over||turn!=="black")return;const m=chooseAI();if(!m){endIfNeeded();return;}history.push({board:clone(board),turn});apply(board,m);turn="red";selected=null;selectedMoves=[];render();if(!endIfNeeded())report(inCheck(board,"red")?"红方被将军":"红方回合");},difficulty==="easy"?180:360);}
 function clickCell(x,y){if(paused||over||(mode==="ai"&&turn==="black"))return;const p=board[y][x];if(selected){const m=selectedMoves.find(v=>v.tx===x&&v.ty===y);if(m){history.push({board:clone(board),turn});apply(board,m);selected=null;selectedMoves=[];turn=opposite(turn);render();if(!endIfNeeded()){if(mode==="ai"&&turn==="black"){report(inCheck(board,"black")?"黑方被将军 · AI 思考中":"AI 思考中");scheduleAI();}else report(turn==="red"?"红方回合":"黑方回合");}return;}}if(p&&p.side===turn){selected={x,y};selectedMoves=legalMoves(board,turn).filter(m=>m.fx===x&&m.fy===y);render();report("已选中 "+p.t+" · 选择合法落点");}else{selected=null;selectedMoves=[];render();}}
-function undo(){if(!history.length)return;clearTimeout(aiTimer);let count=mode==="ai"?(turn==="red"?2:1):1;while(count--&&history.length){const h=history.pop();board=h.board;turn=h.turn;}selected=null;selectedMoves=[];over=false;render();report("已悔棋");}
+function undo(){if(!history.length||paused||over)return;clearTimeout(aiTimer);let count=mode==="ai"?(turn==="red"?2:1):1;while(count--&&history.length){const h=history.pop();board=h.board;turn=h.turn;}selected=null;selectedMoves=[];over=false;render();report("已悔棋");}
 function newGame(){clearTimeout(aiTimer);board=initial();turn="red";selected=null;selectedMoves=[];history=[];over=false;paused=false;render();report("红方先行");}
 document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render();});
 document.getElementById("undoButton").addEventListener("click",undo);

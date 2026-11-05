@@ -209,6 +209,17 @@ const games = [
     await page.locator("#newGameButton").click();
     await page.waitForTimeout(100);
     assert.equal(await gomoku.locator(".stone").count(), 0, "host next-round command should reset the module");
+    await page.locator("#modeControl button[data-mode-index='1']").click();
+    await page.waitForTimeout(100);
+    await gomoku.locator(".gomoku-cell").nth(112).click();
+    await gomoku.locator(".gomoku-cell").nth(113).click();
+    assert.equal(await gomoku.locator(".stone.black").count(), 1, "local Gomoku black player should place a stone");
+    assert.equal(await gomoku.locator(".stone.white").count(), 1, "local Gomoku white player must be able to take a turn");
+    await gomoku.locator("#undoButton").click();
+    assert.equal(await gomoku.locator(".stone.white").count(), 0, "local Gomoku undo should remove only the most recent white stone");
+    await gomoku.locator(".gomoku-cell").nth(114).click();
+    assert.equal(await gomoku.locator(".stone.white").count(), 1, "after undo, Gomoku must restore the white player's turn");
+    await page.locator("#modeControl button[data-mode-index='0']").click();
 
     await openGame("扫雷");
     const mines = page.frameLocator("#gameFrame");
@@ -277,6 +288,21 @@ const games = [
     assert.equal(await xiangqi.locator("#turnText").innerText(), "黑方正在思考", "right rail should announce the side to move");
     await page.waitForTimeout(550);
     assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到红方走", "turn indicator should update after the AI move");
+    await page.locator("#modeControl button[data-mode-index='1']").click();
+    await page.waitForTimeout(100);
+    await xiangqi.locator(".xiangqi-cell").nth(82).click();
+    await xiangqi.locator(".xiangqi-cell").nth(75).click();
+    assert.equal(await xiangqi.locator(".xiangqi-cell").nth(82).locator(".xiangqi-piece").innerText(), "马", "Xiangqi horse cannot jump over its occupied leg");
+    await xiangqi.locator(".xiangqi-cell").nth(54).click();
+    await xiangqi.locator(".xiangqi-cell").nth(45).click();
+    assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到黑方走", "local Xiangqi should pass control to black");
+    await xiangqi.locator(".xiangqi-cell").nth(27).click();
+    await xiangqi.locator(".xiangqi-cell").nth(36).click();
+    assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到红方走", "local Xiangqi should pass control back to red");
+    await xiangqi.locator("#undoButton").click();
+    assert.equal(await xiangqi.locator("#turnText").innerText(), "轮到黑方走", "Xiangqi undo should restore the previous mover");
+    assert.equal(await xiangqi.locator(".xiangqi-cell").nth(27).locator(".xiangqi-piece").innerText(), "卒", "Xiangqi undo must restore the captured board state");
+    await page.locator("#modeControl button[data-mode-index='0']").click();
 
     await openGame("经典纸牌");
     const solitaire = page.frameLocator("#gameFrame");
