@@ -63,11 +63,18 @@ const games = [
       assert.ok(frameLayout.width > 200 && frameLayout.height > 250, name + " should receive a usable game area");
       const zones=await page.frameLocator("#gameFrame").locator("#game").evaluate(root=>{
         const guide=root.querySelector(".game-guide"),tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board");
-        return {guide:guide?getComputedStyle(guide).display:"absent",tools:tools?getComputedStyle(tools).display:"absent",main:main?.getBoundingClientRect().width||0,scroll:document.documentElement.scrollHeight};
+        const rr=root.getBoundingClientRect(),tr=tools?.getBoundingClientRect(),mr=main?.getBoundingClientRect();
+        return {guide:guide?getComputedStyle(guide).display:"absent",tools:tools?getComputedStyle(tools).display:"absent",main:mr?.width||0,toolsWidth:tr?.width||0,toolsRight:tr?.right||0,rootRight:rr.right,columns:getComputedStyle(root).gridTemplateColumns,scroll:document.documentElement.scrollHeight};
       });
       assert.notEqual(zones.tools,"none",name+" right-side game actions must remain visible");
+      assert.ok(zones.toolsWidth>150&&zones.toolsRight<=zones.rootRight+2,name+" right rail must have real width and remain inside the game root; "+JSON.stringify(zones));
       if(zones.guide!=="absent"&&page.viewportSize().width>700)assert.notEqual(zones.guide,"none",name+" left-side keyboard and rule guide must remain visible on desktop");
       assert.ok(zones.main>250,name+" central board must retain priority workspace width");
+      await page.waitForFunction(() => {
+        const el=document.querySelector("#stageLoading");
+        return !el || (el.classList.contains("done") && Number(getComputedStyle(el).opacity)<0.05);
+      });
+      await page.locator("#toast").evaluate(el=>el.classList.remove("show"));
       await fs.promises.mkdir(path.resolve(__dirname,"../p111-smoke-artifacts/games"),{recursive:true});
       const viewport=page.viewportSize();
       const screenshotName=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+viewport.width+"x"+viewport.height;
