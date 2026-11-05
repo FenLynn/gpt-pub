@@ -3,7 +3,7 @@
 const boardEl=document.getElementById("board"),frame=document.querySelector(".chess-frame"),statusEl=document.getElementById("turnText");
 const glyph={w:{K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"},b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"}};
 const value={P:100,N:320,B:335,R:500,Q:900,K:20000},files="abcdefgh";
-let board=[],turn="w",mode="ai",difficulty="normal",paused=true,over=false,flip=false,selected=null,legal=[],history=[],moveLog=[],lastMove=null,ep=null,castle={},captured={w:[],b:[]},aiTimer=null;
+let board=[],turn="w",mode="ai",difficulty="normal",paused=true,over=false,flip=false,selected=null,legal=[],history=[],moveLog=[],lastMove=null,ep=null,castle={},captured={w:[],b:[]},aiTimer=null,halfMoves=0,positions=[],promotionChoices=null;
 const opposite=c=>c==="w"?"b":"w";
 const inside=(x,y)=>x>=0&&x<8&&y>=0&&y<8;
 function initialBoard(){
@@ -13,9 +13,9 @@ function initialBoard(){
 }
 function cloneBoard(b){return b.map(row=>row.map(p=>p?{c:p.c,t:p.t}:null));}
 function cloneCastle(c){return{wK:!!c.wK,wQ:!!c.wQ,bK:!!c.bK,bQ:!!c.bQ};}
-function snapshot(){return{board:cloneBoard(board),turn,castle:cloneCastle(castle),ep:ep?{x:ep.x,y:ep.y}:null,moveNo:moveNo,captured:{w:captured.w.slice(),b:captured.b.slice()},moveLog:moveLog.slice(),lastMove:lastMove?{...lastMove}:null};}
+function snapshot(){return{board:cloneBoard(board),turn,castle:cloneCastle(castle),ep:ep?{x:ep.x,y:ep.y}:null,moveNo:moveNo,captured:{w:captured.w.slice(),b:captured.b.slice()},moveLog:moveLog.slice(),lastMove:lastMove?{...lastMove}:null,halfMoves,positions:positions.slice()};}
 let moveNo=1;
-function restore(s){board=cloneBoard(s.board);turn=s.turn;castle=cloneCastle(s.castle);ep=s.ep?{...s.ep}:null;moveNo=s.moveNo;captured={w:s.captured.w.slice(),b:s.captured.b.slice()};moveLog=s.moveLog.slice();lastMove=s.lastMove?{...s.lastMove}:null;selected=null;legal=[];}
+function restore(s){board=cloneBoard(s.board);turn=s.turn;castle=cloneCastle(s.castle);ep=s.ep?{...s.ep}:null;moveNo=s.moveNo;captured={w:s.captured.w.slice(),b:s.captured.b.slice()};moveLog=s.moveLog.slice();lastMove=s.lastMove?{...s.lastMove}:null;halfMoves=s.halfMoves||0;positions=s.positions?s.positions.slice():[];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];}
 function squareName(x,y){return files[x]+String(8-y);}
 function attacked(b,x,y,by){
  for(let sy=0;sy<8;sy++)for(let sx=0;sx<8;sx++){
@@ -39,8 +39,8 @@ function pseudoMoves(b,x,y,color,rights,epSquare){
  const add=(tx,ty,extra={})=>{if(!inside(tx,ty))return;const q=b[ty][tx];if(q&&q.t==="K")return;if(!q||q.c!==color)out.push({fx:x,fy:y,tx,ty,...extra});};
  if(p.t==="P"){
   const d=color==="w"?-1:1,start=color==="w"?6:1,promo=color==="w"?0:7;
-  if(inside(x,y+d)&&!b[y+d][x]){add(x,y+d,{promotion:y+d===promo?"Q":null});if(y===start&&!b[y+2*d][x])add(x,y+2*d,{double:true});}
-  for(const dx of [-1,1]){const tx=x+dx,ty=y+d;if(!inside(tx,ty))continue;const q=b[ty][tx];if(q&&q.c!==color)add(tx,ty,{promotion:ty===promo?"Q":null});else if(epSquare&&epSquare.x===tx&&epSquare.y===ty)add(tx,ty,{enPassant:true});}
+  if(inside(x,y+d)&&!b[y+d][x]){if(y+d===promo){for(const promotion of ["Q","R","B","N"])add(x,y+d,{promotion});}else add(x,y+d);if(y===start&&!b[y+2*d][x])add(x,y+2*d,{double:true});}
+  for(const dx of [-1,1]){const tx=x+dx,ty=y+d;if(!inside(tx,ty))continue;const q=b[ty][tx];if(q&&q.c!==color){if(ty===promo){for(const promotion of ["Q","R","B","N"])add(tx,ty,{promotion});}else add(tx,ty);}else if(epSquare&&epSquare.x===tx&&epSquare.y===ty)add(tx,ty,{enPassant:true});}
  }else if(p.t==="N"){
   for(const [dx,dy] of [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]])add(x+dx,y+dy);
  }else if(p.t==="K"){
@@ -76,15 +76,61 @@ function updateRights(m,moving,captured){
  if(moving.t==="R"){if(m.fx===0&&m.fy===(moving.c==="w"?7:0))castle[moving.c+"Q"]=false;if(m.fx===7&&m.fy===(moving.c==="w"?7:0))castle[moving.c+"K"]=false;}
  if(captured&&captured.t==="R"){const c=captured.c;if(m.tx===0&&m.ty===(c==="w"?7:0))castle[c+"Q"]=false;if(m.tx===7&&m.ty===(c==="w"?7:0))castle[c+"K"]=false;}
 }
+function positionKey(){
+ const cells=board.map(row=>row.map(p=>p?(p.c==="w"?p.t:p.t.toLowerCase()):".").join("")).join("/");
+ const rights=["wK","wQ","bK","bQ"].filter(k=>castle[k]).join("");
+ const epRelevant=ep&&legalMoves(board,turn,castle,ep).some(m=>m.enPassant);
+ return [cells,turn,rights,epRelevant?ep.x+","+ep.y:"-"].join(":");
+}
+function repetitions(){
+ const key=positionKey();return positions.filter(p=>p===key).length;
+}
+function deadPosition(){
+ const minor=[];
+ for(let y=0;y<8;y++)for(let x=0;x<8;x++){
+  const p=board[y][x];if(!p||p.t==="K")continue;
+  if(!["N","B"].includes(p.t))return false;
+  minor.push({type:p.t,squareColor:(x+y)%2});
+ }
+ if(minor.length===0)return true;
+ if(minor.length===1)return true;
+ return minor.every(p=>p.type==="B")&&minor.every(p=>p.squareColor===minor[0].squareColor);
+}
+function canClaimDraw(){return halfMoves>=100||repetitions()>=3;}
+function finishDraw(message){
+ if(over)return;
+ over=true;paused=true;clearTimeout(aiTimer);statusEl.textContent=message;
+ GameBridge.report(message,{score:0});GameBridge.send("GAME_OVER",{message,score:0,win:false});render();
+}
+function choosePromotion(moves){
+ promotionChoices=moves;
+ let chooser=document.getElementById("promotionChooser");
+ if(!chooser){
+  chooser=document.createElement("div");chooser.id="promotionChooser";chooser.className="chess-promotion-chooser";
+  chooser.setAttribute("role","group");chooser.setAttribute("aria-label","选择升变棋子");
+  document.querySelector(".game-main-board").appendChild(chooser);
+ }
+ chooser.innerHTML="";
+ for(const type of ["Q","R","B","N"]){
+  const move=moves.find(m=>m.promotion===type);if(!move)continue;
+  const button=document.createElement("button");button.type="button";button.className="game-btn";
+  button.textContent=glyph[turn][type]+" "+({Q:"后",R:"车",B:"象",N:"马"})[type];
+  button.dataset.promotion=type;
+  button.addEventListener("click",()=>{if(!promotionChoices)return;promotionChoices=null;chooser.remove();makeMove(move,false);});
+  chooser.appendChild(button);
+ }
+ const cancel=document.createElement("button");cancel.type="button";cancel.className="game-btn";
+ cancel.textContent="取消";cancel.onclick=()=>{promotionChoices=null;chooser.remove();};chooser.appendChild(cancel);
+}
 function makeMove(m,quiet){
  const moving=board[m.fy][m.fx],captured=m.enPassant?board[m.fy][m.tx]:board[m.ty][m.tx];
- history.push(snapshot());updateRights(m,moving,captured);applyPosition(board,m,ep);
+ history.push(snapshot());halfMoves=(moving.t==="P"||captured)?0:halfMoves+1;updateRights(m,moving,captured);applyPosition(board,m,ep);
  if(captured)capturedBy(moving.c,captured);
  ep=m.double?{x:m.fx,y:(m.fy+m.ty)/2}:null;
  lastMove={fx:m.fx,fy:m.fy,tx:m.tx,ty:m.ty};
- const notation=(moving.t==="P"?"":moving.t)+squareName(m.fx,m.fy)+(captured?"×":"–")+squareName(m.tx,m.ty)+(m.promotion?"=Q":"")+(m.castle?" O-O":"");
+ const notation=(moving.t==="P"?"":moving.t)+squareName(m.fx,m.fy)+(captured?"×":"–")+squareName(m.tx,m.ty)+(m.promotion?"="+m.promotion:"")+(m.castle?(m.castle==="Q"?" O-O-O":" O-O"):"");
  if(turn==="w")moveLog.push(moveNo+". "+notation);else{const idx=moveLog.length-1;if(idx>=0)moveLog[idx]+="   "+notation;moveNo++;}
- turn=opposite(turn);selected=null;legal=[];render();
+ turn=opposite(turn);positions.push(positionKey());selected=null;legal=[];render();
  if(!quiet&&!checkEnd()){
   reportTurn();
   if(mode==="ai"&&turn==="b")scheduleAI();
@@ -94,7 +140,12 @@ function capturedBy(color,p){captured[color].push(p.t);}
 function checkEnd(){
  const moves=legalMoves(board,turn,castle,ep),check=inCheck(board,turn);
  document.getElementById("checkState").textContent=check?"将军":"正常";
- if(moves.length)return false;
+ if(moves.length){
+  if(deadPosition()){finishDraw("和棋 · 子力不足");return true;}
+  if(halfMoves>=150){finishDraw("和棋 · 75 回合规则");return true;}
+  if(repetitions()>=5){finishDraw("和棋 · 五次重复局面");return true;}
+  return false;
+ }
  over=true;paused=true;clearTimeout(aiTimer);
  const win=opposite(turn)==="w",message=check?(win?"白方将死获胜":"黑方将死获胜"):"和棋 · 逼和";
  statusEl.textContent=message;GameBridge.report(message,{score:win?1:0});GameBridge.send("GAME_OVER",{message,score:win?1:0,win});render();return true;
@@ -128,11 +179,12 @@ function render(){
  const list=document.getElementById("moveList");list.innerHTML="";moveLog.slice(-24).forEach(row=>{const li=document.createElement("li");li.textContent=row;list.appendChild(li);});
  document.getElementById("undoButton").disabled=!history.length||paused;
  document.getElementById("checkState").textContent=inCheck(board,turn)?"将军":"正常";
+ const claim=document.getElementById("drawClaimButton");if(claim){claim.disabled=!canClaimDraw()||paused||over;claim.title=halfMoves>=100?"可按 50 回合规则要求和棋":"可按三次重复局面要求和棋";}
 }
 function clickSquare(x,y){
  if(paused||over||(mode==="ai"&&turn==="b"))return;
  const p=board[y][x];
- if(selected){const m=legal.find(v=>v.tx===x&&v.ty===y);if(m){makeMove(m,false);return;}}
+ if(selected){const candidates=legal.filter(v=>v.tx===x&&v.ty===y);if(candidates.length>1){choosePromotion(candidates);return;}const m=candidates[0];if(m){makeMove(m,false);return;}}
  if(p&&p.c===turn){selected={x,y};legal=legalMoves(board,turn,castle,ep).filter(m=>m.fx===x&&m.fy===y);render();statusEl.textContent="已选中 "+squareName(x,y)+" · 选择落点";}
  else{selected=null;legal=[];render();}
 }
@@ -143,7 +195,7 @@ function undo(){
  over=false;render();reportTurn();
 }
 function newGame(){
- clearTimeout(aiTimer);board=initialBoard();turn="w";castle={wK:true,wQ:true,bK:true,bQ:true};ep=null;moveNo=1;history=[];moveLog=[];lastMove=null;captured={w:[],b:[]};selected=null;legal=[];over=false;paused=false;render();reportTurn();
+ clearTimeout(aiTimer);board=initialBoard();turn="w";castle={wK:true,wQ:true,bK:true,bQ:true};ep=null;moveNo=1;history=[];moveLog=[];lastMove=null;captured={w:[],b:[]};halfMoves=0;positions=[positionKey()];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];over=false;paused=false;render();reportTurn();
 }
 function pause(){paused=true;clearTimeout(aiTimer);statusEl.textContent="已暂停";GameBridge.report("已暂停",{});}
 function resume(){if(over)return;paused=false;reportTurn();if(mode==="ai"&&turn==="b")scheduleAI();}
@@ -151,6 +203,10 @@ function onKey(e){if(e.key==="Escape"){selected=null;legal=[];render();}if(e.key
 document.addEventListener("keydown",onKey);
 document.getElementById("flipButton").addEventListener("click",()=>{flip=!flip;render();});
 document.getElementById("undoButton").addEventListener("click",undo);
+const claimButton=document.createElement("button");claimButton.type="button";claimButton.id="drawClaimButton";
+claimButton.className="game-btn";claimButton.textContent="申请和棋";claimButton.disabled=true;
+claimButton.addEventListener("click",()=>{if(!paused&&!over&&canClaimDraw())finishDraw(halfMoves>=100?"和棋 · 50 回合规则":"和棋 · 三次重复局面");});
+document.querySelector(".game-tools")?.appendChild(claimButton);
 GameBridge.register({
  init(payload){mode=payload.mode==="two"?"two":"ai";difficulty=payload.difficulty||"normal";newGame();},
  newGame,pause,resume,
