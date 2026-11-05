@@ -53,7 +53,7 @@ function search(b,side,depth,alpha,beta,ply){if(!findGeneral(b,"red"))return -10
 function chooseAI(){const ms=legalMoves(board,"black");if(!ms.length)return null;const depth=difficulty==="easy"?1:difficulty==="hard"?3:2;let best=Infinity,choices=[];for(const m of ms){const n=clone(board),captured=apply(n,m);let v=search(n,"red",depth-1,-Infinity,Infinity,1);if(captured)v-=0.01;if(v<best){best=v;choices=[m];}else if(v===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
 function report(t){
  status.textContent=t;
- document.getElementById("undoButton").disabled=!history.length||paused||over;
+ document.getElementById("undoButton").disabled=!history.length||paused;
  if(turnText&&turnDot){
   const terminal=/获胜|将死|困毙/.test(t)&&over,winner=/红方/.test(t)?"red":"black",side=terminal?winner:turn==="red"?"red":"black";
   turnDot.className="turn-dot "+side;
