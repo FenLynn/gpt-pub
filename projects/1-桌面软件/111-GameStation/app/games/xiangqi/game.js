@@ -2,7 +2,7 @@
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot"),boardArea=document.querySelector(".game-main-board");
 let boardObserver=null;
-function fitBoard(){const widthLimit=Math.max(0,boardArea.clientWidth),heightLimit=Math.max(0,boardArea.clientHeight);const height=Math.min(heightLimit,widthLimit/(8/9));const width=height*(8/9);if(width>0&&height>0){el.style.width=width+"px";el.style.height=height+"px";}}
+function fitBoard(){const widthLimit=Math.max(0,boardArea.clientWidth),heightLimit=Math.max(0,boardArea.clientHeight),margin=Math.min(44,Math.max(24,Math.round(Math.min(widthLimit,heightLimit)*.05)));const innerW=Math.max(0,widthLimit-2*margin),innerH=Math.max(0,heightLimit-2*margin);const height=Math.min(innerH,innerW/(8/9));const width=height*(8/9);if(width>0&&height>0){el.style.width=width+"px";el.style.height=height+"px";}}
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
 const values={"帅":10000,"将":10000,"车":900,"马":430,"炮":450,"仕":220,"士":220,"相":220,"象":220,"兵":100,"卒":100};
