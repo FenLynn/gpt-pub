@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>国际象棋 · GameStation</title>
+<link rel="stylesheet" href="../shared/game.css">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body data-game="chess">
+<main class="game-root game-layout chess-layout" id="game">
+ <aside class="game-guide">
+  <span class="game-guide-kicker">CLASSIC CHESS</span>
+  <h2>国际象棋</h2>
+  <p>白方先行。选择棋子，再选择高亮的合法落点。将死对方王即可获胜。</p>
+  <div class="key-instruction"><strong>鼠标</strong><span>选择棋子 / 确认落点</span></div>
+  <div class="key-instruction"><strong>Esc</strong><span>取消当前选中</span></div>
+  <div class="guide-note">兵到达底线自动升变为后。王车易位、吃过路兵和将军判定均按标准规则处理。</div>
+ </aside>
+ <section class="game-main-board">
+  <div class="board-wrap">
+   <div class="chess-board" id="board" role="grid" aria-label="国际象棋棋盘"></div>
+  </div>
+ </section>
+ <aside class="game-tools">
+  <div class="turn-indicator"><span class="turn-dot" id="turnDot"></span><strong id="turnText">白方走棋</strong></div>
+  <div class="side-score">
+   <div><span>白方</span><strong id="whiteCaptured">0</strong></div>
+   <div><span>黑方</span><strong id="blackCaptured">0</strong></div>
+   <div><span>回合</span><strong id="moveNumber">1</strong></div>
+   <div><span>状态</span><strong id="checkState">正常</strong></div>
+  </div>
+  <button class="game-btn" id="undoButton" type="button">悔棋</button>
+  <button class="game-btn" id="flipButton" type="button">翻转棋盘</button>
+  <div class="move-panel"><div class="move-panel-title">棋谱</div><ol id="moveList"></ol></div>
+  <div class="game-tool-note">白色棋子先行。人机模式由你执白；双人模式可在同一台设备轮流操作。</div>
+ </aside>
+</main>
+<script src="../shared/bridge.js"></script>
+<script src="./game.js"></script>
+</body>
+</html>
