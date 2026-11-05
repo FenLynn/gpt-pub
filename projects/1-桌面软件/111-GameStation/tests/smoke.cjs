@@ -474,6 +474,39 @@ const games = [
     const tetrisTop = await tetris.locator("#canvas").getAttribute("data-piece-top");
     assert.ok(tetrisTop === "" || Number(tetrisTop) >= 0, "Tetris active cells must never enter a negative row");
 
+    // Deterministic stacked-block regression: three O pieces are hard-dropped
+    // into the same two columns, leaving a six-row stack. The fourth piece
+    // must stop exactly on that stack, not sink through it or snap upward.
+    await tetris.locator("body").evaluate(() => {
+      window.__p111OriginalRandom = Math.random;
+      window.Math.random = () => 0.5; // SHAPES[3] = O piece
+    });
+    await page.locator("#newGameButton").click();
+    await tetris.locator("#canvas").evaluate(el=>el.focus());
+    for(let i=0;i<3;i++)await page.keyboard.press("Space");
+    let stackGrounded=false;
+    for(let i=0;i<20;i++){
+      const canFall=await tetris.locator("#canvas").getAttribute("data-piece-can-fall");
+      if(canFall==="false"){stackGrounded=true;break;}
+      await page.keyboard.press("ArrowDown");
+    }
+    assert.ok(stackGrounded,"Tetris must detect collision with a locked stack, not only the floor");
+    const stackState=await tetris.locator("#canvas").evaluate(el=>({
+      canFall:el.dataset.pieceCanFall,
+      visualBottom:Number(el.dataset.pieceVisualBottom),
+      logicalBottom:Number(el.dataset.pieceLogicalBottom),
+      fraction:Number(el.dataset.pieceRenderFraction)
+    }));
+    assert.equal(stackState.canFall,"false");
+    assert.equal(stackState.fraction,0,"Tetris interpolation must stop on top of a locked stack");
+    assert.equal(stackState.visualBottom,stackState.logicalBottom,"Tetris piece must sit flush on the locked stack without sinking or snapping");
+    assert.ok(stackState.visualBottom<20,"Tetris piece above a stack must remain within the 20-row board");
+    await tetris.locator("body").evaluate(() => {
+      if(window.__p111OriginalRandom)window.Math.random=window.__p111OriginalRandom;
+      delete window.__p111OriginalRandom;
+    });
+    await page.locator("#newGameButton").click();
+
     await openGame("贪吃蛇");
     const snake = page.frameLocator("#gameFrame");
     const snakeCanvas = snake.locator("#canvas");
