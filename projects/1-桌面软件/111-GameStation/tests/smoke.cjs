@@ -110,7 +110,7 @@ const names=[
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
   assert.equal(await page.locator("#homeRecentList .recent-game").count(),3,"Recent strip must contain only games actually played");
-  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.innerText.trim(),x:n.getBoundingClientRect().x})));
+  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
