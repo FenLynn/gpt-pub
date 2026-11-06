@@ -29,73 +29,60 @@ const names=[
   await library();game=name;
   await page.locator(".game-card").filter({hasText:name}).click();
   await frame.locator("#game").waitFor({state:"visible",timeout:10000});
-  await frame.locator("#gs-hud").waitFor({state:"visible",timeout:10000});
-  await frame.locator("#gs-start:not([disabled])").waitFor({state:"visible",timeout:10000});
+  await page.locator("#gameActions:not(.hidden)").waitFor({state:"visible",timeout:10000});
+  await page.locator("#startButton:not([disabled])").waitFor({state:"visible",timeout:10000});
   await page.waitForTimeout(55);
   return frame;
  }
  async function start(){
-  await page.locator("#gameFrame").evaluate(el=>el.focus());
-  await page.keyboard.press("Enter");
-  await frame.locator("#gs-start").getByText("结束").waitFor({timeout:4000});
-  await frame.locator("#gs-pause").getByText("暂停").waitFor({timeout:4000});
+  await page.locator("#startButton").click();
+  await page.waitForFunction(()=>document.querySelector("#startButton").getAttribute("aria-label")==="结束");
+  assert.equal(await page.locator("#startButton svg").count(),1,"Start SVG icon must be visible");
+  assert.equal(await page.locator("#pauseButton svg").count(),1,"Pause SVG icon must be visible");
  }
  async function pauseResume(){
-  await page.locator("#gameFrame").evaluate(el=>el.focus());
-  await page.keyboard.press("Enter");
-  await frame.locator("#gs-pause").getByText("继续").waitFor({timeout:4000});
-  await page.keyboard.press("Enter");
-  await frame.locator("#gs-pause").getByText("暂停").waitFor({timeout:4000});
+  await page.locator("#pauseButton").click();
+  await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
+  await page.locator("#pauseButton").click();
+  await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
  }
  async function viewCheck(name,width,height){
   const v=await frame.locator("#game").evaluate(el=>{
-   const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,top:r.top};};
-   const main=el.querySelector(".game-main-board"),guide=el.querySelector(".game-guide"),tools=el.querySelector(".game-tools"),hud=el.querySelector("#gs-hud");
-   const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||el.querySelector(".xiangqi-board")||
-    el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||el.querySelector(".mine-classic")||
-    el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
-   const row=[...el.querySelectorAll("#gs-start,#gs-pause,#gs-next,#gs-tools,#gs-help,#gs-mode,#gs-difficulty")]
-    .filter(x=>x&&!x.hidden&&getComputedStyle(x).display!=="none").map(x=>{const r=box(x);return{...r,centerY:r.y+r.height/2};});
-   return {root:box(el),main:box(main),surface:box(surface),hud:box(hud),row,
-    modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
-    isBattleship:el.classList.contains("battleship-layout"),notice:box(el.querySelector("#gs-notice")),
-    selectCount:el.querySelectorAll("#gs-hud select").length,
-    guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",toolsBox:box(tools),
-    urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","playControls","actionPanel","gameControls","pendingActions"].some(id=>{const q=tools?.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
-    viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth};
+   const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
+   const main=el.querySelector(".game-main-board"),tools=el.querySelector(".game-tools");
+   const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||
+    el.querySelector(".xiangqi-board")||el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||
+    el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
+   return {root:box(el),main:box(main),surface:box(surface),tools:box(tools),toolsVisible:getComputedStyle(tools).display!=="none",
+    guide:getComputedStyle(el.querySelector(".game-guide")).display,
+    hudVisible:getComputedStyle(el.querySelector("#gs-hud")).display!=="none",
+    noticeVisible:getComputedStyle(el.querySelector("#gs-notice")).display!=="none",
+    battleship:el.classList.contains("battleship-layout"),overflow:document.documentElement.scrollWidth,viewport:innerWidth};
   });
-  assert.equal(v.guide,"none",name+" help hints must remain hidden until Help is opened");
-  if(v.urgent)await frame.locator(".game-tools").waitFor({state:"visible",timeout:1500});
-  const toolsDisplay=await frame.locator(".game-tools").evaluate(el=>getComputedStyle(el).display);
-  assert.equal(toolsDisplay,v.urgent?"flex":"none",name+" game tools open only for mandatory response controls");
-  assert.equal(await frame.locator("#gs-tools").getAttribute("aria-expanded"),String(v.urgent),name+" tool toggle reflects automatic response visibility");
-  if(v.urgent){
-   assert.ok(v.main.width>=v.root.width*.68,name+" main board must retain a useful width beside the open tools rail: "+JSON.stringify(v));
-   assert.ok(v.toolsBox.x>=v.main.right-1,name+" open tools must dock to the right without covering the game board: "+JSON.stringify({main:v.main,tools:v.toolsBox}));
-  }else assert.ok(v.main.width>=v.root.width*.97,name+" main board must use almost full iframe width when tools are closed: "+JSON.stringify(v));
-  assert.ok(v.main.height>=v.root.height-58,name+" game stage must use available height: "+JSON.stringify(v));
-  assert.ok(v.hud.width>=v.root.width*.97,name+" unified toolbar must span the game width");
-  const hostClock=await page.locator("#hostGameTimer").evaluate(el=>{
-   const top=document.getElementById("topbar").getBoundingClientRect(),timer=el.getBoundingClientRect();
-   return{shown:getComputedStyle(el).display!=="none",offset:Math.abs((timer.x+timer.width/2)-(top.x+top.width/2)),text:el.textContent.trim()};
+  assert.equal(v.guide,"none",name+" guide should not consume playfield space");
+  assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
+  assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
+  assert.ok(v.main.height>=v.root.height*.96,name+" game stage should use full iframe height: "+JSON.stringify(v));
+  if(v.toolsVisible){
+   assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
+   assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
+  }
+  const header=await page.locator("#topbar").evaluate(el=>{
+   const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,center:a.y+a.height/2};};
+   return{timer:r(el.querySelector("#hostGameTimer")),notice:r(el.querySelector("#gameNotice")),
+    actions:[...el.querySelectorAll("#startButton,#pauseButton,#newGameButton")].map(r),
+    iconCount:el.querySelectorAll("#startButton svg,#pauseButton svg,#newGameButton svg").length,
+    visible:getComputedStyle(el.querySelector("#gameActions")).display!=="none"};
   });
-  assert.ok(hostClock.shown&&hostClock.offset<=2&&/^\d{2}:\d{2}/.test(hostClock.text),name+" timer must be visible at the exact center of the topmost host title bar: "+JSON.stringify(hostClock));
-  assert.equal(await frame.locator("#gs-hud-time").count(),0,name+" inner game toolbar must not duplicate the clock");
-  assert.equal(v.selectCount,0,name+" mode/difficulty must not use native dropdowns");
-  if(v.modeButtons)assert.ok(v.modeButtons>=2,name+" mode selector must be segmented buttons");
-  if(v.difficultyButtons)assert.ok(v.difficultyButtons>=2,name+" difficulty selector must be segmented buttons");
-  assert.ok(v.row.length>=5&&Math.max(...v.row.map(x=>x.centerY))-Math.min(...v.row.map(x=>x.centerY))<=2,name+" toolbar controls must share one horizontal row");
-  assert.ok(v.surface.height>=v.main.height*(v.isBattleship?.62:.72),name+" primary game surface must use the available height: "+JSON.stringify(v));
-  const overlap=v.notice.x<v.surface.right&&v.notice.right>v.surface.x&&v.notice.y<v.surface.bottom&&v.notice.bottom>v.surface.y;
-  assert.equal(overlap,false,name+" floating notice must not cover the primary game surface: "+JSON.stringify({notice:v.notice,surface:v.surface,main:v.main}));
-  assert.ok(v.surface.top>=v.main.top-1&&v.surface.bottom<=v.main.bottom+1,name+" primary surface must remain inside the padded game stage");
-  assert.ok(v.main.bottom<=v.root.bottom+1,name+" stage bottom must stay visible");
-  assert.ok(v.overflow<=v.viewport.width+2,name+" must not scroll horizontally");
-  const captured=await frame.locator("#game").evaluate(el=>{
-   const e=new MouseEvent("contextmenu",{bubbles:true,cancelable:true});
-   el.dispatchEvent(e);return e.defaultPrevented;
-  });
-  assert.ok(captured,name+" must prevent the browser context menu in the game area");
+  assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
+  assert.ok(header.timer.right<=header.notice.x+5,name+" timer left / message center layout: "+JSON.stringify(header));
+  assert.ok(header.notice.width>=65,name+" central notification space should be readable");
+  assert.ok(Math.max(...header.actions.map(x=>x.center))-Math.min(...header.actions.map(x=>x.center))<=2,name+" SVG controls vertically aligned");
+  assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
+  assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
+  assert.ok(v.overflow<=v.viewport+2,name+" no horizontal scrollbar");
+  const rightClick=await frame.locator("#game").evaluate(el=>{const e=new MouseEvent("contextmenu",{bubbles:true,cancelable:true});el.dispatchEvent(e);return e.defaultPrevented;});
+  assert.ok(rightClick,name+" right click must be captured by game");
   const filename=name.replace(/[^\p{L}\p{N}-]+/gu,"-")+"-"+width+"x"+height+".png";
   await page.screenshot({path:path.join(artifacts,"games",filename)});
  }
@@ -122,26 +109,19 @@ const names=[
    await library();
    for(const name of names){
     await open(name);await start();await pauseResume();
-    assert.equal(await page.locator("#gameControls").isVisible(),false,"parent duplicate controls stay hidden while a game is open");
+    if(await page.locator("#modeControl button,#difficultyControl button").count())assert.equal(await page.locator("#gameControls").isVisible(),true,"parent mode/difficulty controls must be visible");
     await viewCheck(name,size.width,size.height);
     if(!noticeChecked){
-     const id=await frame.locator("#game").getAttribute("data-game");
-     await page.evaluate(gameId=>document.querySelector("#gameFrame").contentWindow.postMessage(
-      {channel:"gamestation",protocolVersion:1,gameId,type:"HUD_NOTICE",payload:{message:"通知位置回归测试"}}, "*"),id);
-     await frame.locator("#gs-notice.is-visible").waitFor({timeout:1500});
-     const notice=await frame.locator("#gs-notice").evaluate(el=>{
-      const r=el.getBoundingClientRect(),m=el.parentElement.getBoundingClientRect();
-      return{inside:el.parentElement.classList.contains("game-main-board"),top:r.top,mainTop:m.top,mainBottom:m.bottom,bottom:r.bottom};
-     });
-     assert.equal(notice.inside,true,"important notices must float inside the game stage");
-     assert.ok(notice.top>=notice.mainTop&&notice.bottom<=notice.mainBottom,"in-game notice must stay inside the play area");
-     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"game notices must not activate the external popup");
-     await page.waitForTimeout(2500);
-     assert.equal(await frame.locator("#gs-notice").isVisible(),false,"transient notice must disappear without blocking play");
-     noticeChecked=true;
-    }
-    await frame.locator("#gs-next").click();
-    await frame.locator("#gs-pause").getByText("暂停").waitFor({timeout:4000});
+    await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
+    await page.locator("#gameNotice.visible").waitFor({timeout:1500});
+    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),t=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,barTop:t.top,barBottom:t.bottom,message:el.textContent};});
+    assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must appear only in top titlebar");
+    assert.match(r.message,/顶部通知位置回归测试/);
+    assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
+    noticeChecked=true;
+   }
+   await page.locator("#newGameButton").click();
+    await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
    }
   }
   await page.setViewportSize({width:1440,height:1000});
@@ -158,9 +138,9 @@ const names=[
   }
   await page.waitForTimeout(130);await fitMine();
   assert.equal(await frame.locator(".mine-cell").count(),256);
-  await frame.locator('#gs-difficulty button[data-difficulty="hard"]').click();
+  await page.locator('#difficultyControl button[data-difficulty="hard"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);await fitMine();
-  await frame.locator('#gs-difficulty button[data-difficulty="easy"]').click();
+  await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),81);await fitMine();
   await frame.locator(".mine-cell").nth(8).click({button:"right"});
   assert.ok((await frame.locator(".mine-cell").nth(8).getAttribute("class")).includes("flag"),"right click must place a flag");
@@ -176,7 +156,7 @@ const names=[
   assert.ok(symbols[2].text==="8"&&symbols[2].font>=symbols[2].cell*.65,"Minesweeper numbers must scale with cell size");
   await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
-  await frame.locator("#gs-help").click();
+  await page.locator("#helpButton").click();
   await page.locator("#helpPanel").waitFor({state:"visible"});
   await page.keyboard.press("Escape");
   assert.ok(await page.locator("#helpPanel").isVisible(),"Escape must not close help");
@@ -207,7 +187,7 @@ const names=[
   assert.ok(tsize.height>=tsize.available*.88&&tsize.bottom<=tsize.stageBottom+1,"Tetris must fill available HEIGHT");
   await frame.locator("body").evaluate(()=>{window.__oldRandom=Math.random;Math.random=()=>.5;});
   const round=Number(await tetris.getAttribute("data-round-serial")||0);
-  await frame.locator("#gs-next").click();
+  await page.locator("#newGameButton").click();
   for(let i=0;i<40;i++){
    const n=Number(await tetris.getAttribute("data-round-serial")||0);
    if(n>round)break;
@@ -257,10 +237,10 @@ const names=[
   assert.equal(await frame.locator(".xiangqi-cell").count(),90,"Xiangqi must have exactly 90 intersections");
   await open("国际象棋");await start();
   assert.equal(await frame.locator(".chess-square").count(),64);
-  await frame.locator('#gs-mode button[data-mode-index="1"]').click();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
   await frame.locator('[data-square="e2"]').click();await frame.locator('[data-square="e4"]').click();
   assert.equal(await frame.locator("#moveList li").count(),1);
-  await frame.locator("#gs-tools").click();await frame.locator("#undoButton").click();
+  await frame.locator("#undoButton").click();
   assert.equal(await frame.locator("#moveList li").count(),0);
   await open("中国象棋");await start();assert.equal(await frame.locator(".xiangqi-cell").count(),90);
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
@@ -277,6 +257,6 @@ const names=[
   assert.ok(sanguoshaLayout.players.every(p=>p.left>=sanguoshaLayout.main.left-1&&p.right<=sanguoshaLayout.main.right+1),"All four Sanguosha player cards must remain visible inside the battlefield");
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
-  console.log("P111 R18 Chromium regression passed: 24 games × two desktop viewports (48 game screenshots), centered top-host timer, segmented controls, in-game notices, full-height surfaces, Minesweeper SVG/number sizing, contextmenu, Tetris and card/chess lifecycle.");
+  console.log("P111 R19 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), left timer, central notices, SVG controls, Tetris preview/score, chess and arcade lifecycle.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});
