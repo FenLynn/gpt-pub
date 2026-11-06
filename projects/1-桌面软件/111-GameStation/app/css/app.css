@@ -1025,7 +1025,7 @@ body{font-size:15px}
 /* P111 R20 · dashboard home: metrics banner, full-width heatmap, horizontal recents, full-height ranking. */
 @media(min-width:701px){
  #homeView.home-view{height:100%;min-height:0;overflow:hidden;padding:18px 20px;background:var(--page)}
- #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;gap:16px;align-items:stretch}
+ #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;gap:16px;align-items:stretch;align-content:stretch!important;grid-template-rows:minmax(0,1fr)}
  #homeView .home-main{height:100%!important;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);
   grid-template-rows:164px minmax(0,1fr) 112px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
  #homeView .home-hero{height:100%;min-height:0;display:grid;grid-template-columns:minmax(260px,.88fr) minmax(0,1.52fr);
