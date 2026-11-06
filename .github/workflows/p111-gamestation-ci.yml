@@ -12,13 +12,17 @@ on:
     paths:
       - "projects/1-桌面软件/111-GameStation/**"
       - ".github/workflows/p111-gamestation-ci.yml"
+      - ".github/workflows/repository-pages.yml"
+      - "docs/repository-pages.md"
+      - "目录.md"
+      - "projects/1-桌面软件/README.md"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: p111-gamestation-ci-${{ github.event_name }}-${{ github.ref }}
+  group: p111-gamestation-ci
   cancel-in-progress: true
 
 jobs:
@@ -38,7 +42,7 @@ jobs:
           git fetch origin main
           while IFS= read -r file; do
             case "$file" in
-              projects/1-桌面软件/111-GameStation/*|.github/workflows/p111-gamestation-ci.yml)
+              projects/1-桌面软件/111-GameStation/*|.github/workflows/p111-gamestation-ci.yml|.github/workflows/repository-pages.yml|docs/repository-pages.md|目录.md|projects/1-桌面软件/README.md)
                 ;;
               *)
                 echo "::error file=$file::P111 branch contains an out-of-scope change"
@@ -57,13 +61,11 @@ jobs:
           test -s "$APP/js/app.js"
           test -s "$APP/games/shared/bridge.js"
           test -s "$APP/games/shared/game.css"
-          for game in gomoku xiangqi reversi connect4 battleship checkers minesweeper 2048 memory sudoku sokoban tetris snake pong contra solitaire doudizhu mahjong sanguosha; do
+          for game in gomoku xiangqi minesweeper solitaire tetris snake; do
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
-          # SVG DOM namespace is a constant identifier, not a network request.
-          # Strip that exact namespace, but still reject any other URL on the same line.
-          if grep -RInE 'https?://' "$APP" | sed 's@http://www\.w3\.org/2000/svg@@g' | grep -E 'https?://'; then
+          if grep -RInE 'https?://' "$APP"; then
             echo "::error::Remote URL found in the runtime app"
             exit 1
           fi
@@ -80,7 +82,6 @@ jobs:
             node --check "$file"
           done
           node --check projects/1-桌面软件/111-GameStation/tests/smoke.cjs
-          node --check projects/1-桌面软件/111-GameStation/tests/rules.cjs
 
       - name: Install CJK fonts and browser test tools
         shell: bash
@@ -99,7 +100,6 @@ jobs:
           set -euo pipefail
           export CHROME_BIN="$(command -v google-chrome || command -v chromium || command -v chromium-browser)"
           node projects/1-桌面软件/111-GameStation/tests/smoke.cjs
-          node projects/1-桌面软件/111-GameStation/tests/rules.cjs
 
       - name: Upload browser evidence
         if: always()

@@ -158,3 +158,10 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 
 - 棋子不再使用宽高均为百分比的近似圆，而是固定宽度并以 aspect-ratio: 1/1 计算高度，border-radius 形成严格圆形。
 - Chromium 将棋子宽高差验收从 1.5px 收紧至 0.5px，防止棋盘比例变化时再次出现椭圆。
+
+
+## R21.13｜严格遵守项目边界与炮规则 CI 覆盖（2026-11-06）
+
+- 恢复 P111 CI 工作流为 main 原版；不再修改任何 Actions 工作流文件。
+- `.github/workflows/repository-pages.yml` 已恢复为 main 原版；PR 变更范围不再包含 Pages / Cloudflare / Workers / 域名 / 部署配置。
+- 将中国象棋炮的关键规则直接纳入既有 Chromium smoke 脚本：无炮架、一个炮架、双目标不可越过、己方棋子不可吃，并实际点击完成一次隔子吃子。这样无需修改 CI 工作流也能覆盖用户指出的问题。

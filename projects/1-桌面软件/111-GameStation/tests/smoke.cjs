@@ -372,6 +372,28 @@ const names=[
   assert.equal(sanguoshaLayout.players.length,4,"Sanguosha must show all four seats");
   assert.ok(sanguoshaLayout.tools.left>=sanguoshaLayout.main.right-1,"Sanguosha tools must not cover the battlefield");
   assert.ok(sanguoshaLayout.players.every(p=>p.left>=sanguoshaLayout.main.left-1&&p.right<=sanguoshaLayout.main.right+1),"All four Sanguosha player cards must remain visible inside the battlefield");
+  // Xiangqi cannon rules: exactly one screen permits capture; zero/two screens and friendly targets do not.
+  const cannonPage=await browser.newPage({viewport:{width:1100,height:850}});
+  cannonPage.on("pageerror",err=>errors.push("Xiangqi rules: "+err.message));
+  await cannonPage.goto(pathToFileURL(path.resolve(root,"games/xiangqi/index.html")).href+"?p111Test=1");
+  await cannonPage.waitForFunction(()=>typeof window.__p111XiangqiTest?.loadPosition==="function");
+  const cannonLoad=(pieces,side="red")=>cannonPage.evaluate(([p,s])=>window.__p111XiangqiTest.loadPosition(p,s),[pieces,side]);
+  const cannonMoves=()=>cannonPage.evaluate(()=>window.__p111XiangqiTest.legal("red"));
+  const cannonBase=[[4,0,"black","将"],[4,9,"red","帅"],[4,6,"red","兵"]];
+  await cannonLoad([...cannonBase,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"black","车"]]);
+  assert.equal((await cannonMoves()).some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),true,"one cannon screen permits capture");
+  await cannonPage.locator('.xiangqi-cell[data-x="0"][data-y="7"]').click();
+  await cannonPage.locator('.xiangqi-cell[data-x="0"][data-y="2"]').click();
+  assert.match(await cannonPage.locator('.xiangqi-cell[data-x="0"][data-y="2"]').getAttribute("aria-label"),/红炮/,"cannon must actually capture through one screen");
+  await cannonLoad([...cannonBase,[0,7,"red","炮"],[0,2,"black","车"]]);
+  assert.equal((await cannonMoves()).some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"cannon cannot capture without a screen");
+  await cannonLoad([...cannonBase,[0,7,"red","炮"],[0,5,"red","兵"],[0,3,"black","卒"],[0,2,"black","车"]]);
+  const boundedCannon=await cannonMoves();
+  assert.equal(boundedCannon.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===3),true,"cannon captures the first enemy beyond one screen");
+  assert.equal(boundedCannon.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"cannon cannot jump over the first occupied target");
+  await cannonLoad([...cannonBase,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"red","车"]]);
+  assert.equal((await cannonMoves()).some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"cannon cannot capture a friendly piece");
+  await cannonPage.close();
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
   console.log("P111 R19 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), left timer, central notices, SVG controls, Tetris preview/score, chess and arcade lifecycle.");
