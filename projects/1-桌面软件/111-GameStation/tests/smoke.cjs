@@ -96,6 +96,7 @@ const names=[
    stats:{
     tetris:{plays:4,wins:1,totalMs:240000,bestScore:1800,lastPlayed:today,lastPlayedAt:now-1000,days:{[today]:120000,[yesterday]:120000}},
     minesweeper:{plays:2,wins:1,totalMs:90000,bestScore:450,lastPlayed:today,lastPlayedAt:now-10000,days:{[today]:60000,[yesterday]:30000}},
+    tank:{plays:1,wins:0,totalMs:45000,bestScore:0,lastPlayed:today,lastPlayedAt:now-5000,days:{[today]:45000}},
     gomoku:{plays:1,wins:0,totalMs:30000,bestScore:0,lastPlayed:yesterday,lastPlayedAt:now-100000,days:{[yesterday]:30000}}
    },
    firstStartedAt:first.getTime()
@@ -109,10 +110,12 @@ const names=[
   assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
-  assert.equal(await page.locator("#homeRecentList .recent-game").count(),3,"Recent strip must contain only games actually played");
-  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x})));
-  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
+  assert.equal(await page.locator("#homeRecentList .recent-game").count(),4,"Recent strip must contain only games actually played");
+  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,svg:!!n.querySelector(".game-icon-svg")})));
+  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
+  assert.ok(recent.every(x=>x.svg),"Every recent game must use a local SVG icon, not an OS emoji glyph");
+  assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-icon-svg').count(),1,"90 坦克 must have a dedicated vector icon");
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
   async function homeLayoutCheck(width,height){
@@ -133,14 +136,19 @@ const names=[
    assert.ok(box.recent.bottom>=box.main.bottom-4,"Recent strip must sit at the bottom of the main column: "+JSON.stringify(box));
    assert.equal(box.listDisplay,"flex","Recent games must be a horizontal icon row");
    const visual=await page.evaluate(()=>{
-    const grid=document.querySelector("#heatmapGrid"),cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect();
+    const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
+    const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
-    return{dot:{width:r.width,height:r.height,columns:getComputedStyle(grid).gridTemplateColumns,autoColumn:getComputedStyle(grid).gridAutoColumns},
+    return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
-     recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor}};
+     recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
+     weekdayRow:parseFloat(getComputedStyle(layout.querySelector(".heatmap-weekdays")).gridTemplateRows.split(" ")[0])};
    });
-   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&visual.dot.width>=9&&visual.dot.width<=11.5,"Heatmap must retain square GitHub-style dots: "+JSON.stringify(visual));
-   assert.ok(visual.dot.autoColumn==="9px"||visual.dot.autoColumn==="11px","Heatmap implicit columns must remain fixed-size: "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&visual.dot.width>=9&&visual.dot.width<=22,"Heatmap must retain square, responsive GitHub-style dots: "+JSON.stringify(visual));
+   assert.ok(Math.abs(parseFloat(visual.dot.autoColumn)-visual.dot.width)<.5,"Heatmap implicit columns must match the square dot size: "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.weekdayRow-visual.dot.height)<.5,"Weekday labels must align with the heatmap row pitch: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth>=visual.dot.contentWidth*.95,"53-week heatmap must use almost the full available width: "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.dot.gridLeft-visual.dot.contentLeft)<2,"Heatmap must start at the left content edge rather than float in the middle: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
    assert.equal(visual.recent.border,"0px/0px/0px/0px","Recent games must not be miniature bordered cards: "+JSON.stringify(visual));
@@ -155,6 +163,8 @@ const names=[
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
+  assert.equal(await page.locator(".game-card .game-icon-svg").count(),24,"All 24 library games must have a local SVG pictogram");
+  assert.equal(await page.locator('.game-card[data-game="tank"] .game-icon-svg').count(),1,"The 90 tank library icon must not depend on emoji font support");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});
