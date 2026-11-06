@@ -290,8 +290,8 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  }
  .game-root.game-layout.gs-tools-open>.game-tools{
   position:relative!important;z-index:2!important;top:auto!important;right:auto!important;left:auto!important;bottom:auto!important;
-  grid-column:2!important;grid-row:2!important;align-self:stretch!important;
-  width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-height:none!important;
+  grid-column:2!important;grid-row:2!important;align-self:start!important;
+  width:auto!important;height:max-content!important;min-width:0!important;min-height:0!important;max-height:calc(100% - 16px)!important;
   margin:8px 10px 8px 0!important;padding:12px!important;
   border:1px solid #cadce7!important;border-radius:12px!important;
   background:#fffffffa!important;box-shadow:0 4px 18px #203f5618!important;
