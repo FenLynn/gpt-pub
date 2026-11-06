@@ -213,6 +213,7 @@ const names=[
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),24,"All 24 library games must have a local SVG pictogram");
+  assert.equal(await page.locator(".game-card .game-icon-svg").first().evaluate(el=>el.namespaceURI),"http://www.w3.org/2000/svg","Inline SVG must retain the SVG DOM namespace without a remote URL literal");
   const iconColors=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color));
   assert.notEqual(iconColors[0],iconColors[1],"Board and arcade icons must use distinct category colors");
   assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-svg').count(),1,"The 90 tank library icon must not depend on emoji font support");

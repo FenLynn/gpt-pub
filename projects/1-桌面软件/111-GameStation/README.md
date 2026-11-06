@@ -165,3 +165,9 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 - 恢复 P111 CI 工作流为 main 原版；不再修改任何 Actions 工作流文件。
 - `.github/workflows/repository-pages.yml` 已恢复为 main 原版；PR 变更范围不再包含 Pages / Cloudflare / Workers / 域名 / 部署配置。
 - 将中国象棋炮的关键规则直接纳入既有 Chromium smoke 脚本：无炮架、一个炮架、双目标不可越过、己方棋子不可吃，并实际点击完成一次隔子吃子。这样无需修改 CI 工作流也能覆盖用户指出的问题。
+
+
+## R21.14｜离线 SVG 命名空间兼容（2026-11-06）
+
+- 移除动态内嵌 SVG 字符串中的显式 `xmlns=http://...` 文本；HTML 解析器会为内嵌 `<svg>` 自动创建正确 SVG namespace，不需要任何外部资源或请求。
+- 不降低离线 guard：继续对 app 目录执行原版严格 URL 扫描，并在 Chromium 中断言 24 个游戏图标的 SVG DOM namespace 仍正确。

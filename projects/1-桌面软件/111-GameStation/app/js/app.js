@@ -58,7 +58,7 @@ const gameIconArt={
 };
 function gameIconMarkup(game){
  const art=gameIconArt[game.id]||gameIconArt.default;
- return '<svg class="game-icon-svg" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+art+'</svg>';
+ return '<svg class="game-icon-svg" viewBox="0 0 48 48" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+art+'</svg>';
 }
 
 function read(key,fallback){if(location.search.includes("p111Test=1")){try{const fixture=new URLSearchParams(location.search).get("p111State");if(fixture){const state=JSON.parse(fixture);if(Object.prototype.hasOwnProperty.call(state,key))return state[key];}}catch(e){}}try{const v=JSON.parse(localStorage.getItem(storePrefix+key));return v===null||v===undefined?fallback:v;}catch(e){return fallback;}}
