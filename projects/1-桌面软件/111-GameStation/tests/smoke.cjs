@@ -104,6 +104,7 @@ const names=[
   await page.goto(homeUrl);
   await page.locator("#homeDate").waitFor({state:"visible"});
   assert.equal(await page.locator(".brand-mark i").count(),4);
+  assert.equal(await page.locator(".ranking-panel").count(),1,"Dashboard must retain its right ranking column");
   await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
   assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
