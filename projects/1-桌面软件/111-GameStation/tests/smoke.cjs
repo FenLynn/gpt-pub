@@ -90,13 +90,50 @@ const names=[
   await fs.promises.mkdir(path.join(artifacts,"games"),{recursive:true});
   await page.goto(pathToFileURL(path.join(root,"index.html")).href);
   await page.locator("#homeDate").waitFor({state:"visible"});
-  assert.equal(await page.locator("#totalGameCount").innerText(),"24");
   assert.equal(await page.locator(".brand-mark i").count(),4);
-  const hero=await page.locator(".home-hero").evaluate(el=>{
-   const rect=n=>{const r=n.getBoundingClientRect();return{left:r.left,right:r.right};};
-   return{copy:rect(el.querySelector(".hero-copy")),art:rect(el.querySelector(".home-art")),artDisplay:getComputedStyle(el.querySelector(".home-art")).display};
+  await page.evaluate(()=>{
+   const now=Date.now(),d=new Date(now),today=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+   const prior=new Date(now);prior.setDate(prior.getDate()-1);
+   const yesterday=prior.getFullYear()+"-"+String(prior.getMonth()+1).padStart(2,"0")+"-"+String(prior.getDate()).padStart(2,"0");
+   const first=new Date(now);first.setDate(first.getDate()-23);first.setHours(9,30,0,0);
+   const stats={
+    tetris:{plays:4,wins:1,totalMs:240000,bestScore:1800,lastPlayed:today,lastPlayedAt:now-1000,days:{[today]:120000,[yesterday]:120000}},
+    minesweeper:{plays:2,wins:1,totalMs:90000,bestScore:450,lastPlayed:today,lastPlayedAt:now-10000,days:{[today]:60000,[yesterday]:30000}},
+    gomoku:{plays:1,wins:0,totalMs:30000,bestScore:0,lastPlayed:yesterday,lastPlayedAt:now-100000,days:{[yesterday]:30000}}
+   };
+   localStorage.setItem("gamestation.stats",JSON.stringify(stats));
+   localStorage.setItem("gamestation.firstStartedAt",String(first.getTime()));
   });
-  if(hero.artDisplay!=="none")assert.ok(hero.copy.right<=hero.art.left+3,"Home banner copy must not overlap decorative art");
+  await page.reload();
+  await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
+  assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
+  assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
+  assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
+  assert.equal(await page.locator("#homeRecentList .recent-game").count(),3,"Recent strip must contain only games actually played");
+  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.innerText.trim(),x:n.getBoundingClientRect().x})));
+  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
+  assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
+  assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
+  assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
+  async function homeLayoutCheck(width,height){
+   await page.setViewportSize({width,height});
+   const box=await page.locator("#homeView").evaluate(el=>{
+    const rect=q=>{const r=q.getBoundingClientRect();return{top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
+    return{home:rect(el),main:rect(el.querySelector(".home-main")),hero:rect(el.querySelector(".home-hero")),
+     heat:rect(el.querySelector(".activity-panel")),recent:rect(el.querySelector(".recent-panel")),ranking:rect(el.querySelector(".ranking-panel")),
+     listDisplay:getComputedStyle(el.querySelector("#homeRecentList")).display,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};
+   });
+   assert.ok(box.main.bottom>=box.home.bottom-22,"Main dashboard must use the full vertical area: "+JSON.stringify(box));
+   assert.ok(box.ranking.bottom>=box.home.bottom-22,"Ranking must extend to the bottom edge: "+JSON.stringify(box));
+   assert.ok(box.heat.width>=box.main.width*.98,"Heatmap must occupy the full left-column width: "+JSON.stringify(box));
+   assert.ok(box.recent.top>=box.heat.bottom-1,"Recent strip must sit below the heatmap: "+JSON.stringify(box));
+   assert.equal(box.listDisplay,"flex","Recent games must be a horizontal icon row");
+   assert.ok(box.scrollHeight<=box.clientHeight+2,"Home must not leave content below the viewport");
+  }
+  await homeLayoutCheck(1752,860);
+  await page.screenshot({path:path.join(artifacts,"home-1752x860.png")});
+  await homeLayoutCheck(1366,768);
+  await page.setViewportSize({width:1440,height:1000});
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
   let noticeChecked=false;
   await library();

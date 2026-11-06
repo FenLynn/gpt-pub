@@ -63,28 +63,18 @@
         <section class="home-main">
           <section class="home-hero">
             <div class="hero-copy">
-              <div class="hero-kicker"><span class="hero-logo" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>GAMESTATION · OFFLINE ARCADE</span></div>
-              <div class="date-line"><strong id="homeDate">11月5日 · 星期四</strong><span id="homeTime"></span></div>
-              <div class="weekday-line hidden" id="homeWeekday"></div>
+              <div class="date-line"><strong id="homeDate">11月6日 · 星期五</strong><span id="homeTime"></span></div>
               <h1>今天，玩点什么？</h1>
               <p class="hero-description">把碎片时间留给一局好游戏。所有游戏都在本机运行，打开即玩。</p>
-              <div class="hero-stats">
-                <span><strong id="totalGameCount">19</strong> 款游戏</span>
-                <span><strong>4</strong> 类玩法</span>
-                <span><strong>离线</strong> 随时开局</span>
-              </div>
-              <div class="today-summary" id="todaySummary">今天还没有游戏记录</div>
             </div>
-            <div class="home-art" aria-hidden="true">
-              <div class="art-orbit art-orbit-one"></div><div class="art-orbit art-orbit-two"></div>
-              <div class="art-card art-card-back"><span>♟</span></div>
-              <div class="art-card art-card-mid"><span>2</span><span>4</span><span>8</span></div>
-              <div class="art-card art-card-front"><span class="art-four"><i></i><i></i><i></i><i></i></span><b>PLAY</b></div>
-              <div class="art-spark art-spark-one"></div><div class="art-spark art-spark-two"></div>
+            <div class="hero-metrics" aria-label="游戏使用概况">
+              <div class="hero-metric"><span class="hero-metric-label">首次开始游戏</span><strong id="heroFirstPlayed">尚未开始</strong><small>第一局记录</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">最近游戏</span><strong id="heroLastGame">暂无记录</strong><small id="heroLastGameMeta">开始一局后记录</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">已使用天数</span><strong id="heroActiveDays">0 天</strong><small>有游戏记录的日期</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">累计时间</span><strong id="heroTotalTime">0 分</strong><small>所有游戏累计</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">今日时间</span><strong id="heroTodayTime">0 分</strong><small>本地今日</small></div>
             </div>
           </section>
-
-          <div class="home-insights">
           <section class="activity-panel">
             <div class="panel-heading">
               <div><h2>游戏活动</h2><p>近 12 个月</p></div>
@@ -100,28 +90,13 @@
             </div>
           </section>
           <section class="recent-panel">
-            <div class="recent-heading"><div><h2>最近游玩</h2><p id="recentSubtitle">精选几款，随时开始</p></div><button type="button" id="recentBrowse">全部游戏 <span>›</span></button></div>
-            <div class="recent-list" id="homeRecentList"></div>
-          </section>
-        </div>
-
-          <section class="quick-start">
-            <div class="quick-heading"><h2>按类型开始</h2><span>选择一种玩法</span></div>
-            <div class="quick-grid">
-              <button type="button" data-home-category="board"><span class="quick-icon">♟</span><span><strong>棋类对战</strong><small><span id="homeCount-board">7 款</span> · 思考与布局</small></span><b>›</b></button>
-              <button type="button" data-home-category="puzzle"><span class="quick-icon">▦</span><span><strong>益智解谜</strong><small><span id="homeCount-puzzle">5 款</span> · 观察与推理</small></span><b>›</b></button>
-              <button type="button" data-home-category="arcade"><span class="quick-icon">◉</span><span><strong>街机动作</strong><small><span id="homeCount-arcade">6 款</span> · 反应与节奏</small></span><b>›</b></button>
-              <button type="button" data-home-category="card"><span class="quick-icon">♣</span><span><strong>卡牌桌游</strong><small><span id="homeCount-card">4 款</span> · 策略与运气</small></span><b>›</b></button>
+            <div class="recent-heading">
+              <div><h2>最近游玩</h2><p id="recentSubtitle">按最近游玩时间排序</p></div>
             </div>
-          </section>
-          <section class="featured-section">
-            <div class="featured-heading"><div><h2>精选游戏</h2><p>经典玩法，一键开始</p></div><span>FEATURED</span></div>
-            <div class="featured-grid" id="featuredGames"></div>
+            <div class="recent-list" id="homeRecentList" aria-label="最近游玩的游戏"></div>
           </section>
         </section>
-
-        <aside class="ranking-panel">
-          <div class="ranking-heading"><div><h2>游戏排行榜</h2><p>本机游玩记录</p></div><span class="ranking-mark">TOP 10</span></div>
+          <div class="ranking-heading"><div><h2>游戏排行榜</h2><p>本机游玩记录</p></div><span class="ranking-mark">前十名</span></div>
           <div class="ranking-tabs" role="tablist" aria-label="排行榜类型">
             <button class="active" data-ranking="score" role="tab" aria-selected="true">最高分</button>
             <button data-ranking="time" role="tab" aria-selected="false">时长</button>
