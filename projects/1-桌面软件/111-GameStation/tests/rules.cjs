@@ -103,6 +103,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.track()),52,"Flight Chess track contains 52 squares");
   assert.equal(await flight.locator("#diceFace svg.flight-dice-svg").count(),1,"Flight Chess dice must use a local SVG, not a Unicode font glyph");
   assert.equal(await flight.locator("#diceFace .flight-dice-pip").count(),1,"The initial die face must show one pip");
+  assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
   assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The board center must show the current player, not a generic lifecycle message");
   await flight.evaluate(()=>window.__p111FlightTest.pause());
