@@ -234,5 +234,13 @@ window.addEventListener("message",event=>{
  if(message.type==="HUD_NOTICE"&&message.payload?.message)showNotice(message.payload.message,false);
 });
 window.addEventListener("resize",()=>{if(notice&&!notice.hidden)positionNotice();});
+let lastToolsExpanded=null;
+new MutationObserver(()=>{
+ const expanded=root.classList.contains("gs-tools-open");
+ if(expanded!==lastToolsExpanded){
+  lastToolsExpanded=expanded;
+  window.GameBridge?.send("TOOLS_STATE",{expanded});
+ }
+}).observe(root,{attributes:true,attributeFilter:["class"]});
 setup();
 })();

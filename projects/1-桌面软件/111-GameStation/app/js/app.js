@@ -205,6 +205,14 @@ window.addEventListener("message",event=>{
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}
+ if(m.type==="TOOLS_STATE"){
+  const expanded=!!m.payload?.expanded;
+  railCollapsed=!expanded;
+  $("railToggleButton").setAttribute("aria-expanded",String(expanded));
+  $("railToggleButton").title=expanded?"收起右侧工具栏":"展开右侧工具栏";
+  $("railToggleButton").setAttribute("aria-label",$("railToggleButton").title);
+  return;
+ }
  if(m.type==="TOOLS_META"){
    const hasActions=!!m.payload?.hasActions;
    railCollapsed=!hasActions;
