@@ -49,6 +49,7 @@ function positionNotice(){
 }
 function showNotice(message,persistent=false){
  const value=String(message||"").trim();
+ if(value){window.GameBridge?.report(value);return;}
  if(!value||!notice)return;
  const now=performance.now();
  if(noticePersistent&&!persistent)return;
@@ -223,7 +224,12 @@ window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const message=event.data;
  if(!message||message.channel!=="gamestation"||message.protocolVersion!==1||message.gameId!==gameId)return;
- if(message.type==="INIT"){initHud(message.payload||{});return;}
+ if(message.type==="INIT"){
+  initHud(message.payload||{});
+  const hasActions=!!root.querySelector(".game-tools button,.game-tools select,.game-tools input,.game-tools summary");
+  window.GameBridge?.send("TOOLS_META",{hasActions});
+  return;
+ }
  if(message.type==="HUD_STATE"){updateHud(message.payload||{});return;}
  if(message.type==="HUD_NOTICE"&&message.payload?.message)showNotice(message.payload.message,false);
 });

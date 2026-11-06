@@ -156,7 +156,7 @@ function stopClock(){if(session&&session.running){persistSessionTime();session.r
 function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(active&&ready)send("HUD_STATE",{ready,started,paused,finished:!!session?.finished,elapsed:fmtClock(session.elapsedMs),modeIndex,difficulty});if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
 function countRound(){if(!session||roundCounted)return;const s=statFor(session.id);s.plays++;s.lastPlayed=dateKey(new Date());roundCounted=true;persistStats();renderRanking();renderHomeRecent();}
 function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");startClock();focusGameFrame();toast("开始游戏");}
-function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;persistStats();setGameState();toast("本局已结束");}
+function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;persistStats();setGameState();showGameNotice("本局已结束",0,true);}
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
 function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");startClock();focusGameFrame();toast("继续游戏");}
 function togglePause(){if(paused)resumeGame();else pauseGame();}
@@ -205,7 +205,15 @@ window.addEventListener("message",event=>{
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}
- if(m.type==="HELP_SOURCE"){helpSource={lines:m.payload?.lines||[],note:m.payload?.note||""};if(!$("helpPanel").classList.contains("hidden"))renderHelp();return;}
+ if(m.type==="TOOLS_META"){
+   const hasActions=!!m.payload?.hasActions;
+   railCollapsed=!hasActions;
+   $("railToggleButton").classList.toggle("hidden",!hasActions);
+   $("railToggleButton").setAttribute("aria-expanded",String(hasActions));
+   send("SET_RAIL",{collapsed:!hasActions});
+   return;
+  }
+  if(m.type==="HELP_SOURCE"){helpSource={lines:m.payload?.lines||[],note:m.payload?.note||""};if(!$("helpPanel").classList.contains("hidden"))renderHelp();return;}
  if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
  if(m.type==="STATE"){
   if(Number.isFinite(Number(m.payload?.score))){
@@ -228,9 +236,9 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
   }
  }else if(m.type==="GAME_OVER"){
   finishGame(m.payload||{});
-  toast(m.payload?.message||"游戏结束");
+  showGameNotice(m.payload?.message||"游戏结束",0,true);
  }else if(m.type==="ERROR"){
-  toast(m.payload?.message||"游戏模块发生错误");
+  showGameNotice(m.payload?.message||"游戏模块发生错误",0,true);
  }
 });
 function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:active.modes[modeIndex]==="本机双人"?"two":"ai"});newRound();}
