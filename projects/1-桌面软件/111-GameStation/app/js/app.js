@@ -148,12 +148,21 @@ function renderHeatmap(){
 function resizeHeatmap(){
  const grid=$("heatmapGrid"),content=grid?.parentElement,layout=grid?.closest(".heatmap-layout");
  if(!grid||!content||!layout)return;
- const weeks=Number(grid.dataset.weeks)||53,available=Math.max(0,content.clientWidth),gap=available<760?2:3;
+ const weeks=Number(grid.dataset.weeks)||53;
+ // Use the rendered content box, not clientWidth: the latter can be stale while
+ // the home grid is being reflowed after a viewport or panel-size change.
+ const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
+ const gap=available<760?2:3;
  const cell=Math.max(7,Math.min(22,Math.floor(((available-(weeks-1)*gap)/weeks)*2)/2));
- layout.style.setProperty("--heat-cell",cell+"px");layout.style.setProperty("--heat-gap",gap+"px");
- grid.style.setProperty("--heat-cell",cell+"px");grid.style.setProperty("--heat-gap",gap+"px");
- const gridWidth=grid.getBoundingClientRect().width;
+ layout.style.setProperty("--heat-cell",cell+"px","important");
+ layout.style.setProperty("--heat-gap",gap+"px","important");
+ grid.style.setProperty("--heat-cell",cell+"px","important");
+ grid.style.setProperty("--heat-gap",gap+"px","important");
+ grid.dataset.availableWidth=String(available);
+ grid.dataset.cellSize=String(cell);
+ const gridWidth=weeks*cell+(weeks-1)*gap;
  const months=$("heatmapMonths"),legend=content.querySelector(".heatmap-legend");
+ grid.style.width=gridWidth+"px";
  months.style.width=gridWidth+"px";if(legend)legend.style.width=gridWidth+"px";
  months.querySelectorAll("[data-column]").forEach(label=>{label.style.left=(Number(label.dataset.column)*(cell+gap))+"px";});
 }
@@ -361,7 +370,12 @@ document.addEventListener("contextmenu",e=>{if(e.target instanceof Element&&e.ta
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&ready&&!paused)pauseGame();});
 setInterval(()=>{if(session?.running)updateSessionDisplay();updateHomeClock();},1000);
 window.addEventListener("beforeunload",()=>{if(session?.running)persistSessionTime();persistStats();});
-if(typeof ResizeObserver!=="undefined"){heatmapObserver=new ResizeObserver(resizeHeatmap);heatmapObserver.observe($("heatmapGrid").parentElement);}
- window.addEventListener("resize",resizeHeatmap);
- updateCounts();applySettings();renderHeatmap();renderRanking();renderHomeRecent();updateHomeClock();dragHelp();
+if(typeof ResizeObserver!=="undefined"){
+ heatmapObserver=new ResizeObserver(()=>resizeHeatmap());
+ const heatmapGrid=$("heatmapGrid"),heatmapContent=heatmapGrid.parentElement,heatmapLayout=heatmapGrid.closest(".heatmap-layout"),activityPanel=heatmapGrid.closest(".activity-panel");
+ [heatmapContent,heatmapLayout,activityPanel].forEach(node=>node&&heatmapObserver.observe(node));
+}
+ window.addEventListener("resize",()=>requestAnimationFrame(resizeHeatmap));
+ updateCounts();applySettings();renderHeatmap();renderRanking();renderHomeRecent();updateHomeClock();
+ requestAnimationFrame(resizeHeatmap);dragHelp();
 })();
