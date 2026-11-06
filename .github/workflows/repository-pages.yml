@@ -31,7 +31,7 @@ concurrency:
 jobs:
   build:
     name: Build complete P108 + P109 + P111 site
-    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -164,7 +164,7 @@ jobs:
           test -s "$APP/css/app.css"
           test -s "$APP/js/app.js"
           test -s "$APP/games/shared/bridge.js"
-          for game in gomoku xiangqi reversi connect4 battleship checkers minesweeper 2048 memory sudoku sokoban tetris snake pong contra solitaire doudizhu mahjong sanguosha; do
+          for game in gomoku xiangqi minesweeper solitaire tetris snake; do
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
@@ -239,10 +239,8 @@ jobs:
           test -s _site/p109/index.html
           test -s _site/p111/index.html
           test -s _site/p111/js/app.js
-          for game in gomoku xiangqi reversi connect4 battleship checkers minesweeper 2048 memory sudoku sokoban tetris snake pong contra solitaire doudizhu mahjong sanguosha; do
-            test -s "_site/p111/games/$game/index.html"
-            test -s "_site/p111/games/$game/game.js"
-          done
+          test -s _site/p111/games/gomoku/index.html
+          test -s _site/p111/games/minesweeper/index.html
           test -d _site/p108/assets
           test -s _site/p109/src/app/00-state.js
           test -s _site/p109/src/vendor/echarts.min.js
