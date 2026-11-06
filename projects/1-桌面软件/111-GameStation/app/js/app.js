@@ -151,6 +151,7 @@ function resizeHeatmap(){
  const weeks=Number(grid.dataset.weeks)||53,available=Math.max(0,content.clientWidth),gap=available<760?2:3;
  const cell=Math.max(7,Math.min(22,Math.floor(((available-(weeks-1)*gap)/weeks)*2)/2));
  layout.style.setProperty("--heat-cell",cell+"px");layout.style.setProperty("--heat-gap",gap+"px");
+ grid.style.setProperty("--heat-cell",cell+"px");grid.style.setProperty("--heat-gap",gap+"px");
  const gridWidth=grid.getBoundingClientRect().width;
  const months=$("heatmapMonths"),legend=content.querySelector(".heatmap-legend");
  months.style.width=gridWidth+"px";if(legend)legend.style.width=gridWidth+"px";
