@@ -222,9 +222,10 @@ const names=[
     if(!noticeChecked){
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
     await page.locator("#gameNotice.visible").waitFor({timeout:1500});
-    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),s=document.querySelector("#gameStage").getBoundingClientRect();return{top:x.top,bottom:x.bottom,stageTop:s.top,stageBottom:s.bottom,message:el.textContent};});
-    assert.ok(r.top>=r.stageTop-1&&r.bottom<=r.stageTop+26,"game notices must stay in the narrow top ribbon without covering pieces");
-    assert.equal(await page.locator("#topbar #gameNotice").count(),0,"game notices must not occupy the titlebar");
+    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,centerX:x.left+x.width/2,centerY:x.top+x.height/2,barTop:b.top,barBottom:b.bottom,barCenterX:b.left+b.width/2,message:el.textContent,parent:el.parentElement.id};});
+    assert.equal(r.parent,"topbar","live status must be rendered in the topbar center");
+    assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must stay inside the titlebar, never below the game");
+    assert.ok(Math.abs(r.centerX-r.barCenterX)<=Math.max(12,(r.barBottom-r.barTop)*.5+8),"live notice must be horizontally centered in the titlebar: "+JSON.stringify(r));
     assert.match(r.message,/顶部通知位置回归测试/);
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
     noticeChecked=true;
