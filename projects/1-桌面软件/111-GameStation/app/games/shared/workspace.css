@@ -335,3 +335,26 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  max-height:none!important;min-height:0!important;margin:8px 9px 8px 0!important;
  box-shadow:0 4px 18px #203f5618!important;overflow-y:auto!important
 }
+
+
+/* R19.1 · 52px phantom row regression: override BOTH the base and
+   .gs-tools-open desktop grid variants after the old HUD rules. */
+.game-root.game-layout,
+.game-root.game-layout.gs-tools-open,
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed),
+.game-root.game-layout.rail-collapsed,
+.game-root.game-layout.card-table-layout,
+.game-root.game-layout.solitaire-layout,
+.game-root.game-layout.card-table-layout.gs-tools-open,
+.game-root.game-layout.solitaire-layout.gs-tools-open{
+  grid-template-rows:minmax(0,1fr)!important;
+  align-items:stretch!important;
+}
+.game-root.game-layout>.game-main-board,
+.game-root.game-layout.gs-tools-open>.game-main-board,
+.game-root.game-layout.rail-collapsed>.game-main-board{
+  grid-row:1!important;min-height:0!important;height:100%!important;
+}
+.game-root.game-layout.gs-tools-open>.game-tools{
+  grid-row:1!important;
+}
