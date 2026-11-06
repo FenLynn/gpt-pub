@@ -152,6 +152,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await load([...base,[0,7,"red","炮"],[0,2,"black","车"]]);
   const noScreen=await getMoves();
   assert.equal(noScreen.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"screenless cannon capture must be illegal");
+  // Cannon: highlight and click constraints must match exactly-one-screen rules.
+  await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,3,"black","卒"],[0,2,"black","车"]]);
+  const bounded=await getMoves();
+  assert.equal(bounded.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===3),true,"first enemy beyond one screen capturable");
+  assert.equal(bounded.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"second enemy beyond occupied target cannot be captured");
+  await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="7"]').click();
+  assert.equal(await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="3"].target').count(),1,"first legal target highlighted");
+  assert.equal(await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="2"].target').count(),0,"second target never highlighted");
+  await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="2"]').click();
+  assert.match(await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="7"]').getAttribute("aria-label"),/红炮/,"illegal target cannot move cannon");
+  await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"red","车"]]);
+  assert.equal((await getMoves()).some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"friendly piece cannot be captured");
   // Opposing generals on an empty shared file are mutually checking.
   await load([[4,0,"black","将"],[4,9,"red","帅"]]);
   assert.equal(await xiangqi.evaluate(()=>window.__p111XiangqiTest.faces()),true);
