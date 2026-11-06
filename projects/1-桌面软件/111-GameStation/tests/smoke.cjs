@@ -350,7 +350,7 @@ const names=[
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
   });
-  assert.ok(Math.abs(xiangqiRatio.width-xiangqiRatio.height)<=1.5,"Xiangqi pieces must be truly circular, not elliptical: "+JSON.stringify(xiangqiRatio));
+  assert.ok(Math.abs(xiangqiRatio.width-xiangqiRatio.height)<=.5,"Xiangqi pieces must be mathematically square before border-radius, not elliptical: "+JSON.stringify(xiangqiRatio));
   assert.equal(await frame.locator(".xiangqi-cell").count(),90,"Xiangqi must have exactly 90 intersections");
   await open("国际象棋");await start();
   assert.equal(await frame.locator(".chess-square").count(),64);
