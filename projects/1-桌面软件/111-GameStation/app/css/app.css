@@ -1055,6 +1055,10 @@ body{font-size:15px}
  #homeView .heatmap-layout{flex:1;min-height:0;align-items:center;gap:12px;margin:10px 0 0}
  #homeView .heatmap-content{flex:1 1 0%;width:0;min-width:0;max-width:none;overflow:hidden!important;padding-bottom:2px}
  #homeView .heatmap-months{height:19px}
+ /* Keep the original small dot density; center the 53-week group inside the full-width panel. */
+ #homeView .heatmap-months,#homeView .heatmap-grid,#homeView .heatmap-legend{
+  margin-left:auto!important;margin-right:auto!important
+ }
  /* Remove the old 53 fixed columns: each day occupies a fixed-width implicit column. */
  #homeView .heatmap-grid{display:grid;grid-template-columns:none!important;grid-template-rows:repeat(7,var(--heat-cell,11px))!important;
   grid-auto-columns:var(--heat-cell,11px)!important;grid-auto-flow:column!important;gap:var(--heat-gap,3px)!important;

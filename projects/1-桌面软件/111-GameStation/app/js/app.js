@@ -152,8 +152,11 @@ function resizeHeatmap(){
  // Use the rendered content box, not clientWidth: the latter can be stale while
  // the home grid is being reflowed after a viewport or panel-size change.
  const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
- const gap=available<760?2:3;
- const cell=Math.max(7,Math.min(22,Math.floor(((available-(weeks-1)*gap)/weeks)*2)/2));
+ // Keep the original compact GitHub-style dot size. The activity panel spans
+ // the full column; the individual dates must not grow to fill that width.
+ const compact=window.innerWidth<=1100;
+ const gap=compact?2:3;
+ const cell=compact?9:11;
  layout.style.setProperty("--heat-cell",cell+"px","important");
  layout.style.setProperty("--heat-gap",gap+"px","important");
  grid.style.setProperty("--heat-cell",cell+"px","important");
