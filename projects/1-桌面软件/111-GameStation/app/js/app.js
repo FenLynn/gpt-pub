@@ -114,10 +114,15 @@ function renderHeatmap(){
  resizeHeatmap();
 }
 function resizeHeatmap(){
- const grid=$("heatmapGrid"),content=grid?.parentElement;if(!grid||!content)return;
- const available=Math.max(0,content.clientWidth),cell=available<760?9:11,gap=available<760?2:3;
+ const grid=$("heatmapGrid"),content=grid?.parentElement,layout=grid?.closest(".heatmap-layout");
+ if(!grid||!content||!layout)return;
+ const available=Math.max(0,layout.clientWidth-26),cell=available<760?9:11,gap=available<760?2:3;
+ const weeks=Number(grid.dataset.weeks)||53,width=weeks*cell+(weeks-1)*gap;
  grid.style.setProperty("--heat-cell",cell+"px");grid.style.setProperty("--heat-gap",gap+"px");
- $("heatmapMonths").querySelectorAll("[data-column]").forEach(label=>{label.style.left=(Number(label.dataset.column)*(cell+gap))+"px";});
+ content.style.width=width+"px";content.style.flex="0 1 "+width+"px";
+ const months=$("heatmapMonths"),legend=content.querySelector(".heatmap-legend");
+ months.style.width=width+"px";if(legend)legend.style.width=width+"px";
+ months.querySelectorAll("[data-column]").forEach(label=>{label.style.left=(Number(label.dataset.column)*(cell+gap))+"px";});
 }
 function rankingValue(s,type){if(type==="time")return s.totalMs;if(type==="plays")return s.plays;return s.bestScore;}
 function renderRanking(){
