@@ -73,7 +73,7 @@ const names=[
   if(name==="中国象棋"){
    const geometry=await frame.locator(".xiangqi-board").evaluate(el=>{const r=el.getBoundingClientRect(),p=el.querySelector(".xiangqi-piece").getBoundingClientRect();return{boardRatio:r.width/r.height,pieceWidth:p.width,pieceHeight:p.height};});
    assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
-   assert.ok(Math.abs(geometry.pieceWidth-geometry.pieceHeight)<=1.2,"Every Xiangqi piece must be circular, never oval: "+JSON.stringify(geometry));
+   assert.ok(Math.abs(geometry.pieceWidth-geometry.pieceHeight)<=.5,"Every Xiangqi piece must be mathematically circular, never oval: "+JSON.stringify(geometry));
   }
   if(name==="飞行棋"){
    const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
