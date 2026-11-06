@@ -1027,7 +1027,7 @@ body{font-size:15px}
  #homeView.home-view{height:100%!important;min-height:0;overflow:hidden;padding:18px 20px;background:var(--page)}
  #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;grid-template-rows:minmax(0,1fr);gap:16px;align-items:stretch}
  #homeView .home-main{height:100%!important;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);
-  grid-template-rows:156px minmax(300px,1fr) 108px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
+  grid-template-rows:156px minmax(284px,1fr) 124px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
  #homeView .home-main>*{min-width:0;min-height:0}
  #homeView .home-hero{height:100%;min-height:0;display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.5fr);
   align-items:center;gap:16px;padding:15px 20px;border:1px solid #d9e7ef;border-radius:14px;
@@ -1089,7 +1089,7 @@ body{font-size:15px}
  #homeView .ranking-foot{margin-top:auto}
 }
 @media(min-width:701px) and (max-width:1120px){
- #homeView .home-main{grid-template-rows:176px minmax(260px,1fr) 108px!important}
+ #homeView .home-main{grid-template-rows:176px minmax(244px,1fr) 124px!important}
  #homeView .home-hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:7px;padding:11px 14px}
  #homeView .hero-copy{justify-content:flex-start}
  #homeView .home-hero .date-line{margin-bottom:2px}
@@ -1119,7 +1119,7 @@ body{font-size:15px}
 .game-card-icon{padding:6px}
 .game-card-icon .game-icon-svg{width:30px;height:30px}
 .recent-icon .game-icon-svg{width:38px;height:38px}
-.game-card-icon[data-category="board"],.recent-icon[data-category="board"]{color:#477f9f}
-.game-card-icon[data-category="puzzle"],.recent-icon[data-category="puzzle"]{color:#628d73}
-.game-card-icon[data-category="arcade"],.recent-icon[data-category="arcade"]{color:#b17b45}
-.game-card-icon[data-category="card"],.recent-icon[data-category="card"]{color:#8875a8}
+.game-card-icon[data-category="board"],#homeView .recent-icon[data-category="board"]{color:#477f9f}
+.game-card-icon[data-category="puzzle"],#homeView .recent-icon[data-category="puzzle"]{color:#628d73}
+.game-card-icon[data-category="arcade"],#homeView .recent-icon[data-category="arcade"]{color:#b17b45}
+.game-card-icon[data-category="card"],#homeView .recent-icon[data-category="card"]{color:#8875a8}

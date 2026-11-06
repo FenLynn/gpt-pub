@@ -116,6 +116,8 @@ const names=[
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
   assert.ok(recent.every(x=>x.svg),"Every recent game must use a local SVG icon, not an OS emoji glyph");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-icon-svg').count(),1,"90 坦克 must have a dedicated vector icon");
+  const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
+  assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent game labels must remain fully visible inside the strip: "+JSON.stringify(recentFit));
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
   async function homeLayoutCheck(width,height){
@@ -164,7 +166,9 @@ const names=[
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),24,"All 24 library games must have a local SVG pictogram");
-  assert.equal(await page.locator('.game-card[data-game="tank"] .game-icon-svg').count(),1,"The 90 tank library icon must not depend on emoji font support");
+  const iconColors=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color));
+  assert.notEqual(iconColors[0],iconColors[1],"Board and arcade icons must use distinct category colors");
+  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-svg').count(),1,"The 90 tank library icon must not depend on emoji font support");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});
