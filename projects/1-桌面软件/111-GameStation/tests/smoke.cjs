@@ -140,7 +140,7 @@ const names=[
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor}};
    });
    assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&visual.dot.width>=9&&visual.dot.width<=11.5,"Heatmap must retain square GitHub-style dots: "+JSON.stringify(visual));
-   assert.equal(visual.dot.columns,"none","Heatmap must use fixed implicit dot columns, not the old 53-column stretched grid");
+   assert.ok(visual.dot.autoColumn==="9px"||visual.dot.autoColumn==="11px","Heatmap implicit columns must remain fixed-size: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
    assert.equal(visual.recent.border,"0px/0px/0px/0px","Recent games must not be miniature bordered cards: "+JSON.stringify(visual));
