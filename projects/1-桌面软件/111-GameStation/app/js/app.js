@@ -326,5 +326,5 @@ setInterval(()=>{if(session?.running)updateSessionDisplay();updateHomeClock();},
 window.addEventListener("beforeunload",()=>{if(session?.running)persistSessionTime();persistStats();});
 if(typeof ResizeObserver!=="undefined"){heatmapObserver=new ResizeObserver(resizeHeatmap);heatmapObserver.observe($("heatmapGrid").parentElement);}
  window.addEventListener("resize",resizeHeatmap);
- updateCounts();applySettings();renderHeatmap();renderRanking();renderHomeRecent();renderHomeFeatured();updateHomeClock();dragHelp();
+ updateCounts();applySettings();renderHeatmap();renderRanking();renderHomeRecent();updateHomeClock();dragHelp();
 })();
