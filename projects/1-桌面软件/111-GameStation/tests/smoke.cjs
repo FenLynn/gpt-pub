@@ -180,7 +180,7 @@ const names=[
   async function homeLayoutCheck(width,height){
    await page.setViewportSize({width,height});
    // Wait for the browser's resize event / ResizeObserver animation frame to
-   // apply the fixed-size desktop/compact dot preset before measuring the grid.
+   // apply the content-width heatmap sizing before measuring the grid.
    await page.waitForFunction(()=>{
     const grid=document.querySelector("#heatmapGrid"),content=grid?.parentElement;
     return !!grid&&!!content&&Number.isFinite(Number(grid.dataset.availableWidth))&&
@@ -205,20 +205,23 @@ const names=[
     const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
-    const compact=window.innerWidth<=1100,expectedCell=compact?9:11,expectedGap=compact?2:3;
+    const measured=Math.floor(c.getBoundingClientRect().width),expectedGap=measured<820?2:3;
+    const expectedCell=Math.max(7,Math.min(17.5,Math.floor(((measured-52*expectedGap)/53)*2)/2));
     return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
      weekdayRow:parseFloat(getComputedStyle(layout.querySelector(".heatmap-weekdays")).gridTemplateRows.split(" ")[0]),
      measuredContentWidth:Number(grid.dataset.availableWidth),computedCellSize:Number(grid.dataset.cellSize),expectedCell,expectedGap};
    });
-   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap must preserve the original compact square dots (11px desktop / 9px compact): "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap dots must scale with the actual content width, capped at 17.5px: "+JSON.stringify(visual));
    assert.ok(Math.abs(parseFloat(visual.dot.autoColumn)-visual.dot.width)<.5,"Heatmap implicit columns must match the square dot size: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.weekdayRow-visual.dot.height)<.5,"Weekday labels must align with the heatmap row pitch: "+JSON.stringify(visual));
    assert.ok(visual.measuredContentWidth>=visual.dot.contentWidth*.95,"Heatmap sizing must use the rendered content width, not a stale clientWidth: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
    const expectedGridWidth=53*visual.expectedCell+52*visual.expectedGap;
-   assert.ok(Math.abs(visual.dot.gridWidth-expectedGridWidth)<1,"53-week heatmap must retain the original compact density: "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.dot.gridWidth-expectedGridWidth)<1,"53-week heatmap width must match its computed square-cell geometry: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth>=visual.dot.contentWidth*.90,"53-week dot matrix must make substantial use of the activity panel width: "+JSON.stringify(visual));
+   assert.ok(visual.expectedCell>11||visual.measuredContentWidth<760,"Wide desktop heatmap must not regress to the undersized 11px preset: "+JSON.stringify(visual));
    assert.ok(Math.abs((visual.dot.gridLeft+visual.dot.gridWidth/2)-(visual.dot.contentLeft+visual.dot.contentWidth/2))<2,"The small dot matrix must be centered inside the full-width activity panel: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
