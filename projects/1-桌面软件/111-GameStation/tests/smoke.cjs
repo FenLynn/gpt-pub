@@ -215,6 +215,10 @@ const names=[
   const mx=Number(await mario.getAttribute("data-player-x"));
   await mario.press("ArrowRight");await page.keyboard.down("ArrowRight");await page.waitForTimeout(150);await page.keyboard.up("ArrowRight");
   assert.ok(Number(await mario.getAttribute("data-player-x"))>mx,"Mario must respond to movement");
+  await open("海战棋");await start();
+  await frame.locator(".enemy-sea:not(:disabled)").first().click();
+  assert.equal(await frame.locator(".enemy-sea.shot-impact,.enemy-sea.shot-splash").count(),1,
+   "Battleship hit or miss must mark the latest shot for a nonblocking in-board animation");
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
    lines:el.querySelectorAll(".gomoku-lines line").length,
