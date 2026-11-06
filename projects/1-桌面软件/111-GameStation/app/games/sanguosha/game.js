@@ -244,6 +244,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
   aiProfile(v){return aiProfile(v);},
   aiTarget(seat){return chooseTarget(seat);},
   aiPlan(seat){const a=chooseAIAction(seat);return a?{type:a.card.type,target:a.target}:null;},
+  newGame(){newGame();},
   setRole(seat,role){players[seat].role=role;},
   setPublicSignals(seat,hostile,aggressive){hostility[seat]=hostile;aggression[seat]=aggressive;},
   flags(){return{usedKill,usedWine,current,phase};},

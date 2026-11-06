@@ -266,8 +266,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(lordTargetBefore,0,"The lord AI should prioritize the publicly demonstrated threat");
   // AI chooses only a legal target and uses its own hand; opponents' hidden cards are not inspected.
   for(let i=0;i<4;i++)await call("clearHand",i);
-  await call("setRole",1,"rebel");await call("setTurn",1);await call("addCard",1,"kill","spade");
-  const rebelPlan=await call("aiPlan",1);
+  await call("setRole",2,"rebel");await call("setTurn",2);await call("addCard",2,"kill","spade");
+  const rebelPlan=await call("aiPlan",2);
   assert.deepEqual(rebelPlan,{type:"kill",target:1},"Rebel AI must direct an available Kill at the publicly known lord");
   // Restore the fixture before the existing card-ID-zero Tianxiang regression.
   await call("newGame");
