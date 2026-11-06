@@ -187,8 +187,9 @@ const names=[
     if(!noticeChecked){
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
     await page.locator("#gameNotice.visible").waitFor({timeout:1500});
-    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),t=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,barTop:t.top,barBottom:t.bottom,message:el.textContent};});
-    assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must appear only in top titlebar");
+    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),s=document.querySelector("#gameStage").getBoundingClientRect();return{top:x.top,bottom:x.bottom,stageTop:s.top,stageBottom:s.bottom,message:el.textContent};});
+    assert.ok(r.top>=r.stageTop-1&&r.bottom<=r.stageTop+52,"game notices must float within the top edge of the game stage");
+    assert.equal(await page.locator("#topbar #gameNotice").count(),0,"game notices must not occupy the titlebar");
     assert.match(r.message,/顶部通知位置回归测试/);
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
     noticeChecked=true;
