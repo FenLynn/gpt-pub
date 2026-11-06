@@ -64,16 +64,25 @@ const names=[
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
   assert.ok(v.main.height>=v.root.height*.96,name+" game stage should use full iframe height: "+JSON.stringify(v));
   if(name==="五子棋"){
-   const geometry=await frame.locator(".gomoku-board").evaluate(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height,lines:el.querySelectorAll(".gomoku-lines line").length,cells:el.querySelectorAll(".gomoku-cell").length,border:parseFloat(getComputedStyle(el).borderTopWidth)};});
+   const geometry=await frame.locator(".gomoku-board").evaluate(el=>{
+    const r=el.getBoundingClientRect(),cells=[...el.querySelectorAll(".gomoku-cell")].map(n=>{const q=n.getBoundingClientRect();return{w:q.width,h:q.height};});
+    return{width:r.width,height:r.height,lines:el.querySelectorAll(".gomoku-lines line").length,cells:cells.length,
+     maxCellDelta:Math.max(...cells.map(c=>Math.abs(c.w-c.h))),border:parseFloat(getComputedStyle(el).borderTopWidth)};
+   });
    assert.ok(Math.abs(geometry.width-geometry.height)<=1,"Gomoku board must remain exactly square: "+JSON.stringify(geometry));
    assert.equal(geometry.lines,30,"Gomoku must draw all 15 horizontal and 15 vertical lines");
    assert.equal(geometry.cells,225,"Gomoku must retain all 225 intersections");
+   assert.ok(geometry.maxCellDelta<=1,"All 225 Gomoku intersections must remain square: "+JSON.stringify(geometry));
    assert.ok(geometry.border>=4,"Gomoku must retain a visible wood frame");
   }
   if(name==="中国象棋"){
-   const geometry=await frame.locator(".xiangqi-board").evaluate(el=>{const r=el.getBoundingClientRect(),p=el.querySelector(".xiangqi-piece").getBoundingClientRect();return{boardRatio:r.width/r.height,pieceWidth:p.width,pieceHeight:p.height};});
+   const geometry=await frame.locator(".xiangqi-board").evaluate(el=>{
+    const r=el.getBoundingClientRect(),pieces=[...el.querySelectorAll(".xiangqi-piece")].map(p=>{const q=p.getBoundingClientRect();return{w:q.width,h:q.height};});
+    return{boardRatio:r.width/r.height,pieceCount:pieces.length,maxPieceDelta:Math.max(...pieces.map(p=>Math.abs(p.w-p.h)))};
+   });
    assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
-   assert.ok(Math.abs(geometry.pieceWidth-geometry.pieceHeight)<=.5,"Every Xiangqi piece must be mathematically circular, never oval: "+JSON.stringify(geometry));
+   assert.equal(geometry.pieceCount,32,"Xiangqi must render all 32 starting pieces");
+   assert.ok(geometry.maxPieceDelta<=.5,"All 32 Xiangqi pieces must be mathematically circular, never oval: "+JSON.stringify(geometry));
   }
   if(name==="飞行棋"){
    const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
@@ -84,10 +93,15 @@ const names=[
    assert.equal(dice.turn,"红方回合","Resume must not overwrite the active player's turn label");
   }
   if(name==="中国跳棋"){
-   const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect(),holes=el.querySelectorAll(".star-hole").length,t=el.querySelector(".star-token")?.getBBox();return{ratio:r.width/r.height,holes,tokenWidth:t?.width,tokenHeight:t?.height};});
+   const geometry=await frame.locator("#board").evaluate(el=>{
+    const r=el.getBoundingClientRect(),tokens=[...el.querySelectorAll(".star-token")].map(t=>{const q=t.getBoundingClientRect();return{w:q.width,h:q.height};});
+    return{ratio:r.width/r.height,holes:el.querySelectorAll(".star-hole").length,tokenCount:tokens.length,
+     maxTokenDelta:Math.max(...tokens.map(t=>Math.abs(t.w-t.h)))};
+   });
    assert.ok(Math.abs(geometry.ratio-10/9)<=.025,"Chinese Checkers star board must retain its 10:9 geometry: "+JSON.stringify(geometry));
    assert.equal(geometry.holes,121,"Chinese Checkers must retain all 121 holes");
-   assert.ok(Math.abs(geometry.tokenWidth-geometry.tokenHeight)<=.1,"Chinese Checkers tokens must remain circular");
+   assert.equal(geometry.tokenCount,20,"Chinese Checkers must render both ten-piece camps");
+   assert.ok(geometry.maxTokenDelta<=.5,"All Chinese Checkers tokens must remain circular: "+JSON.stringify(geometry));
   }
   if(name==="飞行棋"||name==="西洋跳棋（8×8）"||name==="国际象棋"){
    const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect();return{ratio:r.width/r.height,width:r.width,height:r.height};});
