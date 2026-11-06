@@ -60,7 +60,7 @@ const names=[
     modeButtons:el.querySelectorAll("#gs-mode button").length,difficultyButtons:el.querySelectorAll("#gs-difficulty button").length,
     isBattleship:el.classList.contains("battleship-layout"),notice:box(el.querySelector("#gs-notice")),
     selectCount:el.querySelectorAll("#gs-hud select").length,
-    guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",
+    guide:guide?getComputedStyle(guide).display:"none",tools:tools?getComputedStyle(tools).display:"none",toolsBox:box(tools),
     urgent:["responseBar","tianxiangPanel","savePanel","claimBar","bidControls","playControls","actionPanel","gameControls","pendingActions"].some(id=>{const q=tools?.querySelector("#"+id);return !!q&&!q.hidden&&getComputedStyle(q).visibility!=="hidden"&&getComputedStyle(q).display!=="none";}),
     viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth};
   });
@@ -69,7 +69,10 @@ const names=[
   const toolsDisplay=await frame.locator(".game-tools").evaluate(el=>getComputedStyle(el).display);
   assert.equal(toolsDisplay,v.urgent?"flex":"none",name+" game tools open only for mandatory response controls");
   assert.equal(await frame.locator("#gs-tools").getAttribute("aria-expanded"),String(v.urgent),name+" tool toggle reflects automatic response visibility");
-  assert.ok(v.main.width>=v.root.width*.97,name+" main board must use almost full iframe width: "+JSON.stringify(v));
+  if(v.urgent){
+   assert.ok(v.main.width>=v.root.width*.68,name+" main board must retain a useful width beside the open tools rail: "+JSON.stringify(v));
+   assert.ok(v.toolsBox.x>=v.main.right-1,name+" open tools must dock to the right without covering the game board: "+JSON.stringify({main:v.main,tools:v.toolsBox}));
+  }else assert.ok(v.main.width>=v.root.width*.97,name+" main board must use almost full iframe width when tools are closed: "+JSON.stringify(v));
   assert.ok(v.main.height>=v.root.height-58,name+" game stage must use available height: "+JSON.stringify(v));
   assert.ok(v.hud.width>=v.root.width*.97,name+" unified toolbar must span the game width");
   const hostClock=await page.locator("#hostGameTimer").evaluate(el=>{
@@ -249,6 +252,15 @@ const names=[
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
   await open("麻将");await start();assert.equal(await frame.locator("#hand .playing-card").count(),14);
   await open("三国杀");await start();assert.equal(await frame.locator(".playing-card").count(),6);
+  const sanguoshaLayout=await frame.evaluate(()=>{
+   const rect=s=>{const r=s.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+   const main=rect(document.querySelector(".game-main-board")),tools=rect(document.querySelector(".game-tools"));
+   const players=[...document.querySelectorAll(".player-chip")].map(rect);
+   return{main,tools,players};
+  });
+  assert.equal(sanguoshaLayout.players.length,4,"Sanguosha must show all four seats");
+  assert.ok(sanguoshaLayout.tools.left>=sanguoshaLayout.main.right-1,"Sanguosha tools must not cover the battlefield");
+  assert.ok(sanguoshaLayout.players.every(p=>p.left>=sanguoshaLayout.main.left-1&&p.right<=sanguoshaLayout.main.right+1),"All four Sanguosha player cards must remain visible inside the battlefield");
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
   console.log("P111 R18 Chromium regression passed: 24 games × two desktop viewports (48 game screenshots), centered top-host timer, segmented controls, in-game notices, full-height surfaces, Minesweeper SVG/number sizing, contextmenu, Tetris and card/chess lifecycle.");

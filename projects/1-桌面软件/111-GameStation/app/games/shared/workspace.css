@@ -276,3 +276,37 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 /* Specific card-table layouts had an older zero-padding rule; notification lane must outrank it. */
 .game-root.game-layout.solitaire-layout.gs-notice-lane>.game-main-board,
 .game-root.game-layout.card-table-layout.gs-notice-lane>.game-main-board{padding-top:56px!important}
+
+
+/* R19 · Dock game tools beside the playfield instead of covering it.
+   The board reflows only while tools are open; closing tools restores full width. */
+@media(min-width:901px){
+ .game-root.game-layout.gs-tools-open{
+  grid-template-columns:minmax(0,1fr) minmax(240px,min(25vw,300px))!important;
+  grid-template-rows:52px minmax(0,1fr)!important;
+ }
+ .game-root.game-layout.gs-tools-open>.game-main-board{
+  grid-column:1!important;grid-row:2!important;min-width:0!important;
+ }
+ .game-root.game-layout.gs-tools-open>.game-tools{
+  position:relative!important;z-index:2!important;top:auto!important;right:auto!important;left:auto!important;bottom:auto!important;
+  grid-column:2!important;grid-row:2!important;align-self:stretch!important;
+  width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;max-height:none!important;
+  margin:8px 10px 8px 0!important;padding:12px!important;
+  border:1px solid #cadce7!important;border-radius:12px!important;
+  background:#fffffffa!important;box-shadow:0 4px 18px #203f5618!important;
+  overflow-x:hidden!important;overflow-y:auto!important;
+ }
+}
+@media(min-width:701px) and (max-width:900px){
+ .game-root.game-layout.gs-tools-open{
+  grid-template-columns:minmax(0,1fr) minmax(190px,230px)!important;
+  grid-template-rows:52px minmax(0,1fr)!important;
+ }
+ .game-root.game-layout.gs-tools-open>.game-main-board{grid-column:1!important;grid-row:2!important}
+ .game-root.game-layout.gs-tools-open>.game-tools{
+  position:relative!important;top:auto!important;right:auto!important;left:auto!important;bottom:auto!important;
+  grid-column:2!important;grid-row:2!important;width:auto!important;height:auto!important;max-height:none!important;
+  margin:6px 6px 6px 0!important;overflow:auto!important
+ }
+}
