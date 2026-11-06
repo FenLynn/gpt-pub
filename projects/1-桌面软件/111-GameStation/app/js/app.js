@@ -115,8 +115,7 @@ function renderHeatmap(){
 }
 function resizeHeatmap(){
  const grid=$("heatmapGrid"),content=grid?.parentElement;if(!grid||!content)return;
- const weeks=Number(grid.dataset.weeks)||53,available=Math.max(0,content.clientWidth),gap=available<620?1:3;
- const cell=Math.max(7,Math.min(22,Math.floor((available-(weeks-1)*gap)/weeks)));
+ const available=Math.max(0,content.clientWidth),cell=available<760?9:11,gap=available<760?2:3;
  grid.style.setProperty("--heat-cell",cell+"px");grid.style.setProperty("--heat-gap",gap+"px");
  $("heatmapMonths").querySelectorAll("[data-column]").forEach(label=>{label.style.left=(Number(label.dataset.column)*(cell+gap))+"px";});
 }

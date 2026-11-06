@@ -1022,14 +1022,15 @@ body{font-size:15px}
 }
 
 
-/* P111 R20 · dashboard home: metrics banner, full-width heatmap, horizontal recents, full-height ranking. */
+/* P111 R21 · restore the original square-dot heatmap and remove dashboard micro-cards. */
 @media(min-width:701px){
- #homeView.home-view{height:100%;min-height:0;overflow:hidden;padding:18px 20px;background:var(--page)}
- #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;gap:16px;align-items:stretch;align-content:stretch!important;grid-template-rows:minmax(0,1fr)}
- #homeView .home-main{height:100%!important;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);
-  grid-template-rows:164px minmax(0,1fr) 112px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
- #homeView .home-hero{height:100%;min-height:0;display:grid;grid-template-columns:minmax(260px,.88fr) minmax(0,1.52fr);
-  align-items:stretch;padding:15px 18px;border:1px solid #d9e7ef;border-radius:14px;
+ #homeView.home-view{height:100%!important;min-height:0;overflow:hidden;padding:18px 20px;background:var(--page)}
+ #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;grid-template-rows:minmax(0,1fr);gap:16px;align-items:stretch}
+ #homeView .home-main{height:100%!important;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);
+  grid-template-rows:156px minmax(300px,1fr) 108px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
+ #homeView .home-main>*{min-width:0;min-height:0}
+ #homeView .home-hero{height:100%;min-height:0;display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.5fr);
+  align-items:center;gap:16px;padding:15px 20px;border:1px solid #d9e7ef;border-radius:14px;
   background:linear-gradient(112deg,#fff 0%,#f4f8fa 55%,#e6f0f5 100%);box-shadow:0 7px 22px #24465c0b}
  #homeView .home-hero:before{opacity:.2}
  #homeView .hero-copy{max-width:none!important;min-width:0;display:flex;flex-direction:column;justify-content:center}
@@ -1039,39 +1040,49 @@ body{font-size:15px}
  #homeView .home-hero .date-line span{display:inline!important;font-size:12px}
  #homeView .home-hero h1{margin:2px 0 5px;font-size:25px}
  #homeView .hero-description{max-width:480px;font-size:12px;line-height:1.6}
- #homeView .hero-metrics{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;align-items:stretch}
- #homeView .hero-metric{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:7px;
-  padding:10px 11px;border:1px solid #dce8ef;border-radius:10px;background:#ffffffb8;overflow:hidden}
- #homeView .hero-metric-label{color:#8095a4;font-size:11px;font-weight:650;white-space:nowrap}
- #homeView .hero-metric strong{display:block;overflow:hidden;color:#315d78;font-size:clamp(13px,1.12vw,17px);
-  font-weight:780;line-height:1.25;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
- #homeView .hero-metric small{overflow:hidden;color:#9aabb5;font-size:10px;white-space:nowrap;text-overflow:ellipsis}
- #homeView .activity-panel{height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;
-  padding:17px 20px;border:1px solid #dce7ed;border-radius:13px;background:#ffffffed;overflow:hidden}
+ /* Five usage metrics remain plain typography: no card, border, tile or per-item background. */
+ #homeView .hero-metrics{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:center}
+ #homeView .hero-metric{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:6px;
+  padding:0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;overflow:hidden}
+ #homeView .hero-metric-label{color:#8196a4;font-size:10px;font-weight:650;white-space:nowrap}
+ #homeView .hero-metric strong{display:block;overflow:hidden;color:#315d78;font-size:clamp(12px,1.05vw,16px);
+  font-weight:760;line-height:1.25;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+ #homeView .hero-metric small{display:none!important}
+ #homeView .activity-panel{height:100%!important;min-height:300px;align-self:stretch;display:flex;flex-direction:column;
+  justify-content:flex-start;padding:17px 20px;border:1px solid #dce7ed;border-radius:13px;background:#ffffffed;overflow:hidden}
  #homeView .panel-heading h2{font-size:16px}
  #homeView .panel-heading p{font-size:11px}
  #homeView .heatmap-layout{flex:1;min-height:0;align-items:center;gap:12px;margin:10px 0 0}
- #homeView .heatmap-content{flex:1;min-width:0;overflow:hidden!important}
+ #homeView .heatmap-content{flex:1;min-width:0;overflow-x:auto!important;overflow-y:hidden!important;padding-bottom:2px}
  #homeView .heatmap-months{height:19px}
- #homeView .heatmap-grid{max-width:100%}
+ /* Remove the old 53 fixed columns: each day occupies a fixed-width implicit column. */
+ #homeView .heatmap-grid{display:grid;grid-template-columns:none!important;grid-template-rows:repeat(7,var(--heat-cell,11px))!important;
+  grid-auto-columns:var(--heat-cell,11px)!important;grid-auto-flow:column!important;gap:var(--heat-gap,3px)!important;
+  width:max-content!important;max-width:none!important}
+ #homeView .heatmap-cell{width:var(--heat-cell,11px)!important;height:var(--heat-cell,11px)!important;
+  flex:none;border-radius:3px}
+ #homeView .heatmap-cell.empty{background:transparent!important;outline:0!important}
  #homeView .heatmap-legend{margin-top:12px}
- #homeView .recent-panel{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);
-  gap:8px;padding:10px 15px;border:1px solid #dce7ed;border-radius:12px;background:#ffffffed;overflow:hidden}
+ #homeView .recent-panel{height:100%!important;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);
+  gap:5px;padding:9px 15px;border:1px solid #dce7ed;border-radius:12px;background:#ffffffed;overflow:hidden}
  #homeView .recent-heading{display:flex;align-items:center;justify-content:space-between;min-width:0}
  #homeView .recent-heading h2{margin:0;color:#2d4d63;font-size:14px;font-weight:760}
  #homeView .recent-heading p{margin:2px 0 0;color:#91a2ad;font-size:10px}
- #homeView .recent-list{display:flex;flex-direction:row;align-items:stretch;gap:9px;min-width:0;min-height:0;
-  overflow-x:auto;overflow-y:hidden;padding:1px 1px 3px;scrollbar-width:thin;scrollbar-color:#cbdbe5 transparent}
- #homeView .recent-game{flex:0 0 138px;min-width:0;min-height:0;display:flex;align-items:center;gap:9px;
-  padding:6px 9px;border:1px solid #e1eaf0;border-radius:9px;background:#fafdfe;text-align:left;
-  transition:background .14s,border-color .14s,transform .14s}
- #homeView .recent-game:hover{background:#f0f7fb;border-color:#bfd5e2;transform:translateY(-1px)}
- #homeView .recent-icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:9px;
-  background:#eaf2f7;color:#477b9a;font-size:23px;line-height:1;
+ /* Recent games are a simple icon strip, not a row of miniature cards. */
+ #homeView .recent-list{display:flex;flex-direction:row;align-items:center;gap:20px;min-width:0;min-height:0;
+  overflow-x:auto;overflow-y:hidden;padding:0 4px 2px;scrollbar-width:thin;scrollbar-color:#cbdbe5 transparent}
+ #homeView .recent-game{flex:0 0 62px;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding:1px 0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;text-align:center;
+  transition:transform .14s}
+ #homeView .recent-game:hover{background:transparent!important;border-color:transparent!important;transform:translateY(-2px)}
+ #homeView .recent-game:focus-visible{outline:2px solid #8bb6ce;outline-offset:2px;border-radius:6px}
+ #homeView .recent-icon{width:auto;height:auto;flex:none;display:grid;place-items:center;border:0;border-radius:0;
+  padding:0;background:transparent!important;color:#477b9a;font-size:29px;line-height:1;
   font-family:"Segoe UI Emoji","Apple Color Emoji","Segoe UI Symbol",sans-serif}
- #homeView .recent-copy{min-width:0;display:flex;align-items:center}
- #homeView .recent-copy strong{overflow:hidden;color:#3c5b70;font-size:12px;font-weight:740;text-overflow:ellipsis;white-space:nowrap}
- #homeView .recent-empty{display:flex;align-items:center;padding:0 10px;color:#93a5b0;font-size:12px}
+ #homeView .recent-copy{width:100%;min-width:0;display:block;text-align:center}
+ #homeView .recent-copy strong{display:block;overflow:hidden;color:#587387;font-size:10px;font-weight:620;
+  text-overflow:ellipsis;white-space:nowrap}
+ #homeView .recent-empty{display:flex;align-items:center;padding:0 8px;color:#93a5b0;font-size:12px}
  #homeView .ranking-panel{height:100%!important;min-height:0;align-self:stretch;display:flex;flex-direction:column;
   padding:16px 14px;border-radius:13px;overflow:hidden}
  #homeView .ranking-mark{font-size:10px;letter-spacing:0}
@@ -1079,27 +1090,28 @@ body{font-size:15px}
  #homeView .ranking-foot{margin-top:auto}
 }
 @media(min-width:701px) and (max-width:1120px){
- #homeView .home-main{grid-template-rows:190px minmax(0,1fr) 112px!important}
- #homeView .home-hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:9px;padding:12px 15px}
+ #homeView .home-main{grid-template-rows:176px minmax(260px,1fr) 108px!important}
+ #homeView .home-hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:7px;padding:11px 14px}
  #homeView .hero-copy{justify-content:flex-start}
- #homeView .home-hero .date-line{margin-bottom:3px}
- #homeView .home-hero h1{font-size:21px}
- #homeView .hero-description{font-size:11px}
- #homeView .hero-metrics{gap:5px}
- #homeView .hero-metric{gap:4px;padding:6px 7px}
- #homeView .hero-metric-label{font-size:10px}
+ #homeView .home-hero .date-line{margin-bottom:2px}
+ #homeView .home-hero h1{font-size:20px}
+ #homeView .hero-description{font-size:10px}
+ #homeView .hero-metrics{gap:9px}
+ #homeView .hero-metric{gap:4px}
+ #homeView .hero-metric-label{font-size:9px}
  #homeView .hero-metric strong{font-size:12px}
- #homeView .hero-metric small{font-size:9px}
- #homeView .recent-game{flex-basis:120px}
+ #homeView .recent-list{gap:13px}
 }
 @media(max-width:700px){
  #homeView .home-hero{display:flex;flex-direction:column;align-items:stretch;gap:10px}
- #homeView .hero-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
- #homeView .hero-metric{padding:7px;border:1px solid #dce8ef;border-radius:8px;background:#ffffffb8}
+ #homeView .hero-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ #homeView .hero-metric{padding:0;border:0;background:transparent}
  #homeView .hero-metric-label{font-size:10px;color:#8095a4}
  #homeView .hero-metric strong{font-size:13px;color:#315d78}
- #homeView .hero-metric small{font-size:9px;color:#9aabb5}
- #homeView .recent-list{display:flex;flex-direction:row;gap:7px;overflow-x:auto}
- #homeView .recent-game{flex:0 0 125px;display:flex;align-items:center;gap:8px}
+ #homeView .hero-metric small{display:none}
+ #homeView .recent-list{display:flex;flex-direction:row;align-items:center;gap:12px;overflow-x:auto}
+ #homeView .recent-game{flex:0 0 58px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:transparent}
+ #homeView .recent-icon{width:auto;height:auto;background:transparent;font-size:26px}
+ #homeView .recent-copy strong{font-size:9px}
  #homeView .recent-empty{font-size:11px}
 }

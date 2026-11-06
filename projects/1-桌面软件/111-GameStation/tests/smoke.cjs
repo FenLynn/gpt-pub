@@ -121,13 +121,30 @@ const names=[
     const rect=q=>{const r=q.getBoundingClientRect();return{top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
     return{home:rect(el),main:rect(el.querySelector(".home-main")),hero:rect(el.querySelector(".home-hero")),
      heat:rect(el.querySelector(".activity-panel")),recent:rect(el.querySelector(".recent-panel")),ranking:rect(el.querySelector(".ranking-panel")),
-     listDisplay:getComputedStyle(el.querySelector("#homeRecentList")).display,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};
+     listDisplay:getComputedStyle(el.querySelector("#homeRecentList")).display,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,
+     viewportHeight:window.innerHeight};
    });
    assert.ok(box.main.bottom>=box.home.bottom-22,"Main dashboard must use the full vertical area: "+JSON.stringify(box));
    assert.ok(box.ranking.bottom>=box.home.bottom-22,"Ranking must extend to the bottom edge: "+JSON.stringify(box));
+   assert.ok(box.home.bottom>=box.viewportHeight-22,"Home view must reach the viewport bottom: "+JSON.stringify(box));
    assert.ok(box.heat.width>=box.main.width*.98,"Heatmap must occupy the full left-column width: "+JSON.stringify(box));
-   assert.ok(box.recent.top>=box.heat.bottom-1,"Recent strip must sit below the heatmap: "+JSON.stringify(box));
+   assert.ok(box.recent.top>=box.heat.bottom-1&&box.recent.top-box.heat.bottom<=16,"Recent strip must sit directly below the heatmap without a large blank gap: "+JSON.stringify(box));
+   assert.ok(box.heat.height>=box.main.height*.42,"Heatmap panel must absorb the available middle height: "+JSON.stringify(box));
+   assert.ok(box.recent.bottom>=box.main.bottom-4,"Recent strip must sit at the bottom of the main column: "+JSON.stringify(box));
    assert.equal(box.listDisplay,"flex","Recent games must be a horizontal icon row");
+   const visual=await page.evaluate(()=>{
+    const grid=document.querySelector("#heatmapGrid"),cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect();
+    const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
+    return{dot:{width:r.width,height:r.height,columns:getComputedStyle(grid).gridTemplateColumns,autoColumn:getComputedStyle(grid).gridAutoColumns},
+     metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
+     recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor}};
+   });
+   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&visual.dot.width>=9&&visual.dot.width<=11.5,"Heatmap must retain square GitHub-style dots: "+JSON.stringify(visual));
+   assert.equal(visual.dot.columns,"none","Heatmap must use fixed implicit dot columns, not the old 53-column stretched grid");
+   assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
+   assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
+   assert.equal(visual.recent.border,"0px/0px/0px/0px","Recent games must not be miniature bordered cards: "+JSON.stringify(visual));
+   assert.equal(visual.recent.background,"rgba(0, 0, 0, 0)","Recent games must be an unboxed icon strip: "+JSON.stringify(visual));
    assert.ok(box.scrollHeight<=box.clientHeight+2,"Home must not leave content below the viewport");
   }
   await homeLayoutCheck(1752,860);
