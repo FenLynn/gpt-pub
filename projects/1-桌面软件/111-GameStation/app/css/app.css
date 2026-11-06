@@ -1208,3 +1208,6 @@ body{font-size:15px}
  opacity:0;pointer-events:none;transition:opacity .16s ease,border-color .16s ease,background .16s ease
 }
 .game-notice-overlay.visible{opacity:1;border-color:#cfe3ef;background:rgba(225,240,249,.96)}
+
+/* Keep the ordinary Home / Library header layout intact after grouping game controls. */
+.topbar-leading{display:flex;align-items:center;min-width:0;flex:1;gap:10px}

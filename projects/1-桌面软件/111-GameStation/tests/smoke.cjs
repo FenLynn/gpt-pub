@@ -1,4 +1,4 @@
-/* P111 R16: current-screen UI and 22-game actual Chromium lifecycle regression. */
+/* P111 R16: current-screen UI and 24-game actual Chromium lifecycle regression. */
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
 const path=require("node:path");
@@ -82,7 +82,7 @@ const names=[
   assert.equal(header.noticePosition,"absolute",name+" status notice must be an overlay, not a titlebar item");
   assert.ok(header.notice.y>=header.stage.y&&header.notice.y<header.stage.y+30,name+" status notice must appear at the top of the game surface: "+JSON.stringify(header));
   assert.ok(header.notice.width>=65,name+" floating notification space should be readable");
-  assert.ok(Math.max(...header.actions.map(x=>x.center))-Math.min(...header.actions.map(x=>x.center))<=2,name+" SVG controls vertically aligned");
+  assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
   assert.ok(v.overflow<=v.viewport+2,name+" no horizontal scrollbar");
