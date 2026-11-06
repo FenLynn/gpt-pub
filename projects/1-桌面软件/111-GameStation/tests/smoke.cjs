@@ -75,6 +75,13 @@ const names=[
    assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
    assert.ok(Math.abs(geometry.pieceWidth-geometry.pieceHeight)<=1.2,"Every Xiangqi piece must be circular, never oval: "+JSON.stringify(geometry));
   }
+  if(name==="飞行棋"){
+   const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
+   assert.equal(dice.svg,1,"Flight Chess must use a vector dice face");
+   assert.equal(dice.pips,1,"Initial Flight Chess die must show one pip");
+   assert.equal(dice.label,"骰子：1点","Flight Chess die must expose its value accessibly");
+   assert.equal(dice.turn,"红方回合","Resume must not overwrite the active player's turn label");
+  }
   if(name==="中国跳棋"){
    const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect(),holes=el.querySelectorAll(".star-hole").length,t=el.querySelector(".star-token")?.getBBox();return{ratio:r.width/r.height,holes,tokenWidth:t?.width,tokenHeight:t?.height};});
    assert.ok(Math.abs(geometry.ratio-10/9)<=.025,"Chinese Checkers star board must retain its 10:9 geometry: "+JSON.stringify(geometry));

@@ -1617,3 +1617,13 @@ html,body,#game{width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;
 @keyframes r18-hit{0%{box-shadow:inset 0 0 0 0 #ffffff,0 0 0 0 #d65a40;transform:scale(.85)}50%{box-shadow:inset 0 0 0 3px #ffefd7,0 0 0 6px #e489645c;transform:scale(1.05)}100%{box-shadow:inset 0 0 0 1px #fff5,0 0 0 0 transparent;transform:scale(1)}}
 @keyframes r18-water{0%{box-shadow:inset 0 0 0 0 #bce9f9;transform:scale(.85)}65%{box-shadow:inset 0 0 0 4px #bce9f9,0 0 0 3px #7ec4dc70;transform:scale(1.04)}100%{transform:scale(1);box-shadow:none}}
 @media(prefers-reduced-motion:reduce){.battleship-layout .fleet-board .sea-cell.shot-impact,.battleship-layout .fleet-board .sea-cell.shot-splash{animation:none!important}}
+
+
+/* R21.6 · Local SVG dice avoids platform-dependent Unicode glyph fallback. */
+.flight-chess-layout .flight-dice{width:52px;height:52px;display:grid;place-items:center;padding:0;color:#4e718e;font-size:0;line-height:1;text-shadow:none}
+.flight-chess-layout .flight-dice-svg{display:block;width:100%;height:100%;overflow:visible;transform-origin:50% 50%;filter:drop-shadow(0 2px 2px rgba(51,79,101,.16))}
+.flight-chess-layout .flight-dice-body{fill:#fffdf7;stroke:#91b2c8;stroke-width:4}
+.flight-chess-layout .flight-dice-pip{fill:#456f8a}
+.flight-chess-layout .flight-dice.rolling .flight-dice-svg{animation:p111-flight-dice-roll .46s cubic-bezier(.2,.75,.28,1) both}
+@keyframes p111-flight-dice-roll{0%{transform:rotate(-16deg) scale(.82)}34%{transform:rotate(13deg) scale(1.08)}68%{transform:rotate(-5deg) scale(.98)}100%{transform:rotate(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.flight-chess-layout .flight-dice.rolling .flight-dice-svg{animation:none!important}}
