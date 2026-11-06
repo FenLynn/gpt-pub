@@ -380,6 +380,12 @@ const names=[
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
   await open("麻将");await start();assert.equal(await frame.locator("#hand .playing-card").count(),14);
   await open("三国杀");await start();assert.equal(await frame.locator(".playing-card").count(),6);
+  await page.locator("#pauseButton").click();
+  await page.waitForFunction(()=>document.querySelector("#gameNotice")?.textContent.trim()==="已暂停");
+  assert.equal(await frame.locator("#tableInfo").innerText(),"已暂停","Sanguosha side status must reflect pause");
+  await page.locator("#pauseButton").click();
+  await page.waitForFunction(()=>document.querySelector("#gameNotice")?.textContent.trim()==="你的回合");
+  assert.equal(await frame.locator("#tableInfo").innerText(),"你的回合","Sanguosha side status must reflect resume");
   const sanguoshaLayout=await frame.locator("#game").evaluate(()=>{
    const rect=s=>{const r=s.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
    const main=rect(document.querySelector(".game-main-board")),tools=rect(document.querySelector(".game-tools"));

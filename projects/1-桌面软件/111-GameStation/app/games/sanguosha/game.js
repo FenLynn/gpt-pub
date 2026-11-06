@@ -6,6 +6,7 @@ let players=[],deck=[],discardPile=[],current=0,phase="play",selected=null,targe
 const defs=[["杀","kill",16],["闪","dodge",10],["桃","peach",8],["酒","wine",4],["决斗","duel",4],["过河拆桥","dismantle",4],["顺手牵羊","steal",4],["无中生有","draw2",4],["南蛮入侵","barbarian",2],["万箭齐发","arrows",2],["桃园结义","peachGarden",2]];
 const suits=["spade","heart","club","diamond"],suitText={spade:"♠",heart:"♥",club:"♣",diamond:"♦"};
 function makeDeck(){const a=[];let id=0;for(const [name,type,n] of defs)for(let i=0;i<n;i++)a.push({id:id++,name,type,suit:suits[i%4],rank:i%13+1});for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function report(t){status.textContent=t;GameBridge.report(t,{score});}
 function log(t){
  const latest=logEl.firstElementChild;
  // Repeated INIT/READY cycles can announce the same opening turn more than once.
@@ -14,7 +15,7 @@ function log(t){
   const row=document.createElement("div");row.textContent=t;logEl.prepend(row);
   while(logEl.children.length>5)logEl.lastChild.remove();
  }
- status.textContent=t;GameBridge.report(t,{score});
+ report(t);
 }
 function alive(){return players.filter(p=>p.alive);}
 function heartCard(card,seat){return card.suit==="heart"||(seat===0&&card.suit==="spade");}
@@ -262,5 +263,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
    pendingResponse:!!pendingResponse,pendingTianxiang:!!pendingTianxiang,over};}
  };
 }
-GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);status.textContent="已暂停";render();},resume(){paused=false;status.textContent=current===0?"你的回合":"AI "+current+" 的回合";render();scheduleAI();},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
+GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");render();},resume(){paused=false;report(current===0?"你的回合":"AI "+current+" 的回合");render();scheduleAI();},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
