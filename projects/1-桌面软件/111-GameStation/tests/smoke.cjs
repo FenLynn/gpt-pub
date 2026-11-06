@@ -251,6 +251,6 @@ const names=[
   await open("三国杀");await start();assert.equal(await frame.locator(".playing-card").count(),6);
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
-  console.log("P111 R17 Chromium regression passed: 22 games × two desktop viewports, centered top-host timer, segmented controls, in-game notices, full-height surfaces, Minesweeper SVG/number sizing, contextmenu, Tetris and card/chess lifecycle.");
+  console.log("P111 R18 Chromium regression passed: 24 games × two desktop viewports (48 game screenshots), centered top-host timer, segmented controls, in-game notices, full-height surfaces, Minesweeper SVG/number sizing, contextmenu, Tetris and card/chess lifecycle.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});

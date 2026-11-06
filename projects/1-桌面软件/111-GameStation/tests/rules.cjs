@@ -415,6 +415,6 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await ddz.close();
   await xiangqi.close();
   assert.deepEqual(errors,[]);
-  console.log("P111 rule fixtures passed: chess; Xiangqi; Sanguosha; Dou Dizhu; Mahjong 136-tile wall, Hu patterns, claim priority, Chi/Pong/Kong, concealed/added/rob-kong and wall exhaustion.");
+  console.log("P111 R18 rule fixtures passed: Chess; Xiangqi; Chinese Checkers 121 holes/multi-hop/undo; Flight Chess 52 squares/capture/safe/finish; Sanguosha; Dou Dizhu; Mahjong 136-tile wall, Hu patterns, claim priority, Chi/Pong/Kong, concealed/added/rob-kong and wall exhaustion.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});
