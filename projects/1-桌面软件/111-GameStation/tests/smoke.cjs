@@ -88,10 +88,7 @@ const names=[
  }
  try{
   await fs.promises.mkdir(path.join(artifacts,"games"),{recursive:true});
-  await page.goto(pathToFileURL(path.join(root,"index.html")).href);
-  await page.locator("#homeDate").waitFor({state:"visible"});
-  assert.equal(await page.locator(".brand-mark i").count(),4);
-  await page.evaluate(()=>{
+  await page.addInitScript(()=>{
    const now=Date.now(),d=new Date(now),today=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
    const prior=new Date(now);prior.setDate(prior.getDate()-1);
    const yesterday=prior.getFullYear()+"-"+String(prior.getMonth()+1).padStart(2,"0")+"-"+String(prior.getDate()).padStart(2,"0");
@@ -104,7 +101,9 @@ const names=[
    localStorage.setItem("gamestation.stats",JSON.stringify(stats));
    localStorage.setItem("gamestation.firstStartedAt",String(first.getTime()));
   });
-  await page.reload();
+  await page.goto(pathToFileURL(path.join(root,"index.html")).href);
+  await page.locator("#homeDate").waitFor({state:"visible"});
+  assert.equal(await page.locator(".brand-mark i").count(),4);
   await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
   assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
