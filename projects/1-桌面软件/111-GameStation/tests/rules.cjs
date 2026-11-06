@@ -253,6 +253,24 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(skillState.players[0].hp,3,"天香 prevents damage to 小乔");
   assert.equal(skillState.players[2].hp,2,"天香 transfers the damage");
   assert.equal(skillState.players[2].hand.length,targetHandBefore+2,"天香 target draws two cards for 4 max HP minus 2 remaining HP");
+  // AI difficulty changes decision policy and response resource use, not just delay.
+  const sgProfiles=await sg.evaluate(()=>["easy","normal","hard"].map(level=>window.__p111SanguoshaTest.aiProfile(level)));
+  assert.deepEqual(sgProfiles.map(x=>x.policy),["随机合法出牌","局面评分与基础攻防","威胁评估与资源管理"]);
+  assert.ok(sgProfiles[0].responseBase<sgProfiles[1].responseBase&&sgProfiles[1].responseBase<sgProfiles[2].responseBase,
+    "Sanguosha AI difficulty must change response policy");
+  // An AI must not read the hidden identities of other seats when choosing a target.
+  await call("setRole",1,"lord");await call("setPublicSignals",0,4,5);await call("setPublicSignals",2,0,1);
+  const lordTargetBefore=await call("aiTarget",1);
+  await call("setRole",0,"spy");await call("setRole",2,"loyalist");await call("setRole",3,"rebel");
+  assert.equal(await call("aiTarget",1),lordTargetBefore,"Changing hidden opponent roles cannot change an AI's target");
+  assert.equal(lordTargetBefore,0,"The lord AI should prioritize the publicly demonstrated threat");
+  // AI chooses only a legal target and uses its own hand; opponents' hidden cards are not inspected.
+  for(let i=0;i<4;i++)await call("clearHand",i);
+  await call("setRole",1,"rebel");await call("setTurn",1);await call("addCard",1,"kill","spade");
+  const rebelPlan=await call("aiPlan",1);
+  assert.deepEqual(rebelPlan,{type:"kill",target:1},"Rebel AI must direct an available Kill at the publicly known lord");
+  // Restore the fixture before the existing card-ID-zero Tianxiang regression.
+  await call("newGame");
   // Card ID 0 is valid; Tianxiang must not treat it as absence of a selection.
   for(let i=0;i<4;i++)await call("clearHand",i);
   await call("setHp",0,3);await call("setHp",2,4);await call("addCard",0,"kill","spade",0);

@@ -2,7 +2,7 @@
 "use strict";
 const handEl=document.getElementById("hand"),status=document.getElementById("tableInfo"),logEl=document.getElementById("gameLog");
 const lordSeat=1,roleText={lord:"主公",loyalist:"忠臣",rebel:"反贼",spy:"内奸"};
-let players=[],deck=[],discardPile=[],current=0,phase="play",selected=null,targetMode=false,usedKill=false,usedWine=false,paused=false,over=false,timer=null,difficulty="normal",score=0,hostility=[0,0,0,0],pendingResponse=null,pendingTianxiang=null,pendingSave=null,aiBusy=false;
+let players=[],deck=[],discardPile=[],current=0,phase="play",selected=null,targetMode=false,usedKill=false,usedWine=false,paused=false,over=false,timer=null,difficulty="normal",score=0,hostility=[0,0,0,0],aggression=[0,0,0,0],pendingResponse=null,pendingTianxiang=null,pendingSave=null,aiBusy=false;
 const defs=[["杀","kill",16],["闪","dodge",10],["桃","peach",8],["酒","wine",4],["决斗","duel",4],["过河拆桥","dismantle",4],["顺手牵羊","steal",4],["无中生有","draw2",4],["南蛮入侵","barbarian",2],["万箭齐发","arrows",2],["桃园结义","peachGarden",2]];
 const suits=["spade","heart","club","diamond"],suitText={spade:"♠",heart:"♥",club:"♣",diamond:"♦"};
 function makeDeck(){const a=[];let id=0;for(const [name,type,n] of defs)for(let i=0;i<n;i++)a.push({id:id++,name,type,suit:suits[i%4],rank:i%13+1});for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
@@ -58,7 +58,67 @@ function die(seat){const p=players[seat];if(!p.alive)return;p.alive=false;log((s
 function nextAlive(seat){for(let i=1;i<=4;i++){const n=(seat+i)%4;if(players[n].alive)return n;}return seat;}
 function startTurn(seat){if(over)return;current=seat;phase="play";usedKill=false;usedWine=false;players[seat].drunk=false;drawCards(seat,2);log(seat===0?"你的回合":seat===lordSeat?"主公的回合":"AI "+seat+" 的回合");render();if(seat!==0)scheduleAI();}
 function endTurn(){if(paused||over||current!==0)return;selected=null;targetMode=false;startTurn(nextAlive(current));}
-function chooseTarget(seat){const p=players[seat];if(p.role==="rebel")return players[lordSeat].alive?lordSeat:nextAlive(seat);if(p.role==="lord"){let best=-1,heat=0;for(let i=0;i<4;i++)if(i!==seat&&players[i].alive&&hostility[i]>heat){heat=hostility[i];best=i;}if(best>=0)return best;}if(p.role==="loyalist"){let best=-1,bestScore=-1;for(let i=0;i<4;i++)if(i!==seat&&i!==lordSeat&&players[i].alive&&hostility[i]>bestScore){best=i;bestScore=hostility[i];}return best>=0?best:(players[lordSeat].alive?lordSeat:nextAlive(seat));}let choices=alive().filter(x=>x.seat!==seat);choices.sort((a,b)=>a.hp-b.hp);return choices[0]?.seat??lordSeat;}
+function aiProfile(level=difficulty){
+ if(level==="easy")return{policy:"随机合法出牌",responseBase:.38,tacticalWeight:0};
+ if(level==="hard")return{policy:"威胁评估与资源管理",responseBase:.88,tacticalWeight:1.35};
+ return{policy:"局面评分与基础攻防",responseBase:.66,tacticalWeight:1};
+}
+function publicThreat(seat){
+ const p=players[seat];if(!p)return 0;
+ return (hostility[seat]||0)*3+(aggression[seat]||0)*.8+(p.maxHp-p.hp)*1.25;
+}
+function chooseTarget(seat){
+ const self=players[seat];if(!self)return -1;
+ const candidates=alive().filter(p=>p.seat!==seat);if(!candidates.length)return -1;
+ if(self.role==="rebel"&&players[lordSeat]?.alive)return lordSeat;
+ if(self.role==="spy"){
+  return candidates.slice().sort((a,b)=>a.hp-b.hp||publicThreat(b.seat)-publicThreat(a.seat))[0].seat;
+ }
+ if(self.role==="loyalist"){
+  const suspects=candidates.filter(p=>p.seat!==lordSeat&&((hostility[p.seat]||0)>0||(aggression[p.seat]||0)>0));
+  if(!suspects.length)return -1;
+  return suspects.sort((a,b)=>publicThreat(b.seat)-publicThreat(a.seat))[0].seat;
+ }
+ return candidates.slice().sort((a,b)=>publicThreat(b.seat)-publicThreat(a.seat)||a.hp-b.hp)[0].seat;
+}
+function shouldAIRespond(target,kind,source){
+ const card=findCard(target,kind);if(!card)return false;
+ const p=players[target],profile=aiProfile();
+ let chance=profile.responseBase;
+ if(p.hp<=1)chance+=.12;
+ else if(p.hp===2)chance+=.06;
+ if(source>=0&&(hostility[source]||0)>0)chance+=.06;
+ if(kind==="杀"&&p.role==="lord"&&p.hp<=2)chance+=.06;
+ return Math.random()<Math.min(.98,chance);
+}
+function chooseAIAction(seat){
+ const p=players[seat];if(!p?.alive)return null;
+ const target=chooseTarget(seat),profile=aiProfile(),actions=[];
+ const targetCard={type:"kill"};
+ const valid=target>=0&&validTarget(seat,target,targetCard);
+ const threat=valid?publicThreat(target):0;
+ const add=(card,value,to=-1)=>{if(card)actions.push({card,target:to,value});};
+ const injured=alive().filter(q=>q.hp<q.maxHp);
+ for(const card of p.hand){
+  if(card.type==="peach"&&p.hp<p.maxHp)add(card,25+(p.maxHp-p.hp)*8+(p.hp<=1?18:0));
+  else if(card.type==="peachGarden"&&injured.length)add(card,8+injured.reduce((n,q)=>n+(q.maxHp-q.hp)*(q.seat===seat?2:1),0)*5);
+  else if(card.type==="draw2")add(card,10+Math.max(0,5-p.hand.length)*2);
+  else if(card.type==="wine"&&!usedWine&&!p.drunk&&p.hand.some(c=>c.type==="kill"&&!usedKill))add(card,7+(p.hp<=2?5:0)+(valid?3:0));
+  else if(card.type==="kill"&&!usedKill&&valid)add(card,16+threat*profile.tacticalWeight+(p.drunk?8:0)+(players[target].hp<=1?8:0),target);
+  else if(card.type==="duel"&&valid)add(card,9+threat*profile.tacticalWeight+(players[target].hand.length<=2?7:0)+(players[target].hp<=1?5:0),target);
+  else if(card.type==="steal"&&valid&&players[target].hand.length)add(card,8+threat*.45+(players[target].hand.length<=2?5:0),target);
+  else if(card.type==="dismantle"&&valid&&players[target].hand.length)add(card,7+threat*.5+(players[target].hand.length>=4?5:0),target);
+  else if((card.type==="barbarian"||card.type==="arrows")&&alive().length>=3){
+   const count=alive().filter(q=>q.seat!==seat).length;
+   add(card,5+count*3+(profile.tacticalWeight>1?2:0));
+  }
+ }
+ if(!actions.length)return null;
+ if(difficulty==="easy")return actions[Math.floor(Math.random()*actions.length)];
+ actions.sort((a,b)=>b.value-a.value||a.card.id-b.card.id);
+ if(difficulty==="normal"&&actions.length>1&&Math.random()<.12)return actions[1];
+ return actions[0];
+}
 players.seat=0;
 function targetList(){return players.map((p,i)=>({...p,seat:i}));}
 function finishDying(){
@@ -110,7 +170,7 @@ function passSave(){
 function applyDamageNow(target,amount,source,done){
  const p=players[target];if(!p.alive){done?.();return;}
  p.hp-=amount;
- if(source!==undefined&&source>=0){score+=target===lordSeat&&players[source].role==="rebel"?10:5;if(target===lordSeat)hostility[source]+=amount;}
+ if(source!==undefined&&source>=0&&source!==target){score+=target===lordSeat&&players[source].role==="rebel"?10:5;aggression[source]+=amount;if(target===lordSeat)hostility[source]+=amount;}
  log((target===0?"小乔":target===lordSeat?"主公":"AI "+target)+" 受到 "+amount+" 点伤害");
  if(p.hp<=0){beginDying(target,done);return;}
  done?.();render();
@@ -127,7 +187,7 @@ function requestResponse(target,kind,source,done){
   else done(false);
   return;
  }
- const use=card&&(difficulty==="hard"||difficulty==="normal"&&Math.random()>.22||difficulty==="easy"&&Math.random()>.6);
+ const use=card&&shouldAIRespond(target,kind,source);
  if(use){removeCard(target,card.id);discardPile.push(card);log("AI "+target+" 使用 "+kind+" 响应");done(true);}
  else done(false);
 }
@@ -157,7 +217,7 @@ function chooseAIAction(seat){const p=players[seat],target=chooseTarget(seat),ha
  if(peach&&p.hp<p.maxHp)return {card:peach,target:seat};if(garden&&alive().some(q=>q.hp<q.maxHp))return {card:garden,target:-1};if(draw2&&hand.length<7)return {card:draw2,target:-1};if(wine&&kill&&!p.drunk&&!usedWine&&p.hp<=2)return {card:wine,target:-1};if(dismantle&&players[target].hand.length>0)return {card:dismantle,target};if(steal&&players[target].hand.length>0)return {card:steal,target};if(duel&&difficulty!=="easy")return {card:duel,target};if(kill&&!usedKill)return {card:kill,target};if(aoe&&alive().length>=3&&difficulty!=="easy")return {card:aoe,target:-1};return null;}
 function aiStep(){if(paused||over||current===0||aiBusy)return;aiBusy=true;const action=chooseAIAction(current);if(!action){aiBusy=false;startTurn(nextAlive(current));return;}const card=removeCard(current,action.card.id);if(!card){aiBusy=false;return;}discardPile.push(card);const seat=current;resolveCard(seat,card,action.target,()=>{aiBusy=false;render();scheduleAI();});}
 function scheduleAI(){clearTimeout(timer);if(paused||over||current===0||aiBusy||pendingResponse||pendingTianxiang||pendingSave)return;timer=setTimeout(aiStep,difficulty==="easy"?350:difficulty==="hard"?650:500);}
-function newGame(){clearTimeout(timer);discardPile=[];deck=makeDeck();players=[{seat:0,name:"小乔",character:"小乔",role:"loyalist",hp:3,maxHp:3,alive:true,hand:[]},{seat:1,name:"主公",character:"曹操",role:"lord",hp:4,maxHp:4,alive:true,hand:[]},{seat:2,name:"AI 2",character:"反贼",role:"rebel",hp:4,maxHp:4,alive:true,hand:[]},{seat:3,name:"AI 3",character:"内奸",role:"spy",hp:3,maxHp:3,alive:true,hand:[]}];hostility=[0,0,0,0];score=0;selected=null;targetMode=false;pendingResponse=null;pendingTianxiang=null;pendingSave=null;current=0;phase="play";usedKill=false;usedWine=false;paused=false;over=false;aiBusy=false;players.forEach(p=>{for(let i=0;i<4;i++)p.hand.push(deck.pop());});startTurn(0);}
+function newGame(){clearTimeout(timer);discardPile=[];deck=makeDeck();hostility=[0,0,0,0];aggression=[0,0,0,0];players=[{seat:0,name:"小乔",character:"小乔",role:"loyalist",hp:3,maxHp:3,alive:true,hand:[]},{seat:1,name:"主公",character:"曹操",role:"lord",hp:4,maxHp:4,alive:true,hand:[]},{seat:2,name:"AI 2",character:"反贼",role:"rebel",hp:4,maxHp:4,alive:true,hand:[]},{seat:3,name:"AI 3",character:"内奸",role:"spy",hp:3,maxHp:3,alive:true,hand:[]}];hostility=[0,0,0,0];score=0;selected=null;targetMode=false;pendingResponse=null;pendingTianxiang=null;pendingSave=null;current=0;phase="play";usedKill=false;usedWine=false;paused=false;over=false;aiBusy=false;players.forEach(p=>{for(let i=0;i<4;i++)p.hand.push(deck.pop());});startTurn(0);}
 document.getElementById("useCard").onclick=playHuman;document.getElementById("endTurn").onclick=endTurn;document.getElementById("cancelCard").onclick=()=>{selected=null;targetMode=false;render();};document.getElementById("respondYes").onclick=()=>respondHuman(true);document.getElementById("respondNo").onclick=()=>respondHuman(false);document.getElementById("tianxiangCancel").onclick=cancelTianxiang;document.getElementById("savePeach").onclick=()=>saveWithCard("桃");document.getElementById("saveWine").onclick=()=>saveWithCard("酒");document.getElementById("saveNo").onclick=passSave;
 document.getElementById("players").addEventListener("click",e=>{const b=e.target.closest("[data-seat]");if(b)useOnTarget(Number(b.dataset.seat));});
 document.getElementById("targetPanel").addEventListener("click",e=>{const b=e.target.closest("[data-target]");if(b)useOnTarget(Number(b.dataset.target));});
@@ -181,6 +241,11 @@ if(new URLSearchParams(location.search).has("p111Test")){
    if(targetMode)useOnTarget(target);else playHuman();return true;
   },
   setDifficulty(v){difficulty=v;},
+  aiProfile(v){return aiProfile(v);},
+  aiTarget(seat){return chooseTarget(seat);},
+  aiPlan(seat){const a=chooseAIAction(seat);return a?{type:a.card.type,target:a.target}:null;},
+  setRole(seat,role){players[seat].role=role;},
+  setPublicSignals(seat,hostile,aggressive){hostility[seat]=hostile;aggression[seat]=aggressive;},
   flags(){return{usedKill,usedWine,current,phase};},
   damage(target,amount,source=-1){damage(target,amount,source,()=>{});render();},
   response(target,kind,source=1){requestResponse(target,kind,source,()=>{});render();},
