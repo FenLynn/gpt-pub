@@ -1199,12 +1199,12 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
 }
 .game-notice-overlay{
- position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:5;
+ position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:5;
  display:flex;align-items:center;justify-content:center;min-width:110px;max-width:min(82%,640px);
- min-height:34px;padding:0 14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
- border:1px solid transparent;border-radius:10px;background:rgba(255,255,255,.92);
- color:#28688e;font-size:13px;font-weight:760;line-height:1.2;text-align:center;
- box-shadow:0 5px 16px rgba(30,60,82,.14);backdrop-filter:blur(8px);
+ min-height:22px;padding:0 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ border:1px solid transparent;border-top:0;border-radius:0 0 8px 8px;background:rgba(225,240,249,.88);
+ color:#28688e;font-size:11px;font-weight:760;line-height:1.1;text-align:center;
+ box-shadow:0 3px 9px rgba(30,60,82,.10);backdrop-filter:blur(8px);
  opacity:0;pointer-events:none;transition:opacity .16s ease,border-color .16s ease,background .16s ease
 }
 .game-notice-overlay.visible{opacity:1;border-color:#cfe3ef;background:rgba(225,240,249,.96)}

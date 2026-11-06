@@ -63,6 +63,28 @@ const names=[
   assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
   assert.ok(v.main.height>=v.root.height*.96,name+" game stage should use full iframe height: "+JSON.stringify(v));
+  if(name==="五子棋"){
+   const geometry=await frame.locator(".gomoku-board").evaluate(el=>{const r=el.getBoundingClientRect();return{width:r.width,height:r.height,lines:el.querySelectorAll(".gomoku-lines line").length,cells:el.querySelectorAll(".gomoku-cell").length,border:parseFloat(getComputedStyle(el).borderTopWidth)};});
+   assert.ok(Math.abs(geometry.width-geometry.height)<=1,"Gomoku board must remain exactly square: "+JSON.stringify(geometry));
+   assert.equal(geometry.lines,30,"Gomoku must draw all 15 horizontal and 15 vertical lines");
+   assert.equal(geometry.cells,225,"Gomoku must retain all 225 intersections");
+   assert.ok(geometry.border>=4,"Gomoku must retain a visible wood frame");
+  }
+  if(name==="中国象棋"){
+   const geometry=await frame.locator(".xiangqi-board").evaluate(el=>{const r=el.getBoundingClientRect(),p=el.querySelector(".xiangqi-piece").getBoundingClientRect();return{boardRatio:r.width/r.height,pieceWidth:p.width,pieceHeight:p.height};});
+   assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
+   assert.ok(Math.abs(geometry.pieceWidth-geometry.pieceHeight)<=1.2,"Every Xiangqi piece must be circular, never oval: "+JSON.stringify(geometry));
+  }
+  if(name==="中国跳棋"){
+   const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect(),holes=el.querySelectorAll(".star-hole").length,t=el.querySelector(".star-token")?.getBBox();return{ratio:r.width/r.height,holes,tokenWidth:t?.width,tokenHeight:t?.height};});
+   assert.ok(Math.abs(geometry.ratio-10/9)<=.025,"Chinese Checkers star board must retain its 10:9 geometry: "+JSON.stringify(geometry));
+   assert.equal(geometry.holes,121,"Chinese Checkers must retain all 121 holes");
+   assert.ok(Math.abs(geometry.tokenWidth-geometry.tokenHeight)<=.1,"Chinese Checkers tokens must remain circular");
+  }
+  if(name==="飞行棋"||name==="西洋跳棋（8×8）"||name==="国际象棋"){
+   const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect();return{ratio:r.width/r.height,width:r.width,height:r.height};});
+   assert.ok(Math.abs(geometry.ratio-1)<=.015,name+" board must preserve a square playing surface: "+JSON.stringify(geometry));
+  }
   if(v.toolsVisible){
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
    assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
@@ -188,7 +210,7 @@ const names=[
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
     await page.locator("#gameNotice.visible").waitFor({timeout:1500});
     const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),s=document.querySelector("#gameStage").getBoundingClientRect();return{top:x.top,bottom:x.bottom,stageTop:s.top,stageBottom:s.bottom,message:el.textContent};});
-    assert.ok(r.top>=r.stageTop-1&&r.bottom<=r.stageTop+52,"game notices must float within the top edge of the game stage");
+    assert.ok(r.top>=r.stageTop-1&&r.bottom<=r.stageTop+26,"game notices must stay in the narrow top ribbon without covering pieces");
     assert.equal(await page.locator("#topbar #gameNotice").count(),0,"game notices must not occupy the titlebar");
     assert.match(r.message,/顶部通知位置回归测试/);
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
