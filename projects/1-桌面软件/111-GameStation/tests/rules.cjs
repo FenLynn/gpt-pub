@@ -57,7 +57,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   // Claims: 50-move rule or third position; automatic 75/fivefold rules.
   await fen("4k3/8/8/8/8/8/8/4K2R w K - 100 61");
   assert.equal(await page.locator("#drawClaimButton").isEnabled(),true);
-  await page.locator("#gs-tools").click();await page.locator("#drawClaimButton").click();
+  await page.locator("#game").evaluate(el=>el.classList.add("gs-tools-open"));await page.locator("#drawClaimButton").click();
   assert.match(await page.locator("#turnText").innerText(),/50 回合规则/);
   await fen("4k3/8/8/8/8/8/8/4K2R w K - 150 76");
   assert.equal(await page.evaluate(()=>window.__p111ChessTest.checkEnd()),true);
