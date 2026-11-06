@@ -259,7 +259,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.ok(sgProfiles[0].responseBase<sgProfiles[1].responseBase&&sgProfiles[1].responseBase<sgProfiles[2].responseBase,
     "Sanguosha AI difficulty must change response policy");
   // An AI must not read the hidden identities of other seats when choosing a target.
-  await call("setRole",1,"lord");await call("setPublicSignals",0,4,5);await call("setPublicSignals",2,0,1);
+  await call("newGame");await call("setRole",1,"lord");
+  assert.equal(await call("aiTarget",1),-1,"The lord AI must not attack an unproven hidden-role opponent");
+  await call("setPublicSignals",0,4,5);await call("setPublicSignals",2,0,1);
   const lordTargetBefore=await call("aiTarget",1);
   await call("setRole",0,"spy");await call("setRole",2,"loyalist");await call("setRole",3,"rebel");
   assert.equal(await call("aiTarget",1),lordTargetBefore,"Changing hidden opponent roles cannot change an AI's target");

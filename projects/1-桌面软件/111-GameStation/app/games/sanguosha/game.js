@@ -79,6 +79,11 @@ function chooseTarget(seat){
   if(!suspects.length)return -1;
   return suspects.sort((a,b)=>publicThreat(b.seat)-publicThreat(a.seat))[0].seat;
  }
+ if(self.role==="lord"){
+  const suspects=candidates.filter(p=>(hostility[p.seat]||0)>0||(aggression[p.seat]||0)>0);
+  if(!suspects.length)return -1;
+  return suspects.sort((a,b)=>publicThreat(b.seat)-publicThreat(a.seat))[0].seat;
+ }
  return candidates.slice().sort((a,b)=>publicThreat(b.seat)-publicThreat(a.seat)||a.hp-b.hp)[0].seat;
 }
 function shouldAIRespond(target,kind,source){
