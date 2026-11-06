@@ -1123,3 +1123,88 @@ body{font-size:15px}
 .game-card-icon[data-category="puzzle"],#homeView .recent-icon[data-category="puzzle"]{color:#628d73}
 .game-card-icon[data-category="arcade"],#homeView .recent-icon[data-category="arcade"]{color:#b17b45}
 .game-card-icon[data-category="card"],#homeView .recent-icon[data-category="card"]{color:#8875a8}
+/* P111 R21.4 · center the session clock and float status notices over the game surface. */
+@media(min-width:1101px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 76px minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;align-items:center!important;gap:10px!important;
+  padding:0 12px!important;overflow:hidden!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
+  grid-column:1!important;grid-row:1!important;display:flex!important;align-items:center!important;
+  justify-content:flex-start!important;gap:12px!important;min-width:0!important;width:100%!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{
+  grid-column:auto!important;grid-row:auto!important;flex:0 1 185px!important;min-width:0!important;
+  max-width:185px!important;width:auto!important;height:auto!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls:not(.hidden){
+  grid-column:auto!important;grid-row:auto!important;display:flex!important;flex:1 1 auto!important;
+  justify-content:flex-end!important;align-items:center!important;gap:5px!important;
+  min-width:0!important;width:auto!important;max-width:none!important;height:auto!important;overflow:visible!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){
+  display:flex!important;grid-column:2!important;grid-row:1!important;position:static!important;
+  transform:none!important;left:auto!important;top:auto!important;margin:0!important;
+  min-width:76px!important;width:76px!important;height:32px!important;padding:0!important;
+  align-items:center!important;justify-content:center!important;pointer-events:none!important;
+  border:1px solid #d7e5ee!important;border-radius:8px!important;background:#e4f0f8!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer strong{
+  font-size:16px!important;font-weight:800!important;color:#275473!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
+  grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
+  align-items:center!important;justify-content:flex-end!important;gap:5px!important;
+  min-width:0!important;width:auto!important;margin:0!important;flex:none!important
+ }
+}
+@media(max-width:1100px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  display:grid!important;grid-template-columns:minmax(0,1fr) 76px minmax(0,1fr)!important;
+  grid-template-rows:32px 30px!important;row-gap:2px!important;column-gap:6px!important;
+  height:66px!important;min-height:66px!important;padding:2px 8px!important;overflow:hidden!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{display:contents!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{
+  grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
+  width:auto!important;height:32px!important;display:flex!important;align-items:center!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls:not(.hidden){
+  grid-column:1/-1!important;grid-row:2!important;display:flex!important;justify-content:center!important;
+  align-items:center!important;width:100%!important;min-width:0!important;max-width:100%!important;
+  height:30px!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){
+  display:flex!important;grid-column:2!important;grid-row:1!important;position:static!important;
+  transform:none!important;left:auto!important;top:auto!important;margin:0!important;
+  min-width:76px!important;width:76px!important;height:30px!important;padding:0!important;
+  align-items:center!important;justify-content:center!important;pointer-events:none!important;
+  border:1px solid #d7e5ee!important;border-radius:8px!important;background:#e4f0f8!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
+  grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
+  align-items:center!important;justify-content:flex-end!important;gap:4px!important;
+  min-width:0!important;width:auto!important;margin:0!important
+ }
+}
+@media(max-width:620px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  grid-template-rows:minmax(0,1fr)!important;height:52px!important;min-height:52px!important;
+  padding:0 6px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls{display:none!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{grid-column:1!important;grid-row:1!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){grid-column:2!important;grid-row:1!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
+}
+.game-notice-overlay{
+ position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:5;
+ display:flex;align-items:center;justify-content:center;min-width:110px;max-width:min(82%,640px);
+ min-height:34px;padding:0 14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ border:1px solid transparent;border-radius:10px;background:rgba(255,255,255,.92);
+ color:#28688e;font-size:13px;font-weight:760;line-height:1.2;text-align:center;
+ box-shadow:0 5px 16px rgba(30,60,82,.14);backdrop-filter:blur(8px);
+ opacity:0;pointer-events:none;transition:opacity .16s ease,border-color .16s ease,background .16s ease
+}
+.game-notice-overlay.visible{opacity:1;border-color:#cfe3ef;background:rgba(225,240,249,.96)}

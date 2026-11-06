@@ -32,19 +32,20 @@
 
   <main class="main-area">
     <header class="topbar" id="topbar">
-      <div class="topbar-left">
-        <button class="mobile-menu" id="mobileMenu" aria-label="打开导航">☰</button>
-        <div class="breadcrumbs" aria-label="当前位置">
-          <span>GameStation</span><i id="crumbCategorySep">›</i><strong id="breadcrumbCategory">首页</strong>
-          <i id="crumbGameSep" class="hidden">›</i><strong id="breadcrumbGame" class="hidden"></strong>
+      <div class="topbar-leading">
+        <div class="topbar-left">
+          <button class="mobile-menu" id="mobileMenu" aria-label="打开导航">☰</button>
+          <div class="breadcrumbs" aria-label="当前位置">
+            <span>GameStation</span><i id="crumbCategorySep">›</i><strong id="breadcrumbCategory">首页</strong>
+            <i id="crumbGameSep" class="hidden">›</i><strong id="breadcrumbGame" class="hidden"></strong>
+          </div>
+        </div>
+        <div class="game-controls hidden" id="gameControls">
+          <div class="segment-control hidden" id="modeControl" role="group" aria-label="对战模式"></div>
+          <div class="segment-control hidden" id="difficultyControl" role="group" aria-label="游戏难度"></div>
         </div>
       </div>
       <span class="elapsed-label host-game-timer hidden" id="hostGameTimer" aria-label="本局用时"><strong id="gameElapsed">00:00</strong></span>
-      <div class="game-notice-center" id="gameNotice" role="status" aria-live="polite" aria-atomic="true"></div>
-      <div class="game-controls hidden" id="gameControls">
-        <div class="segment-control hidden" id="modeControl" role="group" aria-label="对战模式"></div>
-        <div class="segment-control hidden" id="difficultyControl" role="group" aria-label="游戏难度"></div>
-      </div>
       <div class="topbar-actions">
         <div class="round-actions hidden" id="gameActions">
 
@@ -122,6 +123,7 @@
     <section class="workspace-view view-panel hidden" id="workspaceView">
       <div class="game-stage" id="gameStage">
         <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在载入</span></div>
+        <div class="game-notice-overlay" id="gameNotice" role="status" aria-live="polite" aria-atomic="true"></div>
         <iframe id="gameFrame" title="GameStation 游戏区域" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
       </div>
     </section>

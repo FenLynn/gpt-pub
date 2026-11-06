@@ -67,16 +67,21 @@ const names=[
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
    assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
   }
-  const header=await page.locator("#topbar").evaluate(el=>{
-   const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,center:a.y+a.height/2};};
-   return{timer:r(el.querySelector("#hostGameTimer")),notice:r(el.querySelector("#gameNotice")),
-    actions:[...el.querySelectorAll("#startButton,#pauseButton,#newGameButton")].map(r),
-    iconCount:el.querySelectorAll("#startButton svg,#pauseButton svg,#newGameButton svg").length,
-    visible:getComputedStyle(el.querySelector("#gameActions")).display!=="none"};
+  const header=await page.evaluate(()=>{
+   const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,centerX:a.x+a.width/2,centerY:a.y+a.height/2};};
+   const bar=document.querySelector("#topbar"),timer=document.querySelector("#hostGameTimer"),notice=document.querySelector("#gameNotice"),stage=document.querySelector("#gameStage");
+   return{bar:r(bar),timer:r(timer),notice:r(notice),stage:r(stage),noticeParent:notice.parentElement.id,
+    noticePosition:getComputedStyle(notice).position,
+    actions:[...bar.querySelectorAll("#startButton,#pauseButton,#newGameButton")].map(r),
+    iconCount:bar.querySelectorAll("#startButton svg,#pauseButton svg,#newGameButton svg").length,
+    visible:getComputedStyle(bar.querySelector("#gameActions")).display!=="none"};
   });
   assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
-  assert.ok(header.timer.right<=header.notice.x+5,name+" timer left / message center layout: "+JSON.stringify(header));
-  assert.ok(header.notice.width>=65,name+" central notification space should be readable");
+  assert.ok(Math.abs(header.timer.centerX-header.bar.centerX)<=1,name+" session timer must be centered in the top title bar: "+JSON.stringify(header));
+  assert.equal(header.noticeParent,"gameStage",name+" status notice must float inside the game surface");
+  assert.equal(header.noticePosition,"absolute",name+" status notice must be an overlay, not a titlebar item");
+  assert.ok(header.notice.y>=header.stage.y&&header.notice.y<header.stage.y+30,name+" status notice must appear at the top of the game surface: "+JSON.stringify(header));
+  assert.ok(header.notice.width>=65,name+" floating notification space should be readable");
   assert.ok(Math.max(...header.actions.map(x=>x.center))-Math.min(...header.actions.map(x=>x.center))<=2,name+" SVG controls vertically aligned");
   assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
