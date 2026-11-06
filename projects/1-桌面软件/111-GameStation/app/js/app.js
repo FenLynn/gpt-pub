@@ -208,7 +208,11 @@ function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.
 function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
 function renderLibrary(){const grid=$("gameGrid");grid.innerHTML="";const rows=games.filter(g=>(currentCategory==="all"||g.category===currentCategory)&&(!search||(g.name+" "+g.description).toLowerCase().includes(search)));$("libraryCount").textContent=rows.length+" 款";$("emptyState").classList.toggle("hidden",rows.length>0);rows.forEach(g=>{const b=document.createElement("button");b.className="game-card";b.type="button";b.innerHTML='<span class="game-card-icon" data-category="'+g.category+'" data-game="'+g.id+'" aria-hidden="true">'+gameIconMarkup(g)+'</span><span class="game-card-copy"><strong class="game-card-title">'+escapeHtml(g.name)+'</strong><span class="game-card-meta"><i class="game-card-status '+(g.status==="prototype"?"prototype":"")+'"></i>'+(g.status==="prototype"?"持续完善":"可直接游玩")+'</span></span><span class="game-card-arrow">›</span>';b.addEventListener("click",()=>openGame(g.id));grid.appendChild(b);});}
 function send(type,payload={}){if(!active||!frame.contentWindow)return;frame.contentWindow.postMessage({channel:"gamestation",protocolVersion:1,gameId:active.id,sessionId,type,payload},"*");}
-function setBreadcrumb(){$("breadcrumbCategory").textContent=active.categoryName;$("crumbGameSep").classList.remove("hidden");$("breadcrumbGame").textContent=active.name;$("breadcrumbGame").classList.remove("hidden");}
+function setBreadcrumb(){
+ $("breadcrumbCategory").textContent=active.name;
+ $("crumbGameSep").classList.add("hidden");
+ $("breadcrumbGame").classList.add("hidden");
+}
 function renderGameControls(){
  const modeEl=$("modeControl"),difficultyEl=$("difficultyControl"),hasModes=Array.isArray(active?.modes)&&active.modes.length>1;
  modeEl.classList.toggle("hidden",!hasModes);modeEl.innerHTML="";

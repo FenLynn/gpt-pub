@@ -127,6 +127,12 @@ const names=[
   assert.notEqual(header.noticeDisplay,"none",name+" center notification region must remain present");
   assert.ok(Math.abs(header.notice.centerX-header.bar.centerX)<=Math.max(12,header.bar.width*.025),name+" notification region must be horizontally centered: "+JSON.stringify(header));
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
+  const crumb=await page.evaluate(()=>({name:document.querySelector("#breadcrumbCategory").textContent.trim(),
+   gameSeparator:!document.querySelector("#crumbGameSep").classList.contains("hidden"),
+   gameName:!document.querySelector("#breadcrumbGame").classList.contains("hidden")}));
+  assert.equal(crumb.name,name,name+" titlebar breadcrumb must identify the active game");
+  assert.equal(crumb.gameSeparator,false,name+" titlebar must not show an empty second breadcrumb separator");
+  assert.equal(crumb.gameName,false,name+" active game name must not be squeezed out by duplicate breadcrumb text");
   assert.ok(header.notice.width>=65,name+" central notification space should be readable");
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
