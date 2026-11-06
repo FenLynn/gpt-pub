@@ -159,6 +159,13 @@ const names=[
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
   async function homeLayoutCheck(width,height){
    await page.setViewportSize({width,height});
+   // Wait for the browser's resize event / ResizeObserver animation frame to
+   // apply the new container width before measuring the responsive dot grid.
+   await page.waitForFunction(()=>{
+    const grid=document.querySelector("#heatmapGrid"),content=grid?.parentElement;
+    return !!grid&&!!content&&Number.isFinite(Number(grid.dataset.availableWidth))&&
+     Math.abs(Number(grid.dataset.availableWidth)-content.getBoundingClientRect().width)<=1.1;
+   });
    const box=await page.locator("#homeView").evaluate(el=>{
     const rect=q=>{const r=q.getBoundingClientRect();return{top:r.top,bottom:r.bottom,left:r.left,right:r.right,width:r.width,height:r.height};};
     return{home:rect(el),main:rect(el.querySelector(".home-main")),hero:rect(el.querySelector(".home-hero")),
