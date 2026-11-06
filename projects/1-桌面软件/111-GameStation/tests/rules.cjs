@@ -71,6 +71,25 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await page.locator("#drawClaimButton").isEnabled(),true);
   await page.locator("#drawClaimButton").click();
   assert.match(await page.locator("#turnText").innerText(),/三次重复/);
+  await page.goto(pathToFileURL(path.resolve(__dirname,"../app/games/gomoku/index.html")).href+"?p111Test=1");
+  await page.waitForFunction(()=>!!window.__p111GomokuTest);
+  const gomoku=page.evaluate(()=>window.__p111GomokuTest);
+  const gomokuProfiles=await page.evaluate(()=>["easy","normal","hard"].map(level=>window.__p111GomokuTest.profile(level)));
+  assert.deepEqual(gomokuProfiles.map(p=>p.plies),[0,1,3],"Gomoku difficulty levels must use distinct search strategies");
+  assert.deepEqual(gomokuProfiles.map(p=>p.strategy),["tactical-random","weighted-greedy","beam-minimax"]);
+  for(const level of ["easy","normal","hard"]){
+   await page.evaluate(level=>window.__p111GomokuTest.loadPosition([[3,7,-1],[4,7,-1],[5,7,-1],[6,7,-1],[7,7,1]],level),level);
+   assert.deepEqual(await page.evaluate(()=>window.__p111GomokuTest.choose()),[2,7],level+" AI must take an immediate winning move");
+   await page.evaluate(level=>window.__p111GomokuTest.loadPosition([[3,7,1],[4,7,1],[5,7,1],[6,7,1],[7,7,-1]],level),level);
+   assert.deepEqual(await page.evaluate(()=>window.__p111GomokuTest.choose()),[2,7],level+" AI must block the opponent's immediate win");
+  }
+  await page.evaluate(()=>window.__p111GomokuTest.loadPosition([[3,7,1],[4,7,1],[6,7,1]],"normal"));
+  const patternScores=await page.evaluate(()=>({gap:window.__p111GomokuTest.scoreAt(5,7,1),quiet:window.__p111GomokuTest.scoreAt(5,5,1)}));
+  assert.ok(patternScores.gap>patternScores.quiet*20,"Gomoku evaluation must recognize broken four-stone threats");
+  await page.evaluate(()=>window.__p111GomokuTest.loadPosition([[7,7,1],[8,7,-1],[7,8,1],[8,8,-1],[6,7,1],[9,8,-1],[6,8,1],[9,7,-1]],"hard"));
+  const hardTiming=await page.evaluate(()=>{const t=performance.now(),move=window.__p111GomokuTest.choose();return {move,ms:performance.now()-t};});
+  assert.ok(Array.isArray(hardTiming.move)&&hardTiming.move.length===2,"Hard Gomoku AI must return a legal board coordinate");
+  assert.ok(hardTiming.ms<1500,"Hard Gomoku beam search must stay responsive: "+JSON.stringify(hardTiming));
   const star=await browser.newPage({viewport:{width:1150,height:880}});
   star.on("pageerror",e=>errors.push("ChineseCheckers: "+e.message));
   await star.goto(pathToFileURL(path.resolve(__dirname,"../app/games/chinese-checkers/index.html")).href+"?p111Test=1");
