@@ -310,3 +310,9 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   margin:6px 6px 6px 0!important;overflow:auto!important
  }
 }
+
+
+/* R19 · Keep the unified title bar across both the board and the docked tools rail. */
+.game-root.game-layout.gs-tools-open>.gs-hud{
+ grid-column:1/-1!important;grid-row:1!important;width:100%!important
+}
