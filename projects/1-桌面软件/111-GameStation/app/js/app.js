@@ -81,7 +81,7 @@ function renderHomeMetrics(){
  const set=(id,value)=>{const el=$(id);if(el)el.textContent=value;};
  set("heroFirstPlayed",first?metricDate(first):"尚未开始");
  set("heroLastGame",recent?recent.game.name:"暂无记录");
- set("heroLastGameMeta",recent?metricDate(statPlayedAt(recent.stat),true):"开始一局后记录");
+ set("heroLastGameMeta",recent?(Number(recent.stat.lastPlayedAt)>0?metricDate(statPlayedAt(recent.stat),true):metricDate(statPlayedAt(recent.stat))):"开始一局后记录");
  set("heroActiveDays",days.length+" 天");
  set("heroTotalTime",fmtDuration(total));
  set("heroTodayTime",fmtDuration(todayTotal));
