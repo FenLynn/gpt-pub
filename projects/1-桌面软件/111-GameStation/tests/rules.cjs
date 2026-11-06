@@ -180,6 +180,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"black","车"]]);
   const cannon=await getMoves();
   assert.equal(cannon.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),true,"screen permits cannon capture");
+  // Execute the capture through exactly one screen, not merely expose a highlighted move.
+  await load([...base,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"black","车"]]);
+  await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="7"]').click();
+  await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="2"]').click();
+  assert.match(await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="2"]').getAttribute("aria-label"),/红炮/,
+   "cannon must actually land on and capture the enemy piece beyond one screen");
+  assert.match(await xiangqi.locator('.xiangqi-cell[data-x="0"][data-y="7"]').getAttribute("aria-label"),/空位/,
+   "cannon source square must become empty after the capture");
   await load([...base,[0,7,"red","炮"],[0,2,"black","车"]]);
   const noScreen=await getMoves();
   assert.equal(noScreen.some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"screenless cannon capture must be illegal");
