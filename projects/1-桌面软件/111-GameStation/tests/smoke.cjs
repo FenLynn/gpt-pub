@@ -205,7 +205,7 @@ const names=[
     const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
-    const measured=Math.floor(c.getBoundingClientRect().width),expectedGap=measured<820?2:3;
+    const measured=Math.floor(c.width),expectedGap=measured<820?2:3;
     const expectedCell=Math.max(7,Math.min(17.5,Math.floor(((measured-52*expectedGap)/53)*2)/2));
     return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
