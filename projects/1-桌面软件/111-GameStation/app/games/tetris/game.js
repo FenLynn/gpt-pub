@@ -1,13 +1,39 @@
 (function(){
 "use strict";
 const canvas=document.getElementById("canvas"),ctx=canvas.getContext("2d"),status=document.getElementById("status");
+const nextCanvas=document.getElementById("nextCanvas"),nextCtx=nextCanvas.getContext("2d");
 const scoreEl=document.getElementById("score"),linesEl=document.getElementById("lines"),levelEl=document.getElementById("level");
 const COLS=10,ROWS=20,S=30;
 const SHAPES=[[[1,1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[1,1],[1,1]],[[0,1,1],[1,1,0]],[[0,1,0],[1,1,1]],[[1,1,0],[0,1,1]]];
 const COLORS=["#29c4e8","#4969ef","#f28a2e","#f1cf3d","#39bd59","#b64be0","#e94454"];
-let grid,piece,score=0,lines=0,paused=true,over=false,rafId=null,speed=480,baseSpeed=480,difficulty="normal",lastFrame=0,dropAccumulator=0,roundSerial=0;
+let grid,piece,nextPiece=null,score=0,lines=0,paused=true,over=false,rafId=null,speed=480,baseSpeed=480,difficulty="normal",lastFrame=0,dropAccumulator=0,roundSerial=0;
 function setStatus(message){status.textContent=message;GameBridge.report(message,{score,lines});}
-function randomPiece(){const index=Math.floor(Math.random()*SHAPES.length),shape=SHAPES[index].map(row=>row.slice());return{shape,x:Math.floor(COLS/2)-Math.ceil(shape[0].length/2),y:0,color:COLORS[index]};}
+function randomPiece(){const index=Math.floor(Math.random()*SHAPES.length),shape=SHAPES[index].map(row=>row.slice());return{kind:index,shape,x:Math.floor(COLS/2)-Math.ceil(shape[0].length/2),y:0,color:COLORS[index]};}
+function drawNext(){
+ const ctx=nextCtx,size=nextCanvas.width,step=25;
+ ctx.clearRect(0,0,size,size);
+ ctx.fillStyle="#0c2138";ctx.fillRect(0,0,size,size);
+ ctx.lineWidth=1;ctx.strokeStyle="rgba(181,211,232,.1)";
+ for(let k=1;k<4;k++){ctx.beginPath();ctx.moveTo(14+25*k,14);ctx.lineTo(14+25*k,114);ctx.stroke();ctx.beginPath();ctx.moveTo(14,14+25*k);ctx.lineTo(114,14+25*k);ctx.stroke();}
+ if(!nextPiece){nextCanvas.dataset.kind="";return;}
+ const shape=nextPiece.shape;
+ const ox=(size-shape[0].length*step)/2,oy=(size-shape.length*step)/2;
+ for(let y=0;y<shape.length;y++)for(let x=0;x<shape[y].length;x++){
+  if(!shape[y][x])continue;
+  const px=Math.round(ox+x*step)+1,py=Math.round(oy+y*step)+1,w=step-2;
+  ctx.fillStyle=nextPiece.color;ctx.fillRect(px,py,w,w);
+  ctx.fillStyle="rgba(255,255,255,.42)";ctx.fillRect(px,py,w,4);ctx.fillRect(px,py,4,w);
+  ctx.fillStyle="rgba(0,0,0,.24)";ctx.fillRect(px,py+w-4,w,4);ctx.fillRect(px+w-4,py,4,w);
+  ctx.strokeStyle="rgba(255,255,255,.55)";ctx.strokeRect(px+.5,py+.5,w-1,w-1);
+ }
+ nextCanvas.dataset.kind=String(nextPiece.kind);
+}
+function spawnQueuedPiece(){
+ const spawned=nextPiece||randomPiece();
+ nextPiece=randomPiece();drawNext();
+ canvas.dataset.pieceKind=String(spawned.kind);
+ return spawned;
+}
 function rotate(matrix){return matrix[0].map((_,index)=>matrix.map(row=>row[index]).reverse());}
 function collision(candidate){
  for(let y=0;y<candidate.shape.length;y++)for(let x=0;x<candidate.shape[y].length;x++)if(candidate.shape[y][x]){
@@ -64,7 +90,7 @@ function draw(){
  if(over){ctx.fillStyle="#ffffffed";ctx.font="700 19px sans-serif";ctx.textAlign="center";ctx.fillText("游戏结束",150,305);}
  canvas.dataset.paused=String(paused);
 }
-function updateScore(){scoreEl.textContent=score.toLocaleString("zh-CN");linesEl.textContent=String(lines);levelEl.textContent=String(Math.floor(lines/10)+1);}
+function updateScore(){scoreEl.textContent=score.toLocaleString("zh-CN");linesEl.textContent=String(lines);levelEl.textContent=String(Math.floor(lines/10)+1);canvas.dataset.score=String(score);}
 function stop(){if(rafId!==null)cancelAnimationFrame(rafId);rafId=null;lastFrame=0;}
 function run(){stop();if(paused||over)return;rafId=requestAnimationFrame(frame);}
 function finishGame(message){over=true;paused=true;stop();setStatus(message);GameBridge.send("GAME_OVER",{message,score,win:false});updateScore();draw();}
@@ -85,12 +111,12 @@ function lock(){
  placements.forEach(c=>grid[c.y][c.x]=piece.color);
  let cleared=0;for(let y=ROWS-1;y>=0;){if(grid[y].every(Boolean)){grid.splice(y,1);grid.unshift(Array(COLS).fill(0));cleared++;}else y--;}
  if(cleared){lines+=cleared;score+=[0,100,300,500,800][cleared]*Math.max(1,Math.floor(lines/10)+1);speed=Math.max(90,baseSpeed-Math.floor(lines/5)*32);}
- piece=randomPiece();dropAccumulator=0;
+ piece=spawnQueuedPiece();dropAccumulator=0;
  if(collision(piece)){finishGame("游戏结束 · 方块堆叠到顶");return;}
  updateScore();draw();
 }
 function configure(value){difficulty=value||"normal";baseSpeed=difficulty==="easy"?650:difficulty==="hard"?300:480;}
-function newGame(){stop();roundSerial++;canvas.dataset.roundSerial=String(roundSerial);grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;dropAccumulator=0;piece=randomPiece();updateScore();setStatus("游戏进行中");draw();canvas.focus();run();}
+function newGame(){stop();roundSerial++;canvas.dataset.roundSerial=String(roundSerial);grid=Array.from({length:ROWS},()=>Array(COLS).fill(0));score=0;lines=0;configure(difficulty);speed=baseSpeed;over=false;paused=false;dropAccumulator=0;nextPiece=randomPiece();piece=spawnQueuedPiece();updateScore();setStatus("游戏进行中");draw();canvas.focus();run();}
 function pause(){if(paused)return;paused=true;setStatus("已暂停");stop();draw();}
 function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();run();draw();}
 function move(dx,dy){if(paused||over||!piece)return;const next={...piece,x:piece.x+dx,y:piece.y+dy};if(!collision(next)){piece=next;if(dy>0){dropAccumulator=0;score++;updateScore();}draw();}else if(dy>0)lock();}

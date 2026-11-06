@@ -189,6 +189,17 @@ const names=[
   assert.ok(!(await page.locator("#helpPanel").isVisible()),"Help X should close the floating help");
   await open("俄罗斯方块");await start();
   const tetris=frame.locator("#canvas");
+  const preview=frame.locator("#nextCanvas");
+  assert.equal(await preview.count(),1,"Tetris must show a separate next-piece canvas");
+  assert.equal(await frame.locator(".tetris-inboard-sidebar #score").count(),1,"Score must be embedded in the game, not the external tools rail");
+  const inset=await frame.locator(".tetris-inboard-sidebar").evaluate(el=>{
+   const r=el.getBoundingClientRect(),board=el.parentElement.querySelector("#canvas").getBoundingClientRect();
+   const stage=el.closest(".game-main-board").getBoundingClientRect();
+   return{rightOfBoard:r.left>=board.right-1,insideStage:r.right<=stage.right+1,top:r.top,bottom:r.bottom,boardTop:board.top,boardBottom:board.bottom};
+  });
+  assert.ok(inset.rightOfBoard&&inset.insideStage,"NEXT and score sidebar must sit directly to the right within the play stage: "+JSON.stringify(inset));
+  assert.ok(inset.top>=inset.boardTop-4&&inset.bottom<=inset.boardBottom+4,"Score and preview must align vertically with the Tetris board");
+  assert.ok((await preview.getAttribute("data-kind"))!==null,"Next piece preview must be initialized");
   const tsize=await tetris.evaluate(el=>{
    const a=el.getBoundingClientRect(),b=el.closest(".game-main-board").getBoundingClientRect();
    return{height:a.height,available:b.height,top:a.top,bottom:a.bottom,stageBottom:b.bottom};
@@ -203,7 +214,10 @@ const names=[
    await page.waitForTimeout(25);
   }
   assert.ok(Number(await tetris.getAttribute("data-round-serial"))>round);
-  for(let i=0;i<3;i++)await tetris.press("Space");
+  const queued=await preview.getAttribute("data-kind");
+  await tetris.press("Space");
+  assert.equal(await tetris.getAttribute("data-piece-kind"),queued,"Shown NEXT tetromino must become the following active piece after lock");
+  for(let i=0;i<2;i++)await tetris.press("Space");
   assert.equal(Number(await frame.locator("#score").innerText()),96,"Three hard-dropped O pieces form a six-row stack");
   for(let i=0;i<20;i++){
    if(await tetris.getAttribute("data-piece-can-fall")==="false")break;

@@ -1,5 +1,15 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>俄罗斯方块</title><link rel="stylesheet" href="../shared/game.css"></head><body data-game="tetris"><main class="game-root game-layout tetris-layout" id="game">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>俄罗斯方块</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./style.css"></head><body data-game="tetris"><main class="game-root game-layout tetris-layout" id="game">
 <aside class="game-guide"><div class="game-guide-kicker">KEYBOARD</div><h2>操作按键</h2><div class="key-instruction"><strong>← / →</strong><span>左右移动</span></div><div class="key-instruction"><strong>↑</strong><span>顺时针旋转</span></div><div class="key-instruction"><strong>↓</strong><span>加速下落</span></div><div class="key-instruction"><strong>Space</strong><span>直接落底</span></div><div class="key-instruction"><strong>Enter</strong><span>开始 / 继续游戏</span></div><div class="key-instruction"><strong>P</strong><span>暂停 / 继续游戏</span></div><div class="guide-note">点击中间游戏区域后即可使用键盘。顶部工具栏也可暂停和结束本局。</div></aside>
-<section class="game-main-board"><div class="canvas-panel"><canvas class="arcade-canvas" id="canvas" width="300" height="600" tabindex="0" aria-label="俄罗斯方块游戏区域"></canvas></div></section>
-<aside class="game-tools"><div class="game-tools-heading">本局数据</div><div class="game-status" id="status">准备开始</div><div class="tetris-metrics"><div><span>分数</span><strong id="score">0</strong></div><div><span>消行</span><strong id="lines">0</strong></div><div><span>等级</span><strong id="level">1</strong></div></div><div class="game-tool-note">每消除 10 行提升一个等级，下落速度逐步增加。</div></aside>
+<section class="game-main-board"><div class="canvas-panel"><div class="tetris-stage">
+<div class="tetris-playfield"><canvas class="arcade-canvas" id="canvas" width="300" height="600" tabindex="0" aria-label="俄罗斯方块游戏区域"></canvas></div>
+<aside class="tetris-inboard-sidebar" aria-label="本局积分和下一方块">
+ <div class="tetris-inboard-head">下一个</div>
+ <div class="tetris-next-frame"><canvas id="nextCanvas" width="128" height="128" aria-label="下一个方块预览"></canvas></div>
+ <div class="tetris-inboard-stat tetris-inboard-score"><span>分数</span><strong id="score">0</strong></div>
+ <div class="tetris-inboard-stat"><span>消行</span><strong id="lines">0</strong></div>
+ <div class="tetris-inboard-stat"><span>等级</span><strong id="level">1</strong></div>
+ <div class="tetris-inboard-hint">↑ 旋转 · ↓ 加速 · 空格落底</div>
+</aside>
+</div></div></section>
+<aside class="game-tools"><div class="game-status" id="status">准备开始</div><div class="game-tool-note">每消除 10 行提升一个等级，下落速度逐步增加。下一个方块及积分始终显示在游戏区域右侧。</div></aside>
 </main><script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js"></script></body></html>
