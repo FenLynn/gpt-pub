@@ -98,10 +98,9 @@ const names=[
     minesweeper:{plays:2,wins:1,totalMs:90000,bestScore:450,lastPlayed:today,lastPlayedAt:now-10000,days:{[today]:60000,[yesterday]:30000}},
     gomoku:{plays:1,wins:0,totalMs:30000,bestScore:0,lastPlayed:yesterday,lastPlayedAt:now-100000,days:{[yesterday]:30000}}
    };
-   localStorage.setItem("gamestation.stats",JSON.stringify(stats));
-   localStorage.setItem("gamestation.firstStartedAt",String(first.getTime()));
+   window.__P111_TEST_STATE__={stats,firstStartedAt:first.getTime()};
   });
-  await page.goto(pathToFileURL(path.join(root,"index.html")).href);
+  await page.goto(pathToFileURL(path.join(root,"index.html")).href+"?p111Test=1");
   await page.locator("#homeDate").waitFor({state:"visible"});
   assert.equal(await page.locator(".brand-mark i").count(),4);
   await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
