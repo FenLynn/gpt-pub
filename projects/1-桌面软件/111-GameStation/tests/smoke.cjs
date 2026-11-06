@@ -99,19 +99,21 @@ const names=[
   }
   const header=await page.evaluate(()=>{
    const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,centerX:a.x+a.width/2,centerY:a.y+a.height/2};};
-   const bar=document.querySelector("#topbar"),timer=document.querySelector("#hostGameTimer"),notice=document.querySelector("#gameNotice"),stage=document.querySelector("#gameStage");
-   return{bar:r(bar),timer:r(timer),notice:r(notice),stage:r(stage),noticeParent:notice.parentElement.id,
-    noticePosition:getComputedStyle(notice).position,
+   const bar=document.querySelector("#topbar"),timer=document.querySelector("#hostGameTimer"),notice=document.querySelector("#gameNotice");
+   return{bar:r(bar),timer:r(timer),notice:r(notice),noticeParent:notice.parentElement.id,
+    noticePosition:getComputedStyle(notice).position,noticeDisplay:getComputedStyle(notice).display,
     actions:[...bar.querySelectorAll("#startButton,#pauseButton,#newGameButton")].map(r),
     iconCount:bar.querySelectorAll("#startButton svg,#pauseButton svg,#newGameButton svg").length,
     visible:getComputedStyle(bar.querySelector("#gameActions")).display!=="none"};
   });
   assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
-  assert.ok(Math.abs(header.timer.centerX-header.bar.centerX)<=1,name+" session timer must be centered in the top title bar: "+JSON.stringify(header));
-  assert.equal(header.noticeParent,"gameStage",name+" status notice must float inside the game surface");
-  assert.equal(header.noticePosition,"absolute",name+" status notice must be an overlay, not a titlebar item");
-  assert.ok(header.notice.y>=header.stage.y&&header.notice.y<header.stage.y+30,name+" status notice must appear at the top of the game surface: "+JSON.stringify(header));
-  assert.ok(header.notice.width>=65,name+" floating notification space should be readable");
+  assert.ok(header.timer.right<header.notice.x,name+" session timer must stay in the left side of the top title bar: "+JSON.stringify(header));
+  assert.equal(header.noticeParent,"topbar",name+" live status must occupy the center of the titlebar");
+  assert.equal(header.noticePosition,"static",name+" titlebar notification must participate in the topbar grid");
+  assert.notEqual(header.noticeDisplay,"none",name+" center notification region must remain present");
+  assert.ok(Math.abs(header.notice.centerX-header.bar.centerX)<=Math.max(12,header.bar.width*.025),name+" notification region must be horizontally centered: "+JSON.stringify(header));
+  assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
+  assert.ok(header.notice.width>=65,name+" central notification space should be readable");
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");

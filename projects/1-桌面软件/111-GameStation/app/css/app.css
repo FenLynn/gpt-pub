@@ -1209,5 +1209,87 @@ body{font-size:15px}
 }
 .game-notice-overlay.visible{opacity:1;border-color:#cfe3ef;background:rgba(225,240,249,.96)}
 
-/* Keep the ordinary Home / Library header layout intact after grouping game controls. */
-.topbar-leading{display:flex;align-items:center;min-width:0;flex:1;gap:10px}
+/* R21.9 · Requested HUD order: timer left, live notice center, game actions right. */
+.topbar-leading{display:flex;align-items:center;min-width:0;flex:1;gap:12px}
+.main-area:has(#workspaceView:not(.hidden)) .topbar{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ grid-template-rows:minmax(0,1fr)!important;align-items:center!important;gap:10px!important;
+ padding:0 12px!important;overflow:hidden!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
+ grid-column:1!important;grid-row:1!important;display:flex!important;align-items:center!important;
+ justify-content:flex-start!important;gap:12px!important;min-width:0!important;width:100%!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{
+ display:flex!important;align-items:center!important;gap:12px!important;flex:0 1 auto!important;
+ min-width:0!important;max-width:none!important;width:auto!important;height:auto!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar-left .breadcrumbs{min-width:0!important;max-width:220px;overflow:hidden;white-space:nowrap}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){
+ display:flex!important;position:static!important;grid-column:auto!important;grid-row:auto!important;
+ transform:none!important;left:auto!important;top:auto!important;margin:0!important;
+ min-width:76px!important;width:76px!important;height:31px!important;padding:0!important;
+ align-items:center!important;justify-content:center!important;pointer-events:none!important;
+ border:1px solid #d7e5ee!important;border-radius:8px!important;background:#e4f0f8!important;flex:none!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer strong{font-size:15px!important;font-weight:800!important;color:#275473!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .game-controls:not(.hidden){
+ display:flex!important;grid-column:auto!important;grid-row:auto!important;align-items:center!important;
+ justify-content:flex-end!important;gap:5px!important;min-width:0!important;max-width:none!important;
+ width:auto!important;height:auto!important;flex:1 1 auto!important;margin:0!important;overflow:visible!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-center{
+ grid-column:2!important;grid-row:1!important;display:flex!important;align-items:center!important;justify-content:center!important;
+ min-width:0!important;width:100%!important;height:31px!important;padding:0 10px!important;overflow:hidden!important;
+ border:1px solid transparent!important;border-radius:8px!important;white-space:nowrap!important;text-align:center!important;
+ color:#28688e!important;font-size:12px!important;font-weight:750!important;opacity:0!important;
+ transition:opacity .16s ease,background .16s ease!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-center.visible{
+ opacity:1!important;border-color:#cfe3ef!important;background:#e1f0f9!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
+ grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
+ align-items:center!important;justify-content:flex-end!important;gap:5px!important;
+ min-width:0!important;width:auto!important;margin:0!important;flex:none!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions:not(.hidden){display:flex!important;align-items:center!important;gap:5px!important}
+.main-area:has(#workspaceView:not(.hidden)) #gameControls:not(.hidden),
+.main-area:has(#workspaceView:not(.hidden)) #gameActions:not(.hidden),
+.main-area:has(#workspaceView:not(.hidden)) #railToggleButton:not(.hidden){display:flex!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .top-action svg{width:17px;height:17px;flex:none}
+@media(max-width:1100px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)!important;
+  grid-template-rows:32px 30px!important;row-gap:2px!important;column-gap:6px!important;
+  height:66px!important;min-height:66px!important;padding:2px 8px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{display:contents!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{
+  grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
+  width:auto!important;height:32px!important;display:flex!important;align-items:center!important;gap:7px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){
+  min-width:66px!important;width:66px!important;height:29px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls:not(.hidden){
+  grid-column:1/-1!important;grid-row:2!important;display:flex!important;justify-content:center!important;
+  align-items:center!important;width:100%!important;min-width:0!important;max-width:100%!important;
+  height:30px!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:2!important;grid-row:1!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
+  grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
+  align-items:center!important;justify-content:flex-end!important;gap:4px!important;min-width:0!important
+ }
+}
+@media(max-width:620px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  grid-template-rows:minmax(0,1fr)!important;height:52px!important;min-height:52px!important;padding:0 6px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls{display:none!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{grid-column:1!important;grid-row:1!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){min-width:58px!important;width:58px!important;height:27px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:2!important;grid-row:1!important;min-width:0!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
+}
