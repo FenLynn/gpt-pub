@@ -53,10 +53,10 @@ const names=[
    const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||
     el.querySelector(".xiangqi-board")||el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
-   return {root:box(el),main:box(main),surface:box(surface),tools:box(tools),toolsVisible:getComputedStyle(tools).display!=="none",
-    guide:getComputedStyle(el.querySelector(".game-guide")).display,
-    hudVisible:getComputedStyle(el.querySelector("#gs-hud")).display!=="none",
-    noticeVisible:getComputedStyle(el.querySelector("#gs-notice")).display!=="none",
+   return {root:box(el),main:box(main),surface:box(surface),tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
+    guide:el.querySelector(".game-guide")?getComputedStyle(el.querySelector(".game-guide")).display:"none",
+    hudVisible:!!el.querySelector("#gs-hud")&&getComputedStyle(el.querySelector("#gs-hud")).display!=="none",
+    noticeVisible:!!el.querySelector("#gs-notice")&&getComputedStyle(el.querySelector("#gs-notice")).display!=="none",
     battleship:el.classList.contains("battleship-layout"),overflow:document.documentElement.scrollWidth,viewport:innerWidth};
   });
   assert.equal(v.guide,"none",name+" guide should not consume playfield space");
