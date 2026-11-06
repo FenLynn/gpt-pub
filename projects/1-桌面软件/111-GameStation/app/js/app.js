@@ -38,7 +38,15 @@ function dateKey(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2
 function fmtDuration(ms){const sec=Math.floor(Math.max(0,ms)/1000),h=Math.floor(sec/3600),m=Math.floor(sec%3600/60);return h?h+"小时"+m+"分":m+"分";}
 function fmtClock(ms){const sec=Math.floor(ms/1000),m=Math.floor(sec/60),s=sec%60;return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-function toast(message){const el=$("toast");if(active){el.classList.remove("show");send("HUD_NOTICE",{message});return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
+let centerNoticeTimer=null,permanentGameStatus="";
+function showGameNotice(message,timeout=2400,persistent=false){
+ const box=$("gameNotice");if(!box)return;const value=String(message||"").trim();if(!value)return;
+ if(persistent)permanentGameStatus=value;
+ clearTimeout(centerNoticeTimer);box.textContent=value;box.classList.add("visible");
+ if(timeout>0)centerNoticeTimer=setTimeout(()=>{box.textContent=permanentGameStatus;box.classList.toggle("visible",!!permanentGameStatus);},timeout);
+}
+function clearGameNotice(){clearTimeout(centerNoticeTimer);permanentGameStatus="";const box=$("gameNotice");if(box){box.textContent="";box.classList.remove("visible");}}
+function toast(message){const el=$("toast");if(active){el.classList.remove("show");showGameNotice(message);return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[])));
 let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null,helpSource={lines:[],note:""};
 function statFor(id){if(!stats[id])stats[id]={plays:0,wins:0,totalMs:0,bestScore:0,lastPlayed:"",days:{}};const s=stats[id];s.plays=Number(s.plays)||0;s.wins=Number(s.wins)||0;s.totalMs=Number(s.totalMs)||0;s.bestScore=Number(s.bestScore)||0;s.days=s.days||{};return s;}
@@ -170,14 +178,14 @@ function openGame(id){
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
  ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;railCollapsed=false;helpSource={lines:[],note:""};
  session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
- setBreadcrumb();$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");
+ setBreadcrumb();$("gameActions").classList.remove("hidden");$("railToggleButton").classList.remove("hidden");$("helpButton").classList.remove("hidden");
  $("railToggleButton").setAttribute("aria-expanded","true");$("railToggleButton").title="收起右侧操作栏";$("railToggleButton").setAttribute("aria-label","收起右侧操作栏");
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
- $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("helpTitle").textContent=g.name+" · 玩法";
+ $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");clearGameNotice();$("helpTitle").textContent=g.name+" · 玩法";
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry;closeHelp();shell.classList.remove("menu-open");
 }
-function closeGame(){if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;$("hostGameTimer").classList.add("hidden");}
+function closeGame(){if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;$("hostGameTimer").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("railToggleButton").classList.add("hidden");$("helpButton").classList.add("hidden");clearGameNotice();}
 window.addEventListener("message",event=>{
  if(!active||event.source!==frame.contentWindow)return;
  const m=event.data;
@@ -206,7 +214,7 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
    const s=statFor(active.id);
    s.bestScore=Math.max(s.bestScore,currentScore);
   }
-  if(typeof m.payload?.status==="string"&&m.payload.status.trim()){setGameState();send("HUD_NOTICE",{message:m.payload.status});}
+  if(typeof m.payload?.status==="string"&&m.payload.status.trim()){setGameState();showGameNotice(m.payload.status,0,true);}
   if(m.payload?.score!==undefined)persistStats();
  }else if(m.type==="SCORE"){
   const score=Number(m.payload?.score);

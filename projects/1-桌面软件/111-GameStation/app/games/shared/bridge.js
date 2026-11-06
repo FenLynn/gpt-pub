@@ -141,7 +141,8 @@ window.addEventListener("message",event=>{
   suspendTimers();safeCall("loadState",m.payload||{});safePause();
  }else if(m.type==="SET_RAIL"){
   const root=document.querySelector(".game-root");
-  root?.classList.remove("rail-collapsed");
+  root?.classList.toggle("rail-collapsed",!!m.payload?.collapsed);
+  root?.classList.toggle("gs-tools-open",!m.payload?.collapsed);
   window.dispatchEvent(new Event("resize"));
  }else if(m.type==="DISPOSE"){
   suspendTimers();safeCall("dispose");disposeTimers();

@@ -316,3 +316,22 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .game-root.game-layout.gs-tools-open>.gs-hud{
  grid-column:1/-1!important;grid-row:1!important;width:100%!important
 }
+
+
+/* R19: one visible titlebar lives in the parent document. */
+.game-root.game-layout,.game-root.game-layout.card-table-layout,.game-root.game-layout.solitaire-layout,
+.game-root.game-layout.rail-collapsed,.game-root.game-layout.card-table-layout.rail-collapsed{
+ grid-template-rows:minmax(0,1fr)!important;
+}
+.game-root.game-layout>.gs-hud,.game-root.game-layout .gs-notice{display:none!important}
+.game-root.game-layout>.game-main-board,.game-root.game-layout.rail-collapsed>.game-main-board{
+ grid-column:1!important;grid-row:1!important;height:100%!important;width:100%!important
+}
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed){grid-template-columns:minmax(0,1fr) minmax(180px,225px)!important}
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board{grid-column:1!important;grid-row:1!important}
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed)>.game-tools{
+ position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+ grid-column:2!important;grid-row:1!important;width:auto!important;height:auto!important;
+ max-height:none!important;min-height:0!important;margin:8px 9px 8px 0!important;
+ box-shadow:0 4px 18px #203f5618!important;overflow-y:auto!important
+}

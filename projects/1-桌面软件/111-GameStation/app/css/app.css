@@ -955,3 +955,49 @@ body{font-size:15px}
 }
 .game-card-icon{font-size:clamp(21px,2vw,27px)}
 .quick-icon{font-size:21px}
+
+
+/* R19: unified single topbar, timer-left, notifications-center, controls-right. */
+.topbar{display:grid!important;grid-template-columns:minmax(95px,160px) max-content minmax(120px,1fr) max-content max-content!important;
+ grid-template-rows:minmax(0,1fr)!important;align-items:center!important;gap:6px!important;
+ padding:0 10px!important;flex-wrap:nowrap!important;overflow:hidden!important;position:relative!important}
+.topbar-left{grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:none!important;
+ height:auto!important;width:auto!important;flex:none!important;order:0!important}
+.topbar-left .breadcrumbs{overflow:hidden;white-space:nowrap}
+.topbar .host-game-timer:not(.hidden){display:flex!important;position:static!important;left:auto!important;top:auto!important;
+ transform:none!important;grid-column:2!important;grid-row:1!important;min-width:70px!important;height:31px!important;
+ margin:0!important;padding:0 7px!important;align-items:center;justify-content:center;pointer-events:none!important;
+ border:1px solid #d7e5ee;border-radius:8px;background:#e4f0f8}
+.topbar .host-game-timer strong{font-size:15px!important;font-weight:800!important;color:#275473!important}
+.game-notice-center{grid-column:3!important;grid-row:1!important;display:flex;align-items:center;justify-content:center;
+ min-width:0;width:100%;height:31px;padding:0 8px;overflow:hidden;text-overflow:ellipsis;
+ border:1px solid transparent;border-radius:8px;white-space:nowrap;text-align:center;
+ color:#28688e;font-size:12px;font-weight:750;opacity:0;transition:opacity .16s ease,background .16s ease}
+.game-notice-center.visible{opacity:1;border-color:#cfe3ef;background:#e1f0f9}
+.topbar .game-controls:not(.hidden){grid-column:4!important;grid-row:1!important;order:0!important;
+ display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;
+ min-width:0!important;max-width:none!important;width:auto!important;height:auto!important;flex:none!important;margin:0!important}
+.topbar .topbar-actions{grid-column:5!important;grid-row:1!important;order:0!important;display:flex!important;
+ align-items:center!important;justify-content:flex-end!important;gap:5px!important;
+ min-width:0!important;width:auto!important;height:auto!important;margin:0!important;flex:none!important}
+.topbar .round-actions:not(.hidden){display:flex!important;align-items:center!important;gap:5px!important}
+.main-area:has(#workspaceView:not(.hidden)) #gameControls:not(.hidden),
+.main-area:has(#workspaceView:not(.hidden)) #gameActions:not(.hidden),
+.main-area:has(#workspaceView:not(.hidden)) #railToggleButton:not(.hidden){display:flex!important}
+.topbar .top-action svg{width:17px;height:17px;flex:none}
+@media(max-width:1260px){
+ .topbar{grid-template-columns:minmax(70px,120px) max-content minmax(90px,1fr) max-content max-content!important;gap:4px!important}
+ .topbar .round-actions .top-action{width:34px!important;min-width:34px!important;height:34px!important;padding:0!important;gap:0!important}
+ .topbar .round-actions .action-label{display:none!important}
+ .topbar .segment-control button{min-width:39px!important;padding:0 6px!important}
+ .topbar .help-action{padding:0 7px}
+}
+@media(max-width:900px){
+ .topbar{grid-template-columns:minmax(0,1fr) max-content max-content!important;grid-template-rows:30px 30px!important;
+ height:68px!important;min-height:68px!important;padding:3px 7px!important}
+ .topbar-left{grid-column:1!important;grid-row:1!important}
+ .topbar .host-game-timer:not(.hidden){grid-column:2!important;grid-row:1!important}
+ .topbar .topbar-actions{grid-column:3!important;grid-row:1!important}
+ .game-notice-center{grid-column:1/-1!important;grid-row:2!important}
+ .topbar .game-controls:not(.hidden){display:none!important}
+}
