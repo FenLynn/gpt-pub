@@ -88,19 +88,20 @@ const names=[
  }
  try{
   await fs.promises.mkdir(path.join(artifacts,"games"),{recursive:true});
-  await page.addInitScript(()=>{
-   const now=Date.now(),d=new Date(now),today=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-   const prior=new Date(now);prior.setDate(prior.getDate()-1);
-   const yesterday=prior.getFullYear()+"-"+String(prior.getMonth()+1).padStart(2,"0")+"-"+String(prior.getDate()).padStart(2,"0");
-   const first=new Date(now);first.setDate(first.getDate()-23);first.setHours(9,30,0,0);
-   const stats={
+  const now=Date.now(),d=new Date(now),today=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const prior=new Date(now);prior.setDate(prior.getDate()-1);
+  const yesterday=prior.getFullYear()+"-"+String(prior.getMonth()+1).padStart(2,"0")+"-"+String(prior.getDate()).padStart(2,"0");
+  const first=new Date(now);first.setDate(first.getDate()-23);first.setHours(9,30,0,0);
+  const fixture={
+   stats:{
     tetris:{plays:4,wins:1,totalMs:240000,bestScore:1800,lastPlayed:today,lastPlayedAt:now-1000,days:{[today]:120000,[yesterday]:120000}},
     minesweeper:{plays:2,wins:1,totalMs:90000,bestScore:450,lastPlayed:today,lastPlayedAt:now-10000,days:{[today]:60000,[yesterday]:30000}},
     gomoku:{plays:1,wins:0,totalMs:30000,bestScore:0,lastPlayed:yesterday,lastPlayedAt:now-100000,days:{[yesterday]:30000}}
-   };
-   window.__P111_TEST_STATE__={stats,firstStartedAt:first.getTime()};
-  });
-  await page.goto(pathToFileURL(path.join(root,"index.html")).href+"?p111Test=1");
+   },
+   firstStartedAt:first.getTime()
+  };
+  const homeUrl=pathToFileURL(path.join(root,"index.html")).href+"?p111Test=1&p111State="+encodeURIComponent(JSON.stringify(fixture));
+  await page.goto(homeUrl);
   await page.locator("#homeDate").waitFor({state:"visible"});
   assert.equal(await page.locator(".brand-mark i").count(),4);
   await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
