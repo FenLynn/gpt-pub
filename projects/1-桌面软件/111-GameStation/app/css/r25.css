@@ -173,19 +173,19 @@
  #homeView .poster-tips p{font-size:14px!important}
  #homeView .poster-details{gap:12px!important}
 }
-/* R26 — Gomoku header ONLY. Preserve the header of every other game. */
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice:not(.hidden){
+/* R33 — One shared, Gomoku-approved header design for all 24 games. */
+.main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
  display:flex!important;align-items:center!important;gap:8px!important;
  flex:0 1 280px!important;width:280px!important;min-width:240px!important;max-width:280px!important;
  height:34px!important;padding:0!important;border:0!important;border-radius:0!important;
  background:transparent!important;box-shadow:none!important;overflow:visible!important;
  margin-left:auto!important;margin-right:auto!important;opacity:1!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-speaker{
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
  width:21px!important;height:21px!important;flex:none!important;
  stroke:#5289a2!important;stroke-width:2!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-window{
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-window{
  display:flex!important;align-items:center!important;justify-content:flex-start!important;
  box-sizing:border-box!important;flex:1!important;height:32px!important;min-width:0!important;
  padding:1px 9px!important;border:1px solid #243d38!important;border-radius:7px!important;
@@ -193,72 +193,72 @@
  box-shadow:inset 0 1px 5px #000a,0 1px 2px #1f423620!important;
  white-space:nowrap!important;overflow:hidden!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{
  color:#fff!important;font:800 15px/1.1 "Segoe UI",Arial,sans-serif!important;
  letter-spacing:.025em!important;text-shadow:0 0 5px #ffffff55!important;
  white-space:nowrap!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-topbar-cluster{
+.main-area:has(#workspaceView:not(.hidden)) .game-topbar-cluster{
  margin-left:0!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .game-controls:not(.hidden){
+.main-area:has(#workspaceView:not(.hidden)) .topbar .game-controls:not(.hidden){
  gap:9px!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control{
+.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control{
  position:relative!important;display:flex!important;align-items:center!important;gap:0!important;
  min-height:31px!important;height:31px!important;
  padding:2px!important;border:1px solid #c6d9e6!important;border-radius:9px!important;
  background:#e7f1f7!important;box-shadow:inset 0 1px 2px #54778c10!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #modeControl{margin-left:57px!important}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #difficultyControl{margin-left:38px!important}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #modeControl:before,
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #difficultyControl:before{
+.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{margin-left:57px!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{margin-left:38px!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl:before,
+.main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl:before{
  position:absolute!important;top:50%!important;left:auto!important;
  padding:0!important;margin:0!important;transform:translateY(-50%)!important;
  color:#637f91!important;font-size:12px!important;font-weight:690!important;
  line-height:1!important;text-align:right!important;white-space:nowrap!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #modeControl:before{right:calc(100% + 9px)!important}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #difficultyControl:before{right:calc(100% + 9px)!important}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control button{
+.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl:before{right:calc(100% + 9px)!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl:before{right:calc(100% + 9px)!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{
  min-width:44px!important;height:27px!important;margin:0!important;
  border:1px solid transparent!important;border-radius:6px!important;
  background:transparent!important;color:#627f92!important;
  font-size:12px!important;font-weight:700!important;padding:0 8px!important;
  box-shadow:none!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control button+button:not([aria-pressed="true"]){
+.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button+button:not([aria-pressed="true"]){
  border-left-color:#ccdde8!important
 }
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control button[aria-pressed="true"]{
+.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button[aria-pressed="true"]{
  background:#fff!important;border-color:#abccdf!important;
  color:#176fa8!important;box-shadow:0 2px 5px #285a771a!important
 }
 @media(min-width:901px) and (max-width:1450px){
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice:not(.hidden){
+ .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
   flex-basis:240px!important;width:240px!important;min-width:215px!important
  }
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar-leading{
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
   flex-basis:150px!important;min-width:112px!important
  }
 }
 
 /* R26.1 — Only Gomoku at narrower desktop widths: keep breadcrumb fully readable. */
 @media(min-width:901px) and (max-width:1390px){
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar-leading{
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
   flex:0 0 156px!important;min-width:156px!important;max-width:156px!important
  }
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice:not(.hidden){
+ .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
   flex:0 1 207px!important;width:207px!important;max-width:207px!important;min-width:196px!important
  }
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #modeControl{
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{
   margin-left:51px!important
  }
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #difficultyControl{
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{
   margin-left:32px!important
  }
- .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control button{
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{
   min-width:40px!important;padding:0 5px!important
  }
 }

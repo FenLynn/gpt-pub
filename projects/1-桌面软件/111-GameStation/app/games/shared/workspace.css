@@ -358,3 +358,24 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .game-root.game-layout.gs-tools-open>.game-tools{
   grid-row:1!important;
 }
+
+
+/* R33: align the in-page game action buttons with Gomoku's proven action language. */
+.game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn{
+ display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;
+ flex:none!important;width:100%!important;min-height:46px!important;height:auto!important;padding:10px 13px!important;
+ border:1px solid #c4dae7!important;border-radius:12px!important;background:linear-gradient(145deg,#fff,#ebf4f9)!important;
+ color:#305e7b!important;font-size:14px!important;font-weight:740!important;line-height:1.25!important;
+ box-shadow:0 5px 14px #24486216,inset 0 1px #fff!important;
+ transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s,border-color .18s!important
+}
+.game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn:hover:not(:disabled){
+ transform:translateY(-2px)!important;border-color:#9dbfd5!important;
+ box-shadow:0 9px 20px #234b6426,inset 0 1px #fff!important
+}
+.game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn:active:not(:disabled){transform:translateY(0) scale(.98)!important}
+.game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn:disabled{opacity:.45!important;cursor:not-allowed}
+@media(prefers-reduced-motion:reduce){
+ .game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn{transition:none!important}
+ .game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn:hover{transform:none!important}
+}

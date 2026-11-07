@@ -158,7 +158,7 @@ const names=[
     assert.ok(breadcrumb.left>=breadcrumb.barLeft+3&&breadcrumb.scrollWidth<=breadcrumb.clientWidth+2,
      "Narrow desktop Gomoku breadcrumb must not be clipped: "+JSON.stringify(breadcrumb));
    }
-  }else assert.ok(header.notice.width>=110&&header.notice.width<=135,name+" Other games must keep their existing LED size");
+  }else assert.ok(header.notice.width>=(width<=1390?195:214)&&header.notice.width<=285,name+" all game headers must share the Gomoku LED dimensions: "+JSON.stringify(header));
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
   const crumb=await page.evaluate(()=>({name:document.querySelector("#breadcrumbCategory").textContent.trim(),
    gameSeparator:!document.querySelector("#crumbGameSep").classList.contains("hidden"),
@@ -482,7 +482,32 @@ const names=[
    await library();
    for(const name of names){
     await open(name);await start();await pauseResume();
-    if(await page.locator("#modeControl button,#difficultyControl button").count())assert.equal(await page.locator("#gameControls").isVisible(),true,"parent mode/difficulty controls must be visible");
+    const controls=await page.evaluate(()=>{
+      const bar=document.querySelector("#topbar").getBoundingClientRect();
+      const modes=[...document.querySelectorAll("#modeControl button")],levels=[...document.querySelectorAll("#difficultyControl button")];
+      const selectors=[...modes,...levels];
+      const inside=b=>{const r=b.getBoundingClientRect(),s=getComputedStyle(b);return r.width>=28&&r.height>=24&&r.left>=bar.left-1&&r.right<=bar.right+1&&r.top>=bar.top-1&&r.bottom<=bar.bottom+1&&s.visibility==="visible"&&s.display!=="none";};
+      const actions=[...document.querySelectorAll("#startButton,#pauseButton,#newGameButton,#helpButton")];
+      return{modes:modes.length,levels:levels.length,selectedModes:modes.filter(b=>b.getAttribute("aria-pressed")==="true").length,
+       selectedLevels:levels.filter(b=>b.getAttribute("aria-pressed")==="true").length,
+       selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside)};
+     });
+     const dualModes=new Set(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","西洋跳棋（8×8）","中国跳棋","飞行棋"]);
+     assert.equal(controls.modes,dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
+     assert.equal(controls.levels,["2048","推箱子"].includes(name)?0:name==="经典纸牌"?2:3,name+" difficulty choices must match implemented gameplay");
+     assert.equal(controls.selectedModes,controls.modes?1:0,name+" exactly one mode must be selected");
+     assert.equal(controls.selectedLevels,controls.levels?1:0,name+" exactly one difficulty must be selected");
+     assert.ok(controls.selectorsVisible&&controls.actionsVisible,name+" every header switch and action must remain visible within the viewport: "+JSON.stringify(controls));
+     if(controls.modes){
+      await page.locator('#modeControl button[data-mode-index="1"]').click();
+      assert.equal(await page.locator('#modeControl button[aria-pressed="true"]').getAttribute("data-mode-index"),"1",name+" mode switching must work");
+      await page.locator('#modeControl button[data-mode-index="0"]').click();
+     }
+     if(controls.levels){
+      await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
+      assert.equal(await page.locator('#difficultyControl button[aria-pressed="true"]').getAttribute("data-difficulty"),"easy",name+" difficulty switching must work");
+      await page.locator('#difficultyControl button[data-difficulty="normal"]').click();
+     }
     await viewCheck(name,size.width,size.height);
     if(!noticeChecked){
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("已暂停"));
