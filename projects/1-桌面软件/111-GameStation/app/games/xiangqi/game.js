@@ -227,7 +227,8 @@ function showResult(winner,reason){
  document.getElementById("xiangqiResultTitle").textContent=title;
  document.getElementById("xiangqiResultDescription").textContent=detail+" · "+reason;
  resultBox.hidden=false;resultBox.classList.add("visible");
- const message=(winner?(winner==="red"?"红方":"黑方")+"获胜":"和棋")+" · "+reason;
+ const message=!winner?"和棋 · "+reason:mode==="ai"&&winner==="black"?"本局失败 · "+reason:
+  (winner==="red"?"红方":"黑方")+"获胜 · "+reason;
  report(message);
  GameBridge.send("GAME_OVER",{message,score:winner==="red"?1:0,win:mode==="ai"?winner==="red":!!winner});
 }
