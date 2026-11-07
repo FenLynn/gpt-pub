@@ -312,7 +312,7 @@ const names=[
    assert.ok(Math.abs(visual.weekdayRow-visual.dot.height)<.5,"Weekday labels must align with the heatmap row pitch: "+JSON.stringify(visual));
    assert.ok(visual.weekdayLabelWidth>=28,"Weekday labels must have enough width to read: "+JSON.stringify(visual));
    assert.ok(visual.weekdayLabels.every((y,i)=>Math.abs(y-visual.dotRows[i])<1.5),"Weekday labels must align with Monday, Wednesday and Friday dot rows: "+JSON.stringify(visual));
-   assert.ok(visual.recentIconWidth>=40&&visual.recentIconWidth<=64,"Twelve game icons must be legible and remain uncut: "+JSON.stringify(visual));
+   assert.ok(visual.recentIconWidth>=56&&visual.recentIconWidth<=70,"Three-by-three recent game icons must be large and remain uncut: "+JSON.stringify(visual));
    assert.ok(visual.measuredContentWidth>=visual.dot.contentWidth*.95,"Heatmap sizing must use the rendered content width, not a stale clientWidth: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
    const expectedGridWidth=visual.weeks*visual.expectedCell+(visual.weeks-1)*visual.expectedGap;
