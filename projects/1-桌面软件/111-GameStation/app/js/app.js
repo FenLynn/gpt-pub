@@ -29,36 +29,9 @@ const games=[
 const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"街机",card:"卡牌"};
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
 const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
-const gameIconArt={
- "2048":"<rect x=\"5\" y=\"5\" width=\"17\" height=\"17\" rx=\"3\" fill=\"#e8c58e\" stroke=\"none\"/><rect x=\"26\" y=\"5\" width=\"17\" height=\"17\" rx=\"3\" fill=\"#d99b67\" stroke=\"none\"/><rect x=\"5\" y=\"26\" width=\"17\" height=\"17\" rx=\"3\" fill=\"#d98a64\" stroke=\"none\"/><rect x=\"26\" y=\"26\" width=\"17\" height=\"17\" rx=\"3\" fill=\"#b86e52\" stroke=\"none\"/><g fill=\"#fff\" stroke=\"none\" font-size=\"12\" font-weight=\"800\" text-anchor=\"middle\"><text x=\"13.5\" y=\"18\">2</text><text x=\"34.5\" y=\"18\">4</text><text x=\"13.5\" y=\"39\">8</text><text x=\"34.5\" y=\"39\">16</text></g>",
- "gomoku":"<path d=\"M9 9H39M9 24H39M9 39H39M9 9V39M24 9V39M39 9V39\" opacity=\".58\"/><circle cx=\"16.5\" cy=\"16.5\" r=\"4\" fill=\"currentColor\"/><circle cx=\"31.5\" cy=\"31.5\" r=\"4\" fill=\"#fff\"/><circle cx=\"31.5\" cy=\"31.5\" r=\"4\"/>",
- "xiangqi":"<circle cx=\"24\" cy=\"24\" r=\"18\"/><circle cx=\"24\" cy=\"24\" r=\"14\" opacity=\".45\"/><text x=\"24\" y=\"30\" text-anchor=\"middle\" font-family=\"Microsoft YaHei, sans-serif\" font-size=\"18\" font-weight=\"800\" fill=\"currentColor\" stroke=\"none\">将</text>",
- "reversi":"<circle cx=\"16\" cy=\"24\" r=\"10\" fill=\"#263d4e\" stroke=\"#263d4e\"/><circle cx=\"32\" cy=\"24\" r=\"10\" fill=\"#fff\"/><path d=\"M11 20a7 7 0 0 1 9-4\" stroke=\"#fff\" opacity=\".7\"/><path d=\"M27 20a7 7 0 0 1 9-4\" opacity=\".3\"/>",
- "connect4":"<rect x=\"7\" y=\"7\" width=\"34\" height=\"34\" rx=\"5\"/><circle cx=\"16\" cy=\"16\" r=\"4\" fill=\"#e46f61\" stroke=\"none\"/><circle cx=\"32\" cy=\"16\" r=\"4\" fill=\"#e8bd59\" stroke=\"none\"/><circle cx=\"16\" cy=\"31\" r=\"4\" fill=\"#e8bd59\" stroke=\"none\"/><circle cx=\"32\" cy=\"31\" r=\"4\" fill=\"#e46f61\" stroke=\"none\"/>",
- "battleship":"<path d=\"M6 29h36l-5 8H14z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M14 28V20h8v8M24 28V15h8v13M29 15V11h5v4M8 40c4-2 7-2 11 0s7 2 11 0 7-2 10 0\"/>",
- "chinese-checkers":"<path d=\"M24 5 29 16 42 16 33 24 37 38 24 30 11 38 15 24 6 16 19 16Z\" opacity=\".55\"/><circle cx=\"24\" cy=\"13\" r=\"3.1\" fill=\"currentColor\"/><circle cx=\"14\" cy=\"22\" r=\"3.1\" fill=\"currentColor\"/><circle cx=\"34\" cy=\"22\" r=\"3.1\" fill=\"currentColor\"/><circle cx=\"18\" cy=\"33\" r=\"3.1\" fill=\"currentColor\"/><circle cx=\"30\" cy=\"33\" r=\"3.1\" fill=\"currentColor\"/>",
- "flight-chess":"<path d=\"M23 5c2-1 4 1 4 4v10l13 8v4l-13-4v9l5 4v3l-7-2-7 2v-3l5-4v-9L10 31v-4l13-8V9c0-2 0-3 0-4Z\" fill=\"currentColor\" stroke=\"none\"/>",
- "checkers":"<rect x=\"7\" y=\"7\" width=\"34\" height=\"34\" rx=\"3\"/><path d=\"M18 7v34M30 7v34M7 18h34M7 30h34\" opacity=\".45\"/><path d=\"M7 7h11v11H7zM30 18h11v12H30zM18 30h12v11H18z\" fill=\"currentColor\" stroke=\"none\" opacity=\".18\"/><circle cx=\"13\" cy=\"13\" r=\"4\" fill=\"currentColor\"/><circle cx=\"35\" cy=\"35\" r=\"4\" fill=\"#fff\"/>",
- "chess":"<path d=\"M12 39h26M16 35l2-7-4-7 5-10 8 3 7 8-3 7v6Z\"/><path d=\"m19 14 5 4-1-6M26 17l5 5M19 28h15\"/><circle cx=\"25\" cy=\"20\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/>",
- "minesweeper":"<circle cx=\"24\" cy=\"24\" r=\"8\" fill=\"currentColor\"/><path d=\"M24 5v8M24 35v8M5 24h8M35 24h8M10.5 10.5l5.7 5.7M31.8 31.8l5.7 5.7M37.5 10.5l-5.7 5.7M16.2 31.8l-5.7 5.7\"/><circle cx=\"21\" cy=\"21\" r=\"2\" fill=\"#fff\" stroke=\"none\"/>",
- "memory":"<rect x=\"8\" y=\"10\" width=\"23\" height=\"29\" rx=\"4\" transform=\"rotate(-9 8 10)\"/><rect x=\"19\" y=\"8\" width=\"22\" height=\"30\" rx=\"4\" fill=\"#fff\"/><path d=\"m30 15 2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5-3.6-3.5 5-.7Z\" fill=\"currentColor\" stroke=\"none\"/>",
- "sudoku":"<rect x=\"7\" y=\"7\" width=\"34\" height=\"34\" rx=\"2\"/><path d=\"M18.3 7v34M29.7 7v34M7 18.3h34M7 29.7h34\" opacity=\".7\"/><g fill=\"currentColor\" stroke=\"none\" font-size=\"9\" font-weight=\"750\" text-anchor=\"middle\"><text x=\"12.5\" y=\"16\">1</text><text x=\"24\" y=\"27\">5</text><text x=\"35.5\" y=\"38\">9</text></g>",
- "sokoban":"<rect x=\"9\" y=\"9\" width=\"30\" height=\"30\" rx=\"4\"/><path d=\"M15 15h18v18H15z\" stroke-dasharray=\"2.5 2.5\" opacity=\".6\"/><path d=\"m18 24 6-6 6 6M24 18v13\" stroke-width=\"2.8\"/><circle cx=\"34\" cy=\"14\" r=\"3\" fill=\"currentColor\" stroke=\"none\"/>",
- "tetris":"<path d=\"M8 8h10v10H8zM18 8h10v10H18zM28 8h10v10H28zM18 18h10v10H18zM18 28h10v10H18z\" fill=\"currentColor\"/><path d=\"M8 8h10v10H8zM18 8h10v10H18zM28 8h10v10H28zM18 18h10v10H18zM18 28h10v10H18z\" opacity=\".25\"/>",
- "snake":"<path d=\"M10 14h11a5 5 0 0 1 0 10h-1a5 5 0 0 0 0 10h12a6 6 0 0 0 0-12h-1\" stroke-width=\"5\"/><circle cx=\"12\" cy=\"14\" r=\"4\" fill=\"currentColor\"/><circle cx=\"13.5\" cy=\"13\" r=\"1.1\" fill=\"#fff\" stroke=\"none\"/><circle cx=\"36\" cy=\"10\" r=\"3\" fill=\"#d9a45f\" stroke=\"none\"/>",
- "pong":"<rect x=\"7\" y=\"12\" width=\"5\" height=\"24\" rx=\"2\" fill=\"currentColor\" stroke=\"none\"/><rect x=\"36\" y=\"16\" width=\"5\" height=\"20\" rx=\"2\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"25\" cy=\"18\" r=\"4\" fill=\"#dba85f\" stroke=\"none\"/><path d=\"M24 27v3m0 4v3m0-22v3\" stroke-dasharray=\"1 2\" opacity=\".5\"/>",
- "contra":"<path d=\"M7 19h18l4-4h8v4h5v7h-5v4h-8l-4-4H7z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M16 19v-5h7v5M17 30l-4 7M23 30l-2 7\"/><circle cx=\"38\" cy=\"22.5\" r=\"1.5\" fill=\"#fff\" stroke=\"none\"/>",
- "mario":"<path d=\"M9 25c0-9 6-16 15-16s15 7 15 16H9Z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M15 25v10a4 4 0 0 0 4 4h10a4 4 0 0 0 4-4V25Z\" fill=\"#fff\"/><circle cx=\"18\" cy=\"19\" r=\"2.5\" fill=\"#fff\" stroke=\"none\"/><circle cx=\"29\" cy=\"15\" r=\"2.5\" fill=\"#fff\" stroke=\"none\"/><path d=\"M18 25v6m12-6v6\"/>",
- "tank":"<path d=\"M7 28h34v8H7z\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M9 37h30\" stroke-width=\"3\"/><circle cx=\"14\" cy=\"37\" r=\"2\" fill=\"#fff\" stroke=\"none\"/><circle cx=\"24\" cy=\"37\" r=\"2\" fill=\"#fff\" stroke=\"none\"/><circle cx=\"34\" cy=\"37\" r=\"2\" fill=\"#fff\" stroke=\"none\"/><rect x=\"13\" y=\"18\" width=\"22\" height=\"11\" rx=\"3\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M21 18v-6h10v6M29 14h11v4H29\" stroke-width=\"3\"/><circle cx=\"24\" cy=\"23.5\" r=\"2.5\" fill=\"#fff\" stroke=\"none\"/>",
- "solitaire":"<rect x=\"9\" y=\"5\" width=\"30\" height=\"38\" rx=\"4\" fill=\"#fff\"/><path d=\"M24 15c-2-5-9-4-9 2 0 5 9 12 9 12s9-7 9-12c0-6-7-7-9-2Z\" fill=\"#c85c58\" stroke=\"none\"/><path d=\"M13 11h5M13 16h3\" stroke=\"#c85c58\" stroke-width=\"1.5\"/>",
- "doudizhu":"<rect x=\"7\" y=\"12\" width=\"23\" height=\"31\" rx=\"3\" transform=\"rotate(-13 7 12)\" fill=\"#fff\"/><rect x=\"18\" y=\"6\" width=\"23\" height=\"31\" rx=\"3\" transform=\"rotate(10 18 6)\" fill=\"#fff\"/><path d=\"M29 14c-2-4-7-3-7 1 0 4 7 9 7 9s7-5 7-9c0-4-5-5-7-1Z\" fill=\"#d65c58\" stroke=\"none\"/>",
- "mahjong":"<rect x=\"9\" y=\"5\" width=\"30\" height=\"38\" rx=\"4\" fill=\"#fff\"/><path d=\"M16 13l4 8m-1-9 4 8m-1-9 4 8M16 25l4 8m-1-9 4 8m-1-9 4 8\" stroke=\"#4e9875\" stroke-width=\"2.8\"/><circle cx=\"33\" cy=\"15\" r=\"2.2\" fill=\"#c75b58\" stroke=\"none\"/><circle cx=\"33\" cy=\"24\" r=\"2.2\" fill=\"#c75b58\" stroke=\"none\"/>",
- "sanguosha":"<path d=\"m11 9 7 7m-7-7 1 9m-1-9 9 1M37 9l-7 7m7-7-1 9m1-9-9 1M18 16l12 16m-12 0 12-16\" stroke-width=\"2.8\"/><path d=\"M14 35 34 15M14 15l20 20\" stroke-width=\"3\"/>",
- "default":"<rect x=\"6\" y=\"13\" width=\"36\" height=\"22\" rx=\"7\"/><path d=\"M16 19v10m-5-5h10M31 21h.1M36 27h.1\"/><circle cx=\"31\" cy=\"21\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/><circle cx=\"36\" cy=\"27\" r=\"1.8\" fill=\"currentColor\" stroke=\"none\"/>"
-};
 function gameIconMarkup(game){
- const art=gameIconArt[game.id]||gameIconArt.default;
- return '<svg class="game-icon-svg" viewBox="0 0 48 48" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">'+art+'</svg>';
+ const icon=String(game.icon||"🎮");
+ return '<span class="game-icon-glyph" data-icon="'+escapeHtml(icon)+'">'+escapeHtml(icon)+'</span>';
 }
 
 function read(key,fallback){if(location.search.includes("p111Test=1")){try{const fixture=new URLSearchParams(location.search).get("p111State");if(fixture){const state=JSON.parse(fixture);if(Object.prototype.hasOwnProperty.call(state,key))return state[key];}}catch(e){}}try{const v=JSON.parse(localStorage.getItem(storePrefix+key));return v===null||v===undefined?fallback:v;}catch(e){return fallback;}}
@@ -152,11 +125,12 @@ function resizeHeatmap(){
  // Use the rendered content box, not clientWidth: the latter can be stale while
  // the home grid is being reflowed after a viewport or panel-size change.
  const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
- // Scale the 53-week matrix against the actual content width instead of
- // pinning it to tiny 9/11px dots. Cap at 17.5px to fill a wide panel without
- // turning the activity chart into oversized blocks.
- const gap=available<820?2:3;
- const cell=Math.max(7,Math.min(17.5,Math.floor(((available-(weeks-1)*gap)/weeks)*2)/2));
+ // Preserve the original compact GitHub-style dot density: 11px on desktop,
+ // 9px on narrow screens. The full-width panel remains responsive; the matrix
+ // is centered inside it instead of stretching each date into a large block.
+ const narrow=window.innerWidth<=700;
+ const gap=narrow?2:3;
+ const cell=narrow?9:11;
  layout.style.setProperty("--heat-cell",cell+"px","important");
  layout.style.setProperty("--heat-gap",gap+"px","important");
  grid.style.setProperty("--heat-cell",cell+"px","important");

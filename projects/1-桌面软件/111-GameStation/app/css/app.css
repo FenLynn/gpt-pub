@@ -1052,7 +1052,7 @@ body{font-size:15px}
   justify-content:flex-start;padding:17px 20px;border:1px solid #dce7ed;border-radius:13px;background:#ffffffed;overflow:hidden}
  #homeView .panel-heading h2{font-size:16px}
  #homeView .panel-heading p{font-size:11px}
- #homeView .heatmap-layout{flex:1;min-height:0;align-items:center;gap:12px;margin:10px 0 0}
+ #homeView .heatmap-layout{flex:1;min-height:0;align-items:center;gap:10px;margin:10px 0 0}
  #homeView .heatmap-content{flex:1 1 0%;width:0;min-width:0;max-width:none;overflow:hidden!important;padding-bottom:2px}
  #homeView .heatmap-months{height:19px}
  /* Keep the original small dot density; center the 53-week group inside the full-width panel. */
@@ -1081,7 +1081,7 @@ body{font-size:15px}
  #homeView .recent-game:hover{background:transparent!important;border-color:transparent!important;transform:translateY(-2px)}
  #homeView .recent-game:focus-visible{outline:2px solid #8bb6ce;outline-offset:2px;border-radius:6px}
  #homeView .recent-icon{width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:0;
-  padding:0;background:transparent!important;color:#477b9a;font-size:0;line-height:1}
+  padding:0;background:transparent!important;color:#477b9a;font-size:32px;line-height:1}
  #homeView .recent-copy{width:100%;min-width:0;display:block;text-align:center}
  #homeView .recent-copy strong{display:block;overflow:hidden;color:#587387;font-size:11px;font-weight:620;
   text-overflow:ellipsis;white-space:nowrap}
@@ -1118,15 +1118,14 @@ body{font-size:15px}
  #homeView .recent-copy strong{font-size:9px}
  #homeView .recent-empty{font-size:11px}
 }
-/* P111 R21.2 · all game pictograms are local vector artwork, independent of installed emoji fonts. */
-.game-icon-svg{display:block;width:100%;height:100%;overflow:visible}
-.game-card-icon{padding:6px}
-.game-card-icon .game-icon-svg{width:30px;height:30px}
-.recent-icon .game-icon-svg{width:38px;height:38px}
-.game-card-icon[data-category="board"],#homeView .recent-icon[data-category="board"]{color:#477f9f}
-.game-card-icon[data-category="puzzle"],#homeView .recent-icon[data-category="puzzle"]{color:#628d73}
-.game-card-icon[data-category="arcade"],#homeView .recent-icon[data-category="arcade"]{color:#b17b45}
-.game-card-icon[data-category="card"],#homeView .recent-icon[data-category="card"]{color:#8875a8}
+/* P111 R22 · use familiar system pictograms instead of custom-drawn game logos. */
+.game-icon-glyph{
+ display:inline-block;line-height:1;vertical-align:middle;
+ font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji","Segoe UI Symbol",sans-serif
+}
+.game-card-icon{padding:0;font-size:clamp(22px,2vw,27px)}
+#homeView .recent-icon{font-size:32px!important}
+@media(max-width:700px){#homeView .recent-icon{font-size:28px!important}}
 /* P111 R21.4 · center the session clock and float status notices over the game surface. */
 @media(min-width:1101px){
  .main-area:has(#workspaceView:not(.hidden)) .topbar{

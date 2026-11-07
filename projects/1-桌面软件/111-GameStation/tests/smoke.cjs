@@ -168,11 +168,11 @@ const names=[
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
   assert.equal(await page.locator("#homeRecentList .recent-game").count(),4,"Recent strip must contain only games actually played");
-  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,svg:!!n.querySelector(".game-icon-svg")})));
+  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasSvg:!!n.querySelector("svg")})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
-  assert.ok(recent.every(x=>x.svg),"Every recent game must use a local SVG icon, not an OS emoji glyph");
-  assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-icon-svg').count(),1,"90 坦克 must have a dedicated vector icon");
+  assert.ok(recent.every(x=>x.icon&&!x.hasSvg),"Recent games must use familiar system pictograms, not custom-drawn SVG logos");
+  assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-icon-glyph').count(),1,"90 坦克 must use its registered system pictogram");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
   assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent game labels must remain fully visible inside the strip: "+JSON.stringify(recentFit));
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
@@ -205,23 +205,23 @@ const names=[
     const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
-    const measured=Math.floor(c.width),expectedGap=measured<820?2:3;
-    const expectedCell=Math.max(7,Math.min(17.5,Math.floor(((measured-52*expectedGap)/53)*2)/2));
+    const measured=Math.floor(c.width),narrow=window.innerWidth<=700,expectedGap=narrow?2:3,expectedCell=narrow?9:11;
     return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
      weekdayRow:parseFloat(getComputedStyle(layout.querySelector(".heatmap-weekdays")).gridTemplateRows.split(" ")[0]),
      measuredContentWidth:Number(grid.dataset.availableWidth),computedCellSize:Number(grid.dataset.cellSize),expectedCell,expectedGap};
    });
-   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap dots must scale with the actual content width, capped at 17.5px: "+JSON.stringify(visual));
+   assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap dots must retain the fixed square size: "+JSON.stringify(visual));
    assert.ok(Math.abs(parseFloat(visual.dot.autoColumn)-visual.dot.width)<.5,"Heatmap implicit columns must match the square dot size: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.weekdayRow-visual.dot.height)<.5,"Weekday labels must align with the heatmap row pitch: "+JSON.stringify(visual));
    assert.ok(visual.measuredContentWidth>=visual.dot.contentWidth*.95,"Heatmap sizing must use the rendered content width, not a stale clientWidth: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
    const expectedGridWidth=53*visual.expectedCell+52*visual.expectedGap;
    assert.ok(Math.abs(visual.dot.gridWidth-expectedGridWidth)<1,"53-week heatmap width must match its computed square-cell geometry: "+JSON.stringify(visual));
-   assert.ok(visual.dot.gridWidth>=visual.dot.contentWidth*.90,"53-week dot matrix must make substantial use of the activity panel width: "+JSON.stringify(visual));
-   assert.ok(visual.expectedCell>11||visual.measuredContentWidth<760,"Wide desktop heatmap must not regress to the undersized 11px preset: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth<=visual.dot.contentWidth+1,"Compact 53-week dot matrix must fit inside the full-width activity panel: "+JSON.stringify(visual));
+   assert.equal(visual.expectedCell,11,"Desktop heatmap must preserve the original 11px square dots: "+JSON.stringify(visual));
+   assert.equal(visual.expectedGap,3,"Desktop heatmap must preserve the original 3px dot spacing: "+JSON.stringify(visual));
    assert.ok(Math.abs((visual.dot.gridLeft+visual.dot.gridWidth/2)-(visual.dot.contentLeft+visual.dot.contentWidth/2))<2,"The small dot matrix must be centered inside the full-width activity panel: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
@@ -237,11 +237,14 @@ const names=[
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
-  assert.equal(await page.locator(".game-card .game-icon-svg").count(),24,"All 24 library games must have a local SVG pictogram");
-  assert.equal(await page.locator(".game-card .game-icon-svg").first().evaluate(el=>el.namespaceURI),"http://www.w3.org/2000/svg","Inline SVG must retain the SVG DOM namespace without a remote URL literal");
+  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),24,"All 24 library games must use their registered familiar pictogram");
+  assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"Custom-drawn game logo SVGs must not be used");
+  assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-icon-glyph').innerText(),"💣","Minesweeper must use the familiar bomb pictogram");
+  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-icon-glyph').innerText(),"🪖","90 Tank must use a familiar system pictogram");
+  assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-icon-glyph').innerText(),"🀄","Mahjong must use the familiar mahjong tile pictogram");
   const iconColors=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color));
   assert.notEqual(iconColors[0],iconColors[1],"Board and arcade icons must use distinct category colors");
-  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-svg').count(),1,"The 90 tank library icon must not depend on emoji font support");
+  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-glyph').count(),1,"The 90 tank library icon must use its registered system pictogram");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});
