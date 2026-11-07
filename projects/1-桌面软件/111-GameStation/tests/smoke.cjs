@@ -348,7 +348,7 @@ const names=[
   assert.ok(compactPoster.centerDelta<2,"Compact poster play button must remain centered under the icon: "+JSON.stringify(compactPoster));
   await page.setViewportSize({width:1024,height:620});
   const posterNode=page.locator("#homeGamePoster");
-  await posterNode.evaluate(el=>{el.dataset.originalWidth=el.style.width;el.style.width="635px";});
+  await posterNode.evaluate(el=>{el.dataset.originalWidth=el.style.width;el.dataset.originalHeight=el.style.height;el.style.width="635px";el.style.height="387px";});
   const mediumPoster=await posterNode.evaluate(p=>{
    const box=q=>q.getBoundingClientRect(),art=box(p.querySelector(".poster-art")),
     intro=box(p.querySelector(".poster-copy")),play=box(p.querySelector("#homePosterPlay"));
@@ -359,7 +359,7 @@ const names=[
    "Medium landscape poster must use a smaller icon with a clear text column: "+JSON.stringify(mediumPoster));
   assert.ok(mediumPoster.centerDelta<2,"Medium poster play button must stay centered under the icon: "+JSON.stringify(mediumPoster));
   await posterNode.screenshot({path:path.join(artifacts,"poster-medium-landscape.png")});
-  await posterNode.evaluate(el=>{el.style.width=el.dataset.originalWidth;delete el.dataset.originalWidth;});
+  await posterNode.evaluate(el=>{el.style.width=el.dataset.originalWidth;el.style.height=el.dataset.originalHeight;delete el.dataset.originalWidth;delete el.dataset.originalHeight;});
   await homeLayoutCheck(1440,1000);
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
   const gridEvidence=await page.locator("#homeRecentList").evaluate(list=>{
