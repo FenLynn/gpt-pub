@@ -258,11 +258,12 @@ const names=[
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
   const tankVector=await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').evaluate(svg=>({
     ns:svg.namespaceURI,viewBox:svg.getAttribute("viewBox"),path:!!svg.querySelector("path"),
+    pathLength:svg.querySelector("path")?.getAttribute("d")?.length||0,
     width:svg.getBoundingClientRect().width,height:svg.getBoundingClientRect().height
   }));
   assert.equal(tankVector.ns,"http://www.w3.org/2000/svg","The sourced 90 Tank icon must be crisp native SVG");
   assert.equal(tankVector.viewBox,"0 0 512 512");
-  assert.ok(tankVector.path&&tankVector.width>24&&tankVector.height>24,"Tank vector must have real visible dimensions");
+  assert.ok(tankVector.path&&tankVector.pathLength>900&&tankVector.width>24&&tankVector.height>24,"90 Tank must render the detailed armored tank vehicle, not a tank-top clothing icon");
   assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-icon-glyph').innerText(),"💣","Minesweeper must use the familiar bomb pictogram");
   assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use a sourced tank-top SVG");
   assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-icon-glyph').innerText(),"🀄","Mahjong must use the familiar mahjong tile pictogram");
