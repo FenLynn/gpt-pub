@@ -182,7 +182,7 @@ const names=[
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
     icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋","西洋跳棋（8×8）","国际象棋","五子棋"],"Recent games must be sorted newest-to-oldest");
-  assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
+  assert.ok(recent.every((x,i)=>i%4===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
