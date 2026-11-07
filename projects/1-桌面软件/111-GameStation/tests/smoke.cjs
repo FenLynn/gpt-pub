@@ -205,6 +205,10 @@ const names=[
   assert.equal(await page.locator(".ranking-panel").count(),1,"Dashboard must retain its right ranking column");
   await page.locator("#heroFirstPlayed").waitFor({state:"visible"});
   assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
+  const homeFixtureDebug=await page.evaluate(()=>({search:location.search.slice(0,90),date:document.querySelector("#homeDate")?.textContent,
+   lastGame:document.querySelector("#heroLastGame")?.textContent,recent:document.querySelectorAll("#homeRecentList .recent-game").length,
+   script:!!document.querySelector('script[src="./js/app.js"]')}));
+  if(homeFixtureDebug.lastGame!=="俄罗斯方块")console.log("P111_HOME_FIXTURE_DEBUG",JSON.stringify({homeFixtureDebug,errors}));
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
   assert.deepEqual(await page.locator(".hero-metric-label").allInnerTexts(),["首次开始游戏","已使用天数","累计时间","今日时间","最近游戏"],"Recent game metric must occupy the rightmost column");
