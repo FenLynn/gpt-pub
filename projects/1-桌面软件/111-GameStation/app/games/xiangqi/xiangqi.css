@@ -128,7 +128,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  border:0!important;padding:0!important;background:transparent!important}
 .xiangqi-layout .xiangqi-cell.target{background:radial-gradient(circle,#5caf827b 0 17%,transparent 22%)!important}
 .xiangqi-layout .xiangqi-cell.selected{background:radial-gradient(circle,#ffd67e83 0 50%,transparent 54%)!important}
-.xiangqi-layout .xiangqi-piece{
+.game-root.game-layout.xiangqi-layout .xiangqi-piece{
  display:grid!important;place-items:center!important;width:83%!important;height:auto!important;
  aspect-ratio:1!important;flex:0 0 auto!important;min-width:0!important;min-height:0!important;
  border:3px solid #986c3c!important;border-radius:50%!important;box-sizing:border-box!important;
