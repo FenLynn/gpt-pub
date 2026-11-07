@@ -1,0 +1,184 @@
+/* P111 Xiangqi R34: isolated visual system; only this game's document imports this file.
+   Preload workspace CSS in <head> so the legacy left-guide rail never flashes. */
+html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f8!important}
+.game-root.game-layout.xiangqi-layout,
+.game-root.game-layout.xiangqi-layout.gs-tools-open,
+.game-root.game-layout.xiangqi-layout.rail-collapsed,
+.game-root.game-layout.xiangqi-layout.gs-tools-open:not(.rail-collapsed){
+ display:grid!important;
+ grid-template-columns:clamp(146px,14.7vw,192px) minmax(0,1fr) clamp(148px,13.6vw,178px)!important;
+ grid-template-rows:minmax(0,1fr)!important;
+ column-gap:clamp(8px,1.15vw,18px)!important;
+ padding:8px 12px!important;
+ height:100%!important;
+ align-items:stretch!important;
+ background:#eaf2f8!important
+}
+.xiangqi-layout .game-guide,.xiangqi-layout .gs-hud,.xiangqi-layout .gs-notice{display:none!important}
+.game-root.xiangqi-layout>.game-main-board,
+.game-root.xiangqi-layout.gs-tools-open>.game-main-board{
+ grid-column:2!important;grid-row:1!important;
+ width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+ display:grid!important;place-items:center!important;padding:0!important;margin:0!important;
+ overflow:visible!important;container-type:size!important;container-name:playarea!important
+}
+.game-root.xiangqi-layout>.game-main-board>.board-wrap{
+ width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+ margin:0!important;padding:0!important;background:transparent!important;border:0!important;
+ display:grid!important;place-items:center!important;overflow:visible!important;box-shadow:none!important
+}
+.game-root.xiangqi-layout>.xiangqi-record-rail{
+ grid-column:1!important;grid-row:1!important;min-width:0!important;min-height:0!important;
+ display:flex!important;flex-direction:column;align-self:stretch;
+ background:#fcfdfed9;border:1px solid #d5e4ed;border-radius:13px;
+ box-shadow:0 4px 15px #3457710b;overflow:hidden
+}
+.xiangqi-record-heading{display:flex;align-items:center;justify-content:space-between;gap:4px;
+ min-height:48px;padding:0 12px;border-bottom:1px solid #e0e9ef;color:#385c73;font-size:14px}
+.xiangqi-record-heading strong{font-weight:770}
+.xiangqi-record-heading span{color:#849cab;font-size:11px;font-variant-numeric:tabular-nums}
+.xiangqi-record-head,.xiangqi-layout #moveList li{
+ display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1fr);gap:3px;align-items:center
+}
+.xiangqi-record-head{flex:none;padding:9px 7px 7px;color:#8194a2;font-size:10px;text-align:center;border-bottom:1px solid #e7eef3}
+.xiangqi-layout #moveList{
+ display:block!important;flex:1!important;min-height:0!important;max-height:none!important;
+ margin:0!important;padding:5px 4px!important;list-style:none!important;
+ overflow-x:hidden!important;overflow-y:auto!important;scrollbar-width:thin;scrollbar-color:#c7d8e2 transparent
+}
+.xiangqi-layout #moveList:empty:after{content:"暂无走棋记录";display:grid;place-items:center;
+ height:90px;background:transparent;color:#9badb8;font-size:12px}
+.xiangqi-layout #moveList li{
+ min-height:37px!important;margin:0!important;padding:5px 3px!important;border-radius:7px;
+ font-size:clamp(10px,.92vw,12px)!important;color:#4f687b;text-align:center;
+ white-space:nowrap;font-variant-numeric:tabular-nums
+}
+.xiangqi-layout #moveList li:nth-child(2n){background:#f1f6f9}
+.xiangqi-layout #moveList li:last-child{background:#e8f3fa}
+.xiangqi-move-index{color:#9aadb9;font-size:10px}
+.xiangqi-move-side{display:block;min-width:0;font-weight:740}
+.xiangqi-move-side.red{color:#b74236}
+.xiangqi-move-side.black{color:#344b59}
+.xiangqi-record-foot{flex:none;margin-top:auto;padding:12px 8px;border-top:1px solid #e3edf3;
+ color:#8a9eab;font-size:10px;text-align:center;line-height:1.6}
+.game-root.game-layout.xiangqi-layout>.game-tools,
+.game-root.game-layout.xiangqi-layout.gs-tools-open>.game-tools,
+.game-root.game-layout.xiangqi-layout.rail-collapsed>.game-tools{
+ position:relative!important;grid-column:3!important;grid-row:1!important;
+ top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+ display:flex!important;flex-direction:column!important;
+ justify-content:center!important;align-items:stretch!important;
+ align-self:stretch!important;justify-self:stretch!important;
+ width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
+ max-height:none!important;gap:15px!important;padding:0!important;margin:0!important;
+ border:0!important;border-radius:0!important;background:transparent!important;
+ box-shadow:none!important;overflow:visible!important
+}
+.game-root.xiangqi-layout>.game-tools>.game-btn{
+ display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important;
+ flex:none!important;width:100%!important;min-height:55px!important;height:55px!important;
+ padding:0 9px!important;border:1px solid #c4dae7!important;border-radius:13px!important;
+ background:linear-gradient(145deg,#fff,#ebf4f9)!important;color:#305e7b!important;
+ font-size:15px!important;font-weight:750!important;
+ box-shadow:0 6px 16px #2448621b,inset 0 1px #fff!important;
+ transition:transform .18s,box-shadow .18s,border-color .18s!important
+}
+.game-root.xiangqi-layout>.game-tools>.game-btn svg{
+ width:20px!important;height:20px!important;flex:none!important;fill:none;
+ stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round
+}
+.game-root.xiangqi-layout>.game-tools>.game-btn:hover:not(:disabled){
+ transform:translateY(-3px) scale(1.015)!important;border-color:#a0c4d8!important;
+ box-shadow:0 11px 22px #234b642a,inset 0 1px #fff!important
+}
+.game-root.xiangqi-layout>.game-tools>.game-btn:disabled{opacity:.45!important;cursor:not-allowed}
+.game-root.xiangqi-layout>.game-tools>#resignButton{
+ color:#a75e52!important;border-color:#e5c9bf!important;
+ background:linear-gradient(145deg,#fff,#fff1ed)!important
+}
+.game-root.xiangqi-layout .xiangqi-board{
+ position:relative!important;
+ width:min(calc(100cqw - 36px),calc((100cqh - 26px) * 8 / 9))!important;
+ height:min(calc(100cqh - 26px),calc((100cqw - 36px) * 9 / 8))!important;
+ max-width:100%!important;max-height:100%!important;aspect-ratio:8/9!important;
+ border:7px solid #865f39!important;border-radius:5px!important;overflow:visible!important;
+ padding:0!important;background-color:#e9cf9e!important;
+ background-image:radial-gradient(ellipse at 28% 16%,#fff0d54b,transparent 56%),
+ linear-gradient(135deg,#f3dfb7,#e9ce9b 55%,#e0c18d)!important;
+ box-shadow:inset 0 0 0 2px #fce9c6,0 10px 26px #63442931!important
+}
+.xiangqi-layout .xiangqi-lines{z-index:0!important}
+.xiangqi-layout .xiangqi-lines line,.xiangqi-layout .xiangqi-lines path{
+ stroke:#785431!important;stroke-width:2!important
+}
+.xiangqi-layout .xiangqi-lines .xiangqi-border{stroke:#785431!important;stroke-width:3!important}
+.xiangqi-layout .xiangqi-river-label{fill:#9b6b37!important;font-size:32px!important;
+ font-family:"STKaiti","KaiTi","Noto Serif CJK SC",serif;font-weight:690!important;letter-spacing:5px}
+.xiangqi-layout .xiangqi-file-label{font:700 19px/1 "STKaiti","KaiTi","Noto Serif CJK SC",serif;fill:#745534}
+.xiangqi-layout .xiangqi-cell{z-index:2!important;display:grid!important;place-items:center!important;
+ border:0!important;padding:0!important;background:transparent!important}
+.xiangqi-layout .xiangqi-cell.target{background:radial-gradient(circle,#5caf827b 0 17%,transparent 22%)!important}
+.xiangqi-layout .xiangqi-cell.selected{background:radial-gradient(circle,#ffd67e83 0 50%,transparent 54%)!important}
+.xiangqi-layout .xiangqi-piece{
+ display:grid!important;place-items:center!important;width:83%!important;height:auto!important;
+ aspect-ratio:1!important;flex:0 0 auto!important;min-width:0!important;min-height:0!important;
+ border:3px solid #986c3c!important;border-radius:50%!important;box-sizing:border-box!important;
+ background:radial-gradient(circle at 33% 25%,#fffaec 0%,#f3dfb9 53%,#d9b57a 100%)!important;
+ box-shadow:0 3px 5px #50351b55,0 6px 10px #50351b23,inset 0 0 0 2px #fff9e7!important;
+ font-family:"STKaiti","KaiTi","Noto Serif CJK SC","Songti SC","SimSun",serif!important;
+ font-size:clamp(20px,3.7cqh,38px)!important;font-weight:900!important;
+ font-synthesis:weight!important;line-height:1!important;white-space:nowrap!important;
+ text-shadow:.4px 0 currentColor,-.4px 0 currentColor,0 1px #fff9e7!important
+}
+.xiangqi-layout .xiangqi-piece.red{color:#b7332c!important;border-color:#a56e45!important}
+.xiangqi-layout .xiangqi-piece.black{color:#26353d!important}
+.xiangqi-layout .xiangqi-cell.checked .xiangqi-piece{
+ box-shadow:0 0 0 4px #e85b4d,0 0 0 9px #ffad567c,0 0 23px #e74a44a8!important;
+ animation:xiangqi-threat-pulse 1.05s ease-in-out infinite alternate
+}
+.xiangqi-layout .xiangqi-cell.threatening .xiangqi-piece{
+ box-shadow:0 0 0 3px #ecbb47,0 0 19px #edb94ab8,0 4px 7px #4c2f1755!important;
+ animation:xiangqi-threat-pulse 1.05s ease-in-out infinite alternate
+}
+@keyframes xiangqi-threat-pulse{from{filter:brightness(1)}to{filter:brightness(1.21)}}
+.xiangqi-result[hidden]{display:none!important}
+.xiangqi-result{
+ position:absolute;z-index:35;inset:0;display:grid;place-items:center;
+ background:#291f1a7e;backdrop-filter:blur(3px);border-radius:3px
+}
+.xiangqi-result-card{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+ width:min(390px,86%);padding:27px 22px 22px;
+ border:1px solid #efdfbc;border-radius:18px;
+ background:linear-gradient(145deg,#fffdf8f7,#f1e7d2f5);
+ box-shadow:0 18px 48px #241a1269,inset 0 1px #fff;
+ animation:xiangqi-result-rise .45s cubic-bezier(.18,.8,.2,1.1) both
+}
+.xiangqi-result-seal{display:grid;place-items:center;width:70px;height:70px;border-radius:50%;
+ background:radial-gradient(circle at 30% 24%,#fff6db,#e6bf7b);border:2px solid #d3b173;
+ box-shadow:0 7px 15px #977b3838;color:#ae4035;font:900 38px/1 "STKaiti","KaiTi",serif}
+.xiangqi-result[data-result="loss"] .xiangqi-result-seal{background:linear-gradient(145deg,#e8f1f7,#bbcbd8);color:#456276}
+.xiangqi-result[data-result="draw"] .xiangqi-result-seal{background:linear-gradient(145deg,#f9f5ec,#ddd5c5);color:#776653}
+.xiangqi-result-eyebrow{margin-top:12px;color:#9b8359;font-size:11px;font-weight:780;letter-spacing:2px}
+.xiangqi-result-card h2{margin:8px 0 5px;font-size:28px;font-weight:830;color:#2c4c5f}
+.xiangqi-result-card p{margin:0;color:#6a8190;font-size:13px;line-height:1.6}
+.xiangqi-result-buttons{display:flex;gap:12px;margin-top:23px}
+.xiangqi-result-buttons button{min-width:112px;height:42px;padding:0 13px;border-radius:10px;
+ border:1px solid #d0dfe6;background:#fff;color:#496c81;font-size:14px;font-weight:750}
+.xiangqi-result-buttons button:first-child{border-color:#b9dcc5;background:#e8f6eb;color:#307b50}
+.xiangqi-result-buttons button:hover{transform:translateY(-2px);box-shadow:0 5px 12px #294e6a24}
+@keyframes xiangqi-result-rise{from{opacity:0;transform:translateY(15px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:900px){
+ .game-root.game-layout.xiangqi-layout,.game-root.game-layout.xiangqi-layout.gs-tools-open,
+ .game-root.game-layout.xiangqi-layout.rail-collapsed{
+ grid-template-columns:126px minmax(0,1fr) 122px!important;gap:6px!important;padding:5px!important}
+ .xiangqi-record-foot{display:none}
+ .game-root.xiangqi-layout>.game-tools>.game-btn{height:45px!important;min-height:45px!important;font-size:12px!important;gap:5px!important}
+ .xiangqi-layout .xiangqi-piece{font-size:clamp(15px,3cqh,26px)!important}
+}
+@media(prefers-reduced-motion:reduce){
+ .xiangqi-layout .xiangqi-cell.checked .xiangqi-piece,
+ .xiangqi-layout .xiangqi-cell.threatening .xiangqi-piece,
+ .xiangqi-result-card{animation:none!important}
+ .game-root.xiangqi-layout>.game-tools>.game-btn{transition:none!important}
+}

@@ -1,5 +1,48 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>中国象棋</title><link rel="stylesheet" href="../shared/game.css"></head><body data-game="xiangqi"><main class="game-root game-layout xiangqi-layout" id="game">
-<aside class="game-guide"><div class="game-guide-kicker">CHINESE CHESS</div><h2>行棋提示</h2><p>点击己方棋子，再点击棋盘交叉点上的合法落点。</p><div class="guide-note">棋子位于横线与竖线的交点，不是方格中央。</div><div class="guide-note">将帅不能照面；将军时必须立即应将。</div></aside>
-<section class="game-main-board"><div class="board-wrap"><div class="xiangqi-board" id="board" aria-label="中国象棋棋盘"></div></div></section>
-<aside class="game-tools"><div class="turn-indicator"><span class="turn-dot red" id="turnDot"></span><strong id="turnText">轮到红方走</strong></div><div class="game-status sr-only" id="status" aria-live="polite">红方先行</div><button class="game-btn" id="undoButton">悔棋</button><button class="game-btn" id="flip">交换视角</button><button class="game-btn" id="resignButton">认输结束</button><div class="xiangqi-record"><div class="xiangqi-record-heading">棋谱 <span id="moveCount">0 步</span></div><ol id="moveList" aria-label="走棋记录"></ol></div><div class="game-tool-note">红方在下先行。棋子落在交叉点上；将帅不可照面。</div></aside>
-</main><script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中国象棋 · GameStation</title>
+<link rel="stylesheet" href="../shared/game.css">
+<link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css">
+<link rel="stylesheet" href="./xiangqi.css">
+</head>
+<body data-game="xiangqi">
+<main class="game-root game-layout xiangqi-layout" id="game">
+  <aside class="xiangqi-record-rail" aria-label="对局棋谱">
+    <div class="xiangqi-record-heading"><strong>对局棋谱</strong><span id="moveCount">0 步</span></div>
+    <div class="xiangqi-record-head"><span>回合</span><span>红方</span><span>黑方</span></div>
+    <ol id="moveList" aria-label="中国象棋中式棋谱" aria-live="polite"></ol>
+    <div class="xiangqi-record-foot">红方用中文路数 · 黑方用数字路数</div>
+  </aside>
+  <section class="game-main-board">
+    <div class="board-wrap">
+      <div class="xiangqi-board" id="board" aria-label="中国象棋棋盘">
+        <section class="xiangqi-result" id="xiangqiResult" hidden aria-live="assertive">
+          <div class="xiangqi-result-card">
+            <div class="xiangqi-result-seal" id="xiangqiResultSeal">勝</div>
+            <span class="xiangqi-result-eyebrow">本局结算</span>
+            <h2 id="xiangqiResultTitle">红方获胜</h2>
+            <p id="xiangqiResultDescription"></p>
+            <div class="xiangqi-result-buttons">
+              <button id="xiangqiReplay" type="button">再开一局</button>
+              <button id="xiangqiLeave" type="button">离开</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div id="status" class="game-status sr-only" aria-live="polite">红方先行</div>
+  </section>
+  <aside class="game-tools" aria-label="对局操作">
+    <button type="button" class="game-btn" id="undoButton">悔棋</button>
+    <button type="button" class="game-btn" id="flip">交换视角</button>
+    <button type="button" class="game-btn" id="resignButton">认输结束</button>
+  </aside>
+</main>
+<script src="../shared/bridge.js"></script>
+<script src="../shared/workspace.js"></script>
+<script src="./game.js"></script>
+</body>
+</html>

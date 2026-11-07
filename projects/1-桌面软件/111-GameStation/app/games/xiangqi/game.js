@@ -5,7 +5,7 @@ let boardObserver=null;
 function fitBoard(){const widthLimit=Math.max(0,boardArea.clientWidth),heightLimit=Math.max(0,boardArea.clientHeight),margin=Math.min(44,Math.max(24,Math.round(Math.min(widthLimit,heightLimit)*.05)));const innerW=Math.max(0,widthLimit-2*margin),innerH=Math.max(0,heightLimit-2*margin);const height=Math.min(innerH,innerW/(8/9));const width=height*(8/9);if(width>0&&height>0){el.style.width=width+"px";el.style.height=height+"px";}}
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],positionTrail=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
-const values={"帅":10000,"将":10000,"车":900,"马":430,"炮":450,"仕":220,"士":220,"相":220,"象":220,"兵":100,"卒":100};
+const values={"帅":15000,"将":15000,"车":1000,"马":460,"炮":475,"仕":200,"士":200,"相":210,"象":210,"兵":105,"卒":105};
 function clone(b){return b.map(row=>row.map(p=>p?{side:p.side,t:p.t}:null));}
 function initial(){const b=Array.from({length:10},()=>Array(9).fill(null)),back=["车","马","象","士","将","士","象","马","车"];for(let x=0;x<9;x++){b[0][x]={side:"black",t:back[x]};b[9][x]={side:"red",t:back[x]==="将"?"帅":back[x]==="士"?"仕":back[x]==="象"?"相":back[x]};}for(const x of [1,7]){b[2][x]={side:"black",t:"炮"};b[7][x]={side:"red",t:"炮"};}for(const x of [0,2,4,6,8]){b[3][x]={side:"black",t:"卒"};b[6][x]={side:"red",t:"兵"};}return b;}
 function findGeneral(b,side){for(let y=0;y<10;y++)for(let x=0;x<9;x++){const p=b[y][x];if(p&&p.side===side&&(p.t==="将"||p.t==="帅"))return {x,y};}return null;}
@@ -71,9 +71,100 @@ function repetitionOutcome(){
  if(continuous.black&&!continuous.red)return {winner:"red",reason:"黑方长将判负"};
  return {winner:null,reason:"循环局面和棋"};
 }
-function evaluate(b){let score=0;for(let y=0;y<10;y++)for(let x=0;x<9;x++){const p=b[y][x];if(!p)continue;let v=values[p.t]||0;if(p.t==="兵"||p.t==="卒")v+=((p.side==="red"?6-y:y-3)*9)+(x>=2&&x<=6?8:0);if(p.t==="马")v+=(x>=2&&x<=6?18:0);if(p.t==="车")v+=(x>=2&&x<=6?7:0);score+=p.side==="red"?v:-v;}return score;}
-function search(b,side,depth,alpha,beta,ply){if(!findGeneral(b,"red"))return -100000+ply;if(!findGeneral(b,"black"))return 100000-ply;const moves=legalMoves(b,side);if(!moves.length)return side==="red"?-99000+ply:99000-ply;if(depth===0)return evaluate(b);moves.sort((a,c)=>{const av=b[a.ty][a.tx]?values[b[a.ty][a.tx].t]||0:0,cv=b[c.ty][c.tx]?values[b[c.ty][c.tx].t]||0:0;return cv-av;});if(side==="red"){let best=-Infinity;for(const m of moves){const n=clone(b);apply(n,m);best=Math.max(best,search(n,"black",depth-1,alpha,beta,ply+1));alpha=Math.max(alpha,best);if(beta<=alpha)break;}return best;}let best=Infinity;for(const m of moves){const n=clone(b);apply(n,m);best=Math.min(best,search(n,"red",depth-1,alpha,beta,ply+1));beta=Math.min(beta,best);if(beta<=alpha)break;}return best;}
-function chooseAI(){const ms=liveMoves("black");if(!ms.length)return null;const depth=difficulty==="easy"?1:difficulty==="hard"?3:2;let best=Infinity,choices=[];for(const m of ms){const n=clone(board),captured=apply(n,m);let v=search(n,"red",depth-1,-Infinity,Infinity,1);if(captured)v-=0.01;if(v<best){best=v;choices=[m];}else if(v===best)choices.push(m);}return choices[Math.floor(Math.random()*choices.length)];}
+/* Iterative deepening alpha-beta with tactical capture extension, move ordering,
+   per-difficulty deadlines and verified legal move generation. */
+let lastAIStats={depth:0,nodes:0,elapsed:0};
+const SEARCH_ABORT={aborted:true},MATE=120000;
+const moveId=m=>[m.fx,m.fy,m.tx,m.ty].join(",");
+function scorePosition(b,side){
+ let red=0,black=0;
+ for(let y=0;y<10;y++)for(let x=0;x<9;x++){
+  const p=b[y][x];if(!p)continue;
+  const progress=p.side==="red"?9-y:y,center=Math.max(0,4-Math.abs(x-4));
+  let v=values[p.t]||0;
+  if(p.t==="兵"||p.t==="卒"){
+   const crossed=p.side==="red"?y<=4:y>=5;
+   v+=(crossed?110:0)+Math.max(0,progress-3)*(crossed?19:5)+center*(crossed?8:3);
+  }else if(p.t==="马")v+=center*14+Math.max(0,4-Math.abs(y-4.5))*8;
+  else if(p.t==="炮")v+=center*10+(progress>1&&progress<7?24:0);
+  else if(p.t==="车")v+=center*6+Math.min(6,progress)*5;
+  else if(["仕","士","相","象"].includes(p.t))v+=progress<3?13:0;
+  if(p.side==="red")red+=v;else black+=v;
+ }
+ return (side==="red"?red-black:black-red)+(inCheck(b,opposite(side))?35:0)-(inCheck(b,side)?100:0);
+}
+function checkDeadline(ctx){
+ ctx.nodes++;
+ if((ctx.nodes&63)===0&&performance.now()>ctx.deadline)throw SEARCH_ABORT;
+}
+function ordering(b,m,preferred=""){
+ const target=b[m.ty][m.tx],mover=b[m.fy][m.fx];
+ const capture=target?(values[target.t]||0)*12-(values[mover.t]||0):0;
+ return (moveId(m)===preferred?25000:0)+capture+(4-Math.abs(m.tx-4))*4;
+}
+function ordered(b,moves,preferred=""){return moves.slice().sort((a,z)=>ordering(b,z,preferred)-ordering(b,a,preferred));}
+function withMove(b,m,fn){
+ const piece=b[m.fy][m.fx],capture=b[m.ty][m.tx];apply(b,m);
+ try{return fn();}finally{b[m.fy][m.fx]=piece;b[m.ty][m.tx]=capture;}
+}
+function quiescence(b,side,alpha,beta,ply,remaining,ctx){
+ checkDeadline(ctx);
+ const checked=inCheck(b,side);
+ let best=checked?-MATE:scorePosition(b,side);
+ if(!checked){if(best>=beta)return best;alpha=Math.max(alpha,best);}
+ if(remaining<=0)return checked?scorePosition(b,side)-160:best;
+ let moves=legalMoves(b,side);
+ if(!moves.length)return -MATE+ply;
+ if(!checked)moves=moves.filter(m=>!!b[m.ty][m.tx]);
+ if(!moves.length)return best;
+ for(const m of ordered(b,moves)){
+  const v=-withMove(b,m,()=>quiescence(b,opposite(side),-beta,-alpha,ply+1,remaining-1,ctx));
+  best=Math.max(best,v);alpha=Math.max(alpha,v);
+  if(alpha>=beta)break;
+ }
+ return best;
+}
+function searchAI(b,side,depth,alpha,beta,ply,ctx){
+ checkDeadline(ctx);
+ if(depth<=0)return quiescence(b,side,alpha,beta,ply,ctx.quiet,ctx);
+ const moves=legalMoves(b,side);
+ if(!moves.length)return -MATE+ply;
+ const key=depth>1?keyPosition(b,side):null;
+ let best=-Infinity;
+ for(const m of ordered(b,moves,key?ctx.pv.get(key)||"":"")){
+  const v=-withMove(b,m,()=>searchAI(b,opposite(side),depth-1,-beta,-alpha,ply+1,ctx));
+  if(v>best){best=v;if(key)ctx.pv.set(key,moveId(m));}
+  alpha=Math.max(alpha,v);if(alpha>=beta)break;
+ }
+ return best;
+}
+function chooseAI(){
+ const moves=legalMoves(board,"black");if(!moves.length)return null;
+ const start=performance.now();
+ const budget=difficulty==="easy"?80:difficulty==="normal"?300:850;
+ const maxDepth=difficulty==="easy"?1:difficulty==="normal"?3:5;
+ const ctx={nodes:0,deadline:start+budget,quiet:difficulty==="hard"?3:2,pv:new Map()};
+ let sorted=ordered(board,moves),chosen=sorted[0],finishedDepth=0;
+ for(let depth=1;depth<=maxDepth;depth++){
+  let bestScore=-Infinity,best=null,complete=false;
+  try{
+   for(const m of sorted){
+    checkDeadline(ctx);
+    const score=-withMove(board,m,()=>searchAI(board,"red",depth-1,-Infinity,Infinity,1,ctx));
+    if(score>bestScore){best=m;bestScore=score;}
+   }
+   complete=true;
+  }catch(e){if(e!==SEARCH_ABORT)throw e;}
+  if(!complete)break;
+  if(best){
+   chosen=best;finishedDepth=depth;
+   sorted=[best,...sorted.filter(m=>moveId(m)!==moveId(best))];
+  }
+  if(bestScore>MATE-500||performance.now()>ctx.deadline-12)break;
+ }
+ lastAIStats={depth:finishedDepth,nodes:ctx.nodes,elapsed:Math.round(performance.now()-start)};
+ return chosen;
+}
 function report(t){
  status.textContent=t;
  document.getElementById("undoButton").disabled=!history.length||paused;
