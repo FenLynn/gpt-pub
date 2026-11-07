@@ -364,14 +364,14 @@ function importData(file){const reader=new FileReader();reader.onload=()=>{try{c
 function clearData(){if(!confirm("确定清空本机的游戏时间、成绩、次数和收藏吗？此操作不可撤销。"))return;stats={};firstStartedAt=0;try{localStorage.removeItem(storePrefix+"firstStartedAt");}catch(e){}favorites.clear();write("stats",stats);write("favorites",[]);renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();toast("本机记录已清空");}
 $("mobileMenu").addEventListener("click",()=>shell.classList.toggle("menu-open"));
 document.querySelectorAll("[data-view='home']").forEach(b=>b.addEventListener("click",showHome));
-document.querySelectorAll("[data-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.category)));
+document.querySelectorAll(".nav-item[data-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.category)));
 $("breadcrumbCategory").addEventListener("click",()=>active?showLibrary(active.category):showHome());
 $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowerCase();renderLibrary();});
  $("startButton").addEventListener("click",()=>{if(started)endGame();else startGame();});$("pauseButton").addEventListener("click",togglePause);$("newGameButton").addEventListener("click",newRound);
  document.querySelectorAll("[data-recent-tab]").forEach(b=>b.addEventListener("click",()=>{
   homeRecentTab=b.dataset.recentTab==="popular"?"popular":"recent";renderHomeRecent();
  }));
- $("homePosterPlay").addEventListener("click",()=>{const id=$("homeGamePoster")?.dataset.game;if(id)openGame(id);});
+ $("homePosterPlay").addEventListener("click",e=>{e.stopPropagation();const id=$("homeGamePoster")?.dataset.game;if(id)openGame(id);});
  $("modeControl").addEventListener("click",e=>{const b=e.target.closest("button[data-mode-index]");if(b)setMode(b.dataset.modeIndex);});
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
  document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));

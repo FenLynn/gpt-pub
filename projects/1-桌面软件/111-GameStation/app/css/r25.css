@@ -262,3 +262,120 @@
   min-width:40px!important;padding:0 5px!important
  }
 }
+
+
+/* R27 — exact home layout adjustments requested: 3×3 games and a reorganized poster. */
+@media(min-width:701px){
+ #homeView .recent-list{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:repeat(3,minmax(0,1fr))!important;
+  gap:7px 10px!important
+ }
+ #homeView .recent-icon{
+  width:68px!important;height:68px!important;font-size:62px!important
+ }
+ #homeView .recent-icon .game-tank-icon{width:65px!important;height:65px!important}
+ #homeView .recent-game{gap:7px!important}
+ #homeView .recent-copy strong{font-size:14px!important;line-height:1.35!important}
+ #homeView .home-game-poster{display:block!important;position:relative!important}
+ #homeView .poster-top{
+  position:absolute!important;top:14px!important;left:19px!important;right:19px!important;
+  justify-content:flex-start!important;z-index:2
+ }
+ #homeView .poster-left{
+  position:absolute;top:57px;left:18px;width:145px;
+  display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0
+ }
+ #homeView .poster-art{
+  position:relative!important;top:auto!important;left:auto!important;
+  display:grid!important;place-items:center!important;
+  width:138px!important;height:132px!important;min-height:0!important;
+  padding:0!important;flex:none!important;font-size:clamp(92px,6.5vw,116px)!important
+ }
+ #homeView .poster-art .game-tank-icon{width:108px!important;height:108px!important}
+ #homeView .poster-left #homePosterPlay{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  width:auto!important;min-width:112px!important;height:39px!important;padding:0 13px!important;
+  white-space:nowrap!important
+ }
+ #homeView .poster-details{
+  position:absolute!important;top:58px!important;left:181px!important;right:20px!important;bottom:62px!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  justify-content:flex-start!important;gap:18px!important;
+  min-width:0!important;margin:0!important;padding:0!important
+ }
+ #homeView .poster-copy{min-width:0!important}
+ #homeView .poster-category{font-size:13px!important;line-height:1.3!important}
+ #homeView .poster-copy h3{font-size:26px!important;line-height:1.18!important;margin:7px 0 8px!important}
+ #homeView .poster-copy p{
+  display:block!important;overflow:visible!important;
+  font-size:14px!important;line-height:1.6!important;color:#ecf7f4!important
+ }
+ #homeView .poster-tips{
+  display:flex!important;flex-direction:column!important;align-items:flex-start!important;
+  gap:8px!important;min-width:0!important;margin-top:auto!important;
+  padding:13px 0 0!important;border:0!important;border-top:1px solid #ffffff46!important
+ }
+ #homeView .poster-tips-label{font-size:13px!important;font-weight:800!important;color:#cbf2e3!important}
+ #homeView .poster-tips p{margin:0!important;color:#fff!important;font-size:15px!important;font-weight:590!important;line-height:1.65!important}
+ #homeView .poster-bottom{
+  position:absolute!important;left:19px!important;bottom:15px!important;
+  display:flex!important;align-items:center!important;justify-content:flex-start!important;
+  gap:13px!important;margin:0!important;z-index:2
+ }
+ #homeView #homePosterCount{
+  display:block!important;color:#d9ece8!important;
+  font:650 12px/1 Consolas,monospace!important;letter-spacing:.04em
+ }
+ #homeView .poster-dots{display:flex!important;align-items:center!important;gap:5px!important}
+ #homeView .poster-progress{display:none!important}
+}
+@media(min-width:701px) and (max-height:810px){
+ #homeView .recent-icon{width:58px!important;height:58px!important;font-size:53px!important}
+ #homeView .recent-icon .game-tank-icon{width:56px!important;height:56px!important}
+ #homeView .poster-left{top:47px!important;left:14px!important;width:112px!important;gap:8px!important}
+ #homeView .poster-art{width:108px!important;height:100px!important;font-size:84px!important}
+ #homeView .poster-art .game-tank-icon{width:82px!important;height:82px!important}
+ #homeView .poster-left #homePosterPlay{height:35px!important;min-width:102px!important;font-size:12px!important}
+ #homeView .poster-details{top:49px!important;left:137px!important;right:14px!important;bottom:55px!important;gap:12px!important}
+ #homeView .poster-copy h3{font-size:22px!important;margin:5px 0 6px!important}
+ #homeView .poster-copy p{font-size:13px!important;line-height:1.5!important}
+ #homeView .poster-tips{padding-top:9px!important}
+ #homeView .poster-tips p{font-size:13px!important;line-height:1.5!important}
+ #homeView .poster-bottom{left:14px!important;bottom:12px!important;gap:10px!important}
+}
+@media(min-width:701px) and (max-width:1150px){
+ #homeView .poster-left{left:12px!important;width:100px!important}
+ #homeView .poster-art{width:96px!important;height:96px!important;font-size:76px!important}
+ #homeView .poster-art .game-tank-icon{width:76px!important;height:76px!important}
+ #homeView .poster-left #homePosterPlay{min-width:94px!important;padding:0 8px!important}
+ #homeView .poster-details{left:121px!important;right:12px!important}
+ #homeView .poster-copy h3{font-size:19px!important}
+ #homeView .poster-copy p,#homeView .poster-tips p{font-size:12px!important;line-height:1.45!important}
+ #homeView .poster-tips-label{font-size:11px!important}
+ #homeView .poster-bottom{left:12px!important}
+}
+/* R27 — LED text is regular weight; short messages center, long messages scroll. */
+.main-area:has(#workspaceView:not(.hidden)) #gameNotice .game-notice-window{
+ display:flex!important;align-items:center!important;justify-content:center!important
+}
+.main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-window{
+ justify-content:flex-start!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{
+ font-weight:400!important;text-shadow:none!important;letter-spacing:.02em!important
+}
+.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-window{
+ justify-content:center!important
+}
+.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice.marquee .game-notice-window{
+ justify-content:flex-start!important
+}
+.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{
+ font-weight:400!important;text-shadow:none!important;letter-spacing:.02em!important
+}
+@media(max-width:900px) and (prefers-reduced-motion:no-preference){
+ .main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-text{
+  animation:led-scroll var(--led-duration,7s) ease-in-out infinite alternate!important
+ }
+}

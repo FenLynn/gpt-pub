@@ -210,10 +210,10 @@ const names=[
   assert.deepEqual(await page.locator(".hero-metric-label").allInnerTexts(),["首次开始游戏","已使用天数","累计时间","今日时间","最近游戏"],"Recent game metric must occupy the rightmost column");
   const clockSizes=await page.evaluate(()=>({date:parseFloat(getComputedStyle(document.querySelector("#homeDate")).fontSize),time:parseFloat(getComputedStyle(document.querySelector("#homeTime")).fontSize)}));
   assert.ok(Math.abs(clockSizes.date-clockSizes.time)<=1,"Home clock must be as prominent as the date: "+JSON.stringify(clockSizes));
-  assert.equal(await page.locator("#homeRecentList .recent-game").count(),12,"Recent tab must show twelve real played games");
+  assert.equal(await page.locator("#homeRecentList .recent-game").count(),9,"Recent tab must show exactly nine real played games");
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
     icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
-  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋","西洋跳棋（8×8）","国际象棋","五子棋"],"Recent games must be sorted newest-to-oldest");
+  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋"],"Recent games must show the nine newest games in order");
   assert.ok(recent.every((x,i)=>i%3===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
@@ -223,16 +223,35 @@ const names=[
   assert.equal(await page.locator("#homeGamePoster").count(),1,"Right-hand rotating game poster must exist");
   const posterDesign=await page.locator("#homeGamePoster").evaluate(poster=>{
    const rect=el=>el.getBoundingClientRect(),art=rect(poster.querySelector(".poster-art")),intro=rect(poster.querySelector(".poster-copy")),
-    tip=rect(poster.querySelector(".poster-tips")),outer=rect(poster);
-   return{artX:art.left,artY:art.top,introX:intro.left,introY:intro.top,tipX:tip.left,tipY:tip.top,
-    panelX:outer.left,panelY:outer.top,tipFont:parseFloat(getComputedStyle(poster.querySelector(".poster-tips p")).fontSize),
+    tip=rect(poster.querySelector(".poster-tips")),play=rect(poster.querySelector("#homePosterPlay")),
+    count=rect(poster.querySelector("#homePosterCount")),dots=rect(poster.querySelector(".poster-dots")),outer=rect(poster);
+   return{art,intro,tip,play,count,dots,outer,
+    tipFont:parseFloat(getComputedStyle(poster.querySelector(".poster-tips p")).fontSize),
     introFont:parseFloat(getComputedStyle(poster.querySelector(".poster-copy p")).fontSize),
     titleFont:parseFloat(getComputedStyle(poster.querySelector(".poster-copy h3")).fontSize),
     tipText:poster.querySelector("#homePosterTip").textContent};
   });
-  assert.ok(posterDesign.artX-posterDesign.panelX<70&&posterDesign.artY-posterDesign.panelY<90,"Poster icon must be in the upper left: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.tipX>posterDesign.introX&&posterDesign.introY>posterDesign.artY,"Poster intro belongs bottom left and tips to the right: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.tipFont>=13&&posterDesign.introFont>=13&&posterDesign.titleFont>=22&&posterDesign.tipText.length>3,"Poster intro and tips must be readable and populated: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.art.left-posterDesign.outer.left<70&&posterDesign.art.top-posterDesign.outer.top<90,"Poster icon must stay upper left: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.intro.left>posterDesign.art.right+8&&posterDesign.intro.top<posterDesign.outer.top+posterDesign.outer.height*.5,"Game information must move to the upper right: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.tip.left>=posterDesign.intro.left-2&&posterDesign.tip.top>posterDesign.intro.bottom-2,"Tips must stay in the right column below the game information: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.play.top>=posterDesign.art.bottom-1&&Math.abs((posterDesign.play.left+posterDesign.play.right)/2-(posterDesign.art.left+posterDesign.art.right)/2)<12,"Play button must sit directly below and align with the icon: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.count.left-posterDesign.outer.left<80&&posterDesign.count.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.left<posterDesign.outer.left+posterDesign.outer.width*.55,"Poster number and dots must both move to the lower left: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.tipFont>=13&&posterDesign.introFont>=13&&posterDesign.titleFont>=22&&posterDesign.tipText.length>3,"Poster game information and tips must remain readable: "+JSON.stringify(posterDesign));
+  assert.equal(await page.locator("#homePosterProgress,.poster-progress").count(),0,"Poster progress bar must be removed");
+  const preview=page.locator("#homeRecentList .recent-game").nth(1);
+  const previewId=await preview.getAttribute("data-game");
+  await preview.click();
+  assert.equal(await page.locator("#homeGamePoster").getAttribute("data-game"),previewId,"Single click on a recent game must only update the poster preview");
+  await page.locator("#homeRecentList .recent-game").nth(1).dblclick();
+  await page.locator("#workspaceView:not(.hidden)").waitFor({state:"visible"});
+  assert.equal(await page.locator("#libraryView").evaluate(el=>el.classList.contains("hidden")),true,"Double-clicking a recent game must launch it directly, not open its category");
+  await page.locator("[data-view='home']").first().click();
+  await page.locator("#homeDate").waitFor({state:"visible"});
+  await page.locator("#homePosterPlay").click();
+  await page.locator("#workspaceView:not(.hidden)").waitFor({state:"visible"});
+  assert.equal(await page.locator("#libraryView").evaluate(el=>el.classList.contains("hidden")),true,"Poster play button must launch directly, not open a category");
+  await page.locator("[data-view='home']").first().click();
+  await page.locator("#homeDate").waitFor({state:"visible"});
   const posterBefore=await page.locator("#homeGamePoster").getAttribute("data-poster-index");
   await page.waitForFunction(old=>document.querySelector("#homeGamePoster")?.dataset.posterIndex!==old,posterBefore,{timeout:8500});
   await page.locator('[data-recent-tab="popular"]').click();
@@ -321,14 +340,14 @@ const names=[
     const icon=first?.getBoundingClientRect(),panel=list.getBoundingClientRect(),style=first&&getComputedStyle(first);
     return {iconWidth:icon?.width||0,iconHeight:icon?.height||0,iconOverflow:style?.overflow,rows:items.length,panelHeight:panel.height};
   });
-  assert.ok(gridEvidence.iconWidth>=40&&gridEvidence.iconWidth<=64&&gridEvidence.iconHeight>=40&&gridEvidence.iconHeight<=64&&gridEvidence.iconOverflow==="visible","Recent game icons must be larger and never clipped: "+JSON.stringify(gridEvidence));
+  assert.ok(gridEvidence.iconWidth>=64&&gridEvidence.iconWidth<=72&&gridEvidence.iconHeight>=64&&gridEvidence.iconHeight<=72&&gridEvidence.iconOverflow==="visible","Three-by-three recent game icons must be large and never clipped: "+JSON.stringify(gridEvidence));
   const fourRows=await page.locator("#homeRecentList").evaluate(list=>{
     const coords=[...list.querySelectorAll(".recent-game")].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y};});
     const rows=[...new Set(coords.map(p=>Math.round(p.y)))];
     return {coords,rows};
   });
-  assert.ok(fourRows.coords.length===12&&fourRows.rows.length===4,"Recent games must form exactly four rows: "+JSON.stringify(fourRows));
-  for(let row=0;row<4;row++){
+  assert.ok(fourRows.coords.length===9&&fourRows.rows.length===3,"Recent games must form exactly three rows: "+JSON.stringify(fourRows));
+  for(let row=0;row<3;row++){
     const group=fourRows.coords.slice(row*3,row*3+3);
     assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must have three aligned columns: "+JSON.stringify(fourRows));
     assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent row must read left to right: "+JSON.stringify(fourRows));
@@ -363,13 +382,27 @@ const names=[
     if(await page.locator("#modeControl button,#difficultyControl button").count())assert.equal(await page.locator("#gameControls").isVisible(),true,"parent mode/difficulty controls must be visible");
     await viewCheck(name,size.width,size.height);
     if(!noticeChecked){
-    await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
+    await frame.locator("#game").evaluate(()=>window.GameBridge.report("已暂停"));
     await page.locator("#gameNotice.visible").waitFor({timeout:1500});
     const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,x:x.left,right:x.right,width:x.width,centerX:x.left+x.width/2,centerY:x.top+x.height/2,barTop:b.top,barBottom:b.bottom,barCenterX:b.left+b.width/2,message:el.textContent,parent:el.parentElement.id};});
     assert.equal(r.parent,"topbar","live status must be rendered in the topbar center");
     assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must stay inside the titlebar, never below the game");
     assert.ok(r.width>=214&&r.width<=285,"Gomoku LED must be about twice the former width: "+JSON.stringify(r));
-    assert.match(r.message,/顶部通知位置回归测试/);
+    assert.match(r.message,/已暂停/);
+    const shortLed=await page.locator("#gameNotice").evaluate(el=>{
+     const window=el.querySelector(".game-notice-window"),text=el.querySelector(".game-notice-text");
+     return{marquee:el.classList.contains("marquee"),align:getComputedStyle(window).justifyContent,weight:getComputedStyle(text).fontWeight};
+    });
+    assert.deepEqual(shortLed,{marquee:false,align:"center",weight:"400"},"Short LED text must be regular-weight and centered: "+JSON.stringify(shortLed));
+    await frame.locator("#game").evaluate(()=>window.GameBridge.report("这是一段专门用于检查顶部LED在内容较长时能够自动滚动播放的状态提示文字"));
+    await page.waitForFunction(()=>document.querySelector("#gameNotice")?.classList.contains("marquee"),{timeout:1500});
+    const longLed=await page.locator("#gameNotice").evaluate(el=>{
+     const window=el.querySelector(".game-notice-window"),text=el.querySelector(".game-notice-text");
+     return{align:getComputedStyle(window).justifyContent,weight:getComputedStyle(text).fontWeight,animation:getComputedStyle(text).animationName};
+    });
+    assert.equal(longLed.align,"flex-start","Long LED text must scroll from the left edge");
+    assert.equal(longLed.weight,"400","Long LED text must remain regular-weight");
+    assert.equal(longLed.animation,"led-scroll","Long LED text must animate horizontally: "+JSON.stringify(longLed));
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
     noticeChecked=true;
    }
