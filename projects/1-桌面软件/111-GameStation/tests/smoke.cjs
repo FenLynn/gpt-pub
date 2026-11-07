@@ -84,6 +84,14 @@ const names=[
    assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
    assert.equal(geometry.pieceCount,32,"Xiangqi must render all 32 starting pieces");
    assert.ok(geometry.maxPieceDelta<=.5,"All 32 Xiangqi pieces must be mathematically circular, never oval: "+JSON.stringify(geometry));
+    const files=await frame.locator(".xiangqi-file-label").allTextContents();
+    assert.equal(files.length,18,"Xiangqi must mark 9 columns for each perspective");
+    assert.deepEqual(files.slice(0,4),["1","九","2","八"],"Xiangqi black/red route numbers must use opposite perspectives");
+    const river=await frame.locator(".xiangqi-river-label").first().evaluate(el=>({y:el.getAttribute("y"),baseline:el.getAttribute("dominant-baseline")}));
+    assert.equal(river.y,"450","River label must be centered vertically");
+    assert.equal(river.baseline,"middle","River label must use middle baseline");
+    assert.equal(await frame.locator("#turnText").count(),0,"Xiangqi must not duplicate host LED in the right rail");
+    assert.equal(await frame.locator("#xiangqiResult[hidden]").count(),1,"Xiangqi result must begin hidden");
   }
   if(name==="飞行棋"){
    const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
@@ -123,6 +131,20 @@ const names=[
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
     assert.ok(v.main.width>=v.root.width*.46,"Gomoku board must retain enough playfield width: "+JSON.stringify(v));
+   }else if(name==="中国象棋"){
+    const geometry=await frame.locator("#game").evaluate(el=>{
+     const r=s=>{const q=el.querySelector(s).getBoundingClientRect();return{left:q.left,right:q.right,top:q.top,bottom:q.bottom,width:q.width,height:q.height};};
+     return{left:r(".xiangqi-record-rail"),main:r(".game-main-board"),right:r(".game-tools"),
+      styles:[...document.querySelectorAll("head link[rel=stylesheet]")].map(x=>x.getAttribute("href")),
+      background:getComputedStyle(el.querySelector(".xiangqi-board")).backgroundImage};
+    });
+    assert.ok(geometry.left.right<=geometry.main.left+2&&geometry.main.right<=geometry.right.left+2,
+     "Xiangqi must position notation left and actions right, without overlap: "+JSON.stringify(geometry));
+    assert.ok(geometry.main.width>=v.root.width*.50,"Xiangqi chessboard must dominate the center: "+JSON.stringify(geometry));
+    assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.includes("./xiangqi.css"),
+     "Xiangqi dedicated stylesheet must be loaded in HEAD, preventing a legacy layout flash");
+    assert.ok(!geometry.background.includes("repeating-linear-gradient"),
+     "Xiangqi wood board must not contain horizontal stripe gradients");
    }else assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
   }
   const header=await page.evaluate(()=>{

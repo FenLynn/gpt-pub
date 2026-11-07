@@ -229,7 +229,7 @@ function showResult(winner,reason){
  resultBox.hidden=false;resultBox.classList.add("visible");
  const message=(winner?(winner==="red"?"红方":"黑方")+"获胜":"和棋")+" · "+reason;
  report(message);
- GameBridge.send("GAME_OVER",{message,score:winner==="red"?1:0,win:winner==="red"});
+ GameBridge.send("GAME_OVER",{message,score:winner==="red"?1:0,win:mode==="ai"?winner==="red":!!winner});
 }
 function drawBoardLines(){
  const ns="http:"+"//www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
@@ -375,7 +375,8 @@ function newGame(){
 }
 document.getElementById("resignButton").addEventListener("click",()=>{
  if(paused||over)return;
- showResult(opposite(turn),(turn==="red"?"红方":"黑方")+"认输");
+ const loser=mode==="ai"?"red":turn;
+ showResult(opposite(loser),(loser==="red"?"红方":"黑方")+"认输");
 });
 document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render();});
 document.getElementById("undoButton").addEventListener("click",undo);
