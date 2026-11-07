@@ -20,8 +20,8 @@ let side="—",turnMs=0,actionMs=0,mark=performance.now(),running=false,records=
 const sideNode=panel.querySelector("#gs-turn-side"),elapsedNode=panel.querySelector("#gs-turn-elapsed");
 const latest=panel.querySelector("#gs-turn-latest"),counter=panel.querySelector("#gs-turn-count"),list=panel.querySelector("#gs-turn-log");
 function fmt(ms){
- const seconds=Math.max(0,Math.floor(ms/1000)),m=Math.floor(seconds/60),s=seconds%60;
- return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+ const deciseconds=Math.max(0,Math.floor(ms/100)),seconds=Math.floor(deciseconds/10),m=Math.floor(seconds/60),s=seconds%60;
+ return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+(deciseconds%10);
 }
 function advance(now=performance.now()){
  if(running){const dt=Math.max(0,now-mark);turnMs+=dt;actionMs+=dt;}
