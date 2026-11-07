@@ -16,6 +16,27 @@ panel.innerHTML='<div class="gs-turn-clock-header"><span>本回合耗时</span><
  '<ol id="gs-turn-log" aria-label="逐次操作耗时"></ol></details>';
 if(onExistingRail)host.prepend(panel);else host.appendChild(panel);
 root.classList.add("gs-turn-clock-enabled");
+/* Fit both special SVG stages from the REAL first-column rectangle. SVG height:auto
+   otherwise falls back to 300px intrinsic width after the timer rail is introduced. */
+let boardFitObserver=null;
+if(gameId==="chinese-checkers"||gameId==="flight-chess"){
+ const wrap=root.querySelector(".board-wrap");
+ const board=gameId==="chinese-checkers"?root.querySelector("#board.star-checkers-board"):root.querySelector(".flight-stage");
+ const ratio=gameId==="chinese-checkers"?10/9:1;
+ if(wrap&&board){
+  const fit=()=>{
+   const bounds=wrap.getBoundingClientRect();
+   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio);
+   if(width>0){
+    board.style.setProperty("width",width+"px","important");
+    board.style.setProperty("height",width/ratio+"px","important");
+   }
+  };
+  if(typeof ResizeObserver!=="undefined"){boardFitObserver=new ResizeObserver(fit);boardFitObserver.observe(wrap);}
+  window.addEventListener("resize",fit);
+  fit();
+ }
+}
 let side="—",turnMs=0,actionMs=0,mark=performance.now(),running=false,records=[];
 const sideNode=panel.querySelector("#gs-turn-side"),elapsedNode=panel.querySelector("#gs-turn-elapsed");
 const latest=panel.querySelector("#gs-turn-latest"),counter=panel.querySelector("#gs-turn-count"),list=panel.querySelector("#gs-turn-log");

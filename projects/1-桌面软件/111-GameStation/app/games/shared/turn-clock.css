@@ -54,17 +54,7 @@
  align-self:flex-start!important;justify-self:auto!important
 }
 
-/* Responsive SVG boards must derive height from their width once the clock
-   claims a right-side column, otherwise their independent cqw/cqh limits distort geometry. */
-.game-root.gs-turn-clock-enabled.chinese-checkers-layout #board.star-checkers-board{
- width:min(100%,calc(100cqh * 10 / 9))!important;
- height:auto!important;aspect-ratio:10/9!important;
- max-width:100%!important;max-height:100%!important
-}
-.game-root.gs-turn-clock-enabled.flight-chess-layout .flight-stage{
- width:min(100%,100cqh)!important;height:auto!important;
- aspect-ratio:1!important;max-width:100%!important;max-height:100%!important
-}
+/* SVG stages are sized from their actual board-wrap rectangle in turn-clock.js. */
 @media(max-width:900px){
  .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
   grid-template-columns:minmax(0,1fr) 134px!important;column-gap:6px!important;padding:5px!important
