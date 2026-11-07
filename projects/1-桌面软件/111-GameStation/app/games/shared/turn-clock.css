@@ -39,6 +39,20 @@
 .game-root.gs-turn-clock-enabled.gomoku-layout>.game-tools>.gs-turn-clock{
  width:100%!important;flex:none!important;align-self:stretch!important;margin:0!important
 }
+
+/* Sea Battle uses two full-sized boards. Dock its timer in the top-right
+   unused vertical margin instead of removing a board column. */
+.game-root.gs-turn-clock-enabled.battleship-layout>.game-main-board{
+ grid-template-columns:minmax(0,1fr)!important
+}
+.game-root.gs-turn-clock-enabled.battleship-layout>.game-main-board>.fleet-boards{
+ grid-column:1!important;grid-row:1!important;width:100%!important;height:100%!important
+}
+.game-root.gs-turn-clock-enabled.battleship-layout>.game-main-board>.gs-turn-clock{
+ position:absolute!important;top:9px!important;right:10px!important;
+ width:158px!important;max-width:158px!important;grid-column:auto!important;grid-row:auto!important;
+ align-self:flex-start!important;justify-self:auto!important
+}
 @media(max-width:900px){
  .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
   grid-template-columns:minmax(0,1fr) 134px!important;column-gap:6px!important;padding:5px!important
