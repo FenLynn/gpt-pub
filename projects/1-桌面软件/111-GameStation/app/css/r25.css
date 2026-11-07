@@ -382,7 +382,7 @@
  }
  #homeView .poster-left #homePosterPlay svg{display:none!important}
  #homeView .poster-details{
-  top:44px!important;left:clamp(198px,39%,220px)!important;right:18px!important;
+  top:44px!important;left:clamp(206px,40%,226px)!important;right:18px!important;
   bottom:48px!important;gap:0!important
  }
  #homeView .poster-copy h3{font-size:26px!important;line-height:1.18!important;margin:7px 0 6px!important}
