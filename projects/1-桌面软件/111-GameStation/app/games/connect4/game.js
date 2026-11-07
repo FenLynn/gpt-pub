@@ -28,5 +28,20 @@ function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2
 function play(c){if(paused||over||(mode==="ai"&&turn===2))return;if(b[0][c]!==0)return;save();const row=drop(b,c,turn);if(row<0)return;lastDrop={x:c,y:row};render();if(win(b,turn)){finish(turn);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=3-turn;report(turn===1?"红方回合":mode==="ai"?"AI 思考中":"黄方回合");if(mode==="ai"&&turn===2)scheduleAI();}
 function newGame(){clearTimeout(timer);history=[];lastDrop=null;b=Array.from({length:6},()=>Array(7).fill(0));turn=1;over=false;paused=false;render();report("红方先行");}
 document.getElementById("undoButton").addEventListener("click",undo);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ window.__p111Connect4Test={
+  loadBoard(board,side=1){
+   if(!Array.isArray(board)||board.length!==6||board.some(r=>!Array.isArray(r)||r.length!==7||r.some(v=>![0,1,2].includes(v))))throw new Error("Invalid Connect Four fixture");
+   clearTimeout(timer);b=copy(board);turn=side===2?2:1;mode="two";difficulty="normal";paused=false;over=false;history=[];lastDrop=null;render();report(turn===1?"红方回合":"黄方回合");
+   return this.state();
+  },
+  state(){return{board:copy(b),turn,over,winner:win(b,1)?1:win(b,2)?2:0,counts:{red:b.flat().filter(v=>v===1).length,yellow:b.flat().filter(v=>v===2).length}};},
+  play(column){play(column);return this.state();},
+  choose(){return choose();},
+  setDifficulty(v){difficulty=v||"normal";},
+  undo(){undo();return this.state();}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;if(turn===2&&mode==="ai")scheduleAI();else report("继续游戏");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();

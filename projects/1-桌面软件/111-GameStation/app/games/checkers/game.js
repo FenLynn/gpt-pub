@@ -40,5 +40,28 @@ function scheduleAI(chain){clearTimeout(timer);if(paused||over||mode!=="ai"||tur
 function click(x,y){if(paused||over||(mode==="ai"&&turn===2))return;const v=b[y][x];if(selected){const m=legal.find(m=>m.x===selected.x&&m.y===selected.y&&m.tx===x&&m.ty===y);if(m){if(!continuing)saveTurn();const result=apply(b,m);lastHop={x:m.tx,y:m.ty};afterStep(m,result);return;}}if(side(v)===turn&&(!continuing||(continuing.x===x&&continuing.y===y))){selected={x,y};legal=continuing?pieceMoves(b,x,y).filter(m=>m.capture):moves(b,turn).filter(m=>m.x===x&&m.y===y);render();}else if(!continuing){selected=null;legal=[];render();}}
 function newGame(){clearTimeout(timer);history=[];lastHop=null;b=Array.from({length:8},()=>Array(8).fill(0));for(let y=0;y<3;y++)for(let x=0;x<8;x++)if((x+y)%2)b[y][x]=2;for(let y=5;y<8;y++)for(let x=0;x<8;x++)if((x+y)%2)b[y][x]=1;turn=1;selected=null;legal=[];continuing=null;paused=false;over=false;render();report("红方先行");}
 document.getElementById("undoButton").addEventListener("click",undo);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({board:clone(b),turn,over,paused,continuing:continuing?{...continuing}:null,legal:legal.map(m=>({...m,capture:m.capture?m.capture.slice():null}))});
+ window.__p111CheckersTest={
+  loadBoard(board,side=1){
+   if(!Array.isArray(board)||board.length!==8||board.some(r=>!Array.isArray(r)||r.length!==8||r.some(v=>![0,1,2,3,4].includes(v))))throw new Error("Invalid Checkers fixture");
+   clearTimeout(timer);b=clone(board);turn=side===2?2:1;mode="two";difficulty="normal";paused=false;over=false;selected=null;continuing=null;history=[];lastHop=null;legal=moves(b,turn);render();report(turn===1?"红方回合":"黑方回合");
+   return fixtureState();
+  },
+  state:fixtureState,
+  legalMoves(p=turn){return moves(b,p).map(m=>({...m,capture:m.capture?m.capture.slice():null}));},
+  pieceMoves(x,y){return pieceMoves(b,x,y).map(m=>({...m,capture:m.capture?m.capture.slice():null}));},
+  playMove(move){
+   const candidates=continuing?pieceMoves(b,continuing.x,continuing.y).filter(m=>m.capture):moves(b,turn);
+   const m=candidates.find(v=>v.x===move.x&&v.y===move.y&&v.tx===move.tx&&v.ty===move.ty);
+   if(!m)throw new Error("Illegal Checkers fixture move");
+   if(!continuing)saveTurn();const result=apply(b,m);lastHop={x:m.tx,y:m.ty};afterStep(m,result);return fixtureState();
+  },
+  choose(){return choose(moves(b,2));},
+  setDifficulty(v){difficulty=v||"normal";},
+  undo(){undo();return fixtureState();}
+ };
+}
 GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;if(turn===2&&mode==="ai")scheduleAI(!!continuing);else report(turn===1?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();

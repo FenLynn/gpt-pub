@@ -39,5 +39,21 @@ function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const m=moves
 function newGame(){clearTimeout(timer);history=[];lastFlips=new Set();b=Array.from({length:8},()=>Array(8).fill(0));b[3][3]=b[4][4]=2;b[3][4]=b[4][3]=1;turn=1;paused=false;over=false;render();report("黑棋先行");}
 
 document.getElementById("undoButton").addEventListener("click",undo);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ window.__p111ReversiTest={
+  loadBoard(board,side=1){
+   if(!Array.isArray(board)||board.length!==8||board.some(r=>!Array.isArray(r)||r.length!==8||r.some(v=>![0,1,2].includes(v))))throw new Error("Invalid Reversi fixture");
+   clearTimeout(timer);b=copy(board);turn=side===2?2:1;mode="two";difficulty="normal";paused=false;over=false;history=[];lastFlips=new Set();render();report(turn===1?"黑棋回合":"白棋回合");
+   return this.state();
+  },
+  state(){const [black,white]=counts(b);return{board:copy(b),turn,over,paused,counts:{black,white}};},
+  legalMoves(side=turn){return moves(b,side).map(m=>({x:m.x,y:m.y,flips:m.flips.map(p=>p.slice())}));},
+  play(x,y){play(x,y);return this.state();},
+  choose(){return choose();},
+  setDifficulty(v){difficulty=v||"normal";},
+  undo(){undo();return this.state();}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;next();},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
