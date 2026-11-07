@@ -224,18 +224,21 @@ const names=[
   const posterDesign=await page.locator("#homeGamePoster").evaluate(poster=>{
    const rect=el=>el.getBoundingClientRect(),art=rect(poster.querySelector(".poster-art")),intro=rect(poster.querySelector(".poster-copy")),
     tip=rect(poster.querySelector(".poster-tips")),play=rect(poster.querySelector("#homePosterPlay")),
-    count=rect(poster.querySelector("#homePosterCount")),dots=rect(poster.querySelector(".poster-dots")),outer=rect(poster);
-   return{art,intro,tip,play,count,dots,outer,
+    count=rect(poster.querySelector("#homePosterCount")),dots=rect(poster.querySelector(".poster-dots")),
+    outer=rect(poster),list=rect(poster.closest(".recent-panel").querySelector(".recent-list"));
+   return{art,intro,tip,play,count,dots,outer,list,
     tipFont:parseFloat(getComputedStyle(poster.querySelector(".poster-tips p")).fontSize),
     introFont:parseFloat(getComputedStyle(poster.querySelector(".poster-copy p")).fontSize),
     titleFont:parseFloat(getComputedStyle(poster.querySelector(".poster-copy h3")).fontSize),
-    tipText:poster.querySelector("#homePosterTip").textContent};
+    tipText:poster.querySelector("#homePosterTip").textContent,
+    playArrow:poster.querySelector("#homePosterPlay svg")};
   });
-  assert.ok(posterDesign.art.left-posterDesign.outer.left<70&&posterDesign.art.top-posterDesign.outer.top<90,"Poster icon must stay upper left: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.intro.left>posterDesign.art.right+8&&posterDesign.intro.top<posterDesign.outer.top+posterDesign.outer.height*.5,"Game information must move to the upper right: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.tip.left>=posterDesign.intro.left-2&&posterDesign.tip.top>posterDesign.intro.bottom-2,"Tips must stay in the right column below the game information: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.play.top>=posterDesign.art.bottom-1&&Math.abs((posterDesign.play.left+posterDesign.play.right)/2-(posterDesign.art.left+posterDesign.art.right)/2)<12,"Play button must sit directly below and align with the icon: "+JSON.stringify(posterDesign));
-  assert.ok(posterDesign.count.left-posterDesign.outer.left<80&&posterDesign.count.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.left<posterDesign.outer.left+posterDesign.outer.width*.55,"Poster number and dots must both move to the lower left: "+JSON.stringify(posterDesign));
+  assert.ok(Math.abs(posterDesign.outer.height-posterDesign.list.height)<3&&Math.abs(posterDesign.outer.top-posterDesign.list.top)<3,"Poster height and top edge must align with the three-row game grid: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.art.left-posterDesign.outer.left<70&&posterDesign.art.top-posterDesign.outer.top<90&&posterDesign.art.height/posterDesign.outer.height>=.38,"Poster icon must be upper left and occupy about half the card height: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.intro.left-posterDesign.art.right>=18&&posterDesign.intro.top<posterDesign.outer.top+posterDesign.outer.height*.5,"Game information must sit to the right with clear spacing: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.tip.left>=posterDesign.intro.left-2&&posterDesign.tip.top>=posterDesign.intro.bottom&&posterDesign.tip.top-posterDesign.intro.bottom<=26,"Tips divider must sit just below the game description: "+JSON.stringify(posterDesign));
+  assert.ok(posterDesign.play.top>=posterDesign.art.bottom-1&&Math.abs((posterDesign.play.left+posterDesign.play.right)/2-(posterDesign.art.left+posterDesign.art.right)/2)<12&&!posterDesign.playArrow,"Play button must align under the icon and have no arrow: "+JSON.stringify(posterDesign));
+  assert.ok(Math.abs(posterDesign.count.left-posterDesign.dots.left)<2&&posterDesign.count.bottom<=posterDesign.dots.top+1&&posterDesign.dots.bottom>posterDesign.outer.bottom-16,"Poster number must be above the dots at the lower left: "+JSON.stringify(posterDesign));
   assert.ok(posterDesign.tipFont>=13&&posterDesign.introFont>=13&&posterDesign.titleFont>=22&&posterDesign.tipText.length>3,"Poster game information and tips must remain readable: "+JSON.stringify(posterDesign));
   assert.equal(await page.locator("#homePosterProgress,.poster-progress").count(),0,"Poster progress bar must be removed");
   const homePreviewButton=page.locator("#homeRecentList .recent-game").nth(1);

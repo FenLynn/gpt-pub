@@ -355,6 +355,62 @@
  #homeView .poster-tips-label{font-size:11px!important}
  #homeView .poster-bottom{left:12px!important}
 }
+
+
+/* R28 — compact poster aligned to the three-row recent-game grid. */
+@media(min-width:701px){
+ #homeView .home-game-poster{
+  height:calc(100% - 44px)!important;align-self:end!important;
+  box-sizing:border-box!important
+ }
+ #homeView .poster-top{top:13px!important;left:18px!important;right:18px!important}
+ #homeView .poster-left{
+  top:42px!important;bottom:46px!important;left:16px!important;
+  width:clamp(170px,33%,180px)!important;gap:8px!important
+ }
+ #homeView .poster-art{
+  width:100%!important;height:clamp(156px,20vh,200px)!important;
+  min-height:0!important;max-height:200px!important;
+  font-size:clamp(145px,12vw,180px)!important
+ }
+ #homeView .poster-art .game-tank-icon{
+  width:min(170px,100%)!important;height:min(170px,100%)!important
+ }
+ #homeView .poster-left #homePosterPlay{
+  width:112px!important;min-width:112px!important;height:38px!important;
+  padding:0 10px!important;gap:0!important;font-size:13px!important
+ }
+ #homeView .poster-left #homePosterPlay svg{display:none!important}
+ #homeView .poster-details{
+  top:44px!important;left:clamp(198px,39%,220px)!important;right:18px!important;
+  bottom:48px!important;gap:0!important
+ }
+ #homeView .poster-copy h3{font-size:26px!important;line-height:1.18!important;margin:7px 0 6px!important}
+ #homeView .poster-copy p{font-size:14px!important;line-height:1.5!important}
+ #homeView .poster-tips{
+  margin-top:11px!important;padding:10px 0 0!important;
+  border:0!important;border-top:1px solid #ffffff46!important;gap:7px!important
+ }
+ #homeView .poster-tips p{font-size:14px!important;line-height:1.55!important}
+ #homeView .poster-bottom{
+  left:18px!important;bottom:11px!important;flex-direction:column!important;
+  align-items:flex-start!important;justify-content:flex-end!important;
+  gap:6px!important;margin:0!important
+ }
+ #homeView #homePosterCount{font-size:12px!important}
+ #homeView .poster-dots{gap:5px!important}
+}
+@media(min-width:701px) and (max-width:1150px){
+ #homeView .poster-left{left:10px!important;width:124px!important}
+ #homeView .poster-art{height:clamp(130px,18vh,160px)!important;font-size:clamp(118px,12vw,150px)!important}
+ #homeView .poster-art .game-tank-icon{width:120px!important;height:120px!important}
+ #homeView .poster-details{left:146px!important;right:12px!important;top:44px!important;bottom:48px!important}
+ #homeView .poster-copy h3{font-size:20px!important}
+ #homeView .poster-copy p,#homeView .poster-tips p{font-size:12px!important}
+ #homeView .poster-tips-label{font-size:11px!important}
+ #homeView .poster-left #homePosterPlay{width:100px!important;min-width:100px!important;height:34px!important;font-size:12px!important}
+}
+
 /* R27 — LED text is regular weight; short messages center, long messages scroll. */
 .main-area:has(#workspaceView:not(.hidden)) #gameNotice .game-notice-window{
  display:flex!important;align-items:center!important;justify-content:center!important
