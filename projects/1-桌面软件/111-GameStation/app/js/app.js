@@ -181,7 +181,7 @@ function recentRows(){
  rows.sort(homeRecentTab==="popular"?
   (a,b)=>b.stat.plays-a.stat.plays||b.stat.totalMs-a.stat.totalMs||statPlayedAt(b.stat)-statPlayedAt(a.stat):
   (a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)||b.stat.plays-a.stat.plays);
- return rows.slice(0,12);
+ return rows.slice(0,9);
 }
 function renderHomeRecent(){
  const list=$("homeRecentList");if(!list)return;
