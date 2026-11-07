@@ -462,8 +462,8 @@
   #homeView .poster-dots i.active{width:8px!important}
  }
  @container (min-width:361px) and (max-width:700px) and (min-height:300px) and (aspect-ratio > 1.3){
-  #homeView .poster-left{left:16px!important;width:160px!important;align-items:center!important}
-  #homeView .poster-art{width:150px!important;height:150px!important;font-size:clamp(118px,18cqw,136px)!important}
+  #homeView .poster-left{left:16px!important;width:180px!important;align-items:center!important}
+  #homeView .poster-art{width:180px!important;height:190px!important;font-size:clamp(155px,26cqw,170px)!important}
   #homeView .poster-art .game-icon-glyph{display:block!important;font-size:inherit!important;line-height:1!important}
   #homeView .poster-details{left:238px!important;right:16px!important}
   #homeView .poster-left #homePosterPlay{width:112px!important;min-width:112px!important;height:38px!important;align-self:center!important}

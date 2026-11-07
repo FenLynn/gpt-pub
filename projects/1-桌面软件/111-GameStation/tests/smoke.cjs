@@ -360,7 +360,7 @@ const names=[
    return{outer:box(p),art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".poster-art")).fontSize),
     centerDelta:Math.abs((art.left+art.right)/2-(play.left+play.right)/2)};
   });
-  assert.ok(mediumPoster.outer.width===635&&mediumPoster.outer.height===387&&mediumPoster.font>=118&&mediumPoster.font<=136&&mediumPoster.intro.left-mediumPoster.art.right>=50,
+  assert.ok(mediumPoster.outer.width===635&&mediumPoster.outer.height===387&&mediumPoster.font>=155&&mediumPoster.font<=170&&mediumPoster.intro.left-mediumPoster.art.right>=40,
    "Medium landscape poster must use a smaller icon with a clear text column: "+JSON.stringify(mediumPoster));
   assert.ok(mediumPoster.centerDelta<2,"Medium poster play button must stay centered under the icon: "+JSON.stringify(mediumPoster));
   await page.locator("#homeGamePosterTest").screenshot({path:path.join(artifacts,"poster-medium-landscape.png")});
