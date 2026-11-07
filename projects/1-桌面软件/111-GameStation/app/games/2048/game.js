@@ -22,5 +22,17 @@ function newGame(){grid=Array.from({length:4},()=>Array(4).fill(0));score=0;prev
 function key(e){const map={ArrowLeft:"left",ArrowRight:"right",ArrowUp:"up",ArrowDown:"down"};if(map[e.key]){e.preventDefault();move(map[e.key]);}}
 window.addEventListener("keydown",key);document.getElementById("undo").onclick=()=>{if(!previous)return;grid=previous.grid;score=previous.score;won=previous.won;over=previous.over;previous=null;render();report("已撤销一步");};
 let touch=null;boardEl.addEventListener("touchstart",e=>{touch=[e.touches[0].clientX,e.touches[0].clientY];},{passive:true});boardEl.addEventListener("touchend",e=>{if(!touch)return;const dx=e.changedTouches[0].clientX-touch[0],dy=e.changedTouches[0].clientY-touch[1];if(Math.max(Math.abs(dx),Math.abs(dy))>25)move(Math.abs(dx)>Math.abs(dy)?(dx>0?"right":"left"):(dy>0?"down":"up"));touch=null;},{passive:true});
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ window.__p1112048Test={
+  loadGrid(nextGrid,initialScore=0){
+   if(!Array.isArray(nextGrid)||nextGrid.length!==4||nextGrid.some(row=>!Array.isArray(row)||row.length!==4||row.some(v=>!Number.isInteger(v)||v<0)))throw new Error("Invalid 2048 fixture");
+   grid=nextGrid.map(row=>row.slice());score=Math.max(0,Number(initialScore)||0);previous=null;paused=false;over=false;won=grid.some(row=>row.includes(2048));render();report("测试局面");return this.state();
+  },
+  state(){return{grid:grid.map(row=>row.slice()),score,best,previous:!!previous,paused,over,won};},
+  move(direction){move(direction);return this.state();},
+  undo(){document.getElementById("undo").click();return this.state();}
+ };
+}
 GameBridge.register({init:newGame,newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续游戏");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();

@@ -87,5 +87,19 @@ function keydown(event){
 }
 function focusCanvas(){canvas.focus();}
 window.addEventListener("keydown",keydown);canvas.addEventListener("pointerdown",focusCanvas);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({snake:snake.map(p=>({x:p.x,y:p.y})),food:food?{x:food.x,y:food.y}:null,dir:{x:dir.x,y:dir.y},queue:queue.map(p=>({x:p.x,y:p.y})),score,paused,over});
+ window.__p111SnakeTest={
+  loadState(next){
+   if(!next||!Array.isArray(next.snake)||!next.snake.length||!next.dir)throw new Error("Invalid Snake fixture");
+   stop();snake=next.snake.map(p=>({x:p.x,y:p.y}));food=next.food?{x:next.food.x,y:next.food.y}:null;dir={x:next.dir.x,y:next.dir.y};queue=[];score=Math.max(0,Number(next.score)||0);
+   configure(next.difficulty||"normal");paused=!!next.paused;over=!!next.over;lastFrame=0;accumulator=0;scoreEl.textContent=String(score);setStatus(paused?"已暂停":over?"游戏结束":"游戏进行中");draw();return fixtureState();
+  },
+  state:fixtureState,
+  tick(){tick();draw();return fixtureState();},
+  queueDirection(x,y){queueDirection({x,y});return fixtureState();}
+ };
+}
 GameBridge.register({init(p){configure(p.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},dispose(){paused=true;stop();window.removeEventListener("keydown",keydown);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();
