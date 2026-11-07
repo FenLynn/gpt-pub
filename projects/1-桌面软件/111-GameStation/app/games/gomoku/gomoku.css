@@ -53,7 +53,7 @@
  width:min(100cqw,calc(100cqh - 12px))!important;
  height:min(100cqw,calc(100cqh - 12px))!important;
  max-width:100%!important;max-height:100%!important;aspect-ratio:1!important;
- padding:4.1%!important;border:6px solid #856038!important;border-radius:5px!important;
+ padding:1%!important;border:6px solid #856038!important;border-radius:5px!important;
  background:#e9ce9b!important;
  background-image:radial-gradient(ellipse at 28% 16%,#fff0d543,transparent 56%),linear-gradient(135deg,#f3dfb7,#e9ce9b 55%,#e0c18d)!important;
  box-shadow:inset 0 0 0 2px #fce9c6,0 10px 26px #63442936!important
@@ -65,7 +65,7 @@
  color:#6b5030!important;text-shadow:0 1px #f8e4bf
 }
 .game-root.gomoku-layout .gomoku-axis-y{
- left:1px!important;width:4.1%!important;font-size:15px!important;z-index:6!important;
+ left:1px!important;width:26px!important;font-size:15px!important;z-index:6!important;
  color:#63482c!important;text-align:center!important
 }
 .game-root.gomoku-layout .gomoku-axis-y span{font-size:15px!important;font-weight:780!important;padding:0!important}

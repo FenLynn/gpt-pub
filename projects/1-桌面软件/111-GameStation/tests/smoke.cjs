@@ -457,14 +457,14 @@ const names=[
   assert.ok(goStyle.xBottom<=goStyle.boardBottom+1,"Gomoku A–O labels must be inside the wooden board");
   assert.ok(goStyle.yFont>=14,"Gomoku row coordinates must be enlarged");
   await page.screenshot({path:path.join(artifacts,"gomoku-playing-1440x1000.png")});
-  await frame.evaluate(()=>window.__p111GomokuTest.forceFinish(1));
+  await frame.locator('#game').evaluate(()=>window.__p111GomokuTest.forceFinish(1));
   await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
   assert.equal(await frame.locator(".gomoku-win-overlay .gomoku-winning-line").count(),1,"Winning five must glow as a connected line");
   assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"win");
   await page.screenshot({path:path.join(artifacts,"gomoku-win-1440x1000.png")});
   await frame.locator("#gomokuReplay").click();
   await frame.locator("#gomokuResult[hidden]").waitFor({timeout:4000});
-  await frame.evaluate(()=>window.__p111GomokuTest.forceFinish(-1));
+  await frame.locator('#game').evaluate(()=>window.__p111GomokuTest.forceFinish(-1));
   await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
   assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"loss");
   await page.screenshot({path:path.join(artifacts,"gomoku-loss-1440x1000.png")});
