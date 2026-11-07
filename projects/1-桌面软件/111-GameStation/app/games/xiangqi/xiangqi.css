@@ -10,7 +10,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  display:grid!important;
  /* Keep the three columns as one centered group. A 1fr center track left wide,
     empty gutters between the height-constrained board and both side rails. */
- --xiangqi-notation-width:clamp(256px,24vw,340px);
+ --xiangqi-notation-width:clamp(280px,24vw,340px);
  --xiangqi-actions-width:clamp(128px,11.3vw,160px);
  --xiangqi-board-track:min(calc((100dvh - 42px) * 8 / 9 + 16px),
    calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 40px));
