@@ -336,6 +336,16 @@ const names=[
   await page.mouse.move(5,5);
   await page.screenshot({path:path.join(artifacts,"home-1752x860.png")});
   await homeLayoutCheck(1366,768);
+  await page.setViewportSize({width:1024,height:768});
+  const compactPoster=await page.locator("#homeGamePoster").evaluate(p=>{
+   const box=q=>q.getBoundingClientRect(),art=box(p.querySelector(".poster-art")),
+    intro=box(p.querySelector(".poster-copy")),play=box(p.querySelector("#homePosterPlay"));
+   return{art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".game-icon-glyph")).fontSize),
+    centerDelta:Math.abs((art.left+art.right)/2-(play.left+play.right)/2)};
+  });
+  assert.ok(compactPoster.font<=108&&compactPoster.intro.left-compactPoster.art.right>=20,
+   "Compact poster icon must be reduced and kept clear of the copy: "+JSON.stringify(compactPoster));
+  assert.ok(compactPoster.centerDelta<2,"Compact poster play button must remain centered under the icon: "+JSON.stringify(compactPoster));
   await homeLayoutCheck(1440,1000);
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
   const gridEvidence=await page.locator("#homeRecentList").evaluate(list=>{

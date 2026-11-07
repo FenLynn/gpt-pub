@@ -439,3 +439,23 @@
 /* Keep the LED label at its intrinsic width so overflow detection and marquee travel stay exact. */
 .main-area:has(#workspaceView:not(.hidden)) .game-notice-text{flex:0 0 auto!important}
 .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{flex:0 0 auto!important}
+
+
+/* R29 — keep the Gomoku poster icon clear of the copy at compact desktop widths. */
+@media(min-width:701px) and (max-width:1150px){
+ #homeView .poster-left{
+  left:10px!important;width:138px!important;align-items:center!important
+ }
+ #homeView .poster-art{
+  width:138px!important;height:132px!important;
+  font-size:clamp(96px,9vw,108px)!important
+ }
+ #homeView .poster-art .game-icon-glyph{
+  display:block!important;font-size:inherit!important;line-height:1!important
+ }
+ #homeView .poster-details{left:164px!important;right:12px!important}
+ #homeView .poster-left #homePosterPlay{
+  width:104px!important;min-width:104px!important;height:34px!important;
+  align-self:center!important
+ }
+}
