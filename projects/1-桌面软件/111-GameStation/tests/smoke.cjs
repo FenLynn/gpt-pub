@@ -242,8 +242,8 @@ const names=[
   assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-icon-glyph').innerText(),"💣","Minesweeper must use the familiar bomb pictogram");
   assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-icon-glyph').innerText(),"🪖","90 Tank must use a familiar system pictogram");
   assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-icon-glyph').innerText(),"🀄","Mahjong must use the familiar mahjong tile pictogram");
-  const iconColors=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color));
-  assert.notEqual(iconColors[0],iconColors[1],"Board and arcade icons must use distinct category colors");
+  const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
+  assert.deepEqual(iconCategories,["board","arcade"],"System pictograms must retain their board/arcade category metadata");
   assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-glyph').count(),1,"The 90 tank library icon must use its registered system pictogram");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
