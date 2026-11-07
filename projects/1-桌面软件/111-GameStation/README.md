@@ -53,7 +53,7 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 
 ## 验证状态
 
-- **上一轮已验证基线**：SHA `4a5d9a0aff08d81808260517afa5fc8575d60bf8` 的 P111 PR CI（[run 42264646348](https://github.com/FenLynn/gpt-pub/actions/runs/42264646348)）与 Repository hygiene（[run 42264646426](https://github.com/FenLynn/gpt-pub/actions/runs/42264646426)）通过；R22 首页修正提交以其自身 CI 结果为准。
+- **R22 自动化验收通过**：R22 验证实现 SHA：`b34a5cac0aa7102e4f4dd257306007decc736f22`。P111 GameStation CI [run #887](https://github.com/FenLynn/gpt-pub/actions/runs/42329659507) 与 Repository hygiene [run #587](https://github.com/FenLynn/gpt-pub/actions/runs/42329659518) 均通过。浏览器 Artifact [13557126636](https://github.com/FenLynn/gpt-pub/actions/runs/42329659507/artifacts/13557126636) 含 24 款游戏 × 2 分辨率的 48 张游戏截图，另含 2 张首页、1 张游戏库和 1 张扫雷符号截图。
 - 24 款游戏已在 1366×768 与 1440×1000 两种桌面分辨率完成真实 Chromium `file://` 检查，共 48 张游戏截图；另有首页、游戏库与扫雷图标证据。
 - R19 新增断言：工具打开后必须停靠右侧、不能覆盖主游戏区；三国杀四名角色卡必须全部位于战场范围内；顶部 HUD 仍横跨完整工作区。
 - 三国杀专项规则回归覆盖 AI 三档策略、隐藏身份不可见、公开威胁目标选择、反贼攻击主公，以及既有杀/闪/决斗/AOE/濒死救援/小乔天香。
