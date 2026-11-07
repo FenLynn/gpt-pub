@@ -788,6 +788,43 @@ function clearSelection() {
         // Boot
         setupDOM();
         initGame();
+        // Test-only deterministic fixture API for the actual inline Klondike page.
+        if (new URLSearchParams(location.search).has("p111Test")) {
+            const cardData = c => ({ suit: c.suit, rank: c.rank, face: !!c.isFaceUp });
+            const snapshot = () => ({
+                stock: piles.stock.map(cardData), waste: piles.waste.map(cardData),
+                foundations: piles.foundations.map(p => p.map(cardData)),
+                columns: piles.tableau.map(p => p.map(cardData)),
+                selected: selectedCard ? cardData(selectedCard) : null, moves: moveCount, paused: gamePaused, drawCount
+            });
+            const takeCard = c => {
+                const card = deck.find(d => d.suit === c.suit && d.rank === c.rank);
+                if (!card) throw new Error("Unknown Klondike fixture card: " + c.suit + c.rank);
+                card.isFaceUp = !!c.face; return card;
+            };
+            window.__p111SolitaireTest = {
+                state: snapshot,
+                newGame() { initGame(); return snapshot(); },
+                loadState(s) {
+                    stopTimer(); gamePaused = false; winReported = false; isGameStarted = false; elapsedSeconds = 0;
+                    moveCount = Number(s.moves) || 0; undoStack = []; selectedCard = null; draggedCards = []; dragSourcePile = null;
+                    deck.forEach(c => { c.isFaceUp = false; });
+                    const foundations = (s.foundations || [[], [], [], []]).map(p => p.map(takeCard));
+                    const tableau = (s.columns || Array.from({ length: 7 }, () => [])).map(p => p.map(takeCard));
+                    if (foundations.length !== 4 || tableau.length !== 7) throw new Error("Klondike requires four foundations and seven tableau columns");
+                    piles = { stock: (s.stock || []).map(takeCard), waste: (s.waste || []).map(takeCard), foundations, tableau };
+                    calculateLayout(); renderAll(); updateSideMetrics(); updateTimerUI(); reportStatus("测试局面"); return snapshot();
+                },
+                draw() { handleStockClick(); return snapshot(); },
+                chooseWaste() { selectedCard = piles.waste[piles.waste.length - 1] || null; return snapshot(); },
+                chooseColumn(col, index) { selectedCard = piles.tableau[col]?.[index] || null; return snapshot(); },
+                place(target) {
+                    const moving = getDraggableCards(selectedCard), info = getPileKeyAndArray(selectedCard), targetId = `tableau-${target}`;
+                    if (!moving || !info || !isValidTarget(moving, targetId)) { clearSelection(); return snapshot(); }
+                    moveCards(moving, info.arr, getPileArray(targetId)); clearSelection(); return snapshot();
+                }
+            };
+        }
         GameBridge.register({
             init(p) { drawCount = p.difficulty === "easy" ? 1 : 3; initGame(); },
             newGame: initGame,
