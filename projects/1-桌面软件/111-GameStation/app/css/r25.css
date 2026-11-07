@@ -441,21 +441,31 @@
 .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{flex:0 0 auto!important}
 
 
-/* R29 — keep the Gomoku poster icon clear of the copy at compact desktop widths. */
-@media(min-width:701px) and (max-width:1150px){
- #homeView .poster-left{
-  left:10px!important;width:138px!important;align-items:center!important
+/* R30 — size the poster from its actual card width, not the browser viewport. */
+@media(min-width:701px){
+ #homeView .home-game-poster{container-type:inline-size!important}
+ @container (min-width:361px) and (max-width:700px){
+  #homeView .poster-left{left:16px!important;width:160px!important;align-items:center!important}
+  #homeView .poster-art{width:150px!important;height:150px!important;font-size:clamp(118px,18cqw,136px)!important}
+  #homeView .poster-art .game-icon-glyph{display:block!important;font-size:inherit!important;line-height:1!important}
+  #homeView .poster-details{left:238px!important;right:16px!important}
+  #homeView .poster-left #homePosterPlay{width:112px!important;min-width:112px!important;height:38px!important;align-self:center!important}
  }
- #homeView .poster-art{
-  width:138px!important;height:132px!important;
-  font-size:clamp(96px,9vw,108px)!important
- }
- #homeView .poster-art .game-icon-glyph{
-  display:block!important;font-size:inherit!important;line-height:1!important
- }
- #homeView .poster-details{left:164px!important;right:12px!important}
- #homeView .poster-left #homePosterPlay{
-  width:104px!important;min-width:104px!important;height:34px!important;
-  align-self:center!important
+ @container (max-width:360px){
+  #homeView .poster-left{left:8px!important;top:30px!important;bottom:12px!important;width:66px!important;gap:3px!important;align-items:center!important}
+  #homeView .poster-art{width:66px!important;height:54px!important;font-size:52px!important}
+  #homeView .poster-art .game-icon-glyph{display:block!important;font-size:inherit!important;line-height:1!important}
+  #homeView .poster-left #homePosterPlay{width:66px!important;min-width:66px!important;height:18px!important;padding:0 3px!important;align-self:center!important;font-size:9px!important;border-radius:5px!important}
+  #homeView .poster-details{top:30px!important;left:86px!important;right:8px!important;bottom:24px!important;gap:0!important}
+  #homeView .poster-copy h3{font-size:13px!important;line-height:1.15!important;margin:2px 0 3px!important}
+  #homeView .poster-copy p{font-size:9px!important;line-height:1.3!important}
+  #homeView .poster-tips{margin-top:4px!important;padding-top:4px!important;gap:3px!important}
+  #homeView .poster-tips-label{font-size:8px!important}
+  #homeView .poster-tips p{font-size:9px!important;line-height:1.25!important}
+  #homeView .poster-bottom{left:8px!important;bottom:5px!important;gap:4px!important}
+  #homeView #homePosterCount{font-size:8px!important}
+  #homeView .poster-dots{gap:3px!important}
+  #homeView .poster-dots i{width:3px!important;height:3px!important}
+  #homeView .poster-dots i.active{width:8px!important}
  }
 }

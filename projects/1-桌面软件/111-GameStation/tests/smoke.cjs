@@ -343,7 +343,7 @@ const names=[
    return{art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".poster-art")).fontSize),
     centerDelta:Math.abs((art.left+art.right)/2-(play.left+play.right)/2)};
   });
-  assert.ok(compactPoster.font<=108&&compactPoster.intro.left-compactPoster.art.right>=20,
+  assert.ok(compactPoster.font<=52&&compactPoster.intro.left-compactPoster.art.right>=10,
    "Compact poster icon must be reduced and kept clear of the copy: "+JSON.stringify(compactPoster));
   assert.ok(compactPoster.centerDelta<2,"Compact poster play button must remain centered under the icon: "+JSON.stringify(compactPoster));
   await homeLayoutCheck(1440,1000);
