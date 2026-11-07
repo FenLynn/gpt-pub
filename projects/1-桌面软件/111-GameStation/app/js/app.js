@@ -203,6 +203,7 @@ function renderHomeRecent(){
    document.querySelectorAll("#homeRecentList .recent-game").forEach(item=>item.setAttribute("aria-pressed",String(item.dataset.game===game.id)));
    renderHomePoster();
   });
+  button.addEventListener("dblclick",()=>openGame(game.id));
   list.appendChild(button);
  });
 }
