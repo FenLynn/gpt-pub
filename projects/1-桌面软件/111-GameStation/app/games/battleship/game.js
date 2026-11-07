@@ -34,5 +34,20 @@ function ai(){if(paused||over)return;const target=chooseTarget();if(!target){ove
 function scheduleAI(){clearTimeout(aiTimer);if(paused||over)return;aiTimer=setTimeout(()=>{if(!paused&&!over)ai();},difficulty==="easy"?560:420);}
 function attack(x,y){if(paused||over||enemy[y][x]!==0)return;shots++;lastShot={side:"enemy",x,y};if(enemyFleet.grid[y][x]>0){enemy[y][x]=1;hits++;}else enemy[y][x]=2;render();if(hits>=17){over=true;report("敌方舰队全部击沉！");GameBridge.send("GAME_OVER",{message:"海战胜利",score:Math.round(hits/shots*100),win:true});return;}report("敌方回合");scheduleAI();}
 function newGame(){clearTimeout(aiTimer);ownFleet=fleet();enemyFleet=fleet();own=Array.from({length:10},()=>Array(10).fill(0));enemy=Array.from({length:10},()=>Array(10).fill(0));remainingShips=fleetLengths.slice();shots=0;hits=0;paused=false;over=false;lastShot=null;render();report("选择敌方海域开始攻击");}
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const copyGrid=g=>g.map(row=>row.slice());
+ const fixtureState=()=>({own:copyGrid(own),enemy:copyGrid(enemy),ownFleet:copyGrid(ownFleet.grid),enemyFleet:copyGrid(enemyFleet.grid),remainingShips:remainingShips.slice(),shots,hits,paused,over,difficulty});
+ const lengthsOf=g=>{const out={};for(const row of g)for(const id of row)if(id>0)out[id]=(out[id]||0)+1;return out;};
+ window.__p111BattleshipTest={
+  loadState(s){clearTimeout(aiTimer);ownFleet={grid:copyGrid(s.ownFleet),lengths:s.ownLengths||lengthsOf(s.ownFleet)};enemyFleet={grid:copyGrid(s.enemyFleet),lengths:s.enemyLengths||lengthsOf(s.enemyFleet)};own=copyGrid(s.own||Array.from({length:10},()=>Array(10).fill(0)));enemy=copyGrid(s.enemy||Array.from({length:10},()=>Array(10).fill(0)));remainingShips=(s.remainingShips||fleetLengths).slice();shots=Number(s.shots)||0;hits=Number(s.hits)||0;difficulty=s.difficulty||"normal";paused=false;over=false;lastShot=null;render();report("测试局面");return fixtureState();},
+  state:fixtureState,
+  makeFleet(){const f=fleet();return{grid:copyGrid(f.grid),lengths:{...f.lengths}};},
+  chooseTarget(){const p=chooseTarget();return p?p.slice():null;},
+  attack(x,y){attack(x,y);clearTimeout(aiTimer);return fixtureState();},
+  ai(){ai();clearTimeout(aiTimer);return fixtureState();},
+  pause(){paused=true;clearTimeout(aiTimer);return fixtureState();}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(aiTimer);}});
 })();

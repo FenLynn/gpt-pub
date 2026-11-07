@@ -163,11 +163,20 @@ window.addEventListener("resize",onResize);
 if(typeof ResizeObserver!=="undefined"){resizeObserver=new ResizeObserver(fitBoard);resizeObserver.observe(gameArea);}
 if(new URLSearchParams(location.search).has("p111Test")){
  configure("normal");newGame();
+ const fixtureState=()=>({width:W,height:H,mines:MINES,started,over,paused,flags,opened,seconds,cells:cells.map(c=>({mine:c.mine,open:c.open,flag:c.flag,n:c.n}))});
  window.__p111MineTest={
-  forceFlag(index){if(cells[index]){cells[index].flag=true;render();}},
-  forceMine(index){cells.forEach(cell=>{cell.open=false;cell.mine=false;});if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}},
-  forceNumber(index,n){if(cells[index]){cells[index].open=true;cells[index].flag=false;cells[index].mine=false;cells[index].n=n;render();}},
-  cellSize(){return Number(boardEl.dataset.cellSize)||0;}
+  loadBoard({width=3,height=3,mines=[]}={}){
+   stopTimer();W=Math.max(2,Math.floor(width));H=Math.max(2,Math.floor(height));MINES=mines.length;
+   boardEl.style.setProperty("--cols",W);boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);
+   cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));
+   for(const i of mines){if(!Number.isInteger(i)||i<0||i>=cells.length)throw new Error("Invalid Minesweeper mine index");cells[i].mine=true;}
+   recount();started=false;over=false;paused=false;flags=0;opened=0;seconds=0;face.textContent="🙂";render();fitBoard();setStatus("测试局面");return fixtureState();
+  },
+  state:fixtureState,
+  reveal(index){reveal(index);return fixtureState();},
+  toggleFlag(index){toggleFlag(index);return fixtureState();},
+  chord(index){chord(index);return fixtureState();},
+  stopTimer
  };
 }
 GameBridge.register({

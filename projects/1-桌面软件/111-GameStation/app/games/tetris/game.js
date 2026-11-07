@@ -125,5 +125,18 @@ function rotatePiece(){if(paused||over||!piece)return;const shape=rotate(piece.s
 function onKeyDown(event){if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"," "].includes(event.key))event.preventDefault();if(paused||over)return;if(event.key==="ArrowLeft")move(-1,0);else if(event.key==="ArrowRight")move(1,0);else if(event.key==="ArrowDown")move(0,1);else if(event.key==="ArrowUp"||event.key.toLowerCase()==="x")rotatePiece();else if(event.key===" ")hardDrop();}
 function focusCanvas(){canvas.focus();}
 window.addEventListener("keydown",onKeyDown);canvas.addEventListener("pointerdown",focusCanvas);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const copyPiece=p=>p?{...p,shape:p.shape.map(row=>row.slice())}:null;
+ const fixtureState=()=>({grid:grid.map(row=>row.slice()),piece:copyPiece(piece),nextPiece:copyPiece(nextPiece),score,lines,paused,over,speed,roundSerial});
+ window.__p111TetrisTest={
+  loadState(s){stop();grid=s.grid.map(row=>row.slice());if(grid.length!==ROWS||grid.some(row=>row.length!==COLS))throw new Error("Invalid Tetris grid");piece=copyPiece(s.piece);nextPiece=copyPiece(s.nextPiece||randomPiece());score=Number(s.score)||0;lines=Number(s.lines)||0;configure(s.difficulty||"normal");speed=baseSpeed;over=false;paused=false;dropAccumulator=0;updateScore();draw();return fixtureState();},
+  state:fixtureState,
+  move(dx,dy){move(dx,dy);return fixtureState();},
+  rotate(){rotatePiece();return fixtureState();},
+  hardDrop(){hardDrop();return fixtureState();},
+  stepDown(){const moved=stepDown();draw();return{moved,...fixtureState()};}
+ };
+}
 GameBridge.register({init(payload){configure(payload.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},dispose(){paused=true;stop();window.removeEventListener("keydown",onKeyDown);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();

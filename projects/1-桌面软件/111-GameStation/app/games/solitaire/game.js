@@ -10,6 +10,20 @@ function newGame(){const d=deck();stock=[];waste=[];columns=Array.from({length:7
 function draw(){if(paused)return;if(stock.length){const c=stock.pop();c.face=true;waste.push(c);selected=null;setStatus("已发出一张牌");}else if(waste.length){stock=waste.reverse();stock.forEach(c=>c.face=false);waste=[];selected=null;setStatus("废牌堆已回收");}render();}
 function choose(c,source,col=-1,index=-1){if(paused)return;selected={card:c,source,col,index};render();setStatus("已选中 "+names[c.rank-1]+c.suit+"，选择目标列");}
 function place(target){if(paused||!selected)return;const dest=columns[target],card=selected.card,top=dest[dest.length-1];const valid=!top?card.rank===13:(top.face&&red(top)!==red(card)&&top.rank===card.rank+1);if(!valid){setStatus("目标列需要交替颜色、递减排列；空列只能放 K");return;}let moving;if(selected.source==="waste")moving=[waste.pop()];else{moving=columns[selected.col].splice(selected.index);if(selected.col===target){columns[selected.col].push(...moving);selected=null;render();return;}const topOld=columns[selected.col][columns[selected.col].length-1];if(topOld)topOld.face=true;}dest.push(...moving);selected=null;moves++;render();setStatus("移动完成");}
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const copyCard=c=>({...c});
+ const fixtureState=()=>({stock:stock.map(copyCard),waste:waste.map(copyCard),columns:columns.map(col=>col.map(copyCard)),selected:selected?{source:selected.source,col:selected.col,index:selected.index,card:copyCard(selected.card)}:null,paused,moves});
+ window.__p111SolitaireTest={
+  loadState(s){stock=(s.stock||[]).map(copyCard);waste=(s.waste||[]).map(copyCard);columns=(s.columns||Array.from({length:7},()=>[])).map(col=>col.map(copyCard));if(columns.length!==7)throw new Error("Klondike requires seven tableau columns");selected=null;paused=false;moves=Number(s.moves)||0;render();setStatus("测试局面");return fixtureState();},
+  state:fixtureState,
+  newGame(){newGame();return fixtureState();},
+  draw(){draw();return fixtureState();},
+  chooseWaste(){if(waste.length)choose(waste[waste.length-1],"waste");return fixtureState();},
+  chooseColumn(col,index){if(columns[col]?.[index])choose(columns[col][index],"column",col,index);return fixtureState();},
+  place(target){place(target);return fixtureState();}
+ };
+}
 GameBridge.register({init:newGame,newGame,pause(){paused=true;setStatus("已暂停");},resume(){paused=false;setStatus("继续游戏");},dispose(){paused=true;}});
 document.getElementById("reset").addEventListener("click",newGame);
 })();
