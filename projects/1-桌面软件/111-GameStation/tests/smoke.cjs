@@ -108,6 +108,16 @@ const names=[
    const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect();return{ratio:r.width/r.height,width:r.width,height:r.height};});
    assert.ok(Math.abs(geometry.ratio-1)<=.015,name+" board must preserve a square playing surface: "+JSON.stringify(geometry));
   }
+  const pageActions=await frame.locator(".game-tools > button.game-btn").evaluateAll(buttons=>buttons.map(b=>{
+   const r=b.getBoundingClientRect();return{id:b.id,width:r.width,height:r.height,
+    icon:!!b.querySelector("svg"),label:b.textContent.trim()};
+  }));
+  for(const action of pageActions){
+   assert.ok(action.width>=75&&action.height>=42,name+" in-page action button must be readable: "+JSON.stringify(action));
+   assert.ok(action.label.length>0,name+" in-page action must retain its label");
+   if(["undoButton","undo","flip","flipButton","resignButton","reset","next","hint","check"].includes(action.id))
+    assert.equal(action.icon,true,name+" in-page action needs the same SVG treatment as Gomoku: "+action.id);
+  }
   if(v.toolsVisible){
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
    if(name==="五子棋"){

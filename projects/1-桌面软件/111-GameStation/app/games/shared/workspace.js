@@ -96,8 +96,30 @@ function renderOptions(){
  if(difficulty)difficulty.querySelectorAll("[data-difficulty]").forEach(button=>
   button.setAttribute("aria-pressed",String(button.dataset.difficulty===(state.difficulty||"normal"))));
 }
+const actionGlyphs={
+ undoButton:"M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6",undo:"M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6",
+ flip:"M3 10a9 9 0 0 1 15-5l3 3M21 3v5h-5M21 14a9 9 0 0 1-15 5l-3-3M3 21v-5h5",
+ flipButton:"M3 10a9 9 0 0 1 15-5l3 3M21 3v5h-5M21 14a9 9 0 0 1-15 5l-3-3M3 21v-5h5",
+ resignButton:"M5 21V4m0 1q5-4 9 0t7 0v10q-5 4-9 0t-7 0",
+ reset:"M3 11a9 9 0 1 1 2 6M3 4v7h7",next:"M5 4v16m5-16 9 8-9 8z",
+ hint:"M9 18h6m-5 4h4m-8-11a6 6 0 1 1 12 0c0 3-3 4-3 7H9c0-3-3-4-3-7",
+ check:"M20 6 9 17l-5-5"
+};
+function enhancePageActions(){
+ const side=root.querySelector(".game-tools");if(!side)return;
+ side.querySelectorAll(":scope > button.game-btn").forEach(button=>{
+  if(button.querySelector("svg")||!Object.hasOwn(actionGlyphs,button.id))return;
+  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
+  const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d",actionGlyphs[button.id]);svg.appendChild(path);
+  button.classList.add("gs-page-action");button.prepend(svg);
+ });
+}
+
 function setup(){
  if(hud)return;
+ enhancePageActions();
  hud=document.createElement("section");
  hud.className="gs-hud";
  hud.id="gs-hud";

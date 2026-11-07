@@ -379,3 +379,37 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn{transition:none!important}
  .game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn:hover{transform:none!important}
 }
+
+
+/* R33: compact buttons in card/mahjong response groups. */
+.game-root.game-layout .game-tools .game-action-group .game-btn,
+.game-root.game-layout .game-tools .rule-toggle-list .game-btn{
+ min-height:36px!important;height:auto!important;padding:7px 10px!important;
+ border:1px solid #c8dae5!important;border-radius:9px!important;
+ background:linear-gradient(155deg,#fff,#f0f6fa)!important;
+ color:#3a6883!important;font-size:13px!important;font-weight:720!important;line-height:1.25!important;
+ box-shadow:inset 0 1px #fff,0 2px 6px #204c6510!important;
+ transition:background .16s,transform .16s,border-color .16s!important
+}
+.game-root.game-layout .game-tools .game-action-group .game-btn.primary,
+.game-root.game-layout .game-tools .rule-toggle-list .game-btn.primary{
+ border-color:#b5d6c6!important;background:linear-gradient(155deg,#f6fcf8,#e4f3e9)!important;color:#277b51!important
+}
+.game-root.game-layout .game-tools .game-action-group .game-btn:hover:not(:disabled),
+.game-root.game-layout .game-tools .rule-toggle-list .game-btn:hover:not(:disabled){
+ border-color:#8eb9d2!important;transform:translateY(-1px)!important
+}
+.game-root.game-layout .game-tools .game-btn:disabled{opacity:.44!important;cursor:not-allowed!important}
+.game-root.game-layout .game-tools>.gs-page-action svg{
+ display:block;width:19px;height:19px;flex:none;fill:none;stroke:currentColor;
+ stroke-width:1.9;stroke-linejoin:round;stroke-linecap:round
+}
+.game-root.game-layout .game-tools>#resignButton{
+ color:#ad5b51!important;border-color:#e7cac4!important;background:linear-gradient(145deg,#fff,#fff1ee)!important
+}
+@media(prefers-reduced-motion:reduce){
+ .game-root.game-layout .game-tools .game-action-group .game-btn,
+ .game-root.game-layout .game-tools .rule-toggle-list .game-btn{transition:none!important}
+ .game-root.game-layout .game-tools .game-action-group .game-btn:hover,
+ .game-root.game-layout .game-tools .rule-toggle-list .game-btn:hover{transform:none!important}
+}
