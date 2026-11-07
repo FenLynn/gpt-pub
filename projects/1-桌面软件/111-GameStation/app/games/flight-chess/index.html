@@ -1,0 +1,9 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>飞行棋</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="../shared/turn-clock.css"></head>
+<body data-game="flight-chess"><main class="game-root game-layout flight-chess-layout" id="game">
+<aside class="game-guide"><h2>飞行棋</h2><p>红蓝双方各四架飞机，掷出六点起飞；到达对应颜色格子可前进四格，特殊飞行通道额外前进。撞到非安全格上的敌机将其送回机场。</p></aside>
+<section class="game-main-board"><div class="board-wrap"><div class="flight-stage">
+<svg id="board" class="flight-board" viewBox="0 0 900 900" role="group" aria-label="飞行棋 52 格环形跑道与两队飞机"></svg>
+<div class="flight-center"><div id="turnText">红方先行</div><div class="flight-dice" id="diceFace" role="img" aria-label="骰子：1点"></div><button id="rollButton" class="game-btn primary">掷骰子</button></div>
+</div></div></section>
+<aside class="game-tools"><div class="game-tools-heading">飞行棋</div><div class="game-status" id="status">等待开局</div><button id="undoButton" class="game-btn">悔棋</button><div class="game-tool-note">点击骰子，再点击可移动飞机；起飞需六点，掷六点再投一次。移动至终点必须刚好到达。</div></aside>
+</main><script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="../shared/turn-clock.js"></script><script src="./game.js"></script></body></html>
