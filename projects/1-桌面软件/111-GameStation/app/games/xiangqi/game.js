@@ -167,16 +167,69 @@ function chooseAI(){
 }
 function report(t){
  status.textContent=t;
- document.getElementById("undoButton").disabled=!history.length||paused;
- if(turnText&&turnDot){
-  const terminal=/获胜|将死|困毙|和棋/.test(t)&&over,winner=/红方/.test(t)?"red":"black",side=terminal&&!/和棋/.test(t)?winner:turn==="red"?"red":"black";
-  turnDot.className="turn-dot "+side;
-  if(terminal)turnText.textContent=t;
-  else if(/AI 思考中/.test(t))turnText.textContent="黑方正在思考";
-  else if(/已选中/.test(t))turnText.textContent="轮到"+(turn==="red"?"红方":"黑方")+"走 · "+t;
-  else turnText.textContent="轮到"+(turn==="red"?"红方":"黑方")+"走";
+ document.getElementById("undoButton").disabled=!history.length||paused||over;
+ GameBridge.report(t,{turn,side:turn,check:!over&&inCheck(board,turn)});
+}
+function displayPiece(p){
+ const glyph={
+  red:{"车":"俥","马":"傌","相":"相","仕":"仕","帅":"帥","炮":"炮","兵":"兵"},
+  black:{"车":"車","马":"馬","象":"象","士":"士","将":"將","炮":"砲","卒":"卒"}
+ };
+ return glyph[p.side]?.[p.t]||p.t;
+}
+function fileNumber(side,x){
+ const file=side==="red"?9-x:x+1;
+ return side==="red"?"零一二三四五六七八九"[file]:String(file);
+}
+function moveNotation(b,m,side){
+ const p=b[m.fy]?.[m.fx];if(!p)return "";
+ const same=[];
+ for(let y=0;y<10;y++)if(b[y][m.fx]?.side===side&&b[y][m.fx]?.t===p.t)same.push(y);
+ same.sort((a,z)=>side==="red"?a-z:z-a);
+ let prefix=p.t+fileNumber(side,m.fx);
+ if(same.length>1){
+  const index=same.indexOf(m.fy);
+  const symbols=same.length===2?["前","后"]:same.length===3?["前","中","后"]:
+   same.length===4?["前","二","三","后"]:["前","二","三","四","后"];
+  prefix=(symbols[index]||"前")+p.t;
  }
- GameBridge.report(t,{turn,side:turn});
+ const forward=side==="red"?m.ty<m.fy:m.ty>m.fy;
+ const direction=m.ty===m.fy?"平":forward?"进":"退";
+ const last=m.ty===m.fy||m.tx!==m.fx?fileNumber(side,m.tx):
+  side==="red"?"零一二三四五六七八九"[Math.abs(m.ty-m.fy)]:String(Math.abs(m.ty-m.fy));
+ return prefix+direction+last;
+}
+function checkingAttackers(b,side){
+ const king=findGeneral(b,side);if(!king)return [];
+ const enemy=opposite(side),threats=[];
+ for(let y=0;y<10;y++)for(let x=0;x<9;x++){
+  const p=b[y][x];
+  if(p?.side===enemy&&pseudoMoves(b,x,y).some(m=>m.tx===king.x&&m.ty===king.y))
+   threats.push({x,y});
+ }
+ if(generalsFacing(b)){
+  const other=findGeneral(b,enemy);
+  if(other&&!threats.some(p=>p.x===other.x&&p.y===other.y))threats.push(other);
+ }
+ return threats;
+}
+const resultBox=document.getElementById("xiangqiResult");
+function clearResult(){
+ resultBox.hidden=true;resultBox.classList.remove("visible");resultBox.removeAttribute("data-result");
+}
+function showResult(winner,reason){
+ over=true;clearTimeout(aiTimer);
+ const title=!winner?"和棋":mode==="ai"?(winner==="red"?"获胜":"失败"):(winner==="red"?"红方获胜":"黑方获胜");
+ const detail=!winner?"双方战成和棋":mode==="ai"?(winner==="red"?"你执红棋取得胜利":"黑方 AI 获胜"):
+  (winner==="red"?"红方取得胜利":"黑方取得胜利");
+ resultBox.dataset.result=!winner?"draw":mode==="ai"&&winner==="black"?"loss":"win";
+ document.getElementById("xiangqiResultSeal").textContent=!winner?"和":winner==="red"?"帥":"將";
+ document.getElementById("xiangqiResultTitle").textContent=title;
+ document.getElementById("xiangqiResultDescription").textContent=detail+" · "+reason;
+ resultBox.hidden=false;resultBox.classList.add("visible");
+ const message=(winner?(winner==="red"?"红方":"黑方")+"获胜":"和棋")+" · "+reason;
+ report(message);
+ GameBridge.send("GAME_OVER",{message,score:winner==="red"?1:0,win:winner==="red"});
 }
 function drawBoardLines(){
  const ns="http:"+"//www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
@@ -188,23 +241,40 @@ function drawBoardLines(){
  for(let x=0;x<=8;x++){const px=xAt(x);if(x===0||x===8)line(px,Y0,px,Y1);else{line(px,Y0,px,yAt(4));line(px,yAt(5),px,Y1);}}
  for(let y=0;y<=9;y++)line(X0,yAt(y),X1,yAt(y));
  path("M"+xAt(3)+" "+yAt(0)+" L"+xAt(5)+" "+yAt(2)+" M"+xAt(5)+" "+yAt(0)+" L"+xAt(3)+" "+yAt(2)+" M"+xAt(3)+" "+yAt(7)+" L"+xAt(5)+" "+yAt(9)+" M"+xAt(5)+" "+yAt(7)+" L"+xAt(3)+" "+yAt(9));
- const label=(x,text)=>{const e=document.createElementNS(ns,"text");e.setAttribute("x",String(x));e.setAttribute("y","474");e.setAttribute("text-anchor","middle");e.setAttribute("class","xiangqi-river-label");e.textContent=text;svg.appendChild(e);};
+ const label=(x,text)=>{const e=document.createElementNS(ns,"text");e.setAttribute("x",String(x));e.setAttribute("y","450");e.setAttribute("dominant-baseline","middle");e.setAttribute("text-anchor","middle");e.setAttribute("class","xiangqi-river-label");e.textContent=text;svg.appendChild(e);};
  label(270,"楚河");label(530,"汉界");
  const mark=(x,y,dx,dy)=>{const a=8,b=17;path("M"+(x+dx*a)+" "+(y+dy*a)+" l"+(-dx*a)+" 0 l0 "+(-dy*b)+" M"+(x+dx*a)+" "+(y+dy*a)+" l0 "+(-dy*a)+" l"+(-dx*b)+" 0");};
  [[1,2],[7,2],[1,7],[7,7],[0,3],[2,3],[4,3],[6,3],[8,3],[0,6],[2,6],[4,6],[6,6],[8,6]].forEach(([x,y])=>{const px=xAt(x),py=yAt(y);if(x>0)mark(px,py,-1,-1);if(x<8)mark(px,py,1,-1);if(x>0)mark(px,py,-1,1);if(x<8)mark(px,py,1,1);});
+ // Route numbers reflect each player's right-to-left perspective.
+ for(let x=0;x<9;x++){
+  const labels=flip?[fileNumber("red",8-x),fileNumber("black",8-x)]:
+                    [fileNumber("black",x),fileNumber("red",x)];
+  for(const [index,y] of [[0,23],[1,883]]){
+   const t=document.createElementNS(ns,"text");
+   t.setAttribute("x",String(xAt(x)));t.setAttribute("y",String(y));
+   t.setAttribute("text-anchor","middle");t.setAttribute("class","xiangqi-file-label");
+   t.textContent=labels[index];svg.appendChild(t);
+  }
+ }
+ svg.dataset.flip=String(flip);
  el.appendChild(svg);
 }
 function renderMoveList(){
- const list=document.getElementById("moveList");if(!list)return;
- list.innerHTML="";
- history.forEach((h,i)=>{
-  if(!h.move)return;
-  const m=h.move,p=h.board[m.fy]?.[m.fx],side=h.turn==="red"?"红":"黑",target=h.board[m.ty]?.[m.tx];
+ const list=document.getElementById("moveList");
+ list.replaceChildren();
+ for(let i=0;i<history.length;i+=2){
   const row=document.createElement("li");
-  const source=String.fromCharCode(65+m.fx)+(10-m.fy),dest=String.fromCharCode(65+m.tx)+(10-m.ty);
-  row.innerHTML='<span class="xiangqi-move-index">'+(i+1)+'.</span><span class="xiangqi-move-side '+h.turn+'">'+side+'</span><span>'+((p&&p.t)||"棋")+' '+source+' → '+dest+(target?" ×":"")+'</span>';
+  const index=document.createElement("span");
+  index.className="xiangqi-move-index";index.textContent=String(Math.floor(i/2)+1)+".";
+  row.appendChild(index);
+  for(let j=i;j<Math.min(i+2,history.length);j++){
+   const h=history[j],note=document.createElement("span");
+   note.className="xiangqi-move-side "+h.turn;
+   note.textContent=h.notation||moveNotation(h.board,h.move,h.turn);
+   row.appendChild(note);
+  }
   list.appendChild(row);
- });
+ }
  document.getElementById("moveCount").textContent=history.length+" 步";
  list.scrollTop=list.scrollHeight;
 }
@@ -213,18 +283,25 @@ function render(animatedMove=null){
  el.querySelectorAll(".xiangqi-cell").forEach(cell=>cell.remove());
  if(!el.querySelector(".xiangqi-lines"))drawBoardLines();
  const targets=new Set(selectedMoves.map(m=>m.tx+","+m.ty));
+ const underCheck=!over&&inCheck(board,turn),checkedKing=underCheck?findGeneral(board,turn):null;
+ const checking=new Set(underCheck?checkingAttackers(board,turn).map(p=>p.x+","+p.y):[]);
  for(let y=0;y<10;y++)for(let x=0;x<9;x++){
   const px=flip?8-x:x,py=flip?9-y:y,cell=document.createElement("button");
   cell.type="button";cell.className="xiangqi-cell";const boardX=46+(754-46)*x/8,boardY=48+(852-48)*y/9;cell.style.left=(boardX/800*100)+"%";cell.style.top=(boardY/900*100)+"%";cell.style.width=((754-46)/8/800*100)+"%";cell.style.height=((852-48)/9/900*100)+"%";
   cell.dataset.x=String(px);cell.dataset.y=String(py);
   if(selected&&selected.x===px&&selected.y===py)cell.classList.add("selected");
   if(targets.has(px+","+py))cell.classList.add("target");
+   if(checkedKing?.x===px&&checkedKing?.y===py)cell.classList.add("checked");
+   if(checking.has(px+","+py))cell.classList.add("threatening");
   const p=board[py][px];
-  if(p){const s=document.createElement("span");s.className="xiangqi-piece "+p.side;s.textContent=p.t;cell.appendChild(s);cell.setAttribute("aria-label",(p.side==="red"?"红":"黑")+p.t);}
+  if(p){const s=document.createElement("span");s.className="xiangqi-piece "+p.side;s.textContent=displayPiece(p);cell.appendChild(s);cell.setAttribute("aria-label",(p.side==="red"?"红":"黑")+p.t);}
   else cell.setAttribute("aria-label","空位");
   cell.addEventListener("click",()=>clickCell(px,py));el.appendChild(cell);
  }
  el.dataset.pieceCount=String(board.flat().filter(Boolean).length);
+ if(el.querySelector(".xiangqi-lines")?.dataset.flip!==String(flip)){
+  el.querySelector(".xiangqi-lines")?.remove();drawBoardLines();
+ }
  fitBoard();
  animatePiece(animatedMove);
 }
