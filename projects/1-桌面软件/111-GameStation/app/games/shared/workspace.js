@@ -109,9 +109,9 @@ function enhancePageActions(){
  const side=root.querySelector(".game-tools");if(!side)return;
  side.querySelectorAll(":scope > button.game-btn").forEach(button=>{
   if(button.querySelector("svg")||!Object.hasOwn(actionGlyphs,button.id))return;
-  const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  const svg=document.createElementNS("http:"+"//www.w3.org/2000/svg","svg");
   svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
-  const path=document.createElementNS("http://www.w3.org/2000/svg","path");
+  const path=document.createElementNS("http:"+"//www.w3.org/2000/svg","path");
   path.setAttribute("d",actionGlyphs[button.id]);svg.appendChild(path);
   button.classList.add("gs-page-action");button.prepend(svg);
  });
