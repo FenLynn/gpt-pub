@@ -119,7 +119,7 @@ function renderHeatmap(){
   if(date.getDate()===1||offset===0){const label=document.createElement("span");label.textContent=(date.getMonth()+1)+"月";label.dataset.column=String(Math.floor((leading+offset)/7));months.appendChild(label);}
  }
  grid.dataset.weeks=String(Math.ceil((leading+365)/7));
- $("activitySummary").textContent="近 12 个月 · "+activeDays+" 天有记录 · "+fmtDuration(total);
+ $("activitySummary").textContent=activeDays+" 天有记录 · "+fmtDuration(total);
  resizeHeatmap();
 }
 function resizeHeatmap(){
@@ -156,7 +156,8 @@ function renderRanking(){
   const li=document.createElement("li");li.className="ranking-row";
   const value=rankingType==="time"?fmtDuration(x.stat.totalMs):rankingType==="plays"?x.stat.plays+" 次":x.stat.bestScore.toLocaleString("zh-CN");
   const button=document.createElement("button");button.type="button";button.className="ranking-open";button.setAttribute("aria-label","打开"+x.game.name);
-  button.innerHTML='<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span><span class="ranking-name" title="'+escapeHtml(x.game.name)+'">'+escapeHtml(x.game.name)+'</span><span class="ranking-value">'+value+'</span>';
+  const rank=i<3?'<span class="ranking-rank ranking-medal" aria-label="第'+(i+1)+'名">'+["🥇","🥈","🥉"][i]+'</span>':'<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span>';
+  button.innerHTML=rank+'<span class="ranking-name" title="'+escapeHtml(x.game.name)+'">'+escapeHtml(x.game.name)+'</span><span class="ranking-value">'+value+'</span>';
   button.addEventListener("click",()=>openGame(x.game.id));li.appendChild(button);list.appendChild(li);
  });
 }
@@ -165,7 +166,7 @@ function renderHomeRecent(){
  const played=games.map(game=>({game,stat:stats[game.id]||{plays:0,totalMs:0,lastPlayed:"",lastPlayedAt:0}}))
   .filter(row=>row.stat.plays>0||row.stat.lastPlayed)
   .sort((a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)||b.stat.plays-a.stat.plays);
- const rows=played.slice(0,8);
+ const rows=played.slice(0,12);
  list.innerHTML="";
  if(!rows.length){
   const empty=document.createElement("div");empty.className="recent-empty";

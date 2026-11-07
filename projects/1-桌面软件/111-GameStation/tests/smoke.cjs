@@ -154,6 +154,14 @@ const names=[
     tetris:{plays:4,wins:1,totalMs:240000,bestScore:1800,lastPlayed:today,lastPlayedAt:now-1000,days:{[today]:120000,[yesterday]:120000}},
     minesweeper:{plays:2,wins:1,totalMs:90000,bestScore:450,lastPlayed:today,lastPlayedAt:now-10000,days:{[today]:60000,[yesterday]:30000}},
     tank:{plays:1,wins:0,totalMs:45000,bestScore:0,lastPlayed:today,lastPlayedAt:now-5000,days:{[today]:45000}},
+    xiangqi:{plays:1,wins:0,totalMs:40000,bestScore:420,lastPlayed:today,lastPlayedAt:now-15000,days:{}},
+    reversi:{plays:1,wins:0,totalMs:38000,bestScore:380,lastPlayed:today,lastPlayedAt:now-20000,days:{}},
+    connect4:{plays:1,wins:0,totalMs:36000,bestScore:360,lastPlayed:today,lastPlayedAt:now-25000,days:{}},
+    battleship:{plays:1,wins:0,totalMs:34000,bestScore:340,lastPlayed:today,lastPlayedAt:now-30000,days:{}},
+    "chinese-checkers":{plays:1,wins:0,totalMs:32000,bestScore:320,lastPlayed:today,lastPlayedAt:now-35000,days:{}},
+    "flight-chess":{plays:1,wins:0,totalMs:30000,bestScore:300,lastPlayed:today,lastPlayedAt:now-40000,days:{}},
+    checkers:{plays:1,wins:0,totalMs:28000,bestScore:280,lastPlayed:today,lastPlayedAt:now-45000,days:{}},
+    chess:{plays:1,wins:0,totalMs:26000,bestScore:260,lastPlayed:today,lastPlayedAt:now-50000,days:{}},
     gomoku:{plays:1,wins:0,totalMs:30000,bestScore:0,lastPlayed:yesterday,lastPlayedAt:now-100000,days:{[yesterday]:30000}}
    },
    firstStartedAt:first.getTime()
@@ -167,10 +175,13 @@ const names=[
   assert.equal(await page.locator(".hero-metric").count(),5,"Banner must show exactly five usage metrics");
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
-  assert.equal(await page.locator("#homeRecentList .recent-game").count(),4,"Recent strip must contain only games actually played");
+  assert.deepEqual(await page.locator(".hero-metric-label").allInnerTexts(),["首次开始游戏","已使用天数","累计时间","今日时间","最近游戏"],"Recent game metric must occupy the rightmost column");
+  const clockSizes=await page.evaluate(()=>({date:parseFloat(getComputedStyle(document.querySelector("#homeDate")).fontSize),time:parseFloat(getComputedStyle(document.querySelector("#homeTime")).fontSize)}));
+  assert.ok(Math.abs(clockSizes.date-clockSizes.time)<=1,"Home clock must be as prominent as the date: "+JSON.stringify(clockSizes));
+  assert.equal(await page.locator("#homeRecentList .recent-game").count(),12,"Recent strip must show up to 12 played games");
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
     icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
-  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
+  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋","西洋跳棋（8×8）","国际象棋","五子棋"],"Recent games must be sorted newest-to-oldest");
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
   assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
@@ -178,6 +189,12 @@ const names=[
   assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent game labels must remain fully visible inside the strip: "+JSON.stringify(recentFit));
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section,.hero-description,#recentSubtitle").count(),0,"No banner/recent annotation, decorative kicker or duplicate game library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
+  assert.equal(await page.locator(".ranking-trophy").innerText(),"🏆","Leaderboard must show a trophy mark");
+  assert.equal(await page.locator(".ranking-heading p").count(),0,"Remove the redundant local-record subtitle");
+  assert.deepEqual(await page.locator("#rankingList .ranking-medal").allInnerTexts(),["🥇","🥈","🥉"],"Top three ranks must use gold, silver and bronze medals");
+  assert.equal(await page.locator("#activityRange").innerText(),"近 12 个月");
+  assert.ok(!(await page.locator("#activitySummary").innerText()).includes("近 12 个月"),"The activity period must not be duplicated");
+  assert.deepEqual(await page.locator(".heatmap-weekdays span").allInnerTexts(),["周一","周三","周五"],"Weekday labels must be explicit");
   async function homeLayoutCheck(width,height){
    await page.setViewportSize({width,height});
    // Wait for the browser's resize event / ResizeObserver animation frame to
@@ -214,11 +231,18 @@ const names=[
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
      weekdayRow:parseFloat(getComputedStyle(layout.querySelector(".heatmap-weekdays")).gridTemplateRows.split(" ")[0]),
+     weekdayLabelWidth:layout.querySelector(".heatmap-weekdays").getBoundingClientRect().width,
+     weekdayLabels:[...layout.querySelectorAll(".heatmap-weekdays span")].map(el=>{const r=el.getBoundingClientRect();return r.top+r.height/2;}),
+     dotRows:[0,2,4].map(i=>{const r=grid.children[i].getBoundingClientRect();return r.top+r.height/2;}),
+     recentIconWidth:parseFloat(getComputedStyle(document.querySelector("#homeRecentList .recent-icon")).width),
      measuredContentWidth:Number(grid.dataset.availableWidth),computedCellSize:Number(grid.dataset.cellSize),expectedCell,expectedGap};
    });
    assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap dots must retain the fixed square size: "+JSON.stringify(visual));
    assert.ok(Math.abs(parseFloat(visual.dot.autoColumn)-visual.dot.width)<.5,"Heatmap implicit columns must match the square dot size: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.weekdayRow-visual.dot.height)<.5,"Weekday labels must align with the heatmap row pitch: "+JSON.stringify(visual));
+   assert.ok(visual.weekdayLabelWidth>=28,"Weekday labels must have enough width to read: "+JSON.stringify(visual));
+   assert.ok(visual.weekdayLabels.every((y,i)=>Math.abs(y-visual.dotRows[i])<1.5),"Weekday labels must align with Monday, Wednesday and Friday dot rows: "+JSON.stringify(visual));
+   assert.ok(visual.recentIconWidth>=38&&visual.recentIconWidth<=62,"Recent game icons must be about half the previous size: "+JSON.stringify(visual));
    assert.ok(visual.measuredContentWidth>=visual.dot.contentWidth*.95,"Heatmap sizing must use the rendered content width, not a stale clientWidth: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
    const expectedGridWidth=53*visual.expectedCell+52*visual.expectedGap;
@@ -242,15 +266,18 @@ const names=[
     const icon=first?.getBoundingClientRect(),panel=list.getBoundingClientRect(),style=first&&getComputedStyle(first);
     return {iconWidth:icon?.width||0,iconHeight:icon?.height||0,iconOverflow:style?.overflow,rows:items.length,panelHeight:panel.height};
   });
-  assert.ok(gridEvidence.iconWidth>=78&&gridEvidence.iconHeight>=78&&gridEvidence.iconOverflow==="visible","Recent game icons must be large and never clipped: "+JSON.stringify(gridEvidence));
-  const twoRow=await page.locator("#homeRecentList").evaluate(list=>{
-    const originals=[...list.querySelectorAll(".recent-game")];
-    originals.forEach(el=>list.appendChild(el.cloneNode(true)));
-    const coords=[...list.querySelectorAll(".recent-game")].map(el=>({x:el.getBoundingClientRect().x,y:el.getBoundingClientRect().y}));
-    originals.forEach((_,i)=>list.lastElementChild?.remove());
-    return coords;
+  assert.ok(gridEvidence.iconWidth>=38&&gridEvidence.iconWidth<=62&&gridEvidence.iconHeight>=38&&gridEvidence.iconHeight<=62&&gridEvidence.iconOverflow==="visible","Recent game icons must be about half the previous size and never clipped: "+JSON.stringify(gridEvidence));
+  const threeRows=await page.locator("#homeRecentList").evaluate(list=>{
+    const coords=[...list.querySelectorAll(".recent-game")].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y};});
+    const rows=[...new Set(coords.map(p=>Math.round(p.y)))];
+    return {coords,rows};
   });
-  assert.ok(twoRow.length===8&&twoRow[4].y>twoRow[0].y+20&&Math.abs(twoRow[4].x-twoRow[0].x)<2,"Eight recently played games must form two clean rows: "+JSON.stringify(twoRow));
+  assert.ok(threeRows.coords.length===12&&threeRows.rows.length===3,"Twelve recent games must form three rows: "+JSON.stringify(threeRows));
+  for(let row=0;row<3;row++){
+    const group=threeRows.coords.slice(row*4,row*4+4);
+    assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must fill rows left-to-right: "+JSON.stringify(threeRows));
+    assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent-games row must be ordered from left to right: "+JSON.stringify(threeRows));
+  }
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);

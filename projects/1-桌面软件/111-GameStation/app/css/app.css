@@ -1037,7 +1037,7 @@ body{font-size:15px}
  #homeView .hero-kicker,#homeView .home-art{display:none!important}
  #homeView .home-hero .date-line{display:flex;align-items:baseline;gap:11px;margin:0 0 4px}
  #homeView .home-hero .date-line strong{font-size:18px;color:#385a70}
- #homeView .home-hero .date-line span{display:inline!important;font-size:12px}
+ #homeView .home-hero .date-line span{display:inline!important;font-size:18px;font-weight:720;line-height:1.2;letter-spacing:-.4px;color:#1b354c;font-variant-numeric:tabular-nums}
  #homeView .home-hero h1{margin:2px 0 0;font-size:24px}
  /* Five usage metrics remain plain typography: no card, border, tile or per-item background. */
  #homeView .hero-metrics{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;align-items:center}
@@ -1304,4 +1304,31 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){min-width:58px!important;width:58px!important;height:27px!important}
  .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:2!important;grid-row:1!important;min-width:0!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
+}
+
+/* P111 R24 · clear clock hierarchy, aligned heatmap labels, denser recent games and medal ranking. */
+@media(min-width:701px){
+ #homeView .activity-title{display:flex;align-items:baseline;gap:9px;min-width:0}
+ #homeView .activity-title>span{color:#91a3b2;font-size:11px;font-weight:550;white-space:nowrap}
+ #homeView .panel-heading p{display:none}
+ #homeView .heatmap-weekdays{width:30px!important;padding-top:16px;box-sizing:border-box;
+  grid-template-rows:repeat(7,var(--heat-cell,11px))!important;gap:var(--heat-gap,3px)!important;
+  line-height:var(--heat-cell,11px)!important;font-size:9px}
+ #homeView .heatmap-weekdays span{display:flex;align-items:center;white-space:nowrap;line-height:1}
+ #homeView .heatmap-layout{gap:7px!important}
+ #homeView .recent-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+ #homeView .recent-icon{width:clamp(40px,3.5vw,60px)!important;height:clamp(40px,3.5vw,60px)!important;
+  font-size:clamp(35px,3vw,54px)!important;line-height:1.12}
+ #homeView .recent-game{gap:7px!important}
+ #homeView .recent-copy strong{font-size:12px}
+ #homeView .ranking-title{display:flex;align-items:center;gap:7px;min-width:0}
+ #homeView .ranking-trophy{display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:19px;line-height:1}
+ #homeView .ranking-title h2{white-space:nowrap}
+ #homeView .ranking-row:nth-child(-n+3) .ranking-rank{color:inherit}
+ #homeView .ranking-rank.ranking-medal{font-size:17px;line-height:1}
+}
+@media(min-width:701px) and (max-width:1120px){
+ #homeView .home-hero .date-line span{font-size:16px}
+ #homeView .hero-metric strong{font-size:11px}
+ #homeView .hero-metric-label{font-size:8px}
 }
