@@ -690,6 +690,22 @@ const names=[
   await frame.locator("#undoButton").click();
   assert.equal(await frame.locator("#moveList li").count(),0);
   await open("中国象棋");await start();assert.equal(await frame.locator(".xiangqi-cell").count(),90);
+   await frame.locator("#resignButton").click();
+   await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
+   assert.equal(await frame.locator("#xiangqiResultTitle").innerText(),"失败",
+    "AI mode resigning as red must show a loss result, not a neutral message");
+   await page.waitForFunction(()=>document.querySelector("#startButton")?.disabled===true);
+   await frame.locator("#xiangqiReplay").click();
+   await frame.locator("#xiangqiResult[hidden]").waitFor({timeout:4000});
+   assert.equal(await frame.locator(".xiangqi-piece").count(),32,
+    "Replay must create all 32 starting Xiangqi pieces");
+   assert.equal(await frame.locator("#moveCount").innerText(),"0 步",
+    "Replay must reset notation");
+   await frame.locator("#resignButton").click();
+   await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
+   await frame.locator("#xiangqiLeave").click();
+   await page.locator("#libraryView").waitFor({state:"visible",timeout:4000});
+   
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
   await open("麻将");await start();assert.equal(await frame.locator("#hand .playing-card").count(),14);
   await open("三国杀");await start();assert.equal(await frame.locator(".playing-card").count(),6);
