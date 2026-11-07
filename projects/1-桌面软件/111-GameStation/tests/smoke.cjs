@@ -168,14 +168,15 @@ const names=[
   assert.equal(await page.locator("#heroLastGame").innerText(),"俄罗斯方块","Most recent game metric must use last-play timestamp");
   assert.equal(await page.locator("#heroActiveDays").innerText(),"2 天","Usage days must count unique active dates, not game-days");
   assert.equal(await page.locator("#homeRecentList .recent-game").count(),4,"Recent strip must contain only games actually played");
-  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasSvg:!!n.querySelector("svg")})));
+  const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
+    icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","五子棋"],"Recent games must be sorted newest-to-oldest");
   assert.ok(recent.every((x,i)=>i===0||x.x>recent[i-1].x),"Recent games must run left-to-right");
-  assert.ok(recent.every(x=>x.icon&&!x.hasSvg),"Recent games must use familiar system pictograms, not custom-drawn SVG logos");
-  assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-icon-glyph').count(),1,"90 坦克 must use its registered system pictogram");
+  assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
+  assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
   assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent game labels must remain fully visible inside the strip: "+JSON.stringify(recentFit));
-  assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section").count(),0,"No decorative English kicker, duplicate category strip or featured library");
+  assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section,.hero-description,#recentSubtitle").count(),0,"No banner/recent annotation, decorative kicker or duplicate game library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
   async function homeLayoutCheck(width,height){
    await page.setViewportSize({width,height});
@@ -198,14 +199,17 @@ const names=[
    assert.ok(box.home.bottom>=box.viewportHeight-22,"Home view must reach the viewport bottom: "+JSON.stringify(box));
    assert.ok(box.heat.width>=box.main.width*.98,"Heatmap must occupy the full left-column width: "+JSON.stringify(box));
    assert.ok(box.recent.top>=box.heat.bottom-1&&box.recent.top-box.heat.bottom<=16,"Recent strip must sit directly below the heatmap without a large blank gap: "+JSON.stringify(box));
-   assert.ok(box.heat.height>=box.main.height*.42,"Heatmap panel must absorb the available middle height: "+JSON.stringify(box));
+   assert.ok(box.heat.height<box.main.height*.43,"Heatmap panel should only wrap the matrix rather than absorb free height: "+JSON.stringify(box));
+   assert.ok(box.recent.height>box.heat.height,"Recently played games must get more height than the compact heatmap: "+JSON.stringify(box));
+   assert.ok(box.hero.height<=126,"Banner must be shorter than the previous 156px: "+JSON.stringify(box));
    assert.ok(box.recent.bottom>=box.main.bottom-4,"Recent strip must sit at the bottom of the main column: "+JSON.stringify(box));
-   assert.equal(box.listDisplay,"flex","Recent games must be a horizontal icon row");
+   assert.equal(box.listDisplay,"grid","Recent games must be an unboxed 1–2-row icon grid");
    const visual=await page.evaluate(()=>{
     const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
-    const measured=Math.floor(c.width),narrow=window.innerWidth<=700,expectedGap=narrow?2:3,expectedCell=narrow?9:11;
+    const measured=Math.floor(c.width),narrow=window.innerWidth<=700,expectedGap=narrow?2:(measured<850?2:3);
+    const expectedCell=narrow?9:Math.max(3,Math.floor(((measured-52*expectedGap)/53)*100)/100);
     return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
@@ -219,9 +223,8 @@ const names=[
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
    const expectedGridWidth=53*visual.expectedCell+52*visual.expectedGap;
    assert.ok(Math.abs(visual.dot.gridWidth-expectedGridWidth)<1,"53-week heatmap width must match its computed square-cell geometry: "+JSON.stringify(visual));
-   assert.ok(visual.dot.gridWidth<=visual.dot.contentWidth+1,"Compact 53-week dot matrix must fit inside the full-width activity panel: "+JSON.stringify(visual));
-   assert.equal(visual.expectedCell,11,"Desktop heatmap must preserve the original 11px square dots: "+JSON.stringify(visual));
-   assert.equal(visual.expectedGap,3,"Desktop heatmap must preserve the original 3px dot spacing: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth<=visual.dot.contentWidth+1,"53-week matrix must not overflow its activity panel: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth>=visual.dot.contentWidth*.985,"53-week matrix must use almost all available horizontal space: "+JSON.stringify(visual));
    assert.ok(Math.abs((visual.dot.gridLeft+visual.dot.gridWidth/2)-(visual.dot.contentLeft+visual.dot.contentWidth/2))<2,"The small dot matrix must be centered inside the full-width activity panel: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
@@ -234,17 +237,38 @@ const names=[
   await homeLayoutCheck(1366,768);
   await homeLayoutCheck(1440,1000);
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
+  const gridEvidence=await page.locator("#homeRecentList").evaluate(list=>{
+    const items=[...list.querySelectorAll(".recent-game")],first=items[0]?.querySelector(".recent-icon");
+    const icon=first?.getBoundingClientRect(),panel=list.getBoundingClientRect(),style=first&&getComputedStyle(first);
+    return {iconWidth:icon?.width||0,iconHeight:icon?.height||0,iconOverflow:style?.overflow,rows:items.length,panelHeight:panel.height};
+  });
+  assert.ok(gridEvidence.iconWidth>=78&&gridEvidence.iconHeight>=78&&gridEvidence.iconOverflow==="visible","Recent game icons must be large and never clipped: "+JSON.stringify(gridEvidence));
+  const twoRow=await page.locator("#homeRecentList").evaluate(list=>{
+    const originals=[...list.querySelectorAll(".recent-game")];
+    originals.forEach(el=>list.appendChild(el.cloneNode(true)));
+    const coords=[...list.querySelectorAll(".recent-game")].map(el=>({x:el.getBoundingClientRect().x,y:el.getBoundingClientRect().y}));
+    originals.forEach((_,i)=>list.lastElementChild?.remove());
+    return coords;
+  });
+  assert.ok(twoRow.length===8&&twoRow[4].y>twoRow[0].y+20&&Math.abs(twoRow[4].x-twoRow[0].x)<2,"Eight recently played games must form two clean rows: "+JSON.stringify(twoRow));
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
-  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),24,"All 24 library games must use their registered familiar pictogram");
-  assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"Custom-drawn game logo SVGs must not be used");
+  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),23,"All 23 non-tank games must keep their existing pictograms");
+  assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
+  const tankVector=await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').evaluate(svg=>({
+    ns:svg.namespaceURI,viewBox:svg.getAttribute("viewBox"),path:!!svg.querySelector("path"),
+    width:svg.getBoundingClientRect().width,height:svg.getBoundingClientRect().height
+  }));
+  assert.equal(tankVector.ns,"http://www.w3.org/2000/svg","The sourced 90 Tank icon must be crisp native SVG");
+  assert.equal(tankVector.viewBox,"0 0 512 512");
+  assert.ok(tankVector.path&&tankVector.width>24&&tankVector.height>24,"Tank vector must have real visible dimensions");
   assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-icon-glyph').innerText(),"💣","Minesweeper must use the familiar bomb pictogram");
-  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-icon-glyph').innerText(),"🪖","90 Tank must use a familiar system pictogram");
+  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use a sourced tank-top SVG");
   assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-icon-glyph').innerText(),"🀄","Mahjong must use the familiar mahjong tile pictogram");
   const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
   assert.deepEqual(iconCategories,["board","arcade"],"System pictograms must retain their board/arcade category metadata");
-  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-icon-glyph').count(),1,"The 90 tank library icon must use its registered system pictogram");
+  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"The 90 tank library icon must show the non-rasterized vector");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});

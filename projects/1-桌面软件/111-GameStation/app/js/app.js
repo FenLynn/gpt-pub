@@ -30,6 +30,10 @@ const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"�
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
 const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
 function gameIconMarkup(game){
+ // Delapouite / Game-icons.net tank-top, CC BY 3.0. License: assets/NOTICE.md.
+ // The tank silhouette is taken from the published SVG, with its background
+ // removed and foreground recolored; all other games retain their icons.
+ if(game.id==="tank")return '<svg class="game-tank-icon" viewBox="0 0 512 512" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false"><path d="M128 37l32-6c16 112 32 150 96 150s80-38 96-150l32 6s-16 160 32 208c0 96 0 112 16 224-112 16-240 16-352 0 16-112 16-128 16-224 48-48 32-208 32-208z"/></svg>';
  const icon=String(game.icon||"🎮");
  return '<span class="game-icon-glyph" data-icon="'+escapeHtml(icon)+'">'+escapeHtml(icon)+'</span>';
 }
@@ -125,12 +129,11 @@ function resizeHeatmap(){
  // Use the rendered content box, not clientWidth: the latter can be stale while
  // the home grid is being reflowed after a viewport or panel-size change.
  const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
- // Preserve the original compact GitHub-style dot density: 11px on desktop,
- // 9px on narrow screens. The full-width panel remains responsive; the matrix
- // is centered inside it instead of stretching each date into a large block.
+ // Fit all 53 week-columns exactly to the available horizontal space, while
+ // retaining square cells. Narrow/mobile layout keeps its previous behavior.
  const narrow=window.innerWidth<=700;
- const gap=narrow?2:3;
- const cell=narrow?9:11;
+ const gap=narrow?2:(available<850?2:3);
+ const cell=narrow?9:Math.max(3,Math.floor(((available-(weeks-1)*gap)/weeks)*100)/100);
  layout.style.setProperty("--heat-cell",cell+"px","important");
  layout.style.setProperty("--heat-gap",gap+"px","important");
  grid.style.setProperty("--heat-cell",cell+"px","important");
@@ -163,7 +166,6 @@ function renderHomeRecent(){
   .filter(row=>row.stat.plays>0||row.stat.lastPlayed)
   .sort((a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)||b.stat.plays-a.stat.plays);
  const rows=played.slice(0,8);
- $("recentSubtitle").textContent=played.length?"按最近游玩时间排序 · 最近 "+Math.min(played.length,8)+" 款":"暂无记录";
  list.innerHTML="";
  if(!rows.length){
   const empty=document.createElement("div");empty.className="recent-empty";

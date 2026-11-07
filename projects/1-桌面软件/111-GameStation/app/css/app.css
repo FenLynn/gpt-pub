@@ -1022,39 +1022,40 @@ body{font-size:15px}
 }
 
 
-/* P111 R21 · restore the original square-dot heatmap and remove dashboard micro-cards. */
+/* P111 R23 · compact banner, width-filling 53-week matrix and roomy recent games. */
 @media(min-width:701px){
  #homeView.home-view{height:100%!important;min-height:0;overflow:hidden;padding:18px 20px;background:var(--page)}
  #homeView .home-layout{height:100%!important;min-height:0;grid-template-columns:minmax(0,1fr) 286px;grid-template-rows:minmax(0,1fr);gap:16px;align-items:stretch}
  #homeView .home-main{height:100%!important;min-height:0;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);
-  grid-template-rows:156px minmax(284px,1fr) 124px!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
+  grid-template-rows:118px max-content minmax(0,1fr)!important;gap:12px!important;align-content:stretch!important;overflow:hidden}
  #homeView .home-main>*{min-width:0;min-height:0}
  #homeView .home-hero{height:100%;min-height:0;display:grid;grid-template-columns:minmax(260px,.9fr) minmax(0,1.5fr);
-  align-items:center;gap:16px;padding:15px 20px;border:1px solid #d9e7ef;border-radius:14px;
+  align-items:center;gap:16px;padding:12px 19px;border:1px solid #d9e7ef;border-radius:14px;
   background:linear-gradient(112deg,#fff 0%,#f4f8fa 55%,#e6f0f5 100%);box-shadow:0 7px 22px #24465c0b}
  #homeView .home-hero:before{opacity:.2}
  #homeView .hero-copy{max-width:none!important;min-width:0;display:flex;flex-direction:column;justify-content:center}
  #homeView .hero-kicker,#homeView .home-art{display:none!important}
- #homeView .home-hero .date-line{display:flex;align-items:baseline;gap:11px;margin:0 0 7px}
- #homeView .home-hero .date-line strong{font-size:19px;color:#385a70}
+ #homeView .home-hero .date-line{display:flex;align-items:baseline;gap:11px;margin:0 0 4px}
+ #homeView .home-hero .date-line strong{font-size:18px;color:#385a70}
  #homeView .home-hero .date-line span{display:inline!important;font-size:12px}
- #homeView .home-hero h1{margin:2px 0 5px;font-size:25px}
- #homeView .hero-description{max-width:480px;font-size:12px;line-height:1.6}
+ #homeView .home-hero h1{margin:2px 0 0;font-size:24px}
  /* Five usage metrics remain plain typography: no card, border, tile or per-item background. */
- #homeView .hero-metrics{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;align-items:center}
- #homeView .hero-metric{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:6px;
+ #homeView .hero-metrics{min-width:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;align-items:center}
+ #homeView .hero-metric{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:8px;
   padding:0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;overflow:hidden}
- #homeView .hero-metric-label{color:#8196a4;font-size:10px;font-weight:650;white-space:nowrap}
- #homeView .hero-metric strong{display:block;overflow:hidden;color:#315d78;font-size:clamp(12px,1.05vw,16px);
+ #homeView .hero-metric-label{color:#8196a4;font-size:11px;font-weight:650;white-space:nowrap}
+ #homeView .hero-metric strong{display:block;overflow:hidden;color:#315d78;font-size:clamp(14px,1.05vw,18px);
   font-weight:760;line-height:1.25;white-space:nowrap;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
  #homeView .hero-metric small{display:none!important}
- #homeView .activity-panel{height:100%!important;min-height:300px;align-self:stretch;display:flex;flex-direction:column;
-  justify-content:flex-start;padding:17px 20px;border:1px solid #dce7ed;border-radius:13px;background:#ffffffed;overflow:hidden}
+ #homeView .activity-panel{height:auto!important;min-height:0!important;align-self:start;display:flex;flex-direction:column;
+  justify-content:flex-start;padding:13px 18px 11px;border:1px solid #dce7ed;border-radius:13px;background:#ffffffed;overflow:hidden}
  #homeView .panel-heading h2{font-size:16px}
  #homeView .panel-heading p{font-size:11px}
- #homeView .heatmap-layout{flex:1;min-height:0;align-items:center;gap:10px;margin:10px 0 0}
+ #homeView .heatmap-layout{flex:none;min-height:0;align-items:flex-start;gap:9px;margin:7px 0 0;width:100%}
+ #homeView .heatmap-weekdays{grid-template-rows:repeat(7,var(--heat-cell,11px))!important;
+  gap:var(--heat-gap,3px)!important;line-height:var(--heat-cell,11px)!important}
  #homeView .heatmap-content{flex:1 1 0%;width:0;min-width:0;max-width:none;overflow:hidden!important;padding-bottom:2px}
- #homeView .heatmap-months{height:19px}
+ #homeView .heatmap-months{height:16px}
  /* Keep the original small dot density; center the 53-week group inside the full-width panel. */
  #homeView .heatmap-months,#homeView .heatmap-grid,#homeView .heatmap-legend{
   margin-left:auto!important;margin-right:auto!important
@@ -1066,26 +1067,31 @@ body{font-size:15px}
  #homeView .heatmap-cell{width:var(--heat-cell,11px)!important;height:var(--heat-cell,11px)!important;
   flex:none;border-radius:3px}
  #homeView .heatmap-cell.empty{background:transparent!important;outline:0!important}
- #homeView .heatmap-legend{margin-top:12px}
+ #homeView .heatmap-legend{margin-top:8px}
  #homeView .recent-panel{height:100%!important;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);
-  gap:5px;padding:9px 15px;border:1px solid #dce7ed;border-radius:12px;background:#ffffffed;overflow:hidden}
+  gap:8px;padding:13px 17px;border:1px solid #dce7ed;border-radius:12px;background:#ffffffed;overflow:hidden}
  #homeView .recent-heading{display:flex;align-items:center;justify-content:space-between;min-width:0}
  #homeView .recent-heading h2{margin:0;color:#2d4d63;font-size:14px;font-weight:760}
- #homeView .recent-heading p{margin:2px 0 0;color:#91a2ad;font-size:10px}
- /* Recent games are a simple icon strip, not a row of miniature cards. */
- #homeView .recent-list{display:flex;flex-direction:row;align-items:center;gap:20px;min-width:0;min-height:0;
-  overflow-x:auto;overflow-y:hidden;padding:0 4px 2px;scrollbar-width:thin;scrollbar-color:#cbdbe5 transparent}
- #homeView .recent-game{flex:0 0 68px;min-width:0;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-  padding:1px 0;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;text-align:center;
-  transition:transform .14s}
+ /* Games occupy all free lower space, arranged in one or two spacious rows. */
+ #homeView .recent-list{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-template-rows:none!important;grid-auto-rows:minmax(0,1fr)!important;align-items:stretch;
+  justify-items:center;gap:12px 16px;min-width:0;min-height:0;width:100%;
+  overflow:visible!important;padding:4px 0 6px}
+ #homeView .recent-game{flex:none;min-width:0;min-height:0;width:100%;max-width:220px;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:4px 6px;
+  border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;text-align:center;
+  overflow:visible;transition:transform .14s}
  #homeView .recent-game:hover{background:transparent!important;border-color:transparent!important;transform:translateY(-2px)}
  #homeView .recent-game:focus-visible{outline:2px solid #8bb6ce;outline-offset:2px;border-radius:6px}
- #homeView .recent-icon{width:40px;height:40px;flex:none;display:grid;place-items:center;border:0;border-radius:0;
-  padding:0;background:transparent!important;color:#477b9a;font-size:32px;line-height:1}
- #homeView .recent-copy{width:100%;min-width:0;display:block;text-align:center}
- #homeView .recent-copy strong{display:block;overflow:hidden;color:#587387;font-size:11px;font-weight:620;
-  text-overflow:ellipsis;white-space:nowrap}
- #homeView .recent-empty{display:flex;align-items:center;padding:0 8px;color:#93a5b0;font-size:12px}
+ #homeView .recent-icon{width:clamp(78px,7vw,120px);height:clamp(78px,7vw,120px);flex:none;
+  display:grid;place-items:center;border:0;border-radius:0;padding:0;
+  background:transparent!important;color:#477b9a;font-size:clamp(70px,6vw,108px);line-height:1.16;
+  overflow:visible!important}
+ #homeView .recent-copy{width:100%;min-width:0;display:block;text-align:center;overflow:visible}
+ #homeView .recent-copy strong{display:block;color:#587387;font-size:13px;font-weight:650;
+  line-height:1.4;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:break-word}
+ #homeView .recent-empty{grid-column:1/-1;display:grid;place-items:center;width:100%;height:100%;
+  padding:0 8px;color:#93a5b0;font-size:13px}
  #homeView .ranking-panel{height:100%!important;min-height:0;align-self:stretch;display:flex;flex-direction:column;
   padding:16px 14px;border-radius:13px;overflow:hidden}
  #homeView .ranking-mark{font-size:10px;letter-spacing:0}
@@ -1093,17 +1099,16 @@ body{font-size:15px}
  #homeView .ranking-foot{margin-top:auto}
 }
 @media(min-width:701px) and (max-width:1120px){
- #homeView .home-main{grid-template-rows:176px minmax(244px,1fr) 124px!important}
+ #homeView .home-main{grid-template-rows:150px max-content minmax(0,1fr)!important}
  #homeView .home-hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:7px;padding:11px 14px}
  #homeView .hero-copy{justify-content:flex-start}
  #homeView .home-hero .date-line{margin-bottom:2px}
  #homeView .home-hero h1{font-size:20px}
- #homeView .hero-description{font-size:10px}
  #homeView .hero-metrics{gap:9px}
  #homeView .hero-metric{gap:4px}
  #homeView .hero-metric-label{font-size:9px}
  #homeView .hero-metric strong{font-size:12px}
- #homeView .recent-list{gap:13px}
+ #homeView .recent-list{gap:10px}
 }
 @media(max-width:700px){
  #homeView .home-hero{display:flex;flex-direction:column;align-items:stretch;gap:10px}
@@ -1124,7 +1129,11 @@ body{font-size:15px}
  font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji","Segoe UI Symbol",sans-serif
 }
 .game-card-icon{padding:0;font-size:clamp(22px,2vw,27px)}
-#homeView .recent-icon{font-size:32px!important}
+#homeView .recent-icon{font-size:clamp(70px,6vw,108px)!important}
+#homeView .recent-icon .game-icon-glyph{display:inline-flex;align-items:center;justify-content:center;
+ line-height:1.16;overflow:visible;white-space:nowrap}
+.game-tank-icon{display:block;width:100%;height:100%;overflow:visible;fill:#447e56}
+.game-card-icon .game-tank-icon{width:32px;height:32px;flex:none}
 @media(max-width:700px){#homeView .recent-icon{font-size:28px!important}}
 /* P111 R21.4 · center the session clock and float status notices over the game surface. */
 @media(min-width:1101px){
