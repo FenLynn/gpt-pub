@@ -243,3 +243,22 @@
   flex-basis:150px!important;min-width:112px!important
  }
 }
+
+/* R26.1 — Only Gomoku at narrower desktop widths: keep breadcrumb fully readable. */
+@media(min-width:901px) and (max-width:1390px){
+ .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar-leading{
+  flex:0 0 156px!important;min-width:156px!important;max-width:156px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice:not(.hidden){
+  flex:0 1 207px!important;width:207px!important;max-width:207px!important;min-width:196px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #modeControl{
+  margin-left:51px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar #difficultyControl{
+  margin-left:32px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .topbar .segment-control button{
+  min-width:40px!important;padding:0 5px!important
+ }
+}

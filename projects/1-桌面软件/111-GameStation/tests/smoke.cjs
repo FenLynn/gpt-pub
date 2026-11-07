@@ -135,7 +135,7 @@ const names=[
   assert.equal(header.noticePosition,"static",name+" titlebar notification must participate in the topbar grid");
   assert.notEqual(header.noticeDisplay,"none",name+" center notification region must remain present");
   if(name==="五子棋"){
-   assert.ok(header.notice.width>=214&&header.notice.width<=285,name+" Gomoku LED must be about twice the old length: "+JSON.stringify(header));
+   assert.ok(header.notice.width>=(width<=1390?195:214)&&header.notice.width<=285,name+" Gomoku LED must remain longer while fitting the desktop header: "+JSON.stringify(header));
    const led=await page.locator("#gameNotice").evaluate(box=>{
     const speaker=box.querySelector(".game-notice-speaker"),window=box.querySelector(".game-notice-window"),
       label=box.querySelector(".game-notice-text"),screen=getComputedStyle(window),text=getComputedStyle(label);
@@ -145,10 +145,18 @@ const names=[
       modeBorder:getComputedStyle(document.querySelector("#modeControl")).borderTopWidth,
       difficultyBorder:getComputedStyle(document.querySelector("#difficultyControl")).borderTopWidth};
    });
-   assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=180,"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
+   assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=(width<=1390?165:180),"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
    assert.ok(led.textColor==="rgb(255, 255, 255)"&&led.textFont>=14&&led.screenPaddingTop<=3,"Gomoku LED must have large white tightly-spaced text: "+JSON.stringify(led));
    assert.equal(led.modeBorder,"1px","Gomoku mode switches need a shared outline");
    assert.equal(led.difficultyBorder,"1px","Gomoku difficulty switches need a shared outline");
+   if(width<=1390){
+    const breadcrumb=await page.locator("#topbar .breadcrumbs").evaluate(el=>{
+     const r=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();
+     return{left:r.left,barLeft:b.left,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,text:el.innerText};
+    });
+    assert.ok(breadcrumb.left>=breadcrumb.barLeft+3&&breadcrumb.scrollWidth<=breadcrumb.clientWidth+2,
+     "Narrow desktop Gomoku breadcrumb must not be clipped: "+JSON.stringify(breadcrumb));
+   }
   }else assert.ok(header.notice.width>=110&&header.notice.width<=135,name+" Other games must keep their existing LED size");
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
   const crumb=await page.evaluate(()=>({name:document.querySelector("#breadcrumbCategory").textContent.trim(),
