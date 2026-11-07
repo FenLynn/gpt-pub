@@ -1073,7 +1073,7 @@ body{font-size:15px}
  #homeView .recent-heading{display:flex;align-items:center;justify-content:space-between;min-width:0}
  #homeView .recent-heading h2{margin:0;color:#2d4d63;font-size:14px;font-weight:760}
  /* Games occupy all free lower space, arranged in one or two spacious rows. */
- #homeView .recent-list{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ #homeView .recent-list{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
   grid-template-rows:none!important;grid-auto-rows:minmax(0,1fr)!important;align-items:stretch;
   justify-items:center;gap:12px 16px;min-width:0;min-height:0;width:100%;
   overflow:visible!important;padding:4px 0 6px}
@@ -1316,7 +1316,7 @@ body{font-size:15px}
   line-height:var(--heat-cell,11px)!important;font-size:9px}
  #homeView .heatmap-weekdays span{display:flex;align-items:center;white-space:nowrap;line-height:1}
  #homeView .heatmap-layout{gap:7px!important}
- #homeView .recent-list{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+ #homeView .recent-list{grid-template-columns:repeat(6,minmax(0,1fr))!important}
  #homeView .recent-icon{width:clamp(40px,3.5vw,60px)!important;height:clamp(40px,3.5vw,60px)!important;
   font-size:clamp(35px,3vw,54px)!important;line-height:1.12}
  #homeView .recent-game{gap:7px!important}

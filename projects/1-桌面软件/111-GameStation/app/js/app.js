@@ -126,14 +126,12 @@ function resizeHeatmap(){
  const grid=$("heatmapGrid"),content=grid?.parentElement,layout=grid?.closest(".heatmap-layout");
  if(!grid||!content||!layout)return;
  const weeks=Number(grid.dataset.weeks)||53;
- // Use the rendered content box, not clientWidth: the latter can be stale while
- // the home grid is being reflowed after a viewport or panel-size change.
+ // Keep the original compact contribution-map geometry. The panel is full width;
+ // the 53-week matrix remains square and centered instead of stretching its dots.
  const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
- // Fit all 53 week-columns exactly to the available horizontal space, while
- // retaining square cells. Narrow/mobile layout keeps its previous behavior.
  const narrow=window.innerWidth<=700;
  const gap=narrow?2:(available<850?2:3);
- const cell=narrow?9:Math.max(3,Math.floor(((available-(weeks-1)*gap)/weeks)*100)/100);
+ const cell=narrow?9:11;
  layout.style.setProperty("--heat-cell",cell+"px","important");
  layout.style.setProperty("--heat-gap",gap+"px","important");
  grid.style.setProperty("--heat-cell",cell+"px","important");

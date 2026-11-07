@@ -182,7 +182,7 @@ const names=[
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
     icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋","西洋跳棋（8×8）","国际象棋","五子棋"],"Recent games must be sorted newest-to-oldest");
-  assert.ok(recent.every((x,i)=>i%4===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
+  assert.ok(recent.every((x,i)=>i%6===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
@@ -198,7 +198,7 @@ const names=[
   async function homeLayoutCheck(width,height){
    await page.setViewportSize({width,height});
    // Wait for the browser's resize event / ResizeObserver animation frame to
-   // apply the content-width heatmap sizing before measuring the grid.
+   // update the content width used to center the fixed-size heatmap matrix.
    await page.waitForFunction(()=>{
     const grid=document.querySelector("#heatmapGrid"),content=grid?.parentElement;
     return !!grid&&!!content&&Number.isFinite(Number(grid.dataset.availableWidth))&&
@@ -226,7 +226,7 @@ const names=[
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
     const metric=getComputedStyle(document.querySelector(".hero-metric")),recent=getComputedStyle(document.querySelector(".recent-game"));
     const measured=Math.floor(c.width),narrow=window.innerWidth<=700,expectedGap=narrow?2:(measured<850?2:3);
-    const expectedCell=narrow?9:Math.max(3,Math.floor(((measured-52*expectedGap)/53)*100)/100);
+    const expectedCell=narrow?9:11;
     return{dot:{width:r.width,height:r.height,autoColumn:getComputedStyle(grid).gridAutoColumns,gridWidth:g.width,contentWidth:c.width,gridLeft:g.left,contentLeft:c.left},
      metric:{border:[metric.borderTopWidth,metric.borderRightWidth,metric.borderBottomWidth,metric.borderLeftWidth].join("/"),background:metric.backgroundColor},
      recent:{border:[recent.borderTopWidth,recent.borderRightWidth,recent.borderBottomWidth,recent.borderLeftWidth].join("/"),background:recent.backgroundColor},
@@ -235,7 +235,7 @@ const names=[
      weekdayLabels:[...layout.querySelectorAll(".heatmap-weekdays span")].map(el=>{const r=el.getBoundingClientRect();return r.top+r.height/2;}),
      dotRows:[0,2,4].map(i=>{const r=grid.children[i].getBoundingClientRect();return r.top+r.height/2;}),
      recentIconWidth:parseFloat(getComputedStyle(document.querySelector("#homeRecentList .recent-icon")).width),
-     measuredContentWidth:Number(grid.dataset.availableWidth),computedCellSize:Number(grid.dataset.cellSize),expectedCell,expectedGap};
+     weeks:Number(grid.dataset.weeks),measuredContentWidth:Number(grid.dataset.availableWidth),computedCellSize:Number(grid.dataset.cellSize),expectedCell,expectedGap};
    });
    assert.ok(Math.abs(visual.dot.width-visual.dot.height)<.5&&Math.abs(visual.dot.width-visual.expectedCell)<.5,"Heatmap dots must retain the fixed square size: "+JSON.stringify(visual));
    assert.ok(Math.abs(parseFloat(visual.dot.autoColumn)-visual.dot.width)<.5,"Heatmap implicit columns must match the square dot size: "+JSON.stringify(visual));
@@ -245,10 +245,10 @@ const names=[
    assert.ok(visual.recentIconWidth>=38&&visual.recentIconWidth<=62,"Recent game icons must be about half the previous size: "+JSON.stringify(visual));
    assert.ok(visual.measuredContentWidth>=visual.dot.contentWidth*.95,"Heatmap sizing must use the rendered content width, not a stale clientWidth: "+JSON.stringify(visual));
    assert.ok(Math.abs(visual.computedCellSize-visual.dot.width)<.5,"The computed heatmap cell size must match the rendered dot size: "+JSON.stringify(visual));
-   const expectedGridWidth=53*visual.expectedCell+52*visual.expectedGap;
+   const expectedGridWidth=visual.weeks*visual.expectedCell+(visual.weeks-1)*visual.expectedGap;
    assert.ok(Math.abs(visual.dot.gridWidth-expectedGridWidth)<1,"53-week heatmap width must match its computed square-cell geometry: "+JSON.stringify(visual));
    assert.ok(visual.dot.gridWidth<=visual.dot.contentWidth+1,"53-week matrix must not overflow its activity panel: "+JSON.stringify(visual));
-   assert.ok(visual.dot.gridWidth>=visual.dot.contentWidth*.985,"53-week matrix must use almost all available horizontal space: "+JSON.stringify(visual));
+   assert.ok(visual.dot.gridWidth<=visual.dot.contentWidth+1,"The compact fixed-size matrix must fit inside the full-width activity panel: "+JSON.stringify(visual));
    assert.ok(Math.abs((visual.dot.gridLeft+visual.dot.gridWidth/2)-(visual.dot.contentLeft+visual.dot.contentWidth/2))<2,"The small dot matrix must be centered inside the full-width activity panel: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
@@ -267,16 +267,16 @@ const names=[
     return {iconWidth:icon?.width||0,iconHeight:icon?.height||0,iconOverflow:style?.overflow,rows:items.length,panelHeight:panel.height};
   });
   assert.ok(gridEvidence.iconWidth>=38&&gridEvidence.iconWidth<=62&&gridEvidence.iconHeight>=38&&gridEvidence.iconHeight<=62&&gridEvidence.iconOverflow==="visible","Recent game icons must be about half the previous size and never clipped: "+JSON.stringify(gridEvidence));
-  const threeRows=await page.locator("#homeRecentList").evaluate(list=>{
+  const twoRows=await page.locator("#homeRecentList").evaluate(list=>{
     const coords=[...list.querySelectorAll(".recent-game")].map(el=>{const r=el.getBoundingClientRect();return{x:r.x,y:r.y};});
     const rows=[...new Set(coords.map(p=>Math.round(p.y)))];
     return {coords,rows};
   });
-  assert.ok(threeRows.coords.length===12&&threeRows.rows.length===3,"Twelve recent games must form three rows: "+JSON.stringify(threeRows));
-  for(let row=0;row<3;row++){
-    const group=threeRows.coords.slice(row*4,row*4+4);
-    assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must fill rows left-to-right: "+JSON.stringify(threeRows));
-    assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent-games row must be ordered from left to right: "+JSON.stringify(threeRows));
+  assert.ok(twoRows.coords.length===12&&twoRows.rows.length===2,"Twelve recent games must form two horizontal rows: "+JSON.stringify(twoRows));
+  for(let row=0;row<2;row++){
+    const group=twoRows.coords.slice(row*6,row*6+6);
+    assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must fill each row left-to-right: "+JSON.stringify(twoRows));
+    assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent-games row must be ordered from left to right: "+JSON.stringify(twoRows));
   }
   let noticeChecked=false;
   await library();
