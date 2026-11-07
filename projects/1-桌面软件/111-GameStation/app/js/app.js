@@ -139,12 +139,12 @@ function resizeHeatmap(){
  const grid=$("heatmapGrid"),content=grid?.parentElement,layout=grid?.closest(".heatmap-layout");
  if(!grid||!content||!layout)return;
  const weeks=Number(grid.dataset.weeks)||53;
- // Keep the original compact contribution-map geometry. The panel is full width;
- // the 53-week matrix remains square and centered instead of stretching its dots.
- const available=Math.max(0,Math.floor(content.getBoundingClientRect().width));
+ // Distribute all weeks over the visible width, retaining square cells and a
+ // steady gap. The previous fixed 11px size wasted the right side of the panel.
+ const available=Math.max(0,content.getBoundingClientRect().width);
  const narrow=window.innerWidth<=700;
  const gap=narrow?2:(available<850?2:3);
- const cell=narrow?9:11;
+ const cell=Math.max(1,Math.floor(Math.max(0,(available-(weeks-1)*gap)/weeks)*100)/100);
  layout.style.setProperty("--heat-cell",cell+"px","important");
  layout.style.setProperty("--heat-gap",gap+"px","important");
  grid.style.setProperty("--heat-cell",cell+"px","important");
@@ -181,7 +181,7 @@ function recentRows(){
  rows.sort(homeRecentTab==="popular"?
   (a,b)=>b.stat.plays-a.stat.plays||b.stat.totalMs-a.stat.totalMs||statPlayedAt(b.stat)-statPlayedAt(a.stat):
   (a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)||b.stat.plays-a.stat.plays);
- return rows.slice(0,6);
+ return rows.slice(0,12);
 }
 function renderHomeRecent(){
  const list=$("homeRecentList");if(!list)return;
@@ -224,6 +224,7 @@ function renderHomePoster(){
  $("homePosterArt").innerHTML=gameIconMarkup(game);
  $("homePosterCategory").textContent=game.categoryName||categoryNames[game.category]||"游戏";
  $("homePosterTitle").textContent=game.name;$("homePosterDescription").textContent=game.description;
+ $("homePosterTip").textContent=game.tip||"点击进入游戏，查看完整玩法。";
  $("homePosterCount").textContent=String(posterIndex+1).padStart(2,"0")+" / "+String(rows.length).padStart(2,"0");
  $("homePosterDots").replaceChildren(...rows.map((g,i)=>{const x=document.createElement("i");if(i===posterIndex)x.className="active";return x;}));
  const progress=$("homePosterProgress");progress.style.animation="none";void progress.offsetWidth;progress.style.removeProperty("animation");
