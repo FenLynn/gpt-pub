@@ -1,4 +1,6 @@
-/* P111 Xiangqi R34: isolated visual system; only this game's document imports this file.
+/* P111 Xiangqi R35: keep notation and controls close to the height-fitted board.
+   Only this game's document imports this file.
+   Prior R34: isolate the visual system and preload shared workspace styles.
    Preload workspace CSS in <head> so the legacy left-guide rail never flashes. */
 html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f8!important}
 .game-root.game-layout.xiangqi-layout,
@@ -6,12 +8,18 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 .game-root.game-layout.xiangqi-layout.rail-collapsed,
 .game-root.game-layout.xiangqi-layout.gs-tools-open:not(.rail-collapsed){
  display:grid!important;
- grid-template-columns:clamp(146px,14.7vw,192px) minmax(0,1fr) clamp(148px,13.6vw,178px)!important;
+ /* Keep the three columns as one centered group. A 1fr center track left wide,
+    empty gutters between the height-constrained board and both side rails. */
+ --xiangqi-notation-width:clamp(128px,12vw,170px);
+ --xiangqi-actions-width:clamp(128px,11.3vw,160px);
+ --xiangqi-board-track:min(calc((100dvh - 42px) * 8 / 9 + 16px),
+   calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 40px));
+ grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-actions-width)!important;
  grid-template-rows:minmax(0,1fr)!important;
- column-gap:clamp(8px,1.15vw,18px)!important;
+ column-gap:6px!important;
  padding:8px 12px!important;
  height:100%!important;
- align-items:stretch!important;
+ align-items:stretch!important;justify-content:center!important;
  background:#eaf2f8!important
 }
 .xiangqi-layout .game-guide,.xiangqi-layout .gs-hud,.xiangqi-layout .gs-notice{display:none!important}
@@ -98,8 +106,8 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 }
 .game-root.xiangqi-layout .xiangqi-board{
  position:relative!important;
- width:min(calc(100cqw - 36px),calc((100cqh - 26px) * 8 / 9))!important;
- height:min(calc(100cqh - 26px),calc((100cqw - 36px) * 9 / 8))!important;
+ width:min(calc(100cqw - 14px),calc((100cqh - 18px) * 8 / 9))!important;
+ height:min(calc(100cqh - 18px),calc((100cqw - 14px) * 9 / 8))!important;
  max-width:100%!important;max-height:100%!important;aspect-ratio:8/9!important;
  border:7px solid #865f39!important;border-radius:5px!important;overflow:visible!important;
  padding:0!important;background-color:#e9cf9e!important;
@@ -116,6 +124,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  font-family:"STKaiti","KaiTi","Noto Serif CJK SC",serif;font-weight:690!important;letter-spacing:5px}
 .xiangqi-layout .xiangqi-file-label{font:700 19px/1 "STKaiti","KaiTi","Noto Serif CJK SC",serif;fill:#745534}
 .xiangqi-layout .xiangqi-cell{z-index:2!important;display:grid!important;place-items:center!important;
+ container-type:inline-size!important;
  border:0!important;padding:0!important;background:transparent!important}
 .xiangqi-layout .xiangqi-cell.target{background:radial-gradient(circle,#5caf827b 0 17%,transparent 22%)!important}
 .xiangqi-layout .xiangqi-cell.selected{background:radial-gradient(circle,#ffd67e83 0 50%,transparent 54%)!important}
@@ -126,9 +135,10 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  background:radial-gradient(circle at 33% 25%,#fffaec 0%,#f3dfb9 53%,#d9b57a 100%)!important;
  box-shadow:0 3px 5px #50351b55,0 6px 10px #50351b23,inset 0 0 0 2px #fff9e7!important;
  font-family:"STKaiti","KaiTi","Noto Serif CJK SC","Songti SC","SimSun",serif!important;
- font-size:clamp(20px,3.7cqh,38px)!important;font-weight:900!important;
+ /* Match glyph to each intersection, not to the whole board-area height. */
+ font-size:clamp(13px,calc(70cqi - 6px),56px)!important;font-weight:900!important;
  font-synthesis:weight!important;line-height:1!important;white-space:nowrap!important;
- text-shadow:.4px 0 currentColor,-.4px 0 currentColor,0 1px #fff9e7!important
+ text-shadow:.65px 0 currentColor,-.65px 0 currentColor,0 1px #fff9e7!important
 }
 .xiangqi-layout .xiangqi-piece.red{color:#b7332c!important;border-color:#a56e45!important}
 .xiangqi-layout .xiangqi-piece.black{color:#26353d!important}
@@ -171,10 +181,13 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 @media(max-width:900px){
  .game-root.game-layout.xiangqi-layout,.game-root.game-layout.xiangqi-layout.gs-tools-open,
  .game-root.game-layout.xiangqi-layout.rail-collapsed{
- grid-template-columns:126px minmax(0,1fr) 122px!important;gap:6px!important;padding:5px!important}
+ --xiangqi-notation-width:120px;--xiangqi-actions-width:118px;
+ --xiangqi-board-track:min(calc((100dvh - 30px) * 8 / 9 + 14px),
+   calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 26px));
+ grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-actions-width)!important;
+ column-gap:6px!important;padding:5px!important}
  .xiangqi-record-foot{display:none}
  .game-root.xiangqi-layout>.game-tools>.game-btn{height:45px!important;min-height:45px!important;font-size:12px!important;gap:5px!important}
- .xiangqi-layout .xiangqi-piece{font-size:clamp(15px,3cqh,26px)!important}
 }
 @media(prefers-reduced-motion:reduce){
  .xiangqi-layout .xiangqi-cell.checked .xiangqi-piece,

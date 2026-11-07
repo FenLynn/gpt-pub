@@ -134,13 +134,22 @@ const names=[
    }else if(name==="中国象棋"){
     const geometry=await frame.locator("#game").evaluate(el=>{
      const r=s=>{const q=el.querySelector(s).getBoundingClientRect();return{left:q.left,right:q.right,top:q.top,bottom:q.bottom,width:q.width,height:q.height};};
+     const piece=el.querySelector(".xiangqi-piece");
      return{left:r(".xiangqi-record-rail"),main:r(".game-main-board"),right:r(".game-tools"),
+      board:r(".xiangqi-board"),
+      glyphFont:parseFloat(getComputedStyle(piece).fontSize),pieceWidth:piece.getBoundingClientRect().width,
       styles:[...document.querySelectorAll("head link[rel=stylesheet]")].map(x=>x.getAttribute("href")),
       background:getComputedStyle(el.querySelector(".xiangqi-board")).backgroundImage};
     });
     assert.ok(geometry.left.right<=geometry.main.left+2&&geometry.main.right<=geometry.right.left+2,
      "Xiangqi must position notation left and actions right, without overlap: "+JSON.stringify(geometry));
-    assert.ok(geometry.main.width>=v.root.width*.50,"Xiangqi chessboard must dominate the center: "+JSON.stringify(geometry));
+    assert.ok(geometry.main.width>=(geometry.right.right-geometry.left.left)*.50,
+     "Xiangqi board track must dominate its compact three-column group: "+JSON.stringify(geometry));
+    const leftGap=geometry.board.left-geometry.left.right,rightGap=geometry.right.left-geometry.board.right;
+    assert.ok(leftGap>=4&&leftGap<=28&&rightGap>=4&&rightGap<=28,
+     "Xiangqi notation and buttons must stay close to the actual board: "+JSON.stringify({leftGap,rightGap,geometry}));
+    assert.ok(geometry.glyphFont>=geometry.pieceWidth*.62&&geometry.glyphFont<=geometry.pieceWidth*.9,
+     "Xiangqi glyphs must be large and proportional to their circular pieces: "+JSON.stringify(geometry));
     assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.includes("./xiangqi.css"),
      "Xiangqi dedicated stylesheet must be loaded in HEAD, preventing a legacy layout flash");
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
