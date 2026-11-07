@@ -200,7 +200,8 @@ function renderHomeRecent(){
   button.innerHTML='<span class="recent-icon" data-category="'+game.category+'" data-game="'+game.id+'" aria-hidden="true">'+gameIconMarkup(game)+'</span><span class="recent-copy"><strong>'+escapeHtml(game.name)+'</strong></span>';
   button.addEventListener("click",()=>{
    selectedPosterId=game.id;const i=posterGames().findIndex(g=>g.id===game.id);if(i>=0)posterIndex=i;
-   renderHomeRecent();renderHomePoster();
+   document.querySelectorAll("#homeRecentList .recent-game").forEach(item=>item.setAttribute("aria-pressed",String(item.dataset.game===game.id)));
+   renderHomePoster();
   });
   list.appendChild(button);
  });

@@ -238,10 +238,10 @@ const names=[
   assert.ok(posterDesign.count.left-posterDesign.outer.left<80&&posterDesign.count.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.top>posterDesign.outer.top+posterDesign.outer.height*.7&&posterDesign.dots.left<posterDesign.outer.left+posterDesign.outer.width*.55,"Poster number and dots must both move to the lower left: "+JSON.stringify(posterDesign));
   assert.ok(posterDesign.tipFont>=13&&posterDesign.introFont>=13&&posterDesign.titleFont>=22&&posterDesign.tipText.length>3,"Poster game information and tips must remain readable: "+JSON.stringify(posterDesign));
   assert.equal(await page.locator("#homePosterProgress,.poster-progress").count(),0,"Poster progress bar must be removed");
-  const preview=page.locator("#homeRecentList .recent-game").nth(1);
-  const previewId=await preview.getAttribute("data-game");
-  await preview.click();
-  assert.equal(await page.locator("#homeGamePoster").getAttribute("data-game"),previewId,"Single click on a recent game must only update the poster preview");
+  const homePreviewButton=page.locator("#homeRecentList .recent-game").nth(1);
+  const homePreviewGameId=await homePreviewButton.getAttribute("data-game");
+  await homePreviewButton.click();
+  assert.equal(await page.locator("#homeGamePoster").getAttribute("data-game"),homePreviewGameId,"Single click on a recent game must only update the poster preview");
   await page.locator("#homeRecentList .recent-game").nth(1).dblclick();
   await page.locator("#workspaceView:not(.hidden)").waitFor({state:"visible"});
   assert.equal(await page.locator("#libraryView").evaluate(el=>el.classList.contains("hidden")),true,"Double-clicking a recent game must launch it directly, not open its category");
