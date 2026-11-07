@@ -379,3 +379,7 @@
   animation:led-scroll var(--led-duration,7s) ease-in-out infinite alternate!important
  }
 }
+
+/* Keep the LED label at its intrinsic width so overflow detection and marquee travel stay exact. */
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{flex:0 0 auto!important}
+.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{flex:0 0 auto!important}

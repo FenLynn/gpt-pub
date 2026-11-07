@@ -228,7 +228,7 @@ function renderHomePoster(){
  $("homePosterTip").textContent=game.tip||"点击进入游戏，查看完整玩法。";
  $("homePosterCount").textContent=String(posterIndex+1).padStart(2,"0")+" / "+String(rows.length).padStart(2,"0");
  $("homePosterDots").replaceChildren(...rows.map((g,i)=>{const x=document.createElement("i");if(i===posterIndex)x.className="active";return x;}));
- const progress=$("homePosterProgress");progress.style.animation="none";void progress.offsetWidth;progress.style.removeProperty("animation");
+
  poster.classList.remove("arriving");void poster.offsetWidth;poster.classList.add("arriving");
  document.querySelectorAll("#homeRecentList .recent-game").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.game===game.id)));
 }
