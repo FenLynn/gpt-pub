@@ -114,5 +114,15 @@ function resume(){if(over)return;cancelAnimationFrame(raf);paused=false;last=per
 function keydown(e){const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," "].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")keys.a=true;if(k==="d"||k==="arrowright")keys.d=true;if(k==="w"||k==="arrowup"||k===" ")keys.w=true;if(k==="j")keys.j=true;if(k==="k"&&!keys.k){keys.k=true;throwGrenade();}}
 function keyup(e){const k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")keys.a=false;if(k==="d"||k==="arrowright")keys.d=false;if(k==="w"||k==="arrowup"||k===" ")keys.w=false;if(k==="j")keys.j=false;if(k==="k")keys.k=false;}
 window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("pointerdown",()=>canvas.focus());
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const clone=o=>o?JSON.parse(JSON.stringify(o)):o;
+ const fixtureState=()=>({stage,score,lives,weapon,grenadeCount,player:clone(player),enemies:clone(enemies),bullets:clone(bullets.map(b=>({...b,hit:[...(b.hit||[])]}))),enemyShots:clone(enemyShots),grenades:clone(grenades),boss:clone(boss),paused,over});
+ window.__p111ContraTest={
+  start(level="normal"){configure(level);newGame();pause();return fixtureState();},
+  loadState(s={}){cancelAnimationFrame(raf);configure(s.difficulty||"normal");stage=s.stage||1;score=Number(s.score)||0;lives=s.lives??params().lives;weapon=s.weapon||"rifle";grenadeCount=s.grenadeCount??3;player={x:80,y:GROUND-42,w:24,h:42,vy:0,onGround:true,face:1,inv:0,dead:false,...(s.player||{})};enemies=(s.enemies||[]).map(e=>({...e}));bullets=(s.bullets||[]).map(b=>({...b,hit:new Set(b.hit||[])}));enemyShots=(s.enemyShots||[]).map(e=>({...e}));pickups=(s.pickups||[]).map(e=>({...e}));grenades=(s.grenades||[]).map(e=>({...e}));explosions=(s.explosions||[]).map(e=>({...e}));boss=s.boss?{...s.boss}:null;worldX=player.x;cameraX=0;spawnIndex=0;lastShot=-1e9;lastGrenade=-1e9;invulnerable=0;stageIntro=0;paused=true;over=false;keys={};updateHud();draw();return fixtureState();},
+  state:fixtureState,fire(){fire();return fixtureState();},throwGrenade(){throwGrenade();return fixtureState();},hitPlayer(){hitPlayer();return fixtureState();},spawnEnemy(type,x){spawnEnemy(type,x);return fixtureState();},spawnBoss(){spawnBoss();return fixtureState();},explode(x,y){explode(x,y);return fixtureState();},nextStage(){nextStage();return fixtureState();}
+ };
+}
 GameBridge.register({init(p){configure(p.difficulty);newGame();pause();},newGame,resume,pause,setDifficulty(v){configure(v);},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);}});
 })();

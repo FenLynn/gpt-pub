@@ -376,7 +376,47 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    solState=await solitaire.evaluate(s=>window.__p111SolitaireTest.loadState(s),{stock:[],waste:[],columns:[[card("♣",8,false),card("♥",9)], [card("♠",10)],[],[],[],[],[]]});
    await solitaire.evaluate(()=>window.__p111SolitaireTest.chooseColumn(0,1));solState=await solitaire.evaluate(()=>window.__p111SolitaireTest.place(1));
    assert.equal(solState.columns[0][0].face,true,"Moving the top card must reveal the previous tableau card");assert.equal(solState.columns[1].length,2);
+   solState=await solitaire.evaluate(s=>window.__p111SolitaireTest.loadState(s),{stock:[],waste:[card("♥",1)],foundations:[[],[],[],[]],columns:Array.from({length:7},()=>[])});
+   let solMove=await solitaire.evaluate(()=>window.__p111SolitaireTest.move("waste","foundation-0"));assert.equal(solMove.moved,true);assert.equal(solMove.foundations[0][0].rank,1,"Klondike foundations must start with an Ace");
+   solState=await solitaire.evaluate(s=>window.__p111SolitaireTest.loadState(s),{stock:[],waste:[card("♥",2)],foundations:[[card("♥",1)],[],[],[]],columns:Array.from({length:7},()=>[])});
+   solMove=await solitaire.evaluate(()=>window.__p111SolitaireTest.move("waste","foundation-0"));assert.equal(solMove.moved,true);assert.equal(solMove.foundations[0].length,2,"A foundation must ascend by one in the same suit");
+   const completeFoundations=["♥","♦","♣","♠"].map(suit=>Array.from({length:13},(_,i)=>card(suit,i+1)));
+   solState=await solitaire.evaluate(f=>window.__p111SolitaireTest.loadState({foundations:f,columns:Array.from({length:7},()=>[])}),completeFoundations);
+   solState=await solitaire.evaluate(()=>window.__p111SolitaireTest.checkWin());assert.equal(solState.won,true,"Four complete foundations must finish Klondike");
    await solitaire.close();
+   // Contra-style original shooter: difficulty lives, weapon spread, grenade, invulnerability and stage progression.
+   const contra=await browser.newPage({viewport:{width:1100,height:700}});contra.on("pageerror",e=>errors.push("Contra: "+e.message));
+   await contra.goto(pathToFileURL(path.resolve(__dirname,"../app/games/contra/index.html")).href+"?p111Test=1");await contra.waitForFunction(()=>!!window.__p111ContraTest);
+   let contraState=await contra.evaluate(()=>window.__p111ContraTest.start("easy"));assert.equal(contraState.lives,5);assert.equal(contraState.paused,true);
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.start("hard"));assert.equal(contraState.lives,2,"Hard Contra mode must start with two lives");
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.loadState({weapon:"fan",grenadeCount:3}));contraState=await contra.evaluate(()=>window.__p111ContraTest.fire());assert.equal(contraState.bullets.length,3,"Fan weapon must fire three projectiles");
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.throwGrenade());assert.equal(contraState.grenadeCount,2);assert.equal(contraState.grenades.length,1);
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.loadState({lives:2,player:{inv:0}}));contraState=await contra.evaluate(()=>window.__p111ContraTest.hitPlayer());assert.equal(contraState.lives,1);
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.hitPlayer());assert.equal(contraState.lives,1,"Contra invulnerability must prevent repeated immediate damage");
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.loadState({stage:1,weapon:"rifle"}));contraState=await contra.evaluate(()=>window.__p111ContraTest.nextStage());assert.equal(contraState.stage,2);assert.equal(contraState.weapon,"fan");
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.loadState({stage:3,score:100}));contraState=await contra.evaluate(()=>window.__p111ContraTest.nextStage());assert.equal(contraState.over,true);assert.equal(contraState.score,600,"Completing the final Contra area must award the clear bonus");
+   contraState=await contra.evaluate(()=>window.__p111ContraTest.loadState({boss:{x:100,y:100,w:100,h:100,hp:20,maxHp:20}}));contraState=await contra.evaluate(()=>window.__p111ContraTest.explode(150,150));assert.equal(contraState.boss.hp,13,"Grenade explosion must damage a nearby boss");await contra.close();
+
+   // Original platform game: movement, jump physics, platform landing, coin pickup, stomp, damage immunity and goal.
+   const mario=await browser.newPage({viewport:{width:1100,height:750}});mario.on("pageerror",e=>errors.push("Mario: "+e.message));
+   await mario.goto(pathToFileURL(path.resolve(__dirname,"../app/games/mario/index.html")).href+"?p111Test=1");await mario.waitForFunction(()=>!!window.__p111MarioTest);
+   let marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({player:{x:70,y:410,onGround:true},coins:[{x:100,y:430,got:false,phase:0}],enemies:[],platforms:[]}));
+   await mario.evaluate(()=>window.__p111MarioTest.setKeys({d:true}));marioState=await mario.evaluate(()=>window.__p111MarioTest.update(1));assert.ok(marioState.player.x>70);assert.equal(marioState.coinCount,1);assert.equal(marioState.score,100,"Mario must collect coins and award 100 points");
+   marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({player:{x:70,y:410,onGround:true},coins:[],enemies:[],platforms:[]}));await mario.evaluate(()=>window.__p111MarioTest.setKeys({jump:true}));marioState=await mario.evaluate(()=>window.__p111MarioTest.update(1));assert.ok(marioState.player.y<410&&marioState.player.vy<0,"Mario jump input must create upward velocity");
+   marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({player:{x:270,y:300,vy:0,onGround:false},platforms:[{x:260,y:365,w:130,h:18}],coins:[],enemies:[]}));for(let i=0;i<10;i++)marioState=await mario.evaluate(()=>window.__p111MarioTest.update(1));assert.equal(marioState.player.onGround,true);assert.equal(marioState.player.y,321,"Mario must land on top of a platform");
+   marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({player:{x:100,y:380,vy:5,onGround:false,face:1},platforms:[],coins:[],enemies:[{x:100,y:427,dir:0,min:100,max:100,alive:true}]}));marioState=await mario.evaluate(()=>window.__p111MarioTest.update(1));assert.equal(marioState.enemies[0].alive,false);assert.equal(marioState.score,200,"Landing on an enemy must defeat it and award points");
+   marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({lives:2,invuln:0,player:{x:70,y:410,onGround:true},coins:[],enemies:[],platforms:[]}));marioState=await mario.evaluate(()=>window.__p111MarioTest.hit());assert.equal(marioState.lives,1);marioState=await mario.evaluate(()=>window.__p111MarioTest.hit());assert.equal(marioState.lives,1,"Mario damage immunity must block repeated immediate hits");
+   marioState=await mario.evaluate(()=>window.__p111MarioTest.loadState({player:{x:3261,y:410,onGround:true},coins:[],enemies:[],platforms:[]}));marioState=await mario.evaluate(()=>window.__p111MarioTest.update(.1));assert.equal(marioState.over,true,"Reaching the level goal must finish the stage");await mario.close();
+
+   // Tank battle: map collision, boundary blocking, firing direction, enemy hit and base protection.
+   const tank=await browser.newPage({viewport:{width:1000,height:850}});tank.on("pageerror",e=>errors.push("Tank: "+e.message));
+   await tank.goto(pathToFileURL(path.resolve(__dirname,"../app/games/tank/index.html")).href+"?p111Test=1");await tank.waitForFunction(()=>!!window.__p111TankTest);
+   let tankState=await tank.evaluate(()=>window.__p111TankTest.loadState());let tankMove=await tank.evaluate(()=>window.__p111TankTest.move("up"));assert.equal(tankMove.moved,false,"Tank must not pass through brick walls");
+   tankState=await tank.evaluate(()=>window.__p111TankTest.loadState({player:{x:5,y:6,dir:"up",enemy:false,alive:true}}));tankMove=await tank.evaluate(()=>window.__p111TankTest.move("right"));assert.equal(tankMove.moved,false,"Tank must not pass through water");
+   tankState=await tank.evaluate(()=>window.__p111TankTest.loadState({player:{x:0,y:0,dir:"up",enemy:false,alive:true}}));tankMove=await tank.evaluate(()=>window.__p111TankTest.move("left"));assert.equal(tankMove.moved,false,"Tank must remain inside the map boundary");
+   tankState=await tank.evaluate(()=>window.__p111TankTest.loadState({player:{x:2,y:2,dir:"right",enemy:false,alive:true}}));tankState=await tank.evaluate(()=>window.__p111TankTest.fire());assert.ok(tankState.bullets[0].vx>0,"Tank fire must follow its facing direction");
+   tankState=await tank.evaluate(()=>window.__p111TankTest.loadState({player:{x:7,y:12,dir:"up",enemy:false,alive:true},enemies:[{x:3,y:3,dir:"up",enemy:true,alive:true}]}));tankState=await tank.evaluate(()=>window.__p111TankTest.hitEnemy());assert.equal(tankState.kills,1);assert.equal(tankState.enemies[0].alive,false,"A player projectile must destroy an enemy tank");
+   const baseBullet={x:7.5*39,y:15.5*39,vx:0,vy:0,enemy:true,dead:false};tankState=await tank.evaluate(b=>window.__p111TankTest.loadState({spawned:20,bullets:[b]}),baseBullet);tankState=await tank.evaluate(()=>window.__p111TankTest.update(.01));assert.equal(tankState.baseAlive,false);assert.equal(tankState.over,true,"An enemy projectile reaching the base must end the mission");await tank.close();
   const star=await browser.newPage({viewport:{width:1150,height:880}});
   star.on("pageerror",e=>errors.push("ChineseCheckers: "+e.message));
   await star.goto(pathToFileURL(path.resolve(__dirname,"../app/games/chinese-checkers/index.html")).href+"?p111Test=1");
@@ -773,6 +813,6 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await ddz.close();
   await xiangqi.close();
   assert.deepEqual(errors,[]);
-  console.log("P111 rule fixtures passed: Chess; Gomoku; Reversi; Connect Four; Checkers; 2048; Snake; Memory; Sokoban; Sudoku; Pong; Minesweeper; Battleship; Tetris; Klondike; Xiangqi; Chinese Checkers; Flight Chess; Sanguosha; Dou Dizhu; Mahjong.");
+  console.log("P111 rule fixtures passed: Chess; Gomoku; Reversi; Connect Four; Checkers; 2048; Snake; Memory; Sokoban; Sudoku; Pong; Minesweeper; Battleship; Tetris; Klondike; Contra; Mario; Tank; Xiangqi; Chinese Checkers; Flight Chess; Sanguosha; Dou Dizhu; Mahjong.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});

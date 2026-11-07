@@ -85,5 +85,14 @@ function resume(){if(over)return;paused=false;last=performance.now();report("继
 function keydown(e){const k=e.key.toLowerCase();if(["arrowleft","arrowright","arrowup"," ","shift"].includes(k))e.preventDefault();if(k==="a"||k==="arrowleft")keys.a=true;if(k==="d"||k==="arrowright")keys.d=true;if(k==="shift")keys.Shift=true;if(k===" "||k==="w"||k==="arrowup"){if(!keys.jump)keys.jump=true;}}
 function keyup(e){const k=e.key.toLowerCase();if(k==="a"||k==="arrowleft")keys.a=false;if(k==="d"||k==="arrowright")keys.d=false;if(k==="shift")keys.Shift=false;if(k===" "||k==="w"||k==="arrowup")keys.jump=false;}
 window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("pointerdown",()=>canvas.focus());
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const clone=o=>o?JSON.parse(JSON.stringify(o)):o;
+ const fixtureState=()=>({player:clone(player),platforms:clone(platforms),coins:clone(coins),enemies:clone(enemies),score,coinCount,lives,camera,paused,over,invuln});
+ window.__p111MarioTest={
+  loadState(s={}){cancelAnimationFrame(raf);difficulty=s.difficulty||"normal";makeLevel();player={x:70,y:GROUND-44,w:28,h:44,vx:0,vy:0,onGround:true,face:1,...(s.player||{})};if(s.platforms)platforms=clone(s.platforms);if(s.coins)coins=clone(s.coins);if(s.enemies)enemies=clone(s.enemies);score=Number(s.score)||0;coinCount=Number(s.coinCount)||0;lives=s.lives??cfg().lives;camera=Number(s.camera)||0;worldTime=0;invuln=Number(s.invuln)||0;paused=true;over=false;keys={};updateHud();draw();return fixtureState();},
+  state:fixtureState,setKeys(next){keys={...next};return fixtureState();},update(dt=1){update(dt);draw();return fixtureState();},hit(){hit();return fixtureState();},finish(win,message){finish(!!win,message||"测试结束");return fixtureState();}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();pause();},newGame,pause,resume,setDifficulty(v){difficulty=v||"normal";},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);}});
 })();

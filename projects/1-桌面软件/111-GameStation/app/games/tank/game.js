@@ -131,5 +131,16 @@ function resume(){if(over)return;paused=false;last=performance.now();report("守
 function keydown(e){const k=e.key.toLowerCase();if(["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k))e.preventDefault();if(["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d"].includes(k))keys[k===" "?"fire":k]=true;if(k===" ")keys.fire=true;}
 function keyup(e){const k=e.key.toLowerCase();keys[k]=false;if(k===" ")keys.fire=false;}
 window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("pointerdown",()=>canvas.focus());
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const clone=o=>o?JSON.parse(JSON.stringify(o)):o;
+ const fixtureState=()=>({map:map.map(row=>row.slice()),player:clone(player),enemies:clone(enemies),bullets:clone(bullets),kills,lives,spawned,baseAlive,paused,over});
+ window.__p111TankTest={
+  loadState(s={}){cancelAnimationFrame(raf);makeMap();if(s.map)map=clone(s.map);player=s.player?{...s.player}:tank(7,12,false);enemies=(s.enemies||[]).map(e=>({...e}));bullets=(s.bullets||[]).map(b=>({...b}));kills=Number(s.kills)||0;lives=s.lives??3;spawned=s.spawned??enemies.length;spawnTimer=0;moveTimer=0;fireTimer=0;aiTimer=0;baseAlive=s.baseAlive!==false;keys={};over=false;paused=true;updateHud();draw();return fixtureState();},
+  state:fixtureState,move(dir){return{moved:move(player,dir),...fixtureState()};},fire(){fire(player);draw();return fixtureState();},
+  hitEnemy(index=0){const t=enemies[index];if(!t)return{result:false,...fixtureState()};const b={x:(t.x+.5)*T,y:(t.y+.5)*T,enemy:false,dead:false};const result=bulletHitTank(b,t);draw();return{result,...fixtureState()};},
+  bulletHitTank(b,t){const result=bulletHitTank(b,t);draw();return{result,...fixtureState()};},update(dt=.01){update(dt);draw();return fixtureState();}
+ };
+}
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";reset();pause();},newGame:reset,pause,resume,setDifficulty(v){difficulty=v||"normal";},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);}});
 })();

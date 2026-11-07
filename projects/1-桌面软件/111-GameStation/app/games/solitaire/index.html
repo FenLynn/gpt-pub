@@ -790,15 +790,16 @@ function clearSelection() {
         initGame();
         // Test-only deterministic fixture API for the actual inline Klondike page.
         if (new URLSearchParams(location.search).has("p111Test")) {
-            const cardData = c => ({ suit: c.suit, rank: c.rank, face: !!c.isFaceUp });
+            const cardData = c => ({ suit: c.suit, rank: c.value, face: !!c.isFaceUp });
             const snapshot = () => ({
                 stock: piles.stock.map(cardData), waste: piles.waste.map(cardData),
                 foundations: piles.foundations.map(p => p.map(cardData)),
-                columns: piles.tableau.map(p => p.map(cardData)),
-                selected: selectedCard ? cardData(selectedCard) : null, moves: moveCount, paused: gamePaused, drawCount
+                columns: piles.tableau.map(p => p.map(cardData)), tableau: piles.tableau.map(p => p.map(cardData)),
+                selected: selectedCard ? cardData(selectedCard) : null, moves: moveCount, paused: gamePaused, drawCount, won: winReported
             });
             const takeCard = c => {
-                const card = deck.find(d => d.suit === c.suit && d.rank === c.rank);
+                const rankName = typeof c.rank === "number" ? RANKS[c.rank - 1] : c.rank;
+                const card = deck.find(d => d.suit === c.suit && d.rank === rankName);
                 if (!card) throw new Error("Unknown Klondike fixture card: " + c.suit + c.rank);
                 card.isFaceUp = !!c.face; return card;
             };
@@ -807,10 +808,10 @@ function clearSelection() {
                 newGame() { initGame(); return snapshot(); },
                 loadState(s) {
                     stopTimer(); gamePaused = false; winReported = false; isGameStarted = false; elapsedSeconds = 0;
-                    moveCount = Number(s.moves) || 0; undoStack = []; selectedCard = null; draggedCards = []; dragSourcePile = null;
+                    moveCount = Number(s.moves) || 0; drawCount = s.drawCount === 3 ? 3 : 1; undoStack = []; selectedCard = null; draggedCards = []; dragSourcePile = null;
                     deck.forEach(c => { c.isFaceUp = false; });
                     const foundations = (s.foundations || [[], [], [], []]).map(p => p.map(takeCard));
-                    const tableau = (s.columns || Array.from({ length: 7 }, () => [])).map(p => p.map(takeCard));
+                    const tableau = (s.tableau || s.columns || Array.from({ length: 7 }, () => [])).map(p => p.map(takeCard));
                     if (foundations.length !== 4 || tableau.length !== 7) throw new Error("Klondike requires four foundations and seven tableau columns");
                     piles = { stock: (s.stock || []).map(takeCard), waste: (s.waste || []).map(takeCard), foundations, tableau };
                     calculateLayout(); renderAll(); updateSideMetrics(); updateTimerUI(); reportStatus("测试局面"); return snapshot();
@@ -822,7 +823,16 @@ function clearSelection() {
                     const moving = getDraggableCards(selectedCard), info = getPileKeyAndArray(selectedCard), targetId = `tableau-${target}`;
                     if (!moving || !info || !isValidTarget(moving, targetId)) { clearSelection(); return snapshot(); }
                     moveCards(moving, info.arr, getPileArray(targetId)); clearSelection(); return snapshot();
-                }
+                },
+                move(sourceId, targetId, index = 0) {
+                    const source = getPileArray(sourceId), target = getPileArray(targetId);
+                    if (!source || !target) throw new Error("Unknown Klondike pile");
+                    const moving = source.slice(index);
+                    if (!moving.length || !isValidTarget(moving, targetId)) return { moved: false, ...snapshot() };
+                    moveCards(moving, source, target); return { moved: true, ...snapshot() };
+                },
+                undo() { undoMove(); return snapshot(); },
+                checkWin() { checkWin(); return snapshot(); }
             };
         }
         GameBridge.register({
