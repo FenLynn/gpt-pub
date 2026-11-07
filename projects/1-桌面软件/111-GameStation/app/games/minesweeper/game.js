@@ -176,7 +176,11 @@ if(new URLSearchParams(location.search).has("p111Test")){
   reveal(index){reveal(index);return fixtureState();},
   toggleFlag(index){toggleFlag(index);return fixtureState();},
   chord(index){chord(index);return fixtureState();},
-  stopTimer
+  stopTimer,
+  forceFlag(index){if(cells[index]){cells[index].flag=true;render();}return fixtureState();},
+  forceMine(index){cells.forEach(cell=>{cell.open=false;cell.mine=false;});if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}return fixtureState();},
+  forceNumber(index,n){if(cells[index]){cells[index].open=true;cells[index].flag=false;cells[index].mine=false;cells[index].n=n;render();}return fixtureState();},
+  cellSize(){return Number(boardEl.dataset.cellSize)||0;}
  };
 }
 GameBridge.register({
