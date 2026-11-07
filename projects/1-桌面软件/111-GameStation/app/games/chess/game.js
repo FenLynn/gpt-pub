@@ -131,7 +131,7 @@ function makeMove(m,quiet){
  lastMove={fx:m.fx,fy:m.fy,tx:m.tx,ty:m.ty};
  const notation=(moving.t==="P"?"":moving.t)+squareName(m.fx,m.fy)+(captured?"×":"–")+squareName(m.tx,m.ty)+(m.promotion?"="+m.promotion:"")+(m.castle?(m.castle==="Q"?" O-O-O":" O-O"):"");
  if(turn==="w")moveLog.push(moveNo+". "+notation);else{const idx=moveLog.length-1;if(idx>=0)moveLog[idx]+="   "+notation;moveNo++;}
- turn=opposite(turn);positions.push(positionKey());selected=null;legal=[];render();animateChessMove(m);
+ turn=opposite(turn);window.GameTurnClock?.record(moving.c==="w"?"白方":"黑方",turn==="w"?"白方":"黑方",notation);positions.push(positionKey());selected=null;legal=[];render();animateChessMove(m);
  if(!quiet&&!checkEnd()){
   reportTurn();
   if(mode==="ai"&&turn==="b")scheduleAI();
@@ -204,12 +204,12 @@ function clickSquare(x,y){
 }
 function undo(){
  if(!history.length||paused)return;clearTimeout(aiTimer);
- let n=mode==="ai"&&turn==="w"?2:1;
- while(n--&&history.length)restore(history.pop());
+ let n=mode==="ai"&&turn==="w"?2:1,removed=Math.min(n,history.length);
+ while(n--&&history.length)restore(history.pop());window.GameTurnClock?.rewind(removed,turn==="w"?"白方":"黑方");
  over=false;render();reportTurn();
 }
 function newGame(){
- clearTimeout(aiTimer);board=initialBoard();turn="w";castle={wK:true,wQ:true,bK:true,bQ:true};ep=null;moveNo=1;history=[];moveLog=[];lastMove=null;captured={w:[],b:[]};halfMoves=0;positions=[positionKey()];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];over=false;paused=false;render();reportTurn();
+ clearTimeout(aiTimer);board=initialBoard();turn="w";castle={wK:true,wQ:true,bK:true,bQ:true};ep=null;moveNo=1;history=[];moveLog=[];lastMove=null;captured={w:[],b:[]};halfMoves=0;positions=[positionKey()];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];over=false;paused=false;window.GameTurnClock?.reset("白方");render();reportTurn();
 }
 function pause(){paused=true;clearTimeout(aiTimer);statusEl.textContent="已暂停";GameBridge.report("已暂停",{});}
 function resume(){if(over)return;paused=false;reportTurn();if(mode==="ai"&&turn==="b")scheduleAI();}
@@ -253,7 +253,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
    captured={w:[],b:[]};history=[];moveLog=[];lastMove=null;selected=null;legal=[];
    promotionChoices=null;document.getElementById("promotionChooser")?.remove();
    paused=false;over=false;clearTimeout(aiTimer);
-   positions=[positionKey()];render();reportTurn();
+   positions=[positionKey()];window.GameTurnClock?.reset(turn==="w"?"白方":"黑方");render();reportTurn();
   },
   checkEnd(){return checkEnd();},
   state(){return{turn,halfMoves,repetitions:repetitions(),over,paused,castle:{...castle},ep:ep?{...ep}:null,

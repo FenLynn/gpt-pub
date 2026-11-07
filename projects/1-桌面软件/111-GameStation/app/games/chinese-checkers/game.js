@@ -71,7 +71,7 @@ function won(side){return own(side).length===10&&own(side).every(k=>nodes.get(k)
 function apply(move){
  if(!move||pieces.get(move.from)!==turn||!options(move.from).has(move.to)||paused||over)return false;
  history.push({pieces:new Map(pieces),turn});
- pieces.delete(move.from);pieces.set(move.to,turn);selected=null;targets.clear();draw(move);
+ pieces.delete(move.from);pieces.set(move.to,turn);window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"蓝方":"红方","走棋");selected=null;targets.clear();draw(move);
  if(won(turn)){over=true;paused=true;clearTimeout(aiTimer);const name=turn===0?"红方":"蓝方";report(name+"获胜");GameBridge.send("GAME_OVER",{message:name+"获胜",score:10,win:turn===0});return true;}
  turn=1-turn;report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
 }
@@ -89,12 +89,12 @@ function undo(){
  if(paused||!history.length)return;clearTimeout(aiTimer);
  const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
  for(let i=0;i<steps;i++){const prev=history.pop();pieces=new Map(prev.pieces);turn=prev.turn;}
- selected=null;targets.clear();over=false;draw();report("已悔棋");scheduleAI();
+ selected=null;targets.clear();over=false;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
 }
 function newGame(){
  clearTimeout(aiTimer);pieces=new Map();
  for(const seat of [0,1])for(const k of arms[seat===0?0:3])pieces.set(k,seat);
- history=[];turn=0;selected=null;targets.clear();paused=false;over=false;draw();report("红方先行");
+ history=[];turn=0;selected=null;targets.clear();paused=false;over=false;window.GameTurnClock?.reset("红方");draw();report("红方先行");
 }
 document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){

@@ -2,7 +2,7 @@
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot"),boardArea=document.querySelector(".game-main-board");
 let boardObserver=null;
-function fitBoard(){const widthLimit=Math.max(0,boardArea.clientWidth),heightLimit=Math.max(0,boardArea.clientHeight),margin=Math.min(44,Math.max(24,Math.round(Math.min(widthLimit,heightLimit)*.05)));const innerW=Math.max(0,widthLimit-2*margin),innerH=Math.max(0,heightLimit-2*margin);const height=Math.min(innerH,innerW/(8/9));const width=height*(8/9);if(width>0&&height>0){el.style.width=width+"px";el.style.height=height+"px";}}
+function fitBoard(){const widthLimit=Math.max(0,boardArea.clientWidth),heightLimit=Math.max(0,boardArea.clientHeight),margin=Math.min(44,Math.max(24,Math.round(Math.min(widthLimit,heightLimit)*.05)));const innerW=Math.max(0,widthLimit-2*margin),innerH=Math.max(0,heightLimit-2*margin);const height=Math.min(innerH,innerW/(8/9));const width=height*(8/9);if(width>0&&height>0){el.style.width=width+"px";el.style.height=height+"px";}const rail=document.querySelector(".xiangqi-record-rail"),actual=el.getBoundingClientRect().height;if(rail&&actual>0)rail.style.setProperty("--xiangqi-record-height",actual+"px");}
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],positionTrail=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
 const values={"帅":15000,"将":15000,"车":1000,"马":460,"炮":475,"仕":200,"士":200,"相":210,"象":210,"兵":105,"卒":105};
@@ -260,6 +260,17 @@ function drawBoardLines(){
  svg.dataset.flip=String(flip);
  el.appendChild(svg);
 }
+const moveList=document.getElementById("moveList"),scrollCue=document.getElementById("xiangqiScrollCue"),scrollThumb=document.getElementById("xiangqiScrollThumb");
+function syncMoveScrollbar(){
+ const max=Math.max(0,moveList.scrollHeight-moveList.clientHeight);
+ scrollCue.hidden=max<=1;
+ if(scrollCue.hidden)return;
+ const track=Math.max(1,scrollCue.clientHeight),thumbHeight=Math.max(20,track*moveList.clientHeight/moveList.scrollHeight);
+ scrollThumb.style.height=Math.min(track,thumbHeight)+"px";
+ scrollThumb.style.transform="translateY("+((track-Math.min(track,thumbHeight))*moveList.scrollTop/max)+"px)";
+}
+moveList.addEventListener("scroll",syncMoveScrollbar,{passive:true});
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(syncMoveScrollbar).observe(moveList);
 function renderMoveList(){
  const list=document.getElementById("moveList");
  list.replaceChildren();
@@ -277,7 +288,7 @@ function renderMoveList(){
   list.appendChild(row);
  }
  document.getElementById("moveCount").textContent=history.length+" 步";
- list.scrollTop=list.scrollHeight;
+ list.scrollTop=list.scrollHeight;syncMoveScrollbar();
 }
 function render(animatedMove=null){
  renderMoveList();
@@ -331,7 +342,7 @@ function scheduleAI(){
   if(paused||over||turn!=="black")return;
   const m=chooseAI();if(!m){endIfNeeded();return;}
   history.push({board:clone(board),turn,move:{...m},notation:moveNotation(board,m,turn)});
-  const mover=turn;apply(board,m);turn="red";recordPosition(mover);
+  const mover=turn;apply(board,m);turn="red";window.GameTurnClock?.record("黑方","红方",history[history.length-1].notation);recordPosition(mover);
   selected=null;selectedMoves=[];render(m);
   if(!endIfNeeded())report(nextTurnStatus());
  },difficulty==="easy"?120:230);
@@ -344,7 +355,7 @@ function clickCell(x,y){
   if(m){
    history.push({board:clone(board),turn,move:{...m},notation:moveNotation(board,m,turn)});
    const mover=turn;apply(board,m);selected=null;selectedMoves=[];
-   turn=opposite(turn);recordPosition(mover);render(m);
+   turn=opposite(turn);window.GameTurnClock?.record(mover==="red"?"红方":"黑方",turn==="red"?"红方":"黑方",history[history.length-1].notation);recordPosition(mover);render(m);
    if(!endIfNeeded()){
     report(nextTurnStatus()+(mode==="ai"&&turn==="black"?" · AI 思考中":""));
     if(mode==="ai"&&turn==="black")scheduleAI();
@@ -360,18 +371,18 @@ function clickCell(x,y){
 function undo(){
  if(!history.length||paused||over)return;
  clearTimeout(aiTimer);
- let count=mode==="ai"?(turn==="red"?2:1):1;
+ let count=mode==="ai"?(turn==="red"?2:1):1,removed=Math.min(count,history.length);
  while(count--&&history.length){
   const h=history.pop();board=h.board;turn=h.turn;positionTrail.pop();
  }
- selected=null;selectedMoves=[];over=false;clearResult();
+ selected=null;selectedMoves=[];over=false;clearResult();window.GameTurnClock?.rewind(removed,turn==="red"?"红方":"黑方");
  render();report("已悔棋 · "+nextTurnStatus());
 }
 function newGame(){
  clearTimeout(aiTimer);
  board=initial();turn="red";selected=null;selectedMoves=[];
  history=[];positionTrail=[{key:keyPosition(board,turn),lastMover:null,gaveCheck:false}];
- over=false;paused=false;lastAIStats={depth:0,nodes:0,elapsed:0};
+ over=false;paused=false;lastAIStats={depth:0,nodes:0,elapsed:0};window.GameTurnClock?.reset("红方");
  clearResult();render();report("红方先行");
 }
 document.getElementById("resignButton").addEventListener("click",()=>{
@@ -397,7 +408,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
    if(!findGeneral(next,"red")||!findGeneral(next,"black"))throw Error("Missing generals");
    board=next;turn=side;mode="two";paused=false;over=false;history=[];selected=null;selectedMoves=[];
    positionTrail=[{key:keyPosition(board,turn),lastMover:null,gaveCheck:false}];clearTimeout(aiTimer);
-   clearResult();render();report(nextTurnStatus());
+   window.GameTurnClock?.reset(turn==="red"?"红方":"黑方");clearResult();render();report(nextTurnStatus());
   },
   legal(side=turn){return liveMoves(side);},
   pseudo(side=turn){return legalMoves(board,side);},

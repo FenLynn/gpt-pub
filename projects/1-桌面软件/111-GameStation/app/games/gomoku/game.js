@@ -167,7 +167,7 @@ function finish(p,line=[]){
 }
 function place(x,y,p){
  if(board[y][x]||over)return false;
- board[y][x]=p;history.push({x,y,p});
+ board[y][x]=p;history.push({x,y,p});window.GameTurnClock?.record(p===1?"黑棋":"白棋",p===1?"白棋":"黑棋","落子");
  if(winAt(x,y,p)){finish(p,winningSequence(x,y,p));return true;}
  if(history.length===N*N){finish(0);return true;}
  render();return true;
@@ -176,13 +176,13 @@ function scheduleAI(){clearTimeout(aiTimer);if(paused||over||mode!=="ai"||turn!=
 function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const playing=turn;if(!place(x,y,playing))return;if(over)return;turn=-playing;if(mode==="ai"){setStatus("AI 思考中");scheduleAI();}else setStatus(turn===1?"轮到黑棋":"轮到白棋");}
 function newGame(){
  clearTimeout(aiTimer);hideResult();for(let y=0;y<N;y++)board[y].fill(0);
- history=[];winLine=[];turn=1;over=false;paused=false;render();setStatus(mode==="ai"?"你执黑棋，请落子":"黑棋先行");
+ history=[];winLine=[];turn=1;over=false;paused=false;window.GameTurnClock?.reset("黑棋");render();setStatus(mode==="ai"?"你执黑棋，请落子":"黑棋先行");
 }
 function undo(){
  if(!history.length||paused||over)return;clearTimeout(aiTimer);
  const count=mode==="ai"?Math.min(turn===-1?1:2,history.length):1;let lastSide=1;
  for(let i=0;i<count;i++){const m=history.pop();board[m.y][m.x]=0;lastSide=m.p;}
- turn=mode==="ai"?1:lastSide;winLine=[];hideResult();render();setStatus("已悔棋 · "+(turn===1?"轮到黑棋":"轮到白棋"));
+ turn=mode==="ai"?1:lastSide;window.GameTurnClock?.rewind(count,turn===1?"黑棋":"白棋");winLine=[];hideResult();render();setStatus("已悔棋 · "+(turn===1?"轮到黑棋":"轮到白棋"));
 }
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111GomokuTest={

@@ -113,7 +113,7 @@ function draw(){
  renderDice();
 }
 function newTurn(dice){
- roll=null;turn=dice===6?turn:1-turn;
+ roll=null;turn=dice===6?turn:1-turn;window.GameTurnClock?.handover(turn===0?"红方":"蓝方");
  report((turn===0?"红方":"蓝方")+(dice===6?" · 再掷一次":" · 请掷骰子"));
  draw();scheduleAI();
 }
@@ -121,7 +121,7 @@ function throwDice(value=null){
  if(paused||over||roll!==null)return false;
  roll=value==null?1+Math.floor(Math.random()*6):value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
- draw();animateDice();
+ window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","掷骰 "+roll);draw();animateDice();
  if(!moves().length){const d=roll;report("掷出 "+roll+" · 没有可移动飞机");newTurn(d);return true;}
  report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" · 点击高亮飞机");return true;
 }
@@ -131,7 +131,7 @@ function play(index){
  history.push({pawns:pawns.map(row=>row.slice()),turn,roll});
  pawns[turn][index]=m.to;
  for(const enemy of opponentsAt(turn,m.to))pawns[1-turn][enemy]=-1;
- const die=roll;draw();
+ const die=roll;window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","飞机移动");draw();
  if(pawns[turn].every(p=>p===57)){
   over=true;paused=true;clearTimeout(aiTimer);const msg=turn===0?"红方获胜":"蓝方获胜";
   report(msg);GameBridge.send("GAME_OVER",{message:msg,win:turn===0,score:pawns[0].filter(p=>p===57).length});draw();return true;
@@ -155,10 +155,10 @@ function undo(){
  if(paused||!history.length)return;
  clearTimeout(aiTimer);const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
  for(let i=0;i<steps;i++){const h=history.pop();pawns=h.pawns.map(row=>row.slice());turn=h.turn;roll=h.roll;}
- over=false;draw();report("已悔棋");scheduleAI();
+ over=false;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
 }
 function newGame(){
- clearTimeout(aiTimer);pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;history=[];over=false;paused=false;draw();report("红方先行 · 掷出六点起飞");
+ clearTimeout(aiTimer);pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
 }
 function pauseGame(){paused=true;clearTimeout(aiTimer);report("已暂停");draw();}
 function resumeGame(){paused=false;report("继续游戏");draw();scheduleAI();}
@@ -170,7 +170,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
   track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},pause:pauseGame,resume:resumeGame,undo,
-  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;paused=false;over=false;history=[];draw();}
+  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
  };
 }
 GameBridge.register({

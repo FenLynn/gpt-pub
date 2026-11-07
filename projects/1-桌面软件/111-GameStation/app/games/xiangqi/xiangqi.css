@@ -10,7 +10,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  display:grid!important;
  /* Keep the three columns as one centered group. A 1fr center track left wide,
     empty gutters between the height-constrained board and both side rails. */
- --xiangqi-notation-width:clamp(128px,12vw,170px);
+ --xiangqi-notation-width:clamp(256px,24vw,340px);
  --xiangqi-actions-width:clamp(128px,11.3vw,160px);
  --xiangqi-board-track:min(calc((100dvh - 42px) * 8 / 9 + 16px),
    calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 40px));
@@ -37,33 +37,44 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 }
 .game-root.xiangqi-layout>.xiangqi-record-rail{
  grid-column:1!important;grid-row:1!important;min-width:0!important;min-height:0!important;
- display:flex!important;flex-direction:column;align-self:stretch;
+ display:flex!important;flex-direction:column;align-self:center!important;
+ height:var(--xiangqi-record-height,100%)!important;max-height:100%!important;
  background:#fcfdfed9;border:1px solid #d5e4ed;border-radius:13px;
  box-shadow:0 4px 15px #3457710b;overflow:hidden
 }
 .xiangqi-record-heading{display:flex;align-items:center;justify-content:space-between;gap:4px;
  min-height:48px;padding:0 12px;border-bottom:1px solid #e0e9ef;color:#385c73;font-size:14px}
-.xiangqi-record-heading strong{font-weight:770}
+.xiangqi-record-heading strong{font-weight:770;font-size:16px}
 .xiangqi-record-heading span{color:#849cab;font-size:11px;font-variant-numeric:tabular-nums}
 .xiangqi-record-head,.xiangqi-layout #moveList li{
- display:grid;grid-template-columns:24px minmax(0,1fr) minmax(0,1fr);gap:3px;align-items:center
+ display:grid;grid-template-columns:38px minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:center
 }
-.xiangqi-record-head{flex:none;padding:9px 7px 7px;color:#8194a2;font-size:10px;text-align:center;border-bottom:1px solid #e7eef3}
+.xiangqi-record-head{flex:none;padding:11px 18px 9px;color:#8194a2;font-size:12px;text-align:center;border-bottom:1px solid #e7eef3}
+.xiangqi-record-scroll{position:relative;flex:1;min-height:0;min-width:0;overflow:hidden}
 .xiangqi-layout #moveList{
- display:block!important;flex:1!important;min-height:0!important;max-height:none!important;
- margin:0!important;padding:5px 4px!important;list-style:none!important;
- overflow-x:hidden!important;overflow-y:auto!important;scrollbar-width:thin;scrollbar-color:#c7d8e2 transparent
+ display:block!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;
+ margin:0!important;padding:7px 18px!important;list-style:none!important;
+ overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior:contain!important;
+ scrollbar-width:none!important;
 }
+.xiangqi-layout #moveList::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+.xiangqi-layout #moveList li > *{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.xiangqi-scroll-indicator{position:absolute;top:5px;right:3px;bottom:5px;width:4px;border-radius:3px;
+ background:#aac7d320;opacity:0;pointer-events:none;transition:opacity .17s ease}
+.xiangqi-scroll-indicator[hidden]{display:none!important}
+.xiangqi-scroll-thumb{position:absolute;left:0;right:0;top:0;border-radius:3px;background:#83a6bc}
+.xiangqi-record-rail:hover .xiangqi-scroll-indicator,
+.xiangqi-record-rail:focus-within .xiangqi-scroll-indicator{opacity:1}
 .xiangqi-layout #moveList:empty:after{content:"暂无走棋记录";display:grid;place-items:center;
  height:90px;background:transparent;color:#9badb8;font-size:12px}
 .xiangqi-layout #moveList li{
- min-height:37px!important;margin:0!important;padding:5px 3px!important;border-radius:7px;
- font-size:clamp(10px,.92vw,12px)!important;color:#4f687b;text-align:center;
+ min-height:47px!important;margin:0!important;padding:9px 12px!important;border-radius:8px;
+ font-size:clamp(13px,1.08vw,16px)!important;color:#4f687b;text-align:center;
  white-space:nowrap;font-variant-numeric:tabular-nums
 }
 .xiangqi-layout #moveList li:nth-child(2n){background:#f1f6f9}
 .xiangqi-layout #moveList li:last-child{background:#e8f3fa}
-.xiangqi-move-index{color:#9aadb9;font-size:10px}
+.xiangqi-move-index{color:#9aadb9;font-size:12px}
 .xiangqi-move-side{display:block;min-width:0;font-weight:740}
 .xiangqi-move-side.red{color:#b74236}
 .xiangqi-move-side.black{color:#344b59}
@@ -181,7 +192,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 @media(max-width:900px){
  .game-root.game-layout.xiangqi-layout,.game-root.game-layout.xiangqi-layout.gs-tools-open,
  .game-root.game-layout.xiangqi-layout.rail-collapsed{
- --xiangqi-notation-width:120px;--xiangqi-actions-width:118px;
+ --xiangqi-notation-width:240px;--xiangqi-actions-width:118px;
  --xiangqi-board-track:min(calc((100dvh - 30px) * 8 / 9 + 14px),
    calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 26px));
  grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-actions-width)!important;

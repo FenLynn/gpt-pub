@@ -64,6 +64,16 @@ const names=[
   assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
   assert.ok(v.main.height>=v.root.height*.96,name+" game stage should use full iframe height: "+JSON.stringify(v));
+  if(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋"].includes(name)){
+   const timing=await frame.locator("#gs-turn-clock").evaluate(el=>{
+    const r=el.getBoundingClientRect();
+    return{visible:getComputedStyle(el).display!=="none",width:r.width,
+     count:Number(el.ownerDocument.querySelector("#game").dataset.turnClockCount),
+     side:el.querySelector("#gs-turn-side").textContent};
+   });
+   assert.ok(timing.visible&&timing.width>=110,"Board game must display its per-turn clock on the right: "+name+" "+JSON.stringify(timing));
+   assert.equal(timing.count,0,"New board game must start with no recorded moves: "+name);
+  }
   if(name==="五子棋"){
    const geometry=await frame.locator(".gomoku-board").evaluate(el=>{
     const r=el.getBoundingClientRect(),cells=[...el.querySelectorAll(".gomoku-cell")].map(n=>{const q=n.getBoundingClientRect();return{w:q.width,h:q.height};});
@@ -136,7 +146,7 @@ const names=[
      const r=s=>{const q=el.querySelector(s).getBoundingClientRect();return{left:q.left,right:q.right,top:q.top,bottom:q.bottom,width:q.width,height:q.height};};
      const piece=el.querySelector(".xiangqi-piece");
      return{left:r(".xiangqi-record-rail"),main:r(".game-main-board"),right:r(".game-tools"),
-      board:r(".xiangqi-board"),
+      board:r(".xiangqi-board"),scrollBox:r(".xiangqi-record-scroll"),
       glyphFont:parseFloat(getComputedStyle(piece).fontSize),pieceWidth:piece.getBoundingClientRect().width,
       styles:[...document.querySelectorAll("head link[rel=stylesheet]")].map(x=>x.getAttribute("href")),
       background:getComputedStyle(el.querySelector(".xiangqi-board")).backgroundImage};
@@ -145,6 +155,9 @@ const names=[
      "Xiangqi must position notation left and actions right, without overlap: "+JSON.stringify(geometry));
     assert.ok(geometry.main.width>=(geometry.right.right-geometry.left.left)*.50,
      "Xiangqi board track must dominate its compact three-column group: "+JSON.stringify(geometry));
+    assert.ok(geometry.left.width>=280,"Xiangqi notation column should be roughly doubled in width: "+JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.left.height-geometry.board.height)<=1.5,
+     "Xiangqi record rail must precisely match the board height: "+JSON.stringify(geometry));
     const leftGap=geometry.board.left-geometry.left.right,rightGap=geometry.right.left-geometry.board.right;
     assert.ok(leftGap>=4&&leftGap<=28&&rightGap>=4&&rightGap<=28,
      "Xiangqi notation and buttons must stay close to the actual board: "+JSON.stringify({leftGap,rightGap,geometry}));
@@ -152,6 +165,20 @@ const names=[
      "Xiangqi glyphs must be large and proportional to their circular pieces: "+JSON.stringify(geometry));
     assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.includes("./xiangqi.css"),
      "Xiangqi dedicated stylesheet must be loaded in HEAD, preventing a legacy layout flash");
+    const scroll=await frame.locator("#moveList").evaluate(list=>{
+     const beforeWidth=list.getBoundingClientRect().width;
+     const dummy=document.createElement("li");dummy.textContent="测试棋谱滚动定位";
+     const clones=Array.from({length:50},()=>dummy.cloneNode(true));
+     clones.forEach(el=>list.appendChild(el));
+     const overflowing=list.scrollHeight>list.clientHeight;
+     list.scrollTop=list.scrollHeight;list.scrollLeft=999;
+     const afterWidth=list.getBoundingClientRect().width;
+     const hiddenScrollbar=getComputedStyle(list).scrollbarWidth==="none";
+     clones.forEach(el=>el.remove());
+     return{overflowing,beforeWidth,afterWidth,scrollLeft:list.scrollLeft,hiddenScrollbar};
+    });
+    assert.ok(scroll.overflowing&&scroll.hiddenScrollbar&&Math.abs(scroll.beforeWidth-scroll.afterWidth)<.1&&scroll.scrollLeft===0,
+     "Xiangqi notation scrollbar must overlay without horizontal shifting: "+JSON.stringify(scroll));
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
      "Xiangqi wood board must not contain horizontal stripe gradients");
    }else assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
@@ -708,6 +735,14 @@ const names=[
   await frame.locator("#gomokuLeave").click();
   await page.locator("#libraryView").waitFor({state:"visible"});
   await open("中国象棋");await start();
+  await frame.locator('.xiangqi-cell[data-x="0"][data-y="6"]').click();
+  await frame.locator('.xiangqi-cell[data-x="0"][data-y="5"]').click();
+  const realXiangqiClock=await frame.locator("#game").evaluate(el=>({
+   count:Number(el.dataset.turnClockCount),side:el.dataset.turnClockSide,
+   last:window.GameTurnClock?.snapshot().records[0]?.label
+  }));
+  assert.ok(realXiangqiClock.count>=1&&realXiangqiClock.last?.includes("兵"),
+   "A real Xiangqi pawn move must record its notation and elapsed time: "+JSON.stringify(realXiangqiClock));
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
   });
@@ -730,6 +765,9 @@ const names=[
    await frame.locator("#xiangqiResult").waitFor({state:"hidden",timeout:4000});
    assert.equal(await frame.locator(".xiangqi-piece").count(),32,
     "Replay must create all 32 starting Xiangqi pieces");
+    const resetClock=await frame.locator("#game").evaluate(el=>({count:Number(el.dataset.turnClockCount),side:el.dataset.turnClockSide}));
+    assert.equal(resetClock.count,0,"Replaying Xiangqi must clear recorded operation times");
+    assert.equal(resetClock.side,"红方","Xiangqi timer must begin with red side");
    assert.equal(await frame.locator("#moveCount").innerText(),"0 步",
     "Replay must reset notation");
     await page.locator("#startButton").click();
