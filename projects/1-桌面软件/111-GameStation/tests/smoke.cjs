@@ -109,23 +109,32 @@ const names=[
   }
   if(v.toolsVisible){
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
-   assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
+   if(name==="五子棋"){
+    assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
+    assert.ok(v.main.width>=v.root.width*.46,"Gomoku board must retain enough playfield width: "+JSON.stringify(v));
+   }else assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
   }
   const header=await page.evaluate(()=>{
    const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,centerX:a.x+a.width/2,centerY:a.y+a.height/2};};
    const bar=document.querySelector("#topbar"),timer=document.querySelector("#hostGameTimer"),notice=document.querySelector("#gameNotice");
-   return{bar:r(bar),timer:r(timer),notice:r(notice),noticeParent:notice.parentElement.id,
+   return{bar:r(bar),timer:r(timer),notice:r(notice),crumb:r(bar.querySelector(".breadcrumbs")),mode:r(bar.querySelector("#gameControls")),actionArea:r(bar.querySelector(".topbar-actions")),
+    noticeParent:notice.parentElement.id,
     noticePosition:getComputedStyle(notice).position,noticeDisplay:getComputedStyle(notice).display,
     actions:[...bar.querySelectorAll("#startButton,#pauseButton,#newGameButton")].map(r),
     iconCount:bar.querySelectorAll("#startButton svg,#pauseButton svg,#newGameButton svg").length,
     visible:getComputedStyle(bar.querySelector("#gameActions")).display!=="none"};
   });
   assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
-  assert.ok(header.timer.right<header.notice.x,name+" session timer must stay in the left side of the top title bar: "+JSON.stringify(header));
+  assert.ok(header.crumb.right<=header.notice.x+2,name+" LED notice must sit after the game breadcrumb");
+  assert.ok(header.notice.right<=header.timer.x+2,name+" timer must sit to the right of the LED display");
+  if(header.mode.width>0){
+   assert.ok(header.timer.right<=header.mode.x+2,name+" mode switches must sit after the timer");
+   assert.ok(header.mode.right<=header.actionArea.x+2,name+" game buttons must follow the mode and difficulty switches");
+  }else assert.ok(header.timer.right<=header.actionArea.x+2,name+" action buttons must sit after the timer");
   assert.equal(header.noticeParent,"topbar",name+" live status must occupy the center of the titlebar");
   assert.equal(header.noticePosition,"static",name+" titlebar notification must participate in the topbar grid");
   assert.notEqual(header.noticeDisplay,"none",name+" center notification region must remain present");
-  assert.ok(Math.abs(header.notice.centerX-header.bar.centerX)<=Math.max(12,header.bar.width*.025),name+" notification region must be horizontally centered: "+JSON.stringify(header));
+  assert.ok(header.notice.width>=110&&header.notice.width<=135,name+" fixed LED must occupy about two board-cell widths");
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
   const crumb=await page.evaluate(()=>({name:document.querySelector("#breadcrumbCategory").textContent.trim(),
    gameSeparator:!document.querySelector("#crumbGameSep").classList.contains("hidden"),
@@ -133,7 +142,7 @@ const names=[
   assert.equal(crumb.name,name,name+" titlebar breadcrumb must identify the active game");
   assert.equal(crumb.gameSeparator,false,name+" titlebar must not show an empty second breadcrumb separator");
   assert.equal(crumb.gameName,false,name+" active game name must not be squeezed out by duplicate breadcrumb text");
-  assert.ok(header.notice.width>=65,name+" central notification space should be readable");
+  assert.equal(await page.locator("#railToggleButton").count(),0,name+" obsolete fold button must be removed");
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
@@ -178,15 +187,22 @@ const names=[
   assert.deepEqual(await page.locator(".hero-metric-label").allInnerTexts(),["首次开始游戏","已使用天数","累计时间","今日时间","最近游戏"],"Recent game metric must occupy the rightmost column");
   const clockSizes=await page.evaluate(()=>({date:parseFloat(getComputedStyle(document.querySelector("#homeDate")).fontSize),time:parseFloat(getComputedStyle(document.querySelector("#homeTime")).fontSize)}));
   assert.ok(Math.abs(clockSizes.date-clockSizes.time)<=1,"Home clock must be as prominent as the date: "+JSON.stringify(clockSizes));
-  assert.equal(await page.locator("#homeRecentList .recent-game").count(),12,"Recent strip must show up to 12 played games");
+  assert.equal(await page.locator("#homeRecentList .recent-game").count(),6,"Recent tab must show six recent games");
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
     icon:n.querySelector(".game-icon-glyph")?.textContent.trim(),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
-  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋","西洋跳棋（8×8）","国际象棋","五子棋"],"Recent games must be sorted newest-to-oldest");
-  assert.ok(recent.every((x,i)=>i%6===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
+  assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋"],"Recent games must be sorted newest-to-oldest");
+  assert.ok(recent.every((x,i)=>i%2===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.id==="tank"?(x.hasTankSvg&&!x.icon):(!!x.icon&&!x.hasTankSvg)),"Only 90 Tank must use a sourced tank vector; other games keep their familiar glyphs");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
-  assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent game labels must remain fully visible inside the strip: "+JSON.stringify(recentFit));
+  assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent tab labels must remain fully visible inside the list: "+JSON.stringify(recentFit));
+  assert.equal(await page.locator(".recent-tab").count(),2,"Recent games must offer recent/popular tabs");
+  assert.equal(await page.locator("#homeGamePoster").count(),1,"Right-hand rotating game poster must exist");
+  const posterBefore=await page.locator("#homeGamePoster").getAttribute("data-poster-index");
+  await page.waitForFunction(old=>document.querySelector("#homeGamePoster")?.dataset.posterIndex!==old,posterBefore,{timeout:8500});
+  await page.locator('[data-recent-tab="popular"]').click();
+  assert.equal(await page.locator('[data-recent-tab="popular"]').getAttribute("aria-selected"),"true");
+  await page.locator('[data-recent-tab="recent"]').click();
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section,.hero-description,#recentSubtitle").count(),0,"No banner/recent annotation, decorative kicker or duplicate game library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
   assert.equal(await page.locator(".ranking-trophy").innerText(),"🏆","Leaderboard must show a trophy mark");
@@ -220,7 +236,7 @@ const names=[
    assert.ok(box.recent.height>box.heat.height,"Recently played games must get more height than the compact heatmap: "+JSON.stringify(box));
    assert.ok(box.hero.height<=126,"Banner must be shorter than the previous 156px: "+JSON.stringify(box));
    assert.ok(box.recent.bottom>=box.main.bottom-4,"Recent strip must sit at the bottom of the main column: "+JSON.stringify(box));
-   assert.equal(box.listDisplay,"grid","Recent games must be an unboxed 1–2-row icon grid");
+   assert.equal(box.listDisplay,"grid","Recent games must be selectable tabs on the left");
    const visual=await page.evaluate(()=>{
     const grid=document.querySelector("#heatmapGrid"),content=grid.parentElement,layout=grid.closest(".heatmap-layout");
     const cell=grid.querySelector(".heatmap-cell:not(.empty)"),r=cell.getBoundingClientRect(),g=grid.getBoundingClientRect(),c=content.getBoundingClientRect();
@@ -252,11 +268,15 @@ const names=[
    assert.ok(Math.abs((visual.dot.gridLeft+visual.dot.gridWidth/2)-(visual.dot.contentLeft+visual.dot.contentWidth/2))<2,"The small dot matrix must be centered inside the full-width activity panel: "+JSON.stringify(visual));
    assert.equal(visual.metric.border,"0px/0px/0px/0px","Banner metrics must not be individual bordered cards: "+JSON.stringify(visual));
    assert.equal(visual.metric.background,"rgba(0, 0, 0, 0)","Banner metrics must not have individual tile backgrounds: "+JSON.stringify(visual));
-   assert.equal(visual.recent.border,"0px/0px/0px/0px","Recent games must not be miniature bordered cards: "+JSON.stringify(visual));
-   assert.equal(visual.recent.background,"rgba(0, 0, 0, 0)","Recent games must be an unboxed icon strip: "+JSON.stringify(visual));
+   assert.ok(visual.recent.border==="1px/1px/1px/1px"||visual.recent.border==="0px/0px/0px/0px","Recent game tabs must use only subtle borders: "+JSON.stringify(visual));
+   assert.ok(visual.recent.background,"Recent tabs must use lightweight backgrounds: "+JSON.stringify(visual));
    assert.ok(box.scrollHeight<=box.clientHeight+2,"Home must not leave content below the viewport");
   }
   await homeLayoutCheck(1752,860);
+  const dot=page.locator("#heatmapGrid .heatmap-cell:not(.empty)").first();
+  const dotBefore=await dot.boundingBox();await dot.hover();await page.waitForTimeout(220);
+  const dotAfter=await dot.boundingBox();assert.ok(dotAfter.y<dotBefore.y-1,"Heatmap cell must lift visibly when hovered");
+  await page.mouse.move(5,5);
   await page.screenshot({path:path.join(artifacts,"home-1752x860.png")});
   await homeLayoutCheck(1366,768);
   await homeLayoutCheck(1440,1000);
@@ -272,9 +292,9 @@ const names=[
     const rows=[...new Set(coords.map(p=>Math.round(p.y)))];
     return {coords,rows};
   });
-  assert.ok(twoRows.coords.length===12&&twoRows.rows.length===2,"Twelve recent games must form two horizontal rows: "+JSON.stringify(twoRows));
-  for(let row=0;row<2;row++){
-    const group=twoRows.coords.slice(row*6,row*6+6);
+  assert.ok(twoRows.coords.length===6&&twoRows.rows.length===3,"Six recent games must form three compact rows: "+JSON.stringify(twoRows));
+  for(let row=0;row<3;row++){
+    const group=twoRows.coords.slice(row*2,row*2+2);
     assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must fill each row left-to-right: "+JSON.stringify(twoRows));
     assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent-games row must be ordered from left to right: "+JSON.stringify(twoRows));
   }
@@ -427,6 +447,29 @@ const names=[
   assert.ok(Math.abs(goGrid.shape-1)<.015,"Gomoku board must remain square");
   await frame.locator(".gomoku-cell").nth(112).click();
   assert.equal(await frame.locator(".stone.stone-arrived").count(),1,"Gomoku last stone must animate on landing");
+  assert.equal(await frame.locator("#gameWorkspaceStyles").count(),1,"Gomoku shared stylesheet must be preloaded");
+  assert.equal(await frame.locator(".game-guide").evaluate(el=>getComputedStyle(el).display),"none","Legacy left guide must never be visible");
+  assert.equal(await frame.locator("#status").evaluate(el=>getComputedStyle(el).display),"none","Right-side paused status must be removed");
+  const goStyle=await frame.locator("#board").evaluate(el=>({wood:getComputedStyle(el).backgroundImage,
+   xBottom:el.querySelector(".gomoku-axis-x").getBoundingClientRect().bottom,boardBottom:el.getBoundingClientRect().bottom,
+   yFont:parseFloat(getComputedStyle(el.querySelector(".gomoku-axis-y")).fontSize)}));
+  assert.ok(!goStyle.wood.includes("repeating-linear-gradient"),"Gomoku wooden board must have no horizontal stripes");
+  assert.ok(goStyle.xBottom<=goStyle.boardBottom+1,"Gomoku A–O labels must be inside the wooden board");
+  assert.ok(goStyle.yFont>=14,"Gomoku row coordinates must be enlarged");
+  await page.screenshot({path:path.join(artifacts,"gomoku-playing-1440x1000.png")});
+  await frame.evaluate(()=>window.__p111GomokuTest.forceFinish(1));
+  await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
+  assert.equal(await frame.locator(".gomoku-win-overlay .gomoku-winning-line").count(),1,"Winning five must glow as a connected line");
+  assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"win");
+  await page.screenshot({path:path.join(artifacts,"gomoku-win-1440x1000.png")});
+  await frame.locator("#gomokuReplay").click();
+  await frame.locator("#gomokuResult[hidden]").waitFor({timeout:4000});
+  await frame.evaluate(()=>window.__p111GomokuTest.forceFinish(-1));
+  await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
+  assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"loss");
+  await page.screenshot({path:path.join(artifacts,"gomoku-loss-1440x1000.png")});
+  await frame.locator("#gomokuLeave").click();
+  await page.locator("#libraryView").waitFor({state:"visible"});
   await open("中国象棋");await start();
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};

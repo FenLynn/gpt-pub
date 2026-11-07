@@ -4,10 +4,10 @@
 const root=document.getElementById("game");
 if(!root)return;
 const gameId=document.body.dataset.game||root.dataset.game;
-const sheet=document.createElement("link");
-sheet.rel="stylesheet";
-sheet.href="../shared/workspace.css";
-document.head.appendChild(sheet);
+if(!document.getElementById("gameWorkspaceStyles")){
+ const sheet=document.createElement("link");sheet.id="gameWorkspaceStyles";
+ sheet.rel="stylesheet";sheet.href="../shared/workspace.css";document.head.appendChild(sheet);
+}
 root.classList.remove("rail-collapsed");
 root.dataset.workspace="r17";
 let hud=null,menu=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null;
