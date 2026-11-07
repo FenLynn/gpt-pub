@@ -1,6 +1,7 @@
 /* P111 R16: current-screen UI and 24-game actual Chromium lifecycle regression. */
 const assert=require("node:assert/strict");
 const fs=require("node:fs");
+const {execFileSync}=require("node:child_process");
 const path=require("node:path");
 const {pathToFileURL}=require("node:url");
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
@@ -384,6 +385,76 @@ const names=[
     assert.ok(group.every(p=>Math.abs(p.y-group[0].y)<2),"Recent games must have three aligned columns: "+JSON.stringify(fourRows));
     assert.ok(group.every((p,i)=>i===0||p.x>group[i-1].x),"Each recent row must read left to right: "+JSON.stringify(fourRows));
   }
+
+  // Local-data backup round-trip: normalize unknown IDs and invalid counters,
+  // then restore a valid payload without touching the source repository.
+  const backupContext=await browser.newContext({viewport:{width:1280,height:900},acceptDownloads:true});
+  const backupPage=await backupContext.newPage();
+  const backupSeed={
+   stats:{
+    tetris:{plays:2,wins:5,totalMs:123456,bestScore:99,lastPlayed:today,lastPlayedAt:now,days:{[today]:90000000}},
+    unknown:{plays:99,wins:99,totalMs:999999,bestScore:999,lastPlayed:today,lastPlayedAt:now,days:{}}
+   },
+   favorites:["tetris","mahjong","unknown"],
+   settings:{scale:"1.08"},
+   firstStartedAt:first.getTime()
+  };
+  await backupPage.addInitScript(seed=>{
+   localStorage.setItem("gamestation.stats",JSON.stringify(seed.stats));
+   localStorage.setItem("gamestation.favorites",JSON.stringify(seed.favorites));
+   localStorage.setItem("gamestation.settings",JSON.stringify(seed.settings));
+   localStorage.setItem("gamestation.firstStartedAt",JSON.stringify(seed.firstStartedAt));
+  },backupSeed);
+  await backupPage.goto(pathToFileURL(path.join(root,"index.html")).href);
+  await backupPage.locator("#settingsButton").click();
+  const backupDownloadPromise=backupPage.waitForEvent("download");
+  await backupPage.locator("#exportData").click();
+  const backupDownload=await backupDownloadPromise;
+  const exported=JSON.parse(await fs.promises.readFile(await backupDownload.path(),"utf8"));
+  assert.equal(exported.app,"GameStation","Backup must identify its application");
+  assert.equal(exported.schemaVersion,2,"Backup must use the current schema version");
+  assert.deepEqual(Object.keys(exported.stats),["tetris"],"Backup must omit unknown game IDs");
+  assert.equal(exported.stats.tetris.wins,2,"Backup must clamp wins to the number of plays");
+  assert.equal(exported.stats.tetris.days[today],86400000,"Backup must clamp a daily duration to one day");
+  assert.deepEqual(exported.favorites,["tetris","mahjong"],"Backup must retain only known unique favorites");
+  assert.equal(exported.settings.scale,"1.08","Backup must preserve the selected interface scale");
+  assert.equal(exported.firstStartedAt,first.getTime(),"Backup must preserve the first-play timestamp");
+  const restored={
+   app:"GameStation",schemaVersion:2,firstStartedAt:first.getTime()-86400000,
+   stats:{snake:{plays:7,wins:3,totalMs:777000,bestScore:321,lastPlayed:today,lastPlayedAt:now,days:{[today]:60000}}},
+   favorites:["snake","chess","not-a-game"],settings:{scale:"1.16"}
+  };
+  backupPage.on("dialog",dialog=>dialog.accept());
+  await backupPage.locator("#importFile").setInputFiles({
+   name:"gamestation-restore.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify(restored))
+  });
+  await backupPage.waitForFunction(()=>{
+   const stats=JSON.parse(localStorage.getItem("gamestation.stats")||"{}");
+   const favorites=JSON.parse(localStorage.getItem("gamestation.favorites")||"[]");
+   const settings=JSON.parse(localStorage.getItem("gamestation.settings")||"{}");
+   return stats.snake?.plays===7&&favorites.includes("snake")&&settings.scale==="1.16";
+  });
+  assert.deepEqual(await backupPage.evaluate(()=>JSON.parse(localStorage.getItem("gamestation.favorites")||"[]")),["snake","chess"],
+   "Import must discard unknown favorites");
+  assert.equal(await backupPage.evaluate(()=>JSON.parse(localStorage.getItem("gamestation.firstStartedAt"))),first.getTime()-86400000,
+   "Import must restore the original first-play timestamp");
+  const beforeInvalidImport=await backupPage.evaluate(()=>({
+   stats:localStorage.getItem("gamestation.stats"),favorites:localStorage.getItem("gamestation.favorites"),
+   settings:localStorage.getItem("gamestation.settings"),first:localStorage.getItem("gamestation.firstStartedAt")
+  }));
+  await backupPage.locator("#importFile").setInputFiles({
+   name:"invalid.json",mimeType:"application/json",buffer:Buffer.from("{not-json")
+  });
+  await backupPage.waitForFunction(()=>document.querySelector("#toast")?.textContent.includes("无效")&&
+   document.querySelector("#toast")?.classList.contains("show"));
+  const afterInvalidImport=await backupPage.evaluate(()=>({
+   stats:localStorage.getItem("gamestation.stats"),favorites:localStorage.getItem("gamestation.favorites"),
+   settings:localStorage.getItem("gamestation.settings"),first:localStorage.getItem("gamestation.firstStartedAt")
+  }));
+  assert.deepEqual(afterInvalidImport,beforeInvalidImport,"Invalid JSON must not mutate existing local data");
+  await backupContext.close();
+  console.log("P111 local-data backup export/import regression passed.");
+
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
@@ -630,4 +701,7 @@ const names=[
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
   console.log("P111 R19 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), left timer, central notices, SVG controls, Tetris preview/score, chess and arcade lifecycle.");
  }finally{await browser.close();}
-})().catch(err=>{console.error(err);process.exit(1);});
+})().then(()=>{
+ console.log("Running deterministic game-rule regression fixtures...");
+ execFileSync(process.execPath,[path.join(__dirname,"rules.cjs")],{env:process.env,stdio:"inherit"});
+}).catch(err=>{console.error(err);process.exit(1);});
