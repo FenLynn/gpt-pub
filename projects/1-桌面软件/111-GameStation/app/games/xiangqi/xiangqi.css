@@ -182,3 +182,17 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  .xiangqi-result-card{animation:none!important}
  .game-root.xiangqi-layout>.game-tools>.game-btn{transition:none!important}
 }
+
+/* R34: override the shared workspace's high-specificity rail-collapsed / tools-open
+   selectors; otherwise the central Xiangqi board can be sent back to column one. */
+.game-root.game-layout.xiangqi-layout>.game-main-board,
+.game-root.game-layout.xiangqi-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board,
+.game-root.game-layout.xiangqi-layout.rail-collapsed>.game-main-board,
+.game-root.game-layout.xiangqi-layout.gs-tools-open.rail-collapsed>.game-main-board{
+ grid-column:2!important;grid-row:1!important;width:100%!important;height:100%!important
+}
+.game-root.game-layout.xiangqi-layout>.game-tools,
+.game-root.game-layout.xiangqi-layout.gs-tools-open:not(.rail-collapsed)>.game-tools,
+.game-root.game-layout.xiangqi-layout.rail-collapsed>.game-tools{
+ grid-column:3!important;grid-row:1!important;display:flex!important
+}
