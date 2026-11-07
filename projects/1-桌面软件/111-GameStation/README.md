@@ -60,13 +60,13 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 
 ## 验证状态
 
-- **R31 P111 CI 通过**：代码基线 aee964d41e70aea90f700af78f59ba11be73773f；[P111 GameStation CI #42373684339](https://github.com/FenLynn/gpt-pub/actions/runs/42373684339) 与 [Repository hygiene #42373684273](https://github.com/FenLynn/gpt-pub/actions/runs/42373684273) 均通过。
-- 浏览器证据：[Artifact #13575280224](https://github.com/FenLynn/gpt-pub/actions/runs/42373684339/artifacts/13575280224)，包含 24 款游戏 × 2 种桌面分辨率的 48 张截图，以及首页、游戏库和专项界面证据。
+- **R31 P111 CI 通过**：代码基线 128e6025397e6113cb73ef9d39b937ed00e13e73；[P111 GameStation CI #42375593843](https://github.com/FenLynn/gpt-pub/actions/runs/42375593843) 与 [Repository hygiene #42375593795](https://github.com/FenLynn/gpt-pub/actions/runs/42375593795) 均通过。
+- 浏览器证据：[Artifact #13575082703](https://github.com/FenLynn/gpt-pub/actions/runs/42375593843/artifacts/13575082703)，包含 24 款游戏 × 2 种桌面分辨率的 48 张截图，以及首页、游戏库和专项界面证据。
 - 首页回归覆盖 1752×860、1440×1000、1366×768；精选海报另以 635×387 的真实容器尺寸检查图标、文字、按钮和 TIPS 布局。
 - 24 款游戏均完成 Chromium file:// 加载、开始、暂停/继续、下一局和布局检查；运行期无远程请求、无未捕获页面错误。
-- 规则专项测试现由 tests/smoke.cjs 自动调用 tests/rules.cjs，覆盖国际象棋、五子棋、黑白棋、四子棋、西洋跳棋、2048、贪吃蛇、中国象棋、中国跳棋、飞行棋、三国杀、斗地主和麻将。
+- 规则专项测试现由 tests/smoke.cjs 自动调用 tests/rules.cjs，覆盖全部 24 款游戏：国际象棋、五子棋、黑白棋、四子棋、西洋跳棋、2048、贪吃蛇、记忆翻牌、推箱子、数独、Pong、扫雷、海战棋、俄罗斯方块、Klondike、魂斗罗、超级玛丽、90 坦克、中国象棋、中国跳棋、飞行棋、三国杀、斗地主和麻将。
 - 本地 JSON 备份测试覆盖使用统计、收藏、界面字号、首次使用时间的导出/导入、数据规范化及无效文件保护。
-- **尚未完成**：真实 Windows Chrome/Edge 断网实机验收；其余游戏的深层规则测试；各 AI 的多局棋力校准；游戏进行中状态和关卡进度的完整存档/迁移。
+- **尚未完成**：真实 Windows Chrome/Edge 断网实机验收；各 AI 的多局棋力校准；五子棋禁手、象棋竞赛棋例、麻将地方规则和三国杀版本边界冻结；游戏进行中状态和关卡进度的完整存档/迁移。24 款游戏均已有确定性规则专项夹具。
 ## 工程与分支
 
 - 正式项目路径：projects/1-桌面软件/111-GameStation/
@@ -236,4 +236,11 @@ GameStation 是一个完全离线、浏览器本地运行的个人游戏中心�
 - R26–R30：最近游玩由 4×3 调整为 3×3，仅显示最近九款真实游玩游戏；精选海报改为图标在左、说明在右，图标与“进入游戏”按钮同轴，编号位于左下圆点上方，移除进度条；增加按实际容器尺寸计算的响应式布局。
 - 首页回归增加 635×387 海报容器、窄屏桌面卡片、9 项三行三列、图标不裁切、文字与图标不重叠、LED 短文本常规字重居中/长文本滚动等断言。
 - R31：将既有 rules.cjs 接入 smoke.cjs，确保 CI 每次执行规则专项测试；增加 JSON 备份导出、导入、数据规范化和无效文件保护测试。
-- R31 代码基线：aee964d41e70aea90f700af78f59ba11be73773f；P111 CI #42373684339 与 Repository hygiene #42373684273 通过。规则专项已扩展到 13 款游戏，新增 Reversi、Connect Four、Checkers、2048 和 Snake 的确定性测试。
+- R31 代码基线：aee964d41e70aea90f700af78f59ba11be73773f；P111 CI #42373684339 与 Repository hygiene #42373684273 通过。规则专项已扩展到全部 24 款游戏；新增 Minesweeper、Battleship、Tetris、Klondike、Contra、Mario 和 Tank 的规则/动作回归，所有 24 组确定性夹具均通过。
+### R31.2｜24 款游戏规则专项全覆盖（2026-11-07）
+
+- 棋类与策略：Chess、Gomoku、Reversi、Connect Four、Checkers、Xiangqi、Chinese Checkers、Flight Chess。
+- 益智与桌游：2048、Snake、Memory、Sokoban、Sudoku、Pong、Minesweeper、Battleship、Tetris、Klondike。
+- 动作与卡牌：Contra、Mario、Tank、Sanguosha、Dou Dizhu、Mahjong。
+- 规则回归覆盖合法/非法动作、边界、胜负、计分、AI 战术选择及关键状态转换；与 24 款游戏 × 2 桌面视口的 Chromium file:// smoke 同时运行。
+- R31 最终代码基线 128e6025397e6113cb73ef9d39b937ed00e13e73；CI #42375593843、Repository hygiene #42375593795 均通过；56 份浏览器证据见 Artifact #13575082703。
