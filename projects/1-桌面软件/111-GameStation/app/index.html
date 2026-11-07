@@ -138,6 +138,12 @@
       <div class="game-stage" id="gameStage">
         <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在载入</span></div>
         <iframe id="gameFrame" title="GameStation 游戏区域" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
+        <div class="game-pause-overlay" id="gamePauseOverlay" hidden aria-hidden="true">
+          <button class="game-pause-resume" id="gamePauseResume" type="button" aria-label="继续游戏" title="点击继续游戏">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+            <span>已暂停</span>
+          </button>
+        </div>
       </div>
     </section>
   </main>

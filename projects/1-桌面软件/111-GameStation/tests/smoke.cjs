@@ -42,10 +42,21 @@ const names=[
   assert.equal(await page.locator("#pauseButton svg").count(),1,"Pause SVG icon must be visible");
  }
  async function pauseResume(){
+  assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,"Pause icon must not cover an active game");
   await page.locator("#pauseButton").click();
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
-  await page.locator("#pauseButton").click();
+  await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
+  const geometry=await page.locator("#gamePauseResume").evaluate(el=>{
+   const icon=el.querySelector("svg"),r=el.getBoundingClientRect(),stage=document.querySelector("#gameStage").getBoundingClientRect();
+   return{icon:!!icon,centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
+    centerDy:Math.abs((r.top+r.bottom-stage.top-stage.bottom)/2)};
+  });
+  assert.ok(geometry.icon&&geometry.centerDx<2&&geometry.centerDy<2,
+   "All games need a centered, clickable pause glyph: "+JSON.stringify(geometry));
+  if(game==="中国象棋")await page.screenshot({path:path.join(artifacts,"xiangqi-paused.png")});
+  await page.locator("#gamePauseResume").click();
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
+  assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,"Resuming must remove the pause glyph");
  }
  async function viewCheck(name,width,height){
   const v=await frame.locator("#game").evaluate(el=>{
@@ -415,6 +426,8 @@ const names=[
   assert.ok(compactPoster.font<=52&&compactPoster.intro.left-compactPoster.art.right>=10,
    "Compact poster icon must be reduced and kept clear of the copy: "+JSON.stringify(compactPoster));
   assert.ok(compactPoster.centerDelta<2,"Compact poster play button must remain centered under the icon: "+JSON.stringify(compactPoster));
+  assert.ok(compactPoster.play.top-compactPoster.art.bottom>=6,
+   "Home enter-game button must sit slightly lower than the icon: "+JSON.stringify(compactPoster));
   await page.setViewportSize({width:1024,height:620});
   const posterNode=page.locator("#homeGamePoster");
   await posterNode.evaluate(el=>{
@@ -432,6 +445,8 @@ const names=[
   assert.ok(mediumPoster.outer.width===635&&mediumPoster.outer.height===387&&mediumPoster.font>=155&&mediumPoster.font<=170&&mediumPoster.intro.left-mediumPoster.art.right>=40,
    "Medium landscape poster must use a smaller icon with a clear text column: "+JSON.stringify(mediumPoster));
   assert.ok(mediumPoster.centerDelta<2,"Medium poster play button must stay centered under the icon: "+JSON.stringify(mediumPoster));
+  assert.ok(mediumPoster.play.top-mediumPoster.art.bottom>=8,
+   "Medium poster enter-game button needs extra breathing room: "+JSON.stringify(mediumPoster));
   await page.locator("#homeGamePosterTest").screenshot({path:path.join(artifacts,"poster-medium-landscape.png")});
   await page.locator("#homeGamePosterTest").evaluate(el=>el.remove());
   await homeLayoutCheck(1440,1000);
@@ -743,6 +758,15 @@ const names=[
   }));
   assert.ok(realXiangqiClock.count>=1&&realXiangqiClock.last?.includes("兵"),
    "A real Xiangqi pawn move must record its notation and elapsed time: "+JSON.stringify(realXiangqiClock));
+  const inlineTiming=await frame.locator("#moveList li").first().evaluate(row=>({
+   index:row.querySelector(".xiangqi-move-index")?.textContent,
+   tooltip:row.querySelector(".xiangqi-step-times")?.title||"",
+   rightLog:getComputedStyle(document.querySelector(".gs-turn-clock-history")).display
+  }));
+  assert.match(inlineTiming.index,/^1\.（\d+[.:]\d+(?:\/\d+[.:]\d+)?s）$/,
+   "Xiangqi per-move time must appear in parentheses next to its round number: "+JSON.stringify(inlineTiming));
+  assert.match(inlineTiming.tooltip,/红方/,"Xiangqi per-move timing must identify its side");
+  assert.equal(inlineTiming.rightLog,"none","Xiangqi must not duplicate the operation-time list on the right");
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
   });

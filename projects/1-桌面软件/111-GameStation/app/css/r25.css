@@ -411,6 +411,34 @@
  #homeView .poster-left #homePosterPlay{width:100px!important;min-width:100px!important;height:34px!important;font-size:12px!important}
 }
 
+/* R36 — Lower only the featured poster's enter button by 5px. */
+@media(min-width:701px){
+ #homeView .poster-left #homePosterPlay{transform:translateY(5px)!important}
+ #homeView .poster-left #homePosterPlay:hover{transform:translateY(3px)!important}
+ #homeView .poster-left #homePosterPlay:active{transform:translateY(5px) scale(.98)!important}
+}
+/* R36 — Global pause overlay owned by the host, not individual games. */
+#gameStage>.game-pause-overlay{
+ position:absolute;inset:0;z-index:5;display:grid;place-items:center;
+ pointer-events:none;background:radial-gradient(ellipse at center,#edf5f72d,transparent 40%)
+}
+#gameStage>.game-pause-overlay[hidden]{display:none!important}
+#gameStage .game-pause-resume{
+ pointer-events:auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:7px;width:106px;height:106px;padding:12px;border:1px solid #d2e1e8;
+ border-radius:22px;background:#f8fcf0e8;color:#2b5c73;
+ box-shadow:0 14px 42px #1a35465c,inset 0 1px #fff;backdrop-filter:blur(8px);
+ cursor:pointer;transition:transform .18s ease,box-shadow .18s ease
+}
+#gameStage .game-pause-resume svg{
+ display:block;width:40px;height:40px;fill:none;stroke:currentColor;
+ stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round
+}
+#gameStage .game-pause-resume span{font-size:13px;line-height:1.1;font-weight:740;letter-spacing:.06em}
+#gameStage .game-pause-resume:hover{transform:scale(1.05);box-shadow:0 18px 46px #1a35466d,inset 0 1px #fff}
+#gameStage .game-pause-resume:active{transform:scale(.97)}
+@media(prefers-reduced-motion:reduce){#gameStage .game-pause-resume{transition:none!important}}
+
 /* R27 — LED text is regular weight; short messages center, long messages scroll. */
 .main-area:has(#workspaceView:not(.hidden)) #gameNotice .game-notice-window{
  display:flex!important;align-items:center!important;justify-content:center!important
