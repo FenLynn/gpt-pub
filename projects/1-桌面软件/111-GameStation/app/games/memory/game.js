@@ -25,5 +25,17 @@ function startClock(){if(tick!==null||paused||matched===pairCount)return;tick=se
 function configure(v){difficulty=v||"normal";pairCount=difficulty==="easy"?6:difficulty==="hard"?12:8;}
 function newGame(){stopClock();clearTimeout(flipTimer);const icons=allIcons.slice(0,pairCount);cards=[...icons,...icons].map((icon,i)=>({icon,key:i,open:false,matched:false}));for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}opened=[];matched=0;moves=0;seconds=0;locked=false;paused=false;render();report("翻开两张卡片开始");}
 function flip(i){if(paused||locked||cards[i].open||cards[i].matched)return;startClock();cards[i].open=true;opened.push(i);if(opened.length===2){moves++;const [a,b]=opened;if(cards[a].icon===cards[b].icon){cards[a].matched=cards[b].matched=true;matched++;opened=[];if(matched===pairCount){stopClock();const score=Math.max(0,10000-moves*10-seconds*3);report("全部配对成功！");GameBridge.send("GAME_OVER",{message:"记忆挑战完成 · "+moves+" 步",score,win:true});}else report("配对成功");}else{locked=true;report("不一样，再记住位置");flipTimer=setTimeout(()=>{cards[a].open=cards[b].open=false;opened=[];locked=false;render();},750);}}render();}
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({cards:cards.map(c=>({icon:c.icon,open:c.open,matched:c.matched})),opened:opened.slice(),matched,moves,locked,paused,seconds,pairCount});
+ window.__p111MemoryTest={
+  loadDeck(icons){
+   if(!Array.isArray(icons)||!icons.length||icons.some(v=>typeof v!=="string"))throw new Error("Invalid Memory fixture");
+   stopClock();clearTimeout(flipTimer);flipTimer=null;pairCount=icons.length;cards=icons.concat(icons).map(icon=>({icon,open:false,matched:false}));opened=[];matched=0;moves=0;locked=false;paused=false;seconds=0;render();report("测试牌组");return fixtureState();
+  },
+  state:fixtureState,
+  flip(i){flip(i);return fixtureState();}
+ };
+}
 GameBridge.register({init(p){configure(p.difficulty);newGame();},newGame,pause(){paused=true;report("已暂停");render();},resume(){paused=false;report("继续挑战");render();},setDifficulty(v){configure(v);},dispose(){paused=true;stopClock();clearTimeout(flipTimer);}});
 })();

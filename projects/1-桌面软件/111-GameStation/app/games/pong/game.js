@@ -41,5 +41,16 @@ function keyup(e){const key=e.key.length===1?e.key.toLowerCase():e.key;keys[key]
 function focusCanvas(){canvas.focus();}
 window.addEventListener("keydown",keydown);window.addEventListener("keyup",keyup);canvas.addEventListener("pointerdown",focusCanvas);canvas.addEventListener("mousemove",e=>{const r=canvas.getBoundingClientRect();playerY=(e.clientY-r.top)/r.height*360-35;playerY=Math.max(0,Math.min(290,playerY));});
 resetBall(1);draw();
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({playerY,aiY,ball:ball?{x:ball.x,y:ball.y,vx:ball.vx,vy:ball.vy}:null,playerScore:ps,aiScore:as,paused,over,difficulty});
+ window.__p111PongTest={
+  loadState(s){
+   cancelAnimationFrame(raf);playerY=Math.max(0,Math.min(290,Number(s.playerY??145)));aiY=Math.max(0,Math.min(290,Number(s.aiY??145)));ball={x:Number(s.ball.x),y:Number(s.ball.y),vx:Number(s.ball.vx),vy:Number(s.ball.vy)};ps=Number(s.ps)||0;as=Number(s.as)||0;paused=false;over=false;last=0;keys={};difficulty=s.difficulty||"normal";document.getElementById("playerScore").textContent=ps;document.getElementById("aiScore").textContent=as;draw();report("测试局面");return fixtureState();
+  },
+  state:fixtureState,
+  step(t=16.67){last=0;tick(t);cancelAnimationFrame(raf);raf=0;return fixtureState();}
+ };
+}
 GameBridge.register({init(){pause();},newGame:start,pause,resume,setDifficulty(v){difficulty=v||"normal";},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();

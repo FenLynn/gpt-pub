@@ -202,6 +202,93 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    snakeState=await snake.evaluate(()=>window.__p111SnakeTest.tick());
    assert.equal(snakeState.over,true,"Running into the body must end Snake");
    await snake.close();
+  // Memory: deterministic matching, mismatch lockout, timeout flip-back and complete-deck win.
+  const memory=await browser.newPage({viewport:{width:900,height:700}});
+  memory.on("pageerror",e=>errors.push("Memory: "+e.message));
+  await memory.goto(pathToFileURL(path.resolve(__dirname,"../app/games/memory/index.html")).href+"?p111Test=1");
+  await memory.waitForFunction(()=>!!window.__p111MemoryTest);
+  let memoryState=await memory.evaluate(()=>window.__p111MemoryTest.loadDeck(["A","B"]));
+  memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));
+  memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(1));
+  assert.equal(memoryState.locked,true);assert.equal(memoryState.moves,1);assert.deepEqual(memoryState.opened,[0,1]);
+  memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(2));
+  assert.deepEqual(memoryState.opened,[0,1],"Memory must ignore further flips while a mismatch is locked");assert.equal(memoryState.moves,1);
+  await memory.waitForTimeout(800);memoryState=await memory.evaluate(()=>window.__p111MemoryTest.state());
+  assert.equal(memoryState.locked,false);assert.deepEqual(memoryState.opened,[]);assert.equal(memoryState.cards[0].open,false);assert.equal(memoryState.cards[1].open,false);
+  memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(2));
+  assert.equal(memoryState.matched,1);assert.equal(memoryState.cards[0].matched,true);assert.equal(memoryState.cards[2].matched,true);
+  memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(1));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(3));
+  assert.equal(memoryState.matched,2);assert.equal(memoryState.moves,3);assert.ok(memoryState.cards.every(card=>card.matched),"All Memory pairs must finish the game");
+  await memory.close();
+
+  // Sokoban: push onto goal, win state, undo, normal movement and wall blocking.
+  const sokoban=await browser.newPage({viewport:{width:900,height:700}});
+  sokoban.on("pageerror",e=>errors.push("Sokoban: "+e.message));
+  await sokoban.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sokoban/index.html")).href+"?p111Test=1");
+  await sokoban.waitForFunction(()=>!!window.__p111SokobanTest);
+  let boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
+  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.deepEqual(boxState.goals,[22]);
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(0,-1));
+  assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[22]);assert.equal(boxState.complete,true);assert.equal(boxState.moves,1);
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
+  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.equal(boxState.complete,false);assert.equal(boxState.moves,0);
+  for(let i=0;i<3;i++)boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
+  assert.equal(boxState.player,37);assert.equal(boxState.moves,3);
+  const beforeWall={player:boxState.player,moves:boxState.moves};
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
+  assert.equal(boxState.player,beforeWall.player,"Sokoban must not move through a wall");assert.equal(boxState.moves,beforeWall.moves);
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
+  assert.equal(boxState.player,38);assert.equal(boxState.moves,2);
+  await sokoban.close();
+
+  // Sudoku: given-cell protection, error detection and exact-solution completion.
+  const sudoku=await browser.newPage({viewport:{width:900,height:900}});
+  sudoku.on("pageerror",e=>errors.push("Sudoku: "+e.message));
+  await sudoku.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sudoku/index.html")).href+"?p111Test=1");
+  await sudoku.waitForFunction(()=>!!window.__p111SudokuTest);
+  const sudokuSolution=[
+   [5,3,4,6,7,8,9,1,2],[6,7,2,1,9,5,3,4,8],[1,9,8,3,4,2,5,6,7],
+   [8,5,9,7,6,1,4,2,3],[4,2,6,8,5,3,7,9,1],[7,1,3,9,2,4,8,5,6],
+   [9,6,1,5,3,7,2,8,4],[2,8,7,4,1,9,6,3,5],[3,4,5,2,8,6,1,7,9]
+  ];
+  const sudokuPuzzle=sudokuSolution.map(row=>row.slice());sudokuPuzzle[0][0]=0;sudokuPuzzle[0][1]=0;
+  let sudokuState=await sudoku.evaluate(([p,s])=>window.__p111SudokuTest.loadPuzzle(p,s),[sudokuPuzzle,sudokuSolution]);
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(2));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(1));
+  assert.equal(sudokuState.puzzle[0][2],4,"Sudoku must protect given clues");
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(0));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(4));
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.check());
+  assert.ok(sudokuState.status.includes("发现 1 个错误"),"Sudoku check must identify incorrect entries");
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(1));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(3));
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(0));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(5));
+  assert.equal(sudokuState.over,true);assert.deepEqual(sudokuState.puzzle,sudokuSolution,"Sudoku must finish only when every cell matches the solution");
+  await sudoku.close();
+  // Pong: keyboard paddle control, paddle/wall bounce, scoring and distinct AI response speeds.
+  const pong=await browser.newPage({viewport:{width:900,height:600}});
+  pong.on("pageerror",e=>errors.push("Pong: "+e.message));
+  await pong.goto(pathToFileURL(path.resolve(__dirname,"../app/games/pong/index.html")).href+"?p111Test=1");
+  await pong.waitForFunction(()=>!!window.__p111PongTest);
+  const pongLoad=s=>pong.evaluate(v=>window.__p111PongTest.loadState(v),s);
+  let pongState=await pongLoad({playerY:145,aiY:145,ball:{x:30,y:180,vx:-5,vy:0},ps:0,as:0,difficulty:"normal"});
+  pongState=await pong.evaluate(()=>window.__p111PongTest.step());
+  assert.ok(pongState.ball.vx>0,"Pong ball must bounce off the player paddle");
+  await pongLoad({playerY:145,aiY:145,ball:{x:300,y:8,vx:1,vy:-4},ps:0,as:0,difficulty:"normal"});
+  pongState=await pong.evaluate(()=>window.__p111PongTest.step());
+  assert.ok(pongState.ball.vy>0,"Pong ball must bounce off the top wall");
+  await pongLoad({playerY:145,aiY:145,ball:{x:2,y:180,vx:-4,vy:0},ps:0,as:0,difficulty:"normal"});
+  pongState=await pong.evaluate(()=>window.__p111PongTest.step());
+  assert.equal(pongState.aiScore,1,"A ball passing the player side must score for the AI");
+  await pongLoad({playerY:145,aiY:145,ball:{x:2,y:180,vx:-4,vy:0},ps:0,as:6,difficulty:"normal"});
+  pongState=await pong.evaluate(()=>window.__p111PongTest.step());
+  assert.equal(pongState.over,true);assert.equal(pongState.aiScore,7,"Pong must end at seven points");
+  await pongLoad({playerY:145,aiY:0,ball:{x:320,y:300,vx:1,vy:0},ps:0,as:0,difficulty:"easy"});
+  const easyAi=(await pong.evaluate(()=>window.__p111PongTest.step())).aiY;
+  await pongLoad({playerY:145,aiY:0,ball:{x:320,y:300,vx:1,vy:0},ps:0,as:0,difficulty:"hard"});
+  const hardAi=(await pong.evaluate(()=>window.__p111PongTest.step())).aiY;
+  assert.ok(hardAi>easyAi+3,"Hard Pong AI must move faster than easy AI in the same fixture");
+  await pongLoad({playerY:145,aiY:145,ball:{x:320,y:180,vx:1,vy:0},ps:0,as:0,difficulty:"normal"});
+  await pong.keyboard.down("ArrowUp");pongState=await pong.evaluate(()=>window.__p111PongTest.step());await pong.keyboard.up("ArrowUp");
+  assert.equal(pongState.playerY,139,"Pong player paddle must respond to the real ArrowUp key");
+  await pong.close();
   const star=await browser.newPage({viewport:{width:1150,height:880}});
   star.on("pageerror",e=>errors.push("ChineseCheckers: "+e.message));
   await star.goto(pathToFileURL(path.resolve(__dirname,"../app/games/chinese-checkers/index.html")).href+"?p111Test=1");
@@ -598,6 +685,6 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await ddz.close();
   await xiangqi.close();
   assert.deepEqual(errors,[]);
-  console.log("P111 rule fixtures passed: Chess; Gomoku; Reversi; Connect Four; Checkers; 2048; Snake; Xiangqi; Chinese Checkers; Flight Chess; Sanguosha; Dou Dizhu; Mahjong.");
+  console.log("P111 rule fixtures passed: Chess; Gomoku; Reversi; Connect Four; Checkers; 2048; Snake; Memory; Sokoban; Sudoku; Pong; Xiangqi; Chinese Checkers; Flight Chess; Sanguosha; Dou Dizhu; Mahjong.");
  }finally{await browser.close();}
 })().catch(err=>{console.error(err);process.exit(1);});

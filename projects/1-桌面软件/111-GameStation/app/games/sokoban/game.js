@@ -15,5 +15,15 @@ function move(dx,dy){if(paused)return;const x=player%9,y=Math.floor(player/9),nx
 function undo(){const s=history.pop();if(!s)return;player=s.player;boxes=new Set(s.boxes);moves=s.moves;render();report("已撤销一步");}
 function key(e){const map={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};if(map[e.key]){e.preventDefault();move(...map[e.key]);}if(e.key.toLowerCase()==="z")undo();if(e.key.toLowerCase()==="r")parse();}
 document.getElementById("undo").onclick=undo;document.getElementById("reset").onclick=parse;document.getElementById("next").onclick=()=>{level=(level+1)%levels.length;parse();};window.addEventListener("keydown",key);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({level,player,boxes:[...boxes].sort((a,b)=>a-b),goals:[...goals].sort((a,b)=>a-b),walls:[...walls].sort((a,b)=>a-b),moves,paused,complete:[...goals].every(g=>boxes.has(g))});
+ window.__p111SokobanTest={
+  loadLevel(index=0){level=Math.max(0,Math.min(levels.length-1,Math.floor(Number(index)||0)));paused=false;parse();return fixtureState();},
+  state:fixtureState,
+  move(dx,dy){move(dx,dy);return fixtureState();},
+  undo(){undo();return fixtureState();}
+ };
+}
 GameBridge.register({init:parse,newGame:parse,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续闯关");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();

@@ -21,5 +21,20 @@ function put(v){if(paused||over||selected<0)return;const y=Math.floor(selected/9
 function check(){let errors=0;for(let y=0;y<9;y++)for(let x=0;x<9;x++)if(puzzle[y][x]&&puzzle[y][x]!==solution[y][x])errors++;report(errors?"发现 "+errors+" 个错误":"当前填写正确");}
 function key(e){if(/^[1-9]$/.test(e.key))put(Number(e.key));if(e.key==="Backspace"||e.key==="Delete")put(0);}
 document.getElementById("numbers").innerHTML=Array.from({length:9},(_,i)=>'<button type="button" data-number="'+(i+1)+'">'+(i+1)+'</button>').join("")+'<button type="button" data-number="0">⌫</button>';document.getElementById("numbers").addEventListener("click",e=>{const b=e.target.closest("[data-number]");if(b)put(Number(b.dataset.number));});document.getElementById("hint").onclick=()=>{if(selected<0)return;put(solution[Math.floor(selected/9)][selected%9]);};document.getElementById("check").onclick=check;window.addEventListener("keydown",key);
+// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+if(new URLSearchParams(location.search).has("p111Test")){
+ const fixtureState=()=>({puzzle:puzzle.map(r=>r.slice()),solution:solution.map(r=>r.slice()),given:given.map(r=>r.slice()),selected,paused,over,status:status.textContent});
+ window.__p111SudokuTest={
+  loadPuzzle(nextPuzzle,nextSolution){
+   const valid=g=>Array.isArray(g)&&g.length===9&&g.every(r=>Array.isArray(r)&&r.length===9&&r.every(v=>Number.isInteger(v)&&v>=0&&v<=9));
+   if(!valid(nextPuzzle)||!valid(nextSolution))throw new Error("Invalid Sudoku fixture");
+   puzzle=nextPuzzle.map(r=>r.slice());solution=nextSolution.map(r=>r.slice());given=puzzle.map(r=>r.map(v=>v!==0));selected=-1;paused=false;over=false;render();report("测试局面");return fixtureState();
+  },
+  state:fixtureState,
+  select(index){selected=index;render();return fixtureState();},
+  put(value){put(value);return fixtureState();},
+  check(){check();return fixtureState();}
+ };
+}
 GameBridge.register({init(p){level=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续解题");},setDifficulty(v){level=v||"normal";},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();
