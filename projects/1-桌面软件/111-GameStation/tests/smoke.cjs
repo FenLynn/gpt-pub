@@ -718,7 +718,7 @@ const names=[
     "AI mode resigning as red must show a loss result, not a neutral message");
    await page.waitForFunction(()=>document.querySelector("#startButton")?.disabled===true);
    await frame.locator("#xiangqiReplay").click();
-   await frame.locator("#xiangqiResult[hidden]").waitFor({timeout:4000});
+   await frame.locator("#xiangqiResult").waitFor({state:"hidden",timeout:4000});
    assert.equal(await frame.locator(".xiangqi-piece").count(),32,
     "Replay must create all 32 starting Xiangqi pieces");
    assert.equal(await frame.locator("#moveCount").innerText(),"0 步",
