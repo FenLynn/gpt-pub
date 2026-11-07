@@ -463,7 +463,7 @@ const names=[
   assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"win");
   await page.screenshot({path:path.join(artifacts,"gomoku-win-1440x1000.png")});
   await frame.locator("#gomokuReplay").click();
-  await frame.locator("#gomokuResult[hidden]").waitFor({timeout:4000});
+  await frame.locator("#gomokuResult").waitFor({state:"hidden",timeout:4000});
   await frame.locator('#game').evaluate(()=>window.__p111GomokuTest.forceFinish(-1));
   await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
   assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"loss");

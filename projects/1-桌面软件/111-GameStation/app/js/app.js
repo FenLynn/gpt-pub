@@ -208,7 +208,9 @@ function renderHomeRecent(){
 const posterPriority=["gomoku","xiangqi","minesweeper","tetris","tank","mario","solitaire","mahjong"];
 function posterGames(){
  const seen=new Set(),out=[];
- const ordered=[...getPlayedRows().sort((a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)).map(r=>r.game),
+ const selected=games.find(g=>g.id===selectedPosterId);
+ const ordered=[...(selected?[selected]:[]),
+  ...getPlayedRows().sort((a,b)=>statPlayedAt(b.stat)-statPlayedAt(a.stat)).map(r=>r.game),
   ...posterPriority.map(id=>games.find(g=>g.id===id)).filter(Boolean)];
  for(const game of ordered)if(!seen.has(game.id)){seen.add(game.id);out.push(game);}
  return out.slice(0,8);
