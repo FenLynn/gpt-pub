@@ -413,7 +413,7 @@ const names=[
   const exported=JSON.parse(await fs.promises.readFile(await backupDownload.path(),"utf8"));
   assert.equal(exported.app,"GameStation","Backup must identify its application");
   assert.equal(exported.schemaVersion,2,"Backup must use the current schema version");
-  assert.deepEqual(Object.keys(exported.stats),["tetris"],"Backup must omit unknown game IDs");
+  assert.ok(Object.hasOwn(exported.stats,"tetris")&&!Object.hasOwn(exported.stats,"unknown"),"Backup must omit unknown game IDs while retaining known zero-play records");
   assert.equal(exported.stats.tetris.wins,2,"Backup must clamp wins to the number of plays");
   assert.equal(exported.stats.tetris.days[today],86400000,"Backup must clamp a daily duration to one day");
   assert.deepEqual(exported.favorites,["tetris","mahjong"],"Backup must retain only known unique favorites");
