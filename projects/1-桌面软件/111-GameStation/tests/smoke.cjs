@@ -348,18 +348,23 @@ const names=[
   assert.ok(compactPoster.centerDelta<2,"Compact poster play button must remain centered under the icon: "+JSON.stringify(compactPoster));
   await page.setViewportSize({width:1024,height:620});
   const posterNode=page.locator("#homeGamePoster");
-  await posterNode.evaluate(el=>{el.dataset.originalWidth=el.style.width;el.dataset.originalHeight=el.style.height;el.style.width="635px";el.style.height="387px";});
-  const mediumPoster=await posterNode.evaluate(p=>{
+  await posterNode.evaluate(el=>{
+   const clone=el.cloneNode(true);clone.id="homeGamePosterTest";clone.classList.remove("arriving");
+   for(const [k,v] of Object.entries({position:"fixed",left:"0px",top:"0px",width:"635px",height:"387px",zIndex:"9999"}))
+    clone.style.setProperty(k.replace(/[A-Z]/g,m=>"-"+m.toLowerCase()),v,"important");
+   el.parentElement.appendChild(clone);
+  });
+  const mediumPoster=await page.locator("#homeGamePosterTest").evaluate(p=>{
    const box=q=>q.getBoundingClientRect(),art=box(p.querySelector(".poster-art")),
     intro=box(p.querySelector(".poster-copy")),play=box(p.querySelector("#homePosterPlay"));
-   return{art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".poster-art")).fontSize),
+   return{outer:box(p),art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".poster-art")).fontSize),
     centerDelta:Math.abs((art.left+art.right)/2-(play.left+play.right)/2)};
   });
-  assert.ok(mediumPoster.font>=118&&mediumPoster.font<=136&&mediumPoster.intro.left-mediumPoster.art.right>=50,
+  assert.ok(mediumPoster.outer.width===635&&mediumPoster.outer.height===387&&mediumPoster.font>=118&&mediumPoster.font<=136&&mediumPoster.intro.left-mediumPoster.art.right>=50,
    "Medium landscape poster must use a smaller icon with a clear text column: "+JSON.stringify(mediumPoster));
   assert.ok(mediumPoster.centerDelta<2,"Medium poster play button must stay centered under the icon: "+JSON.stringify(mediumPoster));
-  await posterNode.screenshot({path:path.join(artifacts,"poster-medium-landscape.png")});
-  await posterNode.evaluate(el=>{el.style.width=el.dataset.originalWidth;el.style.height=el.dataset.originalHeight;delete el.dataset.originalWidth;delete el.dataset.originalHeight;});
+  await page.locator("#homeGamePosterTest").screenshot({path:path.join(artifacts,"poster-medium-landscape.png")});
+  await page.locator("#homeGamePosterTest").evaluate(el=>el.remove());
   await homeLayoutCheck(1440,1000);
   await page.screenshot({path:path.join(artifacts,"home-1440x1000.png")});
   const gridEvidence=await page.locator("#homeRecentList").evaluate(list=>{
