@@ -330,7 +330,7 @@ const names=[
     if(!noticeChecked){
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("顶部通知位置回归测试"));
     await page.locator("#gameNotice.visible").waitFor({timeout:1500});
-    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,centerX:x.left+x.width/2,centerY:x.top+x.height/2,barTop:b.top,barBottom:b.bottom,barCenterX:b.left+b.width/2,message:el.textContent,parent:el.parentElement.id};});
+    const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,x:x.left,right:x.right,width:x.width,centerX:x.left+x.width/2,centerY:x.top+x.height/2,barTop:b.top,barBottom:b.bottom,barCenterX:b.left+b.width/2,message:el.textContent,parent:el.parentElement.id};});
     assert.equal(r.parent,"topbar","live status must be rendered in the topbar center");
     assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must stay inside the titlebar, never below the game");
     assert.ok(r.width>=110&&r.width<=135,"LED notice must keep a fixed narrow width between breadcrumb and timer: "+JSON.stringify(r));
