@@ -598,11 +598,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(await xiangqi.locator(".xiangqi-cell.checked").count(),1,"checked general must glow");
    assert.equal(await xiangqi.locator(".xiangqi-cell.threatening").count(),1,"attacker must glow");
    assert.match(await xiangqi.locator("#status").innerText(),/红方被将军/);
-   await load([[4,0,"black","将"],[3,9,"red","帅"],[0,3,"black","车"],[0,4,"red","车"]],"black");
-   const tactical=await xiangqi.evaluate(()=>({move:window.__p111XiangqiTest.aiChoice("hard"),stats:window.__p111XiangqiTest.aiStats(),rookMoves:window.__p111XiangqiTest.legal("black").filter(m=>m.fx===0&&m.fy===3)}));
-   console.log("Xiangqi AI tactical diagnostic:",JSON.stringify(tactical));
-   assert.equal(tactical.move.tx,0,"AI captures rook at file A");
-   assert.equal(tactical.move.ty,4,"AI seizes unprotected rook");
+   // Avoid a false tactical verdict: in the sparse earlier position the black
+   // rook can move to the third file with a forcing check, which can be
+   // strategically stronger than taking the hanging red rook immediately.
+   // Add a central blocker to remove that forcing-check resource and isolate
+   // a clean one-move rook capture.
+   await load([[4,0,"black","将"],[4,9,"red","帅"],[4,6,"red","兵"],
+    [0,3,"black","车"],[0,4,"red","车"]],"black");
+   const tactical=await xiangqi.evaluate(()=>({move:window.__p111XiangqiTest.aiChoice("hard"),
+    stats:window.__p111XiangqiTest.aiStats()}));
+   assert.deepEqual(tactical.move,{fx:0,fy:3,tx:0,ty:4},
+    "Hard AI must capture an undefended rook when no forcing mate supersedes the capture");
+   assert.ok(tactical.stats.depth>=1,"Hard AI must complete at least one search iteration");
    assert.ok(tactical.stats.elapsed<2400,"AI must respect bounded search budget");
    await xiangqi.evaluate(()=>window.__p111XiangqiTest.forceResult("red","测试获胜"));
    assert.equal(await xiangqi.locator("#xiangqiResultTitle").innerText(),"获胜");
