@@ -340,7 +340,7 @@ const names=[
   const compactPoster=await page.locator("#homeGamePoster").evaluate(p=>{
    const box=q=>q.getBoundingClientRect(),art=box(p.querySelector(".poster-art")),
     intro=box(p.querySelector(".poster-copy")),play=box(p.querySelector("#homePosterPlay"));
-   return{art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".game-icon-glyph")).fontSize),
+   return{art,intro,play,font:parseFloat(getComputedStyle(p.querySelector(".poster-art")).fontSize),
     centerDelta:Math.abs((art.left+art.right)/2-(play.left+play.right)/2)};
   });
   assert.ok(compactPoster.font<=108&&compactPoster.intro.left-compactPoster.art.right>=20,
