@@ -422,5 +422,22 @@ if(new URLSearchParams(location.search).has("p111Test")){
    }
  };
 }
+/* The host's global "结束" action marks the session finished without a GAME_OVER.
+   Show the same replay/leave surface here without changing any shared host code. */
+function showManualEnd(){
+ if(over)return;
+ over=true;clearTimeout(aiTimer);
+ resultBox.dataset.result="ended";
+ document.getElementById("xiangqiResultSeal").textContent="終";
+ document.getElementById("xiangqiResultTitle").textContent="本局结束";
+ document.getElementById("xiangqiResultDescription").textContent="已手动结束 · 可以再开一局或离开";
+ resultBox.hidden=false;resultBox.classList.add("visible");
+}
+window.addEventListener("message",event=>{
+ if(event.source!==window.parent)return;
+ const m=event.data;
+ if(m?.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!=="xiangqi")return;
+ if(m.type==="HUD_STATE"&&m.payload?.finished&&!over)showManualEnd();
+});
 GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(over)return;if(turn==="black"&&mode==="ai"){report(nextTurnStatus()+" · AI 思考中");scheduleAI();}else report(nextTurnStatus());},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
 })();

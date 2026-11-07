@@ -723,10 +723,18 @@ const names=[
     "Replay must create all 32 starting Xiangqi pieces");
    assert.equal(await frame.locator("#moveCount").innerText(),"0 步",
     "Replay must reset notation");
+    await page.locator("#startButton").click();
+    await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
+    assert.equal(await frame.locator("#xiangqiResultTitle").innerText(),"本局结束",
+     "Top-level end action must show replay/leave without misreporting a win");
+    await frame.locator("#xiangqiReplay").click();
+    await frame.locator("#xiangqiResult").waitFor({state:"hidden",timeout:4000});
+    assert.equal(await frame.locator(".xiangqi-piece").count(),32);
    await frame.locator("#resignButton").click();
    await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
    await frame.locator("#xiangqiLeave").click();
    await page.locator("#libraryView").waitFor({state:"visible",timeout:4000});
+    await page.locator('[data-category="all"]').click();
    
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
   await open("麻将");await start();assert.equal(await frame.locator("#hand .playing-card").count(),14);
