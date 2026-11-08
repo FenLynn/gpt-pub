@@ -1847,3 +1847,12 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  min-height:44px!important;height:44px!important;
  padding:6px 8px!important;
 }
+
+/* R49.2 · Two checkers screens have a single, measured first paint.
+   Visibility keeps geometry measurable and removes the wrong full-height
+   rail frame that was briefly drawn before ResizeObserver set its height. */
+@media(min-width:701px){
+ .game-root.game-layout:is(.checkers-layout,.chinese-checkers-layout):not([data-board-measured="true"]){
+  visibility:hidden!important;
+ }
+}
