@@ -78,16 +78,30 @@ function turnLabel(){
 }
 function report(msg){status.textContent=msg;turnText.textContent=turnLabel();GameBridge.report(msg,{score:pawns[0].filter(p=>p===57).length,turn});}
 function svgNode(tag,attrs){const ns="http:"+"//www.w3.org/2000/svg",e=document.createElementNS(ns,tag);for(const [key,val] of Object.entries(attrs))e.setAttribute(key,String(val));return e;}
-function renderDice(){
- const value=roll||1,face=svgNode("svg",{viewBox:"0 0 100 100",class:"flight-dice-svg","aria-hidden":"true"});
+// Animate visual faces and colorways while the logical die result stays fixed.
+const diceInk=["#447c9c","#d96754","#378b6b","#9771be","#d6a044","#407bb5"];
+const dicePaper=["#e8f4fc","#fff0e8","#eafaef","#f4ebff","#fff6e0","#ebf2fe"];
+let diceAnimationTimer=null,isRolling=false;
+function renderDice(display=null){
+ const value=display??(roll||1),face=svgNode("svg",{viewBox:"0 0 100 100",class:"flight-dice-svg","aria-hidden":"true"});
  face.append(svgNode("rect",{x:7,y:7,width:86,height:86,rx:18,class:"flight-dice-body"}));
  for(const [cx,cy] of dicePips[value])face.append(svgNode("circle",{cx,cy,r:7.8,class:"flight-dice-pip"}));
- diceFace.replaceChildren(face);diceFace.setAttribute("aria-label","骰子："+value+"点");diceFace.dataset.value=String(value);
+ diceFace.style.setProperty("--dice-ink",diceInk[value-1]);diceFace.style.setProperty("--dice-paper",dicePaper[value-1]);
+ diceFace.replaceChildren(face);diceFace.setAttribute("aria-label","骰子："+(roll||1)+"点");
+ diceFace.dataset.value=String(roll||1);diceFace.dataset.displayFace=String(value);
 }
-let diceAnimationTimer=null;
+function stopDiceAnimation(){
+ clearTimeout(diceAnimationTimer);isRolling=false;diceFace.classList.remove("rolling");
+}
 function animateDice(){
- clearTimeout(diceAnimationTimer);diceFace.classList.remove("rolling");void diceFace.offsetWidth;
- diceFace.classList.add("rolling");diceAnimationTimer=setTimeout(()=>diceFace.classList.remove("rolling"),460);
+ clearTimeout(diceAnimationTimer);isRolling=true;diceFace.classList.add("rolling");
+ const faces=[2,5,3,6,1,4,6,2,5,3,4,1];let step=0;
+ const tick=()=>{
+  if(!isRolling)return;
+  if(step>=faces.length){stopDiceAnimation();draw();return;}
+  renderDice(faces[step++]);diceAnimationTimer=setTimeout(tick,75);
+ };
+ tick();
 }
 function routeFor(index){
  const move=moves().find(m=>m.index===index);if(!move)return null;
@@ -97,7 +111,7 @@ function routeFor(index){
  return{move,steps,final:move.to};
 }
 function previewPlane(index){
- if(paused||over||roll===null||(mode==="ai"&&turn===1))return false;
+ if(paused||over||isRolling||roll===null||(mode==="ai"&&turn===1))return false;
  if(!moves().some(m=>m.index===index))return false;
  if(selectedPlane===index)return play(index);
  selectedPlane=index;draw();
@@ -107,7 +121,7 @@ function previewPlane(index){
 function renderChoices(){
  const host=document.getElementById("flightMoveOptions"),label=document.getElementById("flightMoveCount"),
   help=document.getElementById("flightMoveHelp");
- const legal=paused||over||roll===null||mode==="ai"&&turn===1?[]:moves();
+ const legal=paused||over||isRolling||roll===null||mode==="ai"&&turn===1?[]:moves();
  host.replaceChildren();label.textContent=legal.length+" 个";
  for(const m of legal){
   const btn=document.createElement("button");btn.type="button";
@@ -179,7 +193,7 @@ function draw(){
   const [x,y]=position(seat,i,progress),[cx,cy]=pos(x,y);
   const stack=occupied.get(x+","+y),index=stack.findIndex(([s,p])=>s===seat&&p===i);
   const [dx,dy]=displacements(stack.length)[index];
-  const canMove=!paused&&!over&&turn===seat&&roll!==null&&moves().some(m=>m.seat===seat&&m.index===i);
+  const canMove=!paused&&!over&&!isRolling&&turn===seat&&roll!==null&&moves().some(m=>m.seat===seat&&m.index===i);
   const selected=canMove&&selectedPlane===i;
   const group=svgNode("g",{"data-pawn":seat+"-"+i,role:"button",tabindex:"0",
    "data-slot-x":cx,"data-slot-y":cy,"data-center-x":cx+dx,"data-center-y":cy+dy,
@@ -195,7 +209,7 @@ function draw(){
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
  document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===57).length);
- rollButton.disabled=paused||over||roll!==null||turn===1&&mode==="ai";
+ rollButton.disabled=paused||over||isRolling||roll!==null||turn===1&&mode==="ai";
  document.getElementById("flightDiceCaption").textContent=roll===null?"等待掷骰":"点数 "+roll;
  renderChoices();
  document.getElementById("undoButton").disabled=paused||over||!history.length;
@@ -207,15 +221,18 @@ function newTurn(dice){
  draw();scheduleAI();
 }
 function throwDice(value=null){
- if(paused||over||roll!==null)return false;
+ if(paused||over||isRolling||roll!==null)return false;
  selectedPlane=null;roll=value==null?1+Math.floor(Math.random()*6):value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
- window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","掷骰 "+roll);draw();animateDice();
+ const animated=value===null&&!window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+ isRolling=animated;
+ window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","掷骰 "+roll);draw();
+ if(animated)animateDice();else stopDiceAnimation();
  if(!moves().length){const d=roll;window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","无可移动飞机");newTurn(d);report("掷出 "+d+" 点暂无可走飞机 · "+(turn===0?"红方":"蓝方")+"回合");return true;}
  report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" · 点击高亮飞机");return true;
 }
 function play(index){
- if(paused||over||roll===null||(mode==="ai"&&turn===1))return false;
+ if(paused||over||isRolling||roll===null||(mode==="ai"&&turn===1))return false;
  const m=moves().find(x=>x.index===index);if(!m)return false;
  selectedPlane=null;
  history.push({pawns:pawns.map(row=>row.slice()),turn,roll});
@@ -232,6 +249,7 @@ function scheduleAI(){
  clearTimeout(aiTimer);if(paused||over||turn!==1||mode!=="ai")return;
  aiTimer=setTimeout(()=>{
   if(paused||over||turn!==1)return;
+  if(isRolling){scheduleAI();return;}
   if(roll===null){throwDice();if(turn===1&&roll!==null)scheduleAI();return;}
   const best=chooseAI();
   if(best){
@@ -243,14 +261,14 @@ function scheduleAI(){
 }
 function undo(){
  if(paused||over||!history.length)return;
- clearTimeout(aiTimer);const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
+ clearTimeout(aiTimer);stopDiceAnimation();const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
  for(let i=0;i<steps;i++){const h=history.pop();pawns=h.pawns.map(row=>row.slice());turn=h.turn;roll=h.roll;}
  over=false;selectedPlane=null;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
 }
 function newGame(){
- clearTimeout(aiTimer);pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;selectedPlane=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
+ clearTimeout(aiTimer);stopDiceAnimation();pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;selectedPlane=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
 }
-function pauseGame(){paused=true;selectedPlane=null;clearTimeout(aiTimer);report("已暂停");draw();}
+function pauseGame(){paused=true;selectedPlane=null;clearTimeout(aiTimer);stopDiceAnimation();report("已暂停");draw();}
 function resumeGame(){paused=false;report("继续游戏");draw();scheduleAI();}
 rollButton.onclick=()=>{if(mode==="ai"&&turn===1)return;throwDice();};
 diceFace.addEventListener("click",()=>rollButton.click());
@@ -260,7 +278,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111FlightTest={
   track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),position:(seat,i)=>position(seat,i),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
-  setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},pause:pauseGame,resume:resumeGame,undo,
+  setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,pause:pauseGame,resume:resumeGame,undo,
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
  };
 }
@@ -270,6 +288,6 @@ GameBridge.register({
  resume:resumeGame,
  setMode:v=>{mode=v==="two"?"two":"ai";draw();},
  setDifficulty:v=>{difficulty=v||"normal";},
- dispose(){paused=true;clearTimeout(aiTimer);}
+ dispose(){paused=true;clearTimeout(aiTimer);stopDiceAnimation();}
 });
 })();
