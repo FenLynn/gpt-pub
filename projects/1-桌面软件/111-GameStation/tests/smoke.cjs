@@ -241,6 +241,8 @@ const names=[
       top=box(timer),bottom=box(hint);
      return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
       main:box(root.querySelector(".game-main-board")).height,
+      rightHeight:r.height,
+      stageTexture:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
       left:{width:left.width,height:left.height,gap:b.left-left.right},
       center:box(root).left+box(root).width/2,
       rowLabels:[...scores.querySelectorAll(".reversi-count-name")].map(x=>x.textContent.trim()),
@@ -261,6 +263,10 @@ const names=[
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
     assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.board.height)<=3,
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
+    assert.ok(Math.abs(detail.rightHeight-detail.board.height)<=3,
+     name+" right tools must match physical board height: "+JSON.stringify(detail));
+    assert.ok(detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
+     name+" background must be softly shaded with no repeating stripe pattern: "+JSON.stringify(detail));
     assert.ok(detail.rowCount===2&&detail.verticalGap<=15,
      name+" two stacked stats and right-side timer must center vertically: "+JSON.stringify(detail));
     assert.equal(detail.listOverflow,"hidden",name+" move history must never horizontally scroll");
