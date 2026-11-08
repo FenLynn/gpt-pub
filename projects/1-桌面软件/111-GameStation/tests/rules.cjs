@@ -425,6 +425,29 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await star.evaluate(()=>window.__p111StarTest.count()),121,"Chinese Checkers requires exactly 121 holes");
   assert.deepEqual(await star.evaluate(()=>window.__p111StarTest.arms()),[10,10,10,10,10,10],"Each six-pointed star arm has 10 holes");
   assert.equal((await starState()).pieces,20,"Two players start with ten pieces each");
+
+  // Standard 2/3/4/6-player Chinese Checkers configurations and turn perspective.
+  for(const count of [2,3,4,6]){
+   await star.evaluate(n=>window.__p111StarTest.players(n),count);
+   const state=await starState();
+   assert.equal(state.playerCount,count,"Selected number of participants must apply");
+   assert.equal(state.pieces,count*10,"Each participant needs ten marbles");
+   assert.equal(new Set(state.activeArms).size,count,"All active camps must be distinct");
+   assert.equal(await star.locator(".star-seat-marker").count(),6,"All six seat numbers must be visible");
+   assert.equal(await star.locator("#starCounters .reversi-count-row").count(),count,"Each player gets a scoreboard row");
+   const backgrounds=await star.locator("#starCounters .star-count-disc").evaluateAll(els=>els.map(el=>getComputedStyle(el).backgroundImage));
+   assert.equal(new Set(backgrounds).size,count,"All active sides must have distinct marble colors");
+  }
+  await star.evaluate(()=>{const t=window.__p111StarTest;t.mode("two");t.players(6);});
+  const sixMove=await star.evaluate(()=>window.__p111StarTest.moves(0)[0]);
+  assert.ok(sixMove,"Six players must be able to start playing");
+  assert.equal(await star.evaluate(m=>window.__p111StarTest.move(m),sixMove),true);
+  assert.equal((await starState()).turn,1,"Six-player moves must rotate to the next seat");
+  assert.equal((await starState()).viewSeat,1,"The current local player's camp should face down");
+  await star.evaluate(()=>window.__p111StarTest.undo());
+  assert.equal((await starState()).viewSeat,0,"Undo must restore the perspective");
+  await star.evaluate(()=>window.__p111StarTest.players(2));
+
   const starProfiles=await star.evaluate(()=>["easy","normal","hard"].map(level=>window.__p111StarTest.aiProfile(level)));
   assert.deepEqual(starProfiles.map(p=>p.replyDepth),[0,0,1],"Hard Chinese Checkers AI evaluates an opponent reply");
   const firstStarMove=await star.evaluate(()=>{const t=window.__p111StarTest;t.mode("two");return t.moves(0)[0];});
@@ -451,7 +474,12 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.locator("#diceFace .flight-dice-pip").count(),1,"The initial die face must show one pip");
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
-  assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The board center must show the current player, not a generic lifecycle message");
+  assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The right turn rail must show the current player");
+  assert.equal(await flight.locator(".flight-center").count(),0,"Flight Chess must have no second inner board");
+  assert.equal(await flight.locator(".reversi-record-rail").count(),1,"Flight Chess must have a left move history");
+  const firstPlane=await flight.locator('[data-pawn="0-0"]').evaluate(el=>({x:Number(el.dataset.slotX),y:Number(el.dataset.slotY),cx:Number(el.dataset.centerX),cy:Number(el.dataset.centerY)}));
+  assert.equal(firstPlane.x,firstPlane.cx,"A solitary plane must be centered horizontally");
+  assert.equal(firstPlane.y,firstPlane.cy,"A solitary plane must be centered vertically");
   await flight.evaluate(()=>window.__p111FlightTest.pause());
   assert.equal(await flight.locator("#turnText").innerText(),"已暂停","Pause must be reflected in the board center");
   await flight.evaluate(()=>window.__p111FlightTest.resume());
