@@ -974,8 +974,9 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   align-items:center!important;justify-content:center!important;gap:8px!important
  }
  .game-root.game-layout.battleship-layout .fleet-boards #enemy{
-  width:min(100cqw,100cqh)!important;height:min(100cqw,100cqh)!important;
-  max-width:100%!important;max-height:100%!important;aspect-ratio:1!important
+  width:min(100cqw,calc(100cqh - 42px))!important;height:auto!important;
+  max-width:100%!important;max-height:calc(100% - 34px)!important;
+  aspect-ratio:1!important;flex:none!important
  }
  .game-root.game-layout.battleship-layout .fleet-own-preview{
   display:flex;justify-content:center;align-items:stretch;

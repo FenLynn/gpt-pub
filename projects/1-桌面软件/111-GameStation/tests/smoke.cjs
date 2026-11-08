@@ -408,7 +408,7 @@ const names=[
    :v.main.height*.70;
   assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
    name+" primary surface must maximize height within the symmetric side-gutter geometry: "+JSON.stringify({availableHeight,geometry:v}));
-  assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
+  assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically: "+JSON.stringify(v));
   assert.ok(v.overflow<=v.viewport+2,name+" no horizontal scrollbar");
   const rightClick=await frame.locator("#game").evaluate(el=>{const e=new MouseEvent("contextmenu",{bubbles:true,cancelable:true});el.dispatchEvent(e);return e.defaultPrevented;});
   assert.ok(rightClick,name+" right click must be captured by game");

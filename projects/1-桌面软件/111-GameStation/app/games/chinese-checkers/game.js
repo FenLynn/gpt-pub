@@ -82,7 +82,8 @@ function apply(move){
  history.push({pieces:new Map(pieces),turn});
  pieces.delete(move.from);pieces.set(move.to,turn);window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"蓝方":"红方","走棋");selected=null;targets.clear();draw(move);
  if(won(turn)){over=true;paused=true;document.getElementById("undoButton").disabled=true;clearTimeout(aiTimer);const name=turn===0?"红方":"蓝方";report(name+"获胜");GameBridge.send("GAME_OVER",{message:name+"获胜",score:10,win:turn===0});return true;}
- turn=1-turn;draw();report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
+ turn=1-turn;layoutRoot.dataset.turnSide=turn===0?"red":"blue";board.dataset.turn=String(turn);
+  report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
 }
 function click(k){
  if(paused||over||(mode==="ai"&&turn===1))return;
