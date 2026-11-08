@@ -255,6 +255,9 @@ const names=[
       top=box(timer),bottom=box(hint);
      return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
       main:box(root.querySelector(".game-main-board")).height,
+      physicalHeight:kind==="中国跳棋"?b.height*812/900:kind==="海战棋"?b.bottom-box(root.querySelector(".fleet-boards .fleet-board .fleet-title")).top:b.height,
+      physicalTop:kind==="中国跳棋"?b.top+(b.height-b.height*812/900)/2:kind==="海战棋"?box(root.querySelector(".fleet-boards .fleet-board .fleet-title")).top:b.top,
+      physicalBottom:kind==="中国跳棋"?b.bottom-(b.height-b.height*812/900)/2:b.bottom,
       primaryCenter:kind==="海战棋"?box(root.querySelector(".fleet-boards")).left+box(root.querySelector(".fleet-boards")).width/2:b.left+b.width/2,
       ownBoardInStage:kind==="海战棋"?root.querySelector(".fleet-boards").contains(root.querySelector("#own")):null,
       ownCenter:kind==="海战棋"?box(root.querySelector("#own")).left+box(root.querySelector("#own")).width/2:null,
@@ -270,7 +273,7 @@ const names=[
       hasOwnPreview:kind==="海战棋"?record.contains(root.querySelector("#own")):null,
       ownSquare:kind==="海战棋"?box(root.querySelector("#own")).width:null};
     },name);
-    const wantedRatio=name==="四子棋"?7/6:name==="中国跳棋"?10/9:1;
+    const wantedRatio=name==="四子棋"?7/6:1;
     const minHeightShare=name==="海战棋"?.35:name==="四子棋"?.74:name==="中国跳棋"?.72:.80;
     assert.ok(Math.abs(detail.board.width/detail.board.height-wantedRatio)<.03,
      name+" must retain actual board aspect ratio: "+JSON.stringify(detail));
@@ -278,12 +281,12 @@ const names=[
      name+" must prioritize the available height instead of a shallow board: "+JSON.stringify(detail));
     assert.ok(Math.abs(detail.primaryCenter-detail.center)<=2.5,
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
-    assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.board.height)<=3,
+    assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.physicalHeight)<=3,
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
-    assert.ok(Math.abs(detail.rightHeight-detail.board.height)<=3,
+    assert.ok(Math.abs(detail.rightHeight-detail.physicalHeight)<=3,
      name+" right tools must match physical board height: "+JSON.stringify(detail));
-    assert.ok(detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
-     name+" background must be softly shaded with no repeating stripe pattern: "+JSON.stringify(detail));
+    assert.ok((name==="海战棋"||name==="中国跳棋")?detail.stageTexture==="none":detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
+     name+" stage must not contain an unnecessary central colored frame: "+JSON.stringify(detail));
     assert.ok(detail.rowCount===2&&detail.verticalGap<=15,
      name+" two stacked stats and right-side timer must center vertically: "+JSON.stringify(detail));
     assert.equal(detail.listOverflow,"hidden",name+" move history must never horizontally scroll");
@@ -297,7 +300,7 @@ const names=[
      assert.deepEqual(detail.rowLabels,["红方棋子","黑方棋子"]);
      assert.equal(detail.currentSide,"red");
     }else if(name==="中国跳棋"){
-     assert.deepEqual(detail.rowLabels,["红方入营","蓝方入营"]);
+     assert.deepEqual(detail.rowLabels,["1号玩家入营","2号玩家入营"]);
      assert.equal(detail.currentSide,"red");
     }
    }
@@ -956,6 +959,18 @@ const names=[
    "Battleship attacks must record time in the left full-height history");
   assert.equal(await frame.locator(".fleet-boards #own").count(),1,
     "Own fleet must remain beside enemy sea at full size");
+  const seaFrame=await frame.locator("#game").evaluate(root=>{
+   const own=root.querySelector("#own"),enemy=root.querySelector("#enemy"),record=root.querySelector(".reversi-record-rail");
+   return{frame:getComputedStyle(enemy).borderWidth,stage:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
+    a:own.getBoundingClientRect().right,b:enemy.getBoundingClientRect().left,
+    history:record.getBoundingClientRect().height,
+    title:root.querySelector(".fleet-board .fleet-title").getBoundingClientRect().top,
+    bottom:own.getBoundingClientRect().bottom};
+  });
+  assert.equal(seaFrame.frame,"0px","Battleship removes redundant blue grid outline");
+  assert.equal(seaFrame.stage,"none","Battleship removes colored middle-stage box");
+  assert.ok(Math.abs(seaFrame.history-(seaFrame.bottom-seaFrame.title))<3,"Sea history matches full title-plus-board height");
+  assert.ok(seaFrame.b>seaFrame.a,"Sea boards must remain separate around the central axis");
   await page.screenshot({path:path.join(artifacts,"battleship-height-first-enemy.png")});
   // Western checkers: a real legal move changes side highlight and timed history.
   await open("西洋跳棋（8×8）");await start();
@@ -986,7 +1001,9 @@ const names=[
   await frame.locator(".star-hole.target").first().click();
   assert.equal(await frame.locator("#reversiMoveList li").count(),1,
    "Chinese Checkers move must enter the left history");
-  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"blue");
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"yellow");
+  assert.equal(await frame.locator(".star-seat-marker").count(),2,"Two-player star must show only two numbered seats");
+  assert.equal(await frame.locator(".star-seat-marker.is-current").getAttribute("data-position"),"2","Second player marker must flash without rotating the board");
   await frame.locator("#undoButton").click();
   assert.equal(await frame.locator("#reversiMoveList li").count(),0);
   assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"red");
