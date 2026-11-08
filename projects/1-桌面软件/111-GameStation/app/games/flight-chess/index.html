@@ -1,5 +1,5 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>飞行棋</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="../shared/turn-clock.css"></head>
-<body data-game="flight-chess"><main class="game-root game-layout flight-chess-layout" id="game">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>飞行棋</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="../shared/turn-clock.css"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css"></head>
+<body data-game="flight-chess"><main class="game-root game-layout gs-tools-open flight-chess-layout" id="game" data-board-measured="false">
 <aside class="game-guide"><h2>飞行棋</h2><p>红蓝双方各四架飞机，掷出六点起飞；到达对应颜色格子可前进四格，特殊飞行通道额外前进。撞到非安全格上的敌机将其送回机场。</p></aside>
 <aside class="reversi-record-rail" aria-label="飞行棋操作历史"><div class="reversi-record-heading"><strong>操作历史</strong><span id="reversiHistoryCount">0 步</span></div><div class="reversi-record-columns"><span>步数</span><span>操作方</span><span>用时</span></div><div class="reversi-record-scroll"><ol id="reversiMoveList" aria-label="飞行棋逐次操作历史"></ol></div></aside>
 <section class="game-main-board"><div class="board-wrap"><div class="flight-stage">
