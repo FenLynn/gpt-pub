@@ -110,6 +110,7 @@ function draw(){
  }));
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  rollButton.disabled=paused||over||roll!==null||turn===1&&mode==="ai";
+ document.getElementById("undoButton").disabled=paused||over||!history.length;
  renderDice();
 }
 function newTurn(dice){
@@ -152,7 +153,7 @@ function scheduleAI(){
  },difficulty==="easy"?360:240);
 }
 function undo(){
- if(paused||!history.length)return;
+ if(paused||over||!history.length)return;
  clearTimeout(aiTimer);const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
  for(let i=0;i<steps;i++){const h=history.pop();pawns=h.pawns.map(row=>row.slice());turn=h.turn;roll=h.roll;}
  over=false;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
