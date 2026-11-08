@@ -909,6 +909,57 @@ const names=[
    assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"0 步");
    assert.equal(await frame.locator("#reversiMoveList li").count(),0);
   await page.screenshot({path:path.join(artifacts,"reversi-refined-playing.png")});
+
+  // Connect Four: use actual player actions and the same Xiangqi/Reversi side rails.
+  await open("四子棋");await start();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"0 步");
+  await frame.locator(".connect4-slot").first().click();
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("red")?.textContent==="1");
+  assert.equal(await frame.locator("#yellow").innerText(),"0");
+  assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"1 步");
+  assert.equal(await frame.locator("#reversiMoveList li").count(),1);
+  const fourTurn=await frame.locator("#game").evaluate(el=>({
+   turn:el.dataset.turnSide,backgrounds:[...el.querySelectorAll(".reversi-count-row")].map(e=>getComputedStyle(e).backgroundColor)
+  }));
+  assert.equal(fourTurn.turn,"yellow","Red drop must hand the turn and highlight to yellow");
+  assert.notEqual(fourTurn.backgrounds[0],fourTurn.backgrounds[1],"Current Connect Four side must be highlighted");
+  await frame.locator("#undoButton").click();
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("red")?.textContent==="0");
+  assert.equal(await frame.locator("#reversiMoveList li").count(),0,"Connect Four undo must remove timed history entry");
+  assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"0 步");
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"red");
+  await page.screenshot({path:path.join(artifacts,"connect4-workspace-and-stacked-counters.png")});
+
+  // Genuine Connect Four end packets: AI uses win/loss, local duel names winner.
+  await page.locator('#modeControl button[data-mode-index="0"]').click();
+  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(1));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"获胜");
+  assert.ok(!(await page.locator("#gameResultMessage").innerText()).includes("红方"));
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(2));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"失败");
+  assert.ok(!(await page.locator("#gameResultMessage").innerText()).includes("黄方"));
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(1));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"红方获胜");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(2));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"黄方获胜");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(0));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"平局");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
    lines:el.querySelectorAll(".gomoku-lines line").length,
