@@ -1729,8 +1729,10 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  animation:p111-flight-goal-breathe 2.35s ease-in-out infinite!important
 }
 @keyframes p111-flight-goal-breathe{
- 0%,100%{opacity:.75;transform:scale(.96);filter:drop-shadow(0 0 3px #42bb72)}
- 50%{opacity:1;transform:scale(1.07);filter:drop-shadow(0 0 11px #27d57a)}
+ /* The clickable SVG target must remain geometrically stable: only its
+    light and halo breathe, never the hit box or its position. */
+ 0%,100%{opacity:.73;filter:drop-shadow(0 0 3px #42bb72)}
+ 50%{opacity:1;filter:drop-shadow(0 0 12px #27d57a)}
 }
 @media(prefers-reduced-motion:reduce){
  .game-root.game-layout.flight-chess-layout .flight-dice.rolling,
