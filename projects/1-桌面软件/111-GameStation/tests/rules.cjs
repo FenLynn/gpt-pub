@@ -481,6 +481,29 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await flight.goto(pathToFileURL(path.resolve(__dirname,"../app/games/flight-chess/index.html")).href+"?p111Test=1");
   await flight.waitForFunction(()=>!!window.__p111FlightTest);
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.track()),52,"Flight Chess track contains 52 squares");
+  // Ensure the printed board follows the SAME jumps and route indexing as advance().
+  const mapGuide=await flight.locator("#board").evaluate(board=>({
+   colors:[...board.querySelectorAll("[data-track-color]")].map(el=>el.getAttribute("data-track-color")),
+   jumps:[...board.querySelectorAll("[data-jump-seat]")].map(el=>({index:Number(el.dataset.track),seat:el.dataset.jumpSeat})),
+   arrows:[...board.querySelectorAll(".flight-route-arrow")].map(el=>({index:Number(el.dataset.flowIndex),next:Number(el.dataset.flowNext)})),
+   homes:board.querySelectorAll(".flight-home-arrow").length,
+   corridors:[...board.querySelectorAll(".flight-air-corridor")].map(el=>({from:Number(el.dataset.flightFrom),to:Number(el.dataset.flightTo)})),
+   legend:board.querySelectorAll(".flight-map-legend").length,
+   launch:[...board.querySelectorAll("[data-launch]")].map(el=>Number(el.dataset.track))
+  }));
+  assert.deepEqual(mapGuide.colors,Array.from({length:52},(_,i)=>["red","yellow","blue","green"][i%4]),
+   "Printed 4-color sequence must agree with actual red/blue jump predicates");
+  assert.deepEqual(mapGuide.launch,[0,26],"Red and blue start on their correctly colored grid");
+  assert.equal(mapGuide.arrows.length,52,"All 52 regular track squares require a direction arrow");
+  assert.ok(mapGuide.arrows.every(({index,next})=>next===(index+1)%52),
+   "Arrow destinations must agree with the 52-slot engine route");
+  assert.equal(mapGuide.homes,12,"Each finish lane needs six inward direction arrows");
+  assert.deepEqual(mapGuide.corridors,[{from:12,to:38},{from:38,to:12}],
+   "The two flyover lanes must coincide with the engine's real shortcut gates");
+  assert.equal(mapGuide.jumps.filter(j=>j.seat==="red").length,11);
+  assert.equal(mapGuide.jumps.filter(j=>j.seat==="blue").length,11);
+  assert.ok(mapGuide.legend>=3,"The board must visibly explain direction, jump and flight");
+
   assert.equal(await flight.locator("#diceFace .flight-dice-side svg.flight-dice-svg").count(),6,"Real 3D flight die must have six local SVG faces");
   assert.equal(await flight.locator("#diceFace .flight-dice-side[data-face=\"1\"] .flight-dice-pip").count(),1,"The front face must show one pip");
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
