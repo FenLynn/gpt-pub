@@ -148,7 +148,7 @@ const names=[
     return{ratio:r.width/r.height,holes:el.querySelectorAll(".star-hole").length,tokenCount:tokens.length,
      maxTokenDelta:Math.max(...tokens.map(t=>Math.abs(t.w-t.h)))};
    });
-   assert.ok(Math.abs(geometry.ratio-10/9)<=.025,"Chinese Checkers star board must retain its 10:9 geometry: "+JSON.stringify(geometry));
+   assert.ok(Math.abs(geometry.ratio-1)<=.015,"Chinese Checkers circular board must use a square SVG viewport: "+JSON.stringify(geometry));
    assert.equal(geometry.holes,121,"Chinese Checkers must retain all 121 holes");
    assert.equal(geometry.tokenCount,20,"Chinese Checkers must render both ten-piece camps");
    assert.ok(geometry.maxTokenDelta<=.5,"All Chinese Checkers tokens must remain circular: "+JSON.stringify(geometry));
