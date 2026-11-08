@@ -4,22 +4,36 @@ const layoutRoot=document.getElementById("game");
 // Align both side rails with the visible 810-unit wooden board frame,
 // rather than the 900-unit SVG stage with blank drawing margins.
 const fitHistoryHeight=()=>{
- const h=el.getBoundingClientRect().height*810/900;
- if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+ const rect=el.getBoundingClientRect(),h=rect.height*810/900;
+ if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
+  layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+  // Release the first paint only after workspace CSS, HUD and sizing are set.
+  if(document.getElementById("gs-turn-clock"))layoutRoot.dataset.boardMeasured="true";
+ }
 };
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
-window.addEventListener("resize",fitHistoryHeight);requestAnimationFrame(fitHistoryHeight);
+window.addEventListener("resize",fitHistoryHeight);
+fitHistoryHeight();requestAnimationFrame(fitHistoryHeight);
 const track=[
 [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
 [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],
 [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[9,6],[10,6],[11,6],[12,6],[13,6],[14,6],[14,7],
 [14,8],[13,8],[12,8],[11,8],[10,8],[9,8],[8,9],[8,10],[8,11],[8,12],[8,13],[8,14],[7,14]
 ];
-const pads=[[[1,10],[3,10],[1,12],[3,12]],[[11,1],[13,1],[11,3],[13,3]]];
+// Four parking positions divide each 296×296 airport into a symmetric 3×3
+// spacing scheme; all four plane centers are equidistant from its edges.
+const camps=[{x:66,y:535,c:"#eea49b"},{x:535,y:66,c:"#a5cde8"},
+ {x:66,y:66,c:"#c2e1b5"},{x:535,y:535,c:"#f4e1a2"}];
+const airportPads=({x,y})=>{
+ const x1=(x+296/3-100)/50,x2=(x+592/3-100)/50;
+ const y1=(y+296/3-100)/50,y2=(y+592/3-100)/50;
+ return[[x1,y1],[x2,y1],[x1,y2],[x2,y2]];
+};
+const pads=[airportPads(camps[0]),airportPads(camps[1])];
 const houses=[[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]]];
 const colors=["#d8584c","#4c91d2"];
 const dicePips={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,25],[72,25],[28,50],[72,50],[28,75],[72,75]]};
-let pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn=0,mode="ai",difficulty="normal",paused=true,over=false,roll=null,history=[],aiTimer=null,selectedPlane=null;
+let pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn=0,mode="ai",difficulty="normal",paused=true,over=false,roll=null,history=[],aiTimer=null,selectedPlane=null,expandedStackKey=null;
 const start=seat=>seat===0?0:26;
 const absolute=(seat,progress)=>progress<52?(start(seat)+progress)%52:-1;
 const safe=cell=>cell%13===0||cell%4===0;
@@ -180,7 +194,7 @@ function previewPlane(index){
  if(paused||over||isRolling||roll===null||(mode==="ai"&&turn===1))return false;
  if(!moves().some(m=>m.index===index))return false;
  if(selectedPlane===index)return play(index);
- selectedPlane=index;draw();
+ expandedStackKey=null;selectedPlane=index;draw();
  report((turn===0?"红方":"蓝方")+(index+1)+"号飞机：绿色序号是路径，请点击绿色终点确认");
  return true;
 }
@@ -206,7 +220,6 @@ function draw(){
  el.replaceChildren();
  const pos=(x,y)=>[100+x*50,100+y*50];
  el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:28,class:"flight-outline"}));
- const camps=[{x:66,y:535,c:"#eea49b"},{x:535,y:66,c:"#a5cde8"},{x:66,y:66,c:"#c2e1b5"},{x:535,y:535,c:"#f4e1a2"}];
  for(const camp of camps)el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:26,fill:camp.c,opacity:".7"}));
  track.forEach(([x,y],index)=>{
   const [cx,cy]=pos(x,y),seatColor=index%4;
@@ -244,33 +257,84 @@ function draw(){
   el.append(goal);
  }
 
- const occupied=new Map();
- pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
-  const [x,y]=position(seat,i,progress),k=x+","+y;
-  if(!occupied.has(k))occupied.set(k,[]);
-  occupied.get(k).push([seat,i]);
+ // A cell represents one or more airplanes. A pile never draws four
+ // overlapping circles: show its team color(s) and a large ×N count instead.
+ const posBuckets=new Map();
+ pawns.forEach((row,seat)=>row.forEach((progress,index)=>{
+  const [x,y]=position(seat,index,progress),key=x+","+y;
+  if(!posBuckets.has(key))posBuckets.set(key,[]);
+  const [cx,cy]=pos(x,y);
+  posBuckets.get(key).push({seat,index,cx,cy,key});
  }));
- const displacements=n=>{
-  if(n===1)return [[0,0]];
-  const columns=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/columns),step=n>4?12:18;
-  return Array.from({length:n},(_,i)=>[(i%columns-(columns-1)/2)*step,(Math.floor(i/columns)-(rows-1)/2)*step]);
- };
- pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
-  const [x,y]=position(seat,i,progress),[cx,cy]=pos(x,y);
-  const stack=occupied.get(x+","+y),index=stack.findIndex(([s,p])=>s===seat&&p===i);
-  const [dx,dy]=displacements(stack.length)[index];
-  const canMove=!paused&&!over&&!isRolling&&turn===seat&&roll!==null&&moves().some(m=>m.seat===seat&&m.index===i);
-  const selected=canMove&&selectedPlane===i;
-  const group=svgNode("g",{"data-pawn":seat+"-"+i,role:"button",tabindex:"0",
-   "data-slot-x":cx,"data-slot-y":cy,"data-center-x":cx+dx,"data-center-y":cy+dy,
-   transform:"translate("+(cx+dx)+" "+(cy+dy)+")",
-   class:"flight-aircraft"+(canMove?" can-move":"")+(selected?" is-selected":"")});
-  group.append(svgNode("circle",{cx:0,cy:0,r:stack.length>1?14:19,fill:colors[seat],stroke:"#fff","stroke-width":3}));
-  group.append(svgNode("path",{d:"M0 -12 l-6 15 l6 -4 l6 4 Z",fill:"#fff"}));
-  const count=svgNode("text",{x:0,y:12,"text-anchor":"middle",class:"flight-aircraft-number"});count.textContent=String(i+1);group.append(count);
-  group.addEventListener("click",()=>previewPlane(i));group.addEventListener("keydown",e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();previewPlane(i);}});
+ const playable=!paused&&!over&&!isRolling&&roll!==null&&!(mode==="ai"&&turn===1);
+ const legal=playable?new Set(moves().map(m=>m.index)):new Set();
+ for(const [key,members] of posBuckets){
+  const {cx,cy}=members[0];
+  if(members.length===1){
+   const {seat,index}=members[0];
+   const canMove=playable&&seat===turn&&legal.has(index);
+   const selected=canMove&&selectedPlane===index;
+   const group=svgNode("g",{"data-pawn":seat+"-"+index,role:"button",tabindex:"0",
+    "data-slot-x":cx,"data-slot-y":cy,"data-center-x":cx,"data-center-y":cy,
+    transform:"translate("+cx+" "+cy+")",
+    class:"flight-aircraft"+(canMove?" can-move":"")+(selected?" is-selected":"")});
+   group.append(svgNode("circle",{cx:0,cy:0,r:19,fill:colors[seat],stroke:"#fff","stroke-width":3}));
+   group.append(svgNode("path",{d:"M0 -12 l-6 15 l6 -4 l6 4 Z",fill:"#fff"}));
+   const label=svgNode("text",{x:0,y:12,"text-anchor":"middle",class:"flight-aircraft-number"});
+   label.textContent=String(index+1);group.append(label);
+   group.addEventListener("click",()=>previewPlane(index));
+   group.addEventListener("keydown",e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();previewPlane(index);}});
+   el.append(group);continue;
+  }
+  const choices=members.filter(m=>m.seat===turn&&legal.has(m.index));
+  const selected=members.some(m=>m.seat===turn&&m.index===selectedPlane);
+  const teams=[...new Set(members.map(m=>m.seat))];
+  const group=svgNode("g",{transform:"translate("+cx+" "+cy+")",
+   "data-stack-key":key,"data-stack-count":members.length,
+   "data-stack-members":members.map(m=>m.seat+"-"+m.index).join(","),
+   role:"button",tabindex:"0",
+   "aria-label":members.length+"架飞机叠放"+(choices.length?"，点击选择具体飞机":""),
+   class:"flight-stack"+(choices.length?" can-move":"")+(selected?" is-selected":"")});
+  group.append(svgNode("circle",{cx:-3,cy:3,r:19,fill:colors[teams[0]],opacity:".47",stroke:"#fff","stroke-width":2}));
+  group.append(svgNode("circle",{cx:0,cy:0,r:19,fill:colors[teams[0]],stroke:"#fff","stroke-width":3}));
+  if(teams.length>1)group.append(svgNode("path",{d:"M 0 -19 A 19 19 0 0 1 0 19 Z",fill:colors[teams[1]]}));
+  const tally=svgNode("text",{x:0,y:6,"text-anchor":"middle",class:"flight-stack-count"});
+  tally.textContent="×"+members.length;group.append(tally);
+  const pick=()=>{
+   if(!choices.length)return;
+   if(choices.length===1){previewPlane(choices[0].index);return;}
+   expandedStackKey=expandedStackKey===key?null:key;draw();
+   if(expandedStackKey)report("同格"+members.length+"架飞机 · 请选择飞机编号");
+  };
+  group.addEventListener("click",pick);
+  group.addEventListener("keydown",e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();pick();}});
   el.append(group);
- }));
+ }
+ if(expandedStackKey&&posBuckets.has(expandedStackKey)){
+  const bucket=posBuckets.get(expandedStackKey);
+  const choices=bucket.filter(m=>m.seat===turn&&legal.has(m.index));
+  if(choices.length>1){
+   const {cx,cy}=bucket[0];
+   const picker=svgNode("g",{class:"flight-stack-picker",role:"group","aria-label":"叠机选择"});
+   picker.append(svgNode("circle",{cx,cy,r:68,class:"flight-stack-picker-backdrop"}));
+   // Four cardinal quadrants leave the center count visible and fully
+   // separate the individual numbered choices.
+   const points=[[-42,-42],[42,-42],[-42,42],[42,42]];
+   choices.forEach((member,i)=>{
+    const [dx,dy]=points[i];
+    const option=svgNode("g",{transform:"translate("+(cx+dx)+" "+(cy+dy)+")",
+     class:"flight-stack-option","data-stack-choice":member.seat+"-"+member.index,
+     role:"button",tabindex:"0","aria-label":"选择"+(member.index+1)+"号飞机"});
+    option.append(svgNode("circle",{r:19,fill:colors[member.seat],stroke:"#fff","stroke-width":3}));
+    const text=svgNode("text",{x:0,y:6,"text-anchor":"middle",class:"flight-stack-option-number"});
+    text.textContent=String(member.index+1);option.append(text);
+    option.addEventListener("click",()=>previewPlane(member.index));
+    option.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();previewPlane(member.index);}});
+    picker.append(option);
+   });
+   el.append(picker);
+  }else expandedStackKey=null;
+ }
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
@@ -282,13 +346,13 @@ function draw(){
  if(!isRolling)renderDice();
 }
 function newTurn(dice){
- roll=null;selectedPlane=null;turn=dice===6?turn:1-turn;window.GameTurnClock?.handover(turn===0?"红方":"蓝方");
+ roll=null;selectedPlane=null;expandedStackKey=null;turn=dice===6?turn:1-turn;window.GameTurnClock?.handover(turn===0?"红方":"蓝方");
  report((turn===0?"红方":"蓝方")+(dice===6?" · 再掷一次":" · 请掷骰子"));
  draw();scheduleAI();
 }
 function throwDice(value=null){
  if(paused||over||isRolling||roll!==null)return false;
- selectedPlane=null;roll=value==null?fairDie():value;
+ selectedPlane=null;expandedStackKey=null;roll=value==null?fairDie():value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
  lastDie=roll;hasRolled=true;
  const animated=value===null&&!window.matchMedia("(prefers-reduced-motion:reduce)").matches;
@@ -307,7 +371,7 @@ function throwDice(value=null){
 function play(index){
  if(paused||over||isRolling||roll===null||(mode==="ai"&&turn===1))return false;
  const m=moves().find(x=>x.index===index);if(!m)return false;
- selectedPlane=null;
+ selectedPlane=null;expandedStackKey=null;
  history.push({pawns:pawns.map(row=>row.slice()),turn,roll});
  pawns[turn][index]=m.to;
  for(const enemy of opponentsAt(turn,m.to))pawns[1-turn][enemy]=-1;
@@ -336,12 +400,12 @@ function undo(){
  if(paused||over||!history.length)return;
  clearTimeout(aiTimer);stopDiceAnimation();pendingNoMove=false;const steps=mode==="ai"&&turn===0?Math.min(2,history.length):1;
  for(let i=0;i<steps;i++){const h=history.pop();pawns=h.pawns.map(row=>row.slice());turn=h.turn;roll=h.roll;}
- over=false;selectedPlane=null;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
+ over=false;selectedPlane=null;expandedStackKey=null;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
 }
 function newGame(){
- clearTimeout(aiTimer);stopDiceAnimation();pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
+ clearTimeout(aiTimer);stopDiceAnimation();pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;expandedStackKey=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
 }
-function pauseGame(){paused=true;selectedPlane=null;clearTimeout(aiTimer);stopDiceAnimation();report("已暂停");draw();}
+function pauseGame(){paused=true;selectedPlane=null;expandedStackKey=null;clearTimeout(aiTimer);stopDiceAnimation();report("已暂停");draw();}
 function resumeGame(){paused=false;if(pendingNoMove)finishPendingNoMove();else{report("继续游戏");draw();scheduleAI();}}
 rollButton.onclick=()=>{if(mode==="ai"&&turn===1)return;throwDice();};
 diceFace.addEventListener("click",()=>rollButton.click());
@@ -352,14 +416,14 @@ if(new URLSearchParams(location.search).has("p111Test")){
   track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,fairDie,pause:pauseGame,resume:resumeGame,undo,
-  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
+  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;expandedStackKey=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
  };
 }
 function resign(){
  if(paused||over)return false;
  const loser=mode==="ai"?0:turn,winner=1-loser;
  clearTimeout(aiTimer);stopDiceAnimation();
- over=true;paused=true;selectedPlane=null;roll=null;turn=winner;
+ over=true;paused=true;selectedPlane=null;expandedStackKey=null;roll=null;turn=winner;
  const label=s=>s===0?"红方":"蓝方";
  draw();const message=label(loser)+"认输 · "+label(winner)+"获胜";
  report(message);GameBridge.send("GAME_OVER",{message,winner:label(winner),score:pawns[0].filter(p=>p===57).length,
