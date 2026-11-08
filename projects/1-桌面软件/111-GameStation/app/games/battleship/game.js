@@ -63,5 +63,13 @@ if(new URLSearchParams(location.search).has("p111Test")){
   pause(){paused=true;clearTimeout(aiTimer);return fixtureState();}
  };
 }
+function resign(){
+ if(paused||over)return false;
+ clearTimeout(aiTimer);over=true;paused=true;
+ render();report("我方认输 · 敌方获胜");
+ GameBridge.send("GAME_OVER",{message:"我方认输 · 敌方获胜",winner:"敌方",score:Math.round(hits/Math.max(1,shots)*100),win:false});
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(aiTimer);}});
 })();
