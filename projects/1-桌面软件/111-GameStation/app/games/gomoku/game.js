@@ -159,9 +159,9 @@ function chooseAI(){
  }
  return best||[7,7];
 }
-function finish(p,line=[]){
+function finish(p,line=[],reason=""){
  over=true;winLine=line;render();
- const msg=p===0?"平局":mode==="ai"?(p===1?"你赢了":"你输了"):(p===1?"黑棋获胜":"白棋获胜");
+ const msg=(p===0?"平局":mode==="ai"?(p===1?"你赢了":"你输了"):(p===1?"黑棋获胜":"白棋获胜"))+(reason?" · "+reason:"");
  setStatus(msg);clearTimeout(resultTimer);resultTimer=setTimeout(()=>showResult(p),p===0?190:900);
  GameBridge.send("GAME_OVER",{message:msg,score:history.length,win:p===1});
 }
@@ -207,5 +207,12 @@ document.getElementById("gomokuReplay").addEventListener("click",()=>GameBridge.
 document.getElementById("gomokuLeave").addEventListener("click",()=>GameBridge.send("CONTROL",{action:"leave"}));
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(fitBoard);boardObserver.observe(boardArea);}
+function resign(){
+ if(paused||over)return false;
+ clearTimeout(aiTimer);paused=true;
+ finish(mode==="ai"?-1:-turn,[],"认输");
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);setStatus("已暂停");},resume(){paused=false;if(turn===-1&&mode==="ai")scheduleAI();else setStatus(turn===1?"轮到你了":"轮到白棋");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);clearTimeout(resultTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
 })();
