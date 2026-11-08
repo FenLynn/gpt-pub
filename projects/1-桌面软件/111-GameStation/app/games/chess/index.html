@@ -17,6 +17,12 @@
   <div class="key-instruction"><strong>Esc</strong><span>取消当前选中</span></div>
   <div class="guide-note">兵到达底线自动升变为后。王车易位、吃过路兵和将军判定均按标准规则处理。</div>
  </aside>
+ <aside class="chess-notation-rail" aria-label="国际象棋操作棋谱">
+  <div class="move-panel">
+   <div class="move-panel-title"><strong>操作历史</strong><span id="chessHistoryCount">0 步</span></div>
+   <ol id="moveList" aria-label="国际象棋逐步棋谱"></ol>
+  </div>
+ </aside>
  <section class="game-main-board">
   <div class="board-wrap">
    <div class="chess-frame"><div class="chess-board" id="board" role="grid" aria-label="国际象棋棋盘"></div></div>
@@ -32,7 +38,6 @@
   </div>
   <button class="game-btn" id="undoButton" type="button">悔棋</button>
   <button class="game-btn" id="flipButton" type="button">翻转棋盘</button>
-  <div class="move-panel"><div class="move-panel-title">棋谱</div><ol id="moveList"></ol></div>
   <div class="game-tool-note">白色棋子先行。人机模式由你执白；双人模式可在同一台设备轮流操作。</div>
  </aside>
 </main>
