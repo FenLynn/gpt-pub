@@ -481,25 +481,44 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await flight.goto(pathToFileURL(path.resolve(__dirname,"../app/games/flight-chess/index.html")).href+"?p111Test=1");
   await flight.waitForFunction(()=>!!window.__p111FlightTest);
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.track()),52,"Flight Chess track contains 52 squares");
-  assert.equal(await flight.locator("#diceFace svg.flight-dice-svg").count(),1,"Flight Chess dice must use a local SVG, not a Unicode font glyph");
-  assert.equal(await flight.locator("#diceFace .flight-dice-pip").count(),1,"The initial die face must show one pip");
+  assert.equal(await flight.locator("#diceFace .flight-dice-side svg.flight-dice-svg").count(),6,"Real 3D flight die must have six local SVG faces");
+  assert.equal(await flight.locator("#diceFace .flight-dice-side[data-face=\"1\"] .flight-dice-pip").count(),1,"The front face must show one pip");
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
   assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The right turn rail must show the current player");
-  // Real roll animation cycles through several visible pips AND ink/paper colors.
+  // Secure random source must reach all six faces. Animation must turn in
+  // <=200ms, rest for about 500ms, and finish on a genuine 3D cube face.
+  const dieSamples=await flight.evaluate(()=>Array.from({length:600},()=>window.__p111FlightTest.fairDie()));
+  assert.deepEqual([...new Set(dieSamples)].sort(),[1,2,3,4,5,6],
+   "Secure die must produce all six equiprobable values across real samples");
   const diceFrames=await flight.evaluate(async()=>{
    window.__p111FlightTest.animateDice();
-   const faces=new Set(),colors=new Set(),el=document.getElementById("diceFace");
-   for(let i=0;i<11;i++){
-    faces.add(el.dataset.displayFace);
-    colors.add(el.style.getPropertyValue("--dice-ink"));
+   const faces=new Set(),inks=new Set(),transitions=new Set(),restStarts=[],turnStarts=[],el=document.getElementById("diceFace");
+   let previous="";
+   for(let i=0;i<45;i++){
+    faces.add(Number(el.dataset.displayFace));
+    inks.add(el.style.getPropertyValue("--dice-ink"));
+    const duration=parseFloat(getComputedStyle(el.querySelector(".flight-dice-cube")).transitionDuration);
+    if(el.dataset.phase==="turn")transitions.add(duration);
+    if(previous!==el.dataset.phase){
+     if(el.dataset.phase==="rest")restStarts.push(performance.now());
+     if(el.dataset.phase==="turn")turnStarts.push(performance.now());
+     previous=el.dataset.phase;
+    }
     await new Promise(resolve=>setTimeout(resolve,80));
    }
-   return{faces:[...faces],colors:[...colors]};
+   return{faces:[...faces],inks:[...inks],transitions:[...transitions],
+    restDurations:restStarts.map((t,i)=>turnStarts[i+1]?turnStarts[i+1]-t:null).filter(n=>n!==null),
+    cubeFaces:el.querySelectorAll(".flight-dice-side").length,
+    final:el.dataset.displayFace};
   });
-  assert.ok(diceFrames.faces.length>=4&&diceFrames.colors.length>=4,
-   "Dice roll must display different numbered faces and distinct colored inks: "+JSON.stringify(diceFrames));
-  await flight.waitForFunction(()=>!document.getElementById("diceFace")?.classList.contains("rolling"),null,{timeout:3500});
+  assert.equal(diceFrames.cubeFaces,6,"The die must remain a physical six-sided 3D cube");
+  assert.ok(diceFrames.faces.length>=4&&diceFrames.inks.length>=4,
+   "3D dice must land on four distinct painted faces: "+JSON.stringify(diceFrames));
+  assert.ok(diceFrames.transitions.every(x=>x<=.2),"Every face turn must take no more than 200ms: "+JSON.stringify(diceFrames));
+  assert.ok(diceFrames.restDurations.length>=2&&diceFrames.restDurations.every(n=>n>=460),
+   "Each separate turn must be separated by a half-second readable rest: "+JSON.stringify(diceFrames));
+  await flight.waitForFunction(()=>!document.getElementById("diceFace")?.classList.contains("rolling"),null,{timeout:5000});
 
   assert.equal(await flight.locator(".flight-center").count(),0,"Flight Chess must have no second inner board");
   assert.equal(await flight.locator(".reversi-record-rail").count(),1,"Flight Chess must have a left move history");
@@ -558,10 +577,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.roll(2)),true);
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.moves().length),0,"A plane needs a six to depart");
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).turn,1,"No legal move passes to the other player");
+  const lastRoll=await flight.evaluate(()=>({
+   state:window.__p111FlightTest.state(),
+   face:document.getElementById("diceFace").dataset.displayFace,
+   caption:document.getElementById("flightDiceCaption").textContent
+  }));
+  assert.equal(lastRoll.state.lastDie,2,"No-move roll must retain its real value, not return to 1");
+  assert.equal(lastRoll.face,"2","Visible cube must show the last real value after passing turn");
+  assert.equal(lastRoll.caption,"上次 2 点","No legal move should still display the actual last die value");
   await flight.evaluate(()=>window.__p111FlightTest.roll(6));
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.moves().length),4,"Six points unlock four possible planes");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：6点","A six-point roll must update the accessible dice value");
-  assert.equal(await flight.locator("#diceFace .flight-dice-pip").count(),6,"A six-point roll must render six visible pips");
+  assert.equal(await flight.locator("#diceFace .flight-dice-side[data-face=\"6\"] .flight-dice-pip").count(),6,"A six-point roll must show six pips on its outward-facing side");
   assert.equal(await flight.locator("#turnText").innerText(),"蓝方 · 6点","The center label must show the active player and rolled value");
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
   const flightState=await flight.evaluate(()=>window.__p111FlightTest.state());
