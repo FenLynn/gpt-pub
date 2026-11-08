@@ -488,7 +488,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    arrows:[...board.querySelectorAll(".flight-route-arrow")].map(el=>({index:Number(el.dataset.flowIndex),next:Number(el.dataset.flowNext)})),
    homeArrows:[...board.querySelectorAll("[data-home-arrow]")].map(el=>el.dataset.homeArrow),
    homeTiles:board.querySelectorAll(".flight-home-tile").length,
-   holes:board.querySelectorAll(".flight-track-hole").length,
+   holes:board.querySelectorAll("[data-hole-track]").length,
    airports:[...board.querySelectorAll("[data-airport]")].map(el=>el.dataset.airport),
    parking:[...board.querySelectorAll("[data-airport-pad]")].reduce((m,el)=>(m[el.dataset.airportPad]=(m[el.dataset.airportPad]||0)+1,m),{}),
    pinwheel:board.querySelectorAll("[data-center-seat]").length,
@@ -499,13 +499,13 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.deepEqual(mapGuide.colors,Array.from({length:52},(_,i)=>["red","yellow","blue","green"][i%4]),
    "Classic four-color ring must agree with real red/blue jump logic");
   assert.deepEqual(mapGuide.launch,[0,26],"Two active takeoff tiles remain rule-aligned");
-  assert.equal(mapGuide.holes,52,"All 52 playable outer route tiles need white circular holes");
+  assert.equal(mapGuide.holes,52,"All 52 playable outer route tiles must retain exactly one route marker");
   assert.deepEqual(mapGuide.airports,["red","blue","yellow","green"],"All four corner hangars remain visible");
   assert.deepEqual(mapGuide.parking,{red:4,blue:4,yellow:4,green:4},"Four parking spaces in every corner");
   assert.equal(mapGuide.homeTiles,24,"Four six-tile colored lanes meet at the center");
   assert.deepEqual(mapGuide.homeArrows,["red","blue","yellow","green"]);
   assert.equal(mapGuide.pinwheel,4,"Classic center has four colored sectors");
-  assert.equal(mapGuide.arrows.length,8,"Use sparse arrows instead of crowding all 52 white circles");
+  assert.equal(mapGuide.arrows.length,4,"Keep a few guide arrows without crowding the printed classic board");
   assert.ok(mapGuide.arrows.every(({index,next})=>next===(index+1)%52),
    "Each sparse arrow must follow the real 52-slot movement order");
   assert.deepEqual(mapGuide.corridors,[{from:12,to:38},{from:38,to:12}],
