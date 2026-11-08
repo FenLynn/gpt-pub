@@ -1390,7 +1390,15 @@ const names=[
   // control inside its upper-right edge. Normal and Esc exit restore chrome.
   await open("飞行棋");await start();
   await page.locator("#fullscreenButton").click();
-  await page.waitForFunction(()=>document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
+  const entered=await page.evaluate(()=>({
+   shell:document.querySelector("#appShell").className,
+   workspace:document.querySelector("#workspaceView").className,
+   exitExists:!!document.querySelector("#exitFullscreenButton"),
+   exitHidden:document.querySelector("#exitFullscreenButton")?.hidden,
+   gameSrc:document.querySelector("#gameFrame").src,native:!!document.fullscreenElement
+  }));
+  assert.match(entered.shell,/game-only-fullscreen/,
+   "Game-only fullscreen must be active immediately: "+JSON.stringify({entered,errors:errors.slice(-3)}));
   const full=await page.evaluate(()=>{
    const rect=id=>{const r=document.querySelector(id).getBoundingClientRect();return{left:r.left,top:r.top,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
    return{sidebar:getComputedStyle(document.querySelector("#sidebar")).display,
