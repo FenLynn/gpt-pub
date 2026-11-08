@@ -23,16 +23,17 @@
 .gs-turn-clock-history li span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .gs-turn-clock-history time{font:700 11px/1 ui-monospace,Consolas,monospace;flex:none}
 .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
- display:grid!important;grid-template-columns:minmax(0,1fr) 158px!important;
+ --gs-clock-gutter:158px;
+ display:grid!important;grid-template-columns:var(--gs-clock-gutter) minmax(0,1fr) var(--gs-clock-gutter)!important;
  grid-template-rows:minmax(0,1fr)!important;gap:8px!important;padding:7px 9px!important;
  align-items:center!important;justify-items:stretch!important
 }
 .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>:not(.gs-turn-clock):not(.gs-notice){
- grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
+ grid-column:2!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
  width:100%!important;height:100%!important
 }
 .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>.gs-turn-clock{
- grid-column:2!important;grid-row:1!important;width:100%!important;align-self:center!important;
+ grid-column:3!important;grid-row:1!important;width:100%!important;align-self:center!important;
  justify-self:stretch!important;z-index:4
 }
 .game-root.gs-turn-clock-enabled.xiangqi-layout>.game-tools>.gs-turn-clock,
@@ -57,7 +58,7 @@
 /* SVG stages are sized from their actual board-wrap rectangle in turn-clock.js. */
 @media(max-width:900px){
  .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
-  grid-template-columns:minmax(0,1fr) 134px!important;column-gap:6px!important;padding:5px!important
+  --gs-clock-gutter:134px;column-gap:6px!important;padding:5px!important
  }
  .gs-turn-clock{padding:10px 8px;gap:6px}
  .gs-turn-clock-value{font-size:20px}

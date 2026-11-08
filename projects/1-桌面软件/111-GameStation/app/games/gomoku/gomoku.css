@@ -4,14 +4,14 @@
 .game-root.game-layout.gomoku-layout.gs-tools-open:not(.rail-collapsed),
 .game-root.game-layout.gomoku-layout.rail-collapsed{
  display:grid!important;
- grid-template-columns:minmax(0,min(calc(100vh - 18px),calc(100vw - 220px))) 165px!important;
+ grid-template-columns:165px minmax(0,min(calc(100dvh - 18px),calc(100% - 372px))) 165px!important;
  grid-template-rows:minmax(0,1fr)!important;justify-content:center!important;align-items:stretch!important;
  column-gap:18px!important;padding:8px 12px!important;overflow:hidden!important
 }
 .game-root.gomoku-layout>.game-guide{display:none!important}
 .game-root.gomoku-layout>.game-main-board,
 .game-root.gomoku-layout.gs-tools-open>.game-main-board{
- grid-column:1!important;grid-row:1!important;width:100%!important;height:100%!important;
+ grid-column:2!important;grid-row:1!important;width:100%!important;height:100%!important;
  min-height:0!important;min-width:0!important;margin:0!important;padding:0!important;overflow:visible!important
 }
 .game-root.gomoku-layout>.game-main-board>.board-wrap{
@@ -21,7 +21,7 @@
 .game-root.gomoku-layout>.game-tools,
 .game-root.gomoku-layout.gs-tools-open>.game-tools,
 .game-root.gomoku-layout.rail-collapsed>.game-tools{
- position:relative!important;display:flex!important;grid-column:2!important;grid-row:1!important;
+ position:relative!important;display:flex!important;grid-column:3!important;grid-row:1!important;
  align-self:center!important;justify-self:stretch!important;align-items:stretch!important;justify-content:center!important;
  top:auto!important;bottom:auto!important;right:auto!important;left:auto!important;
  width:165px!important;min-width:0!important;height:auto!important;min-height:0!important;max-height:none!important;
@@ -128,7 +128,7 @@
  .game-root.game-layout.gomoku-layout,
  .game-root.game-layout.gomoku-layout.gs-tools-open,
  .game-root.game-layout.gomoku-layout.rail-collapsed{
-  grid-template-columns:minmax(0,min(calc(100vh - 15px),calc(100vw - 155px))) 120px!important;
+  grid-template-columns:120px minmax(0,min(calc(100dvh - 15px),calc(100% - 256px))) 120px!important;
   gap:8px!important;padding:6px!important
  }
  .game-root.gomoku-layout>.game-tools{width:120px!important}

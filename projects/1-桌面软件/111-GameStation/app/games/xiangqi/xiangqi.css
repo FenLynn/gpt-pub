@@ -8,13 +8,13 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 .game-root.game-layout.xiangqi-layout.rail-collapsed,
 .game-root.game-layout.xiangqi-layout.gs-tools-open:not(.rail-collapsed){
  display:grid!important;
- /* Keep the three columns as one centered group. A 1fr center track left wide,
-    empty gutters between the height-constrained board and both side rails. */
+ /* Keep the CHESSBOARD itself exactly centered using symmetric virtual side tracks.
+    The right controls use only the near-board portion of the right track. */
  --xiangqi-notation-width:clamp(280px,24vw,340px);
  --xiangqi-actions-width:clamp(128px,11.3vw,160px);
  --xiangqi-board-track:min(calc((100dvh - 42px) * 8 / 9 + 16px),
-   calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 40px));
- grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-actions-width)!important;
+   calc(100% - var(--xiangqi-notation-width) - var(--xiangqi-notation-width) - 40px));
+ grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-notation-width)!important;
  grid-template-rows:minmax(0,1fr)!important;
  column-gap:6px!important;
  padding:8px 12px!important;
@@ -98,8 +98,8 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  display:flex!important;flex-direction:column!important;
  justify-content:center!important;align-items:stretch!important;
  align-self:stretch!important;justify-self:stretch!important;
- width:100%!important;height:100%!important;min-width:0!important;min-height:0!important;
- max-height:none!important;gap:15px!important;padding:0!important;margin:0!important;
+ width:var(--xiangqi-actions-width)!important;height:100%!important;min-width:0!important;min-height:0!important;
+ justify-self:start!important;max-height:none!important;gap:15px!important;padding:0!important;margin:0!important;
  border:0!important;border-radius:0!important;background:transparent!important;
  box-shadow:none!important;overflow:visible!important
 }
@@ -204,8 +204,8 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  .game-root.game-layout.xiangqi-layout.rail-collapsed{
  --xiangqi-notation-width:240px;--xiangqi-actions-width:118px;
  --xiangqi-board-track:min(calc((100dvh - 30px) * 8 / 9 + 14px),
-   calc(100dvw - var(--xiangqi-notation-width) - var(--xiangqi-actions-width) - 26px));
- grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-actions-width)!important;
+   calc(100% - var(--xiangqi-notation-width) - var(--xiangqi-notation-width) - 26px));
+ grid-template-columns:var(--xiangqi-notation-width) minmax(0,var(--xiangqi-board-track)) var(--xiangqi-notation-width)!important;
  column-gap:6px!important;padding:5px!important}
  .xiangqi-record-foot{display:none}
  .game-root.xiangqi-layout>.game-tools>.game-btn{height:45px!important;min-height:45px!important;font-size:12px!important;gap:5px!important}
