@@ -509,16 +509,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   // Selecting previews without moving; a green target confirms landing.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(6));
-  const dynamicRail=()=>flight.evaluate(()=>{
-   const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height};};
-   return{right:box("#game > .game-tools"),dice:box(".flight-play-controls"),options:box(".flight-move-panel"),
-    help:box("#flightMoveHelp")};
+  // Standalone rule fixtures intentionally hide the HUD/rails; check the
+  // stable document structure here and measure geometry in the shell smoke.
+  const stableOrder=await flight.locator("#game > .game-tools").evaluate(tools=>{
+   const nodes=[...tools.children],idx=id=>nodes.indexOf(tools.querySelector(id));
+   return{help:idx("#flightMoveHelp"),dice:idx(".flight-play-controls"),
+    options:idx(".flight-move-panel"),last:idx(".flight-move-panel")===nodes.length-1};
   });
-  const expandedRail=await dynamicRail();
-  assert.ok(expandedRail.help.top<expandedRail.dice.top&&expandedRail.dice.bottom<expandedRail.options.top,
-   "Flight instructions precede fixed dice controls; variable airplane options belong at the bottom: "+JSON.stringify(expandedRail));
-  assert.ok(Math.abs(expandedRail.options.bottom-expandedRail.right.bottom)<=5,
-   "Variable-height plane options must stay docked to right rail bottom: "+JSON.stringify(expandedRail));
+  assert.ok(stableOrder.help>=0&&stableOrder.help<stableOrder.dice&&stableOrder.dice<stableOrder.options&&stableOrder.last,
+   "Flight dynamic choices must be last and help text before the dice: "+JSON.stringify(stableOrder));
   const beforePreview=await flight.evaluate(()=>window.__p111FlightTest.state());
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.preview(0)),true);
   assert.deepEqual((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns,beforePreview.pawns,"Preview does not automatically move the selected airplane");
