@@ -458,7 +458,7 @@ window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
  if(m?.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!=="xiangqi")return;
- if(m.type==="HUD_STATE"&&m.payload?.finished&&!over)showManualEnd();
+ /* Manual ending is settled by the host; native effects remain for actual results. */
 });
 GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(over)return;if(turn==="black"&&mode==="ai"){report(nextTurnStatus()+" · AI 思考中");scheduleAI();}else report(nextTurnStatus());},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",fitBoard);}});
 })();
