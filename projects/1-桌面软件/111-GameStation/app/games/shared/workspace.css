@@ -801,3 +801,198 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
       - var(--gs-board-gap) - var(--gs-board-gap) - 12px))
  }
 }
+
+
+/* R44 HEIGHT-FIRST · The primary board gets width before either accessory rail.
+   Equal left/right tracks keep its center fixed; never distort 7:6, 1:1 or 10:9. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout){
+  --gs-board-gap:clamp(7px,.65vw,11px)!important;
+  --gs-board-side:clamp(156px,calc(50% - 50dvh - 7px),235px)!important;
+  --gs-board-track:min(calc(100dvh - 14px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
+  grid-template-columns:var(--gs-board-side) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
+  column-gap:var(--gs-board-gap)!important;justify-content:center!important
+ }
+ /* Four-in-a-row is a 7:6 landscape board; its width must follow its HEIGHT. */
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout{
+  --gs-board-side:clamp(156px,calc(50% - 58.333dvh - 7px),240px)!important;
+  --gs-board-track:min(calc(116.6667dvh - 17px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
+ }
+ /* The 121-hole Chinese-checkers star has a 10:9 geometry. */
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+  --gs-board-track:min(calc(111.111dvh - 16px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-main-board{
+  grid-column:2!important;grid-row:1!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.reversi-record-rail{
+  grid-column:1!important;grid-row:1!important;display:flex!important;
+  flex-direction:column!important;align-self:center!important;justify-self:stretch!important;
+  height:var(--reversi-board-height,100%)!important;max-height:100%!important;
+  min-height:0!important;min-width:0!important;overflow:hidden!important;
+  border:1px solid #d5e4ec!important;border-radius:12px!important;
+  background:rgba(250,252,254,.95)!important;box-shadow:0 5px 18px #294a6115!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools{
+  grid-column:3!important;grid-row:1!important;justify-self:start!important;
+  align-self:stretch!important;display:flex!important;flex-direction:column!important;
+  align-items:stretch!important;justify-content:center!important;
+  width:100%!important;height:100%!important;max-height:100%!important;
+  min-height:0!important;min-width:0!important;margin:0!important;padding:0!important;
+  gap:12px!important;overflow-x:hidden!important;overflow-y:auto!important;
+  border:0!important;background:transparent!important;box-shadow:none!important;
+  scrollbar-width:none!important
+ }
+ .game-root.game-layout.gs-tools-open.connect4-layout>.game-tools{
+  --connect4-actions-width:100%!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.gs-turn-clock{
+  flex:none!important;order:-10!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.game-btn{
+  order:1!important;min-height:49px!important;flex:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score{
+  order:2!important;flex:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.gs-board-tip{
+  order:3!important;margin-top:3px!important;color:#678294;font-size:12px;
+  line-height:1.65;padding:2px 2px;flex:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-heading{
+  display:flex;justify-content:space-between;align-items:center;gap:6px;
+  min-height:48px;padding:0 10px;border-bottom:1px solid #e3ebf0;color:#385e74
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-heading strong{
+  font-size:15px;font-weight:760
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-heading span{
+  font-size:11px;color:#849bab;white-space:nowrap
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-columns,
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList li{
+  display:grid;grid-template-columns:27px minmax(0,1fr) 54px;gap:4px;
+  align-items:center;min-width:0;font-variant-numeric:tabular-nums
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-columns{
+  min-height:35px;padding:7px 8px;font-size:11px;color:#849bab;
+  border-bottom:1px solid #e5edf2;flex:none
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-columns span:last-child{text-align:right}
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-record-scroll{
+  flex:1;min-height:0;min-width:0;overflow:hidden
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList{
+  margin:0;padding:6px 5px 10px;list-style:none;box-sizing:border-box;
+  width:100%;height:100%;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;
+  overscroll-behavior:contain
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList::-webkit-scrollbar{display:none!important}
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList li{
+  padding:9px 4px;min-height:39px;box-sizing:border-box;border-radius:7px;
+  font-size:11px;color:#46687b
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList li:nth-child(even){background:#f0f5f8}
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList li:last-child{background:#e7f2fa}
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList .reversi-move-action{
+  min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:630
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList time{
+  color:#476c84;font:700 10px/1.2 Consolas,monospace;text-align:right;white-space:nowrap
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) #reversiMoveList:empty:after{
+  content:"暂无操作记录";display:block;padding:23px 0;text-align:center;color:#98aebc;font-size:11px
+ }
+ /* Four-in-a-row retains full-height history, but uses compact columns when
+    horizontal space is more valuable for the actual board. */
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout .reversi-record-columns,
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout #reversiMoveList li{
+  grid-template-columns:27px minmax(0,1fr) 54px!important;gap:4px!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout .reversi-record-columns{padding:9px 7px!important}
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout #reversiMoveList li{padding:10px 4px!important;font-size:11px!important}
+}
+/* Hide the duplicated timed move list on the right; the expanded history is
+   always in the full-height left rail, while current turn time remains right. */
+.game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.gs-turn-clock .gs-turn-clock-history{
+ display:none!important
+}
+.game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score{
+ display:flex!important;flex-direction:column!important;gap:9px!important;
+ border:0!important;background:transparent!important;overflow:visible!important
+}
+.game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score>.reversi-count-row{
+ display:grid!important;grid-template-columns:30px minmax(0,1fr) auto!important;
+ gap:7px!important;align-items:center!important;min-height:65px!important;
+ padding:9px 8px!important;border:1px solid #dbe7ed!important;
+ border-radius:10px!important;background:#fff!important;
+ transition:background .15s ease,border-color .15s ease
+}
+.game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-count-name{
+ min-width:0!important;white-space:nowrap!important;line-height:1.2!important;
+ color:#637d90!important;font-size:11px!important
+}
+.game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout) .reversi-count-row strong{
+ color:#345a74!important;font-size:20px!important;font-variant-numeric:tabular-nums
+}
+.game-root.game-layout.checkers-layout .checkers-disc.reversi-count-disc,
+.game-root.game-layout.chinese-checkers-layout .star-count-disc.reversi-count-disc{
+ display:block!important;position:relative!important;flex:none!important;
+ width:29px!important;height:29px!important;aspect-ratio:1!important;
+ box-sizing:border-box!important;border-radius:50%!important
+}
+.game-root.game-layout.chinese-checkers-layout .star-count-disc.red{
+ background:radial-gradient(circle at 30% 23%,#ffd3b8,#dc6458 62%,#a73a3e);
+ border:2px solid #a73a3e;box-shadow:0 3px 7px #85514b55
+}
+.game-root.game-layout.chinese-checkers-layout .star-count-disc.blue{
+ background:radial-gradient(circle at 30% 23%,#e2f3ff,#609bd2 62%,#32669d);
+ border:2px solid #32669d;box-shadow:0 3px 7px #32669d55
+}
+.game-root.game-layout.battleship-layout .fleet-count-icon{
+ display:grid!important;place-items:center;width:29px;height:29px;
+ border-radius:50%;font-size:23px;color:#377b9d;background:#e5f2f9
+}
+.game-root.game-layout.checkers-layout[data-turn-side="red"] .reversi-count-row[data-side="red"],
+.game-root.game-layout.checkers-layout[data-turn-side="black"] .reversi-count-row[data-side="black"],
+.game-root.game-layout.chinese-checkers-layout[data-turn-side="red"] .reversi-count-row[data-side="red"],
+.game-root.game-layout.chinese-checkers-layout[data-turn-side="blue"] .reversi-count-row[data-side="blue"]{
+ border-color:#80b89e!important;background:#e8f5ec!important;
+ box-shadow:inset 3px 0 #4da27b,0 2px 8px #215e4730!important
+}
+/* Battleship: enlarge the interactive enemy sea to the maximum square in the
+   center; put the secondary own-fleet map in a left-rail preview. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout>.game-main-board>.fleet-boards{
+  display:grid!important;grid-template-columns:1fr!important;
+  width:100%!important;height:100%!important;place-items:center!important;
+  gap:0!important;min-width:0!important;min-height:0!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-boards>.fleet-board{
+  width:100%!important;height:100%!important;min-height:0!important;
+  display:flex!important;flex-direction:column!important;
+  align-items:center!important;justify-content:center!important;gap:8px!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-boards #enemy{
+  width:min(100cqw,100cqh)!important;height:min(100cqw,100cqh)!important;
+  max-width:100%!important;max-height:100%!important;aspect-ratio:1!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-own-preview{
+  display:flex;justify-content:center;align-items:stretch;
+  flex:none;min-width:0;padding:8px 6px 10px;border-bottom:1px solid #e4edf2
+ }
+ .game-root.game-layout.battleship-layout .fleet-own-preview>.fleet-board{
+  display:flex!important;align-items:center;flex-direction:column;
+  width:100%!important;min-width:0!important;gap:6px!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-own-preview .fleet-title{font-size:12px}
+ .game-root.game-layout.battleship-layout .fleet-own-preview #own{
+  width:min(100%,180px)!important;height:auto!important;aspect-ratio:1!important;
+  max-height:180px!important;flex:none!important
+ }
+}
+/* The more limited mobile layout keeps its original board surface / fleet pair. */
+@media(max-width:700px){
+ .game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.reversi-record-rail{display:none!important}
+ .game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score{display:flex!important;flex-direction:column!important}
+}
