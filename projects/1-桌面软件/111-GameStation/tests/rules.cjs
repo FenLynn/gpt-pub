@@ -491,6 +491,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const dieSamples=await flight.evaluate(()=>Array.from({length:600},()=>window.__p111FlightTest.fairDie()));
   assert.deepEqual([...new Set(dieSamples)].sort(),[1,2,3,4,5,6],
    "Secure die must be able to produce every value 1–6");
+  // The standalone rule fixture hides the right rail by default. Expose
+  // the physical die so Chromium actually paints interpolated 3D frames;
+  // geometry of the real GameStation shell is checked by smoke.cjs.
+  const diceVisible=await flight.evaluate(()=>{
+   const tools=document.querySelector("#game > .game-tools");
+   tools.style.setProperty("display","flex","important");
+   return document.getElementById("diceFace").getBoundingClientRect().width;
+  });
+  assert.ok(diceVisible>=60,"3D animation fixture must render a visible die");
   const diceRun=await flight.evaluate(async()=>{
    const api=window.__p111FlightTest;
    api.setPawns([[0,-1,-1,-1],[-1,-1,-1,-1]]);
