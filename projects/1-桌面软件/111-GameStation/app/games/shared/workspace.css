@@ -1327,7 +1327,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .game-root.game-layout.chinese-checkers-layout .star-player-options button{
  min-width:0!important;min-height:32px!important;padding:5px 1px!important;
  border:1px solid #ccdde6;border-radius:7px;
- background:#fff;color:#55748a;font:700 11px/1.2 inherit;cursor:pointer
+ background:#fff;color:#55748a;font:700 11px/1.2 "Segoe UI",Arial,sans-serif;cursor:pointer
 }
 .game-root.game-layout.chinese-checkers-layout .star-player-options button[aria-pressed="true"]{
  color:#23668b;border-color:#7baeca;background:#e4f1f9;
