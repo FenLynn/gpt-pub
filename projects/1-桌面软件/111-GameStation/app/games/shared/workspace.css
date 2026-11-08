@@ -1187,7 +1187,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards :is(#enemy,#own){
   flex:none!important;box-sizing:border-box!important;
   width:min(calc(50cqw - 17px),calc(100cqh - 56px))!important;
-  height:auto!important;aspect-ratio:1!important;
+  height:min(calc(50cqw - 17px),calc(100cqh - 56px))!important;aspect-ratio:1!important;
   max-width:100%!important;max-height:calc(100% - 48px)!important;
   border-color:#397fa4!important;
   background:radial-gradient(ellipse at 28% 18%,#b9e0f1,#85bcd8 85%)!important;
