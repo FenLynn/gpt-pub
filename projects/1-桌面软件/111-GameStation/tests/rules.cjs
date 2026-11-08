@@ -612,28 +612,30 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],0,"Clicking the green landing circle executes the move");
 
 
-  // Airport grid is a symmetric 2x2 layout in each 296x296 airport.
+  // The four physical reference airports have slightly perspective-adjusted
+  // 2x2 positions, but must remain centered around the traced airport rings.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
   const airportGeometry=await flight.locator("#board").evaluate(svg=>{
-   const camps=[{x:66,y:535},{x:535,y:66}],result=[];
+   const names=["red","blue"],out=[];
    for(let seat=0;seat<2;seat++){
+    const ring=svg.querySelector('[data-airport-circle="'+names[seat]+'"]');
+    const cx=Number(ring.getAttribute("cx")),cy=Number(ring.getAttribute("cy"));
     const points=Array.from({length:4},(_,i)=>{
      const pawn=svg.querySelector('[data-pawn="'+seat+'-'+i+'"]');
      return{x:Number(pawn.dataset.centerX),y:Number(pawn.dataset.centerY)};
     });
     const xs=[...new Set(points.map(p=>p.x))].sort((a,b)=>a-b);
     const ys=[...new Set(points.map(p=>p.y))].sort((a,b)=>a-b);
-    result.push({marginsX:[xs[0]-camps[seat].x,xs[1]-xs[0],camps[seat].x+296-xs[1]],
-     marginsY:[ys[0]-camps[seat].y,ys[1]-ys[0],camps[seat].y+296-ys[1]],
-     unique:new Set(points.map(p=>p.x+","+p.y)).size});
+    out.push({unique:new Set(points.map(p=>p.x+","+p.y)).size,
+     columns:xs.length,rows:ys.length,centerX:(xs[0]+xs[xs.length-1])/2,
+     centerY:(ys[0]+ys[ys.length-1])/2,cx,cy});
    }
-   return result;
+   return out;
   });
   for(const g of airportGeometry){
    assert.equal(g.unique,4,"All four parked planes must occupy separate airport positions");
-   assert.ok(Math.max(...g.marginsX)-Math.min(...g.marginsX)<.1&&
-    Math.max(...g.marginsY)-Math.min(...g.marginsY)<.1,
-    "Each airport must place planes at equal edge/internal spacing: "+JSON.stringify(g));
+   assert.ok(g.rows>=2&&g.columns>=2&&Math.abs(g.centerX-g.cx)<7&&
+    Math.abs(g.centerY-g.cy)<7,"Reference airport planes must be centered: "+JSON.stringify(g));
   }
   // Four planes on one square consolidate into a readable x4 badge.
   // No token may be lost: clicking the pile fans out its four real plane IDs.
