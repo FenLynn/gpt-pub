@@ -188,7 +188,7 @@ const names=[
     assert.ok(rail.buttons.every(b=>b.icon&&b.height>=32),
      name+" right action buttons need the shared icon and sufficient touch area: "+JSON.stringify(rail));
    }
-   if(name==="黑白棋"){
+   if(name==="黑白棋"||name==="四子棋"){
     const detail=await frame.locator("#game").evaluate(root=>{
      const left=root.querySelector(".reversi-record-rail"),right=root.querySelector(".game-tools"),
       board=root.querySelector("#board"),clock=root.querySelector("#gs-turn-clock"),
@@ -218,10 +218,11 @@ const names=[
     assert.equal(detail.clockHistory,"none","Reversi move list should exist only on the left");
     assert.ok(detail.rightCenter<=12,"Reversi right-side tools should be centered vertically: "+JSON.stringify(detail));
     assert.ok(detail.hintLast&&detail.rowGap>=6,"Reversi counters must stack with hint at the end");
-    assert.deepEqual(detail.rows.map(r=>r.label),["黑色棋子","白色棋子"]);
+    assert.deepEqual(detail.rows.map(r=>r.label),
+     name==="黑白棋"?["黑色棋子","白色棋子"]:["红色棋子","黄色棋子"]);
     assert.ok(detail.rows.every(r=>r.iconWidth>=25&&Math.abs(r.iconWidth-r.iconHeight)<=1),
      "Reversi counter icons must be large circles: "+JSON.stringify(detail.rows));
-    assert.equal(detail.turn,"black","Black goes first");
+    assert.equal(detail.turn,name==="黑白棋"?"black":"red","First player's side must be highlighted");
     assert.notEqual(detail.rows[0].background,detail.rows[1].background,
      "Current player must be distinctly highlighted: "+JSON.stringify(detail.rows));
     assert.equal(detail.listOverflowX,"hidden");
@@ -271,7 +272,7 @@ const names=[
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
      "Xiangqi wood board must not contain horizontal stripe gradients");
    }else {
-    const feasible=name==="黑白棋"
+    const feasible=(name==="黑白棋"||name==="四子棋")
     ?Math.min(v.root.height-30,v.root.width-2*(await frame.locator(".reversi-record-rail").evaluate(el=>el.getBoundingClientRect().width))-38)
     :Math.min(v.root.height-30,v.root.width-400);
     assert.ok(v.main.width>=feasible*.96&&v.main.width<=v.root.width,
@@ -354,6 +355,7 @@ const names=[
   const availableHeight=name==="中国象棋"
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
    :name==="黑白棋"?Math.min(v.main.height,Math.max(0,v.main.width-18))
+   :name==="四子棋"?Math.min(v.main.height,Math.max(0,(v.main.width-18)*6/7))
    :v.battleship?Math.min(v.main.height*.60,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
   assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
