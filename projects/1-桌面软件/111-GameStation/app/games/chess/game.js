@@ -191,7 +191,7 @@ function render(){
  document.getElementById("blackCaptured").textContent=captured.b.length?captured.b.map(t=>glyph.w[t]).join(" "):"—";
  document.getElementById("moveNumber").textContent=String(moveNo);
  const list=document.getElementById("moveList");list.innerHTML="";moveLog.slice(-24).forEach(row=>{const li=document.createElement("li");li.textContent=row;list.appendChild(li);});
- document.getElementById("undoButton").disabled=!history.length||paused;
+ document.getElementById("undoButton").disabled=!history.length||paused||over;
  document.getElementById("checkState").textContent=inCheck(board,turn)?"将军":"正常";
  const claim=document.getElementById("drawClaimButton");if(claim){claim.disabled=!canClaimDraw()||paused||over;claim.title=halfMoves>=100?"可按 50 回合规则要求和棋":"可按三次重复局面要求和棋";}
 }
@@ -211,8 +211,8 @@ function undo(){
 function newGame(){
  clearTimeout(aiTimer);board=initialBoard();turn="w";castle={wK:true,wQ:true,bK:true,bQ:true};ep=null;moveNo=1;history=[];moveLog=[];lastMove=null;captured={w:[],b:[]};halfMoves=0;positions=[positionKey()];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];over=false;paused=false;window.GameTurnClock?.reset("白方");render();reportTurn();
 }
-function pause(){paused=true;clearTimeout(aiTimer);statusEl.textContent="已暂停";GameBridge.report("已暂停",{});}
-function resume(){if(over)return;paused=false;reportTurn();if(mode==="ai"&&turn==="b")scheduleAI();}
+function pause(){paused=true;clearTimeout(aiTimer);document.getElementById("undoButton").disabled=true;statusEl.textContent="已暂停";GameBridge.report("已暂停",{});}
+function resume(){if(over)return;paused=false;render();reportTurn();if(mode==="ai"&&turn==="b")scheduleAI();}
 function onKey(e){if(e.key==="Escape"){selected=null;legal=[];render();}if(e.key.toLowerCase()==="u"){e.preventDefault();undo();}}
 document.addEventListener("keydown",onKey);
 document.getElementById("flipButton").addEventListener("click",()=>{flip=!flip;render();});
