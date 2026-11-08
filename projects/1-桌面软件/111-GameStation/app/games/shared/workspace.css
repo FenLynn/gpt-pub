@@ -997,3 +997,109 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.reversi-record-rail{display:none!important}
  .game-root.game-layout:is(.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score{display:flex!important;flex-direction:column!important}
 }
+
+
+/* R45 · Four-board visual polish only: Connect Four, Battleship and two
+   checkers variants. Preserve existing game mechanics, board ratios and
+   all other games' styles. Wood is softly shaded, never stripe-patterned. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-main-board{
+  padding:4px!important
+ }
+ /* Both accessory rails follow the physical board, not the full iframe.
+    Real board height is measured by each game's existing ResizeObserver. */
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools{
+  align-self:center!important;
+  height:min(100%,var(--reversi-board-height,100%))!important;
+  max-height:100%!important;
+  justify-content:space-between!important;
+  gap:clamp(8px,1.5cqh,14px)!important;
+  padding:1px 0!important;
+  overflow-y:auto!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.reversi-record-rail{
+  background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(241,247,251,.96))!important;
+  border-color:#d3e2ea!important;
+  box-shadow:0 6px 17px #27465b15!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.gs-turn-clock{
+  background:linear-gradient(145deg,#fff,#eef5f9)!important;
+  border-color:#d5e3ec!important;
+  box-shadow:0 4px 12px #294b6011!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.gs-board-tip{
+  line-height:1.55!important;
+  padding:2px 3px!important;
+  font-size:12px!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools>.reversi-side-score>.reversi-count-row{
+  box-shadow:0 2px 8px #36546a0b!important
+ }
+ /* The stage remains visually quiet so the board, rather than a busy
+    repeated background pattern, attracts attention. */
+ .game-root.game-layout.connect4-layout>.game-main-board{
+  background:radial-gradient(ellipse at 50% 42%,#f1f7fc 0%,#e0edf8 100%)!important
+ }
+ .game-root.game-layout.battleship-layout>.game-main-board{
+  background:radial-gradient(ellipse at 48% 38%,#eff9fd 0%,#d8ebf4 100%)!important
+ }
+ .game-root.game-layout.checkers-layout>.game-main-board{
+  background:radial-gradient(ellipse at 46% 36%,#fbf5e9 0%,#ecdfca 100%)!important
+ }
+ .game-root.game-layout.chinese-checkers-layout>.game-main-board{
+  background:radial-gradient(ellipse at 50% 39%,#fcf5e8 0%,#ead9be 100%)!important
+ }
+ /* Four-in-a-row: embossed blue plastic, with soft central lighting and
+    subdued wells, while preserving the existing 7:6 geometry and disc motion. */
+ .game-root.game-layout.connect4-layout #board{
+  background:radial-gradient(ellipse at 30% 20%,#4e92d2 0%,#2c70bc 56%,#194b8b 100%)!important;
+  box-shadow:0 11px 26px #224c7840,inset 0 2px #b5d6f04d!important
+ }
+ .game-root.game-layout.connect4-layout #board .connect4-slot{
+  background:radial-gradient(circle at 45% 33%,#1c589a,#153f78 85%)!important;
+  box-shadow:inset 0 3px 7px #0c2d5b85,0 1px #b4d9f14d!important
+ }
+ /* Battleship: the main sea remains large and the second fleet sits in
+    the left history rail. Restrained water tones; no tiled wave stripes. */
+ .game-root.game-layout.battleship-layout .fleet-boards #enemy{
+  background:radial-gradient(ellipse at 28% 18%,#b9e0f1,#85bcd8 85%)!important;
+  border-color:#397fa4!important;
+  box-shadow:0 9px 22px #2d628130!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-own-preview{
+  background:linear-gradient(180deg,#f2f8fb,#eaf3f8)!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-own-preview #own{
+  background:radial-gradient(ellipse at 28% 20%,#c6e5f3,#9bc7dc)!important;
+  box-shadow:0 3px 9px #31587520!important
+ }
+ .game-root.game-layout.battleship-layout .fleet-board .fleet-title{
+  background:transparent!important;
+  color:#406e89!important;
+  padding:4px 5px!important;
+  margin:0!important
+ }
+ /* Western checkers: calm natural wood shades, no repeating line/grain.
+    Alternating square contrast and move-selection highlights remain intact. */
+ .game-root.game-layout.checkers-layout #board{
+  border-color:#73533d!important;
+  background:radial-gradient(ellipse at 32% 18%,#987457,#684630 100%)!important;
+  box-shadow:0 11px 25px #5e422c36,inset 0 0 0 2px #c19d73!important
+ }
+ .game-root.game-layout.checkers-layout #board .checkers-square.light{
+  background:radial-gradient(circle at 33% 24%,#f6e7d0,#e7cfac 100%)!important
+ }
+ .game-root.game-layout.checkers-layout #board .checkers-square.dark{
+  background:radial-gradient(circle at 33% 24%,#9e7152,#815039 100%)!important
+ }
+ /* Chinese checkers: retain the original six-camp coloring and unobscured
+    SVG holes, with a warmer central wooden surface and understated border. */
+ .game-root.game-layout.chinese-checkers-layout .star-center{
+  fill:#f3e4c8!important;
+  stroke:#d5b991!important;
+  stroke-width:4
+ }
+ .game-root.game-layout.chinese-checkers-layout #board.star-checkers-board{
+  filter:drop-shadow(0 8px 13px #72563725)!important
+ }
+}
