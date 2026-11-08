@@ -79,6 +79,7 @@ function turnLabel(){
  const side=turn===0?"红方":"蓝方";
  if(over)return side+"获胜";
  if(paused)return "已暂停";
+ if(isRolling&&diceFace.dataset.phase==="spin")return side+" · 掷骰中";
  return roll===null?side+"回合":side+" · "+roll+"点";
 }
 function report(msg){status.textContent=msg;turnText.textContent=turnLabel();GameBridge.report(msg,{score:pawns[0].filter(p=>p===57).length,turn});}
@@ -159,6 +160,7 @@ function animateDice(){
   diceFace.dataset.phase="settle";
   renderDice(landing);
   document.getElementById("flightDiceCaption").textContent="点数 "+landing;
+  turnText.textContent=turnLabel();
   diceAnimationTimer=setTimeout(()=>{
    if(!isRolling)return;
    stopDiceAnimation();
