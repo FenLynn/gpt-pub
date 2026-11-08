@@ -443,9 +443,9 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
 $("helpButton").addEventListener("click",()=>{openHelp();});$("helpClose").addEventListener("click",closeHelp);
 let gameFullscreenRequested=false,nativeGameFullscreen=false;
 function syncGameFullscreen(){
- const on=gameFullscreenRequested&&!!active&&!$("#workspaceView").classList.contains("hidden");
+ const on=gameFullscreenRequested&&!!active&&!$("workspaceView").classList.contains("hidden");
  shell.classList.toggle("game-only-fullscreen",on);
- const exit=$("#exitFullscreenButton");exit.hidden=!on;
+ const exit=$("exitFullscreenButton");exit.hidden=!on;
  exit.setAttribute("aria-hidden",String(!on));
 }
 async function exitGameFullscreen(){
@@ -456,7 +456,7 @@ async function exitGameFullscreen(){
 }
 $("fullscreenButton").addEventListener("click",async()=>{
  if(gameFullscreenRequested){await exitGameFullscreen();return;}
- if(active&&!$("#workspaceView").classList.contains("hidden")){
+ if(active&&!$("workspaceView").classList.contains("hidden")){
   // The user's fullscreen action means an immersive, game-only layout.
   // Never depend on the browser's native Fullscreen API: it is disabled by
   // some file:// hosts and remote desktops, and can exit spontaneously.
