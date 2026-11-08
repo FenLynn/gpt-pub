@@ -1,0 +1,43 @@
+/* P111 Flight Chess · page-specific first-paint and stacked-aircraft styles.
+   This loads in <head> AFTER the existing shared styles, so no late
+   workspace stylesheet insertion or visible rail reshuffle is needed. */
+@media (min-width:701px){
+ #game.flight-chess-layout[data-board-measured="false"]{
+  visibility:hidden!important;
+ }
+}
+#game.flight-chess-layout .flight-stack{
+ cursor:pointer;filter:drop-shadow(0 2px 2px #23435b40);
+}
+#game.flight-chess-layout .flight-stack.can-move{
+ filter:drop-shadow(0 0 6px #38c678);
+ animation:p111-flight-pile-glow 1.4s ease-in-out infinite alternate;
+}
+#game.flight-chess-layout .flight-stack.is-selected{
+ filter:drop-shadow(0 0 8px #ffcd5e);
+}
+#game.flight-chess-layout .flight-stack-count,
+#game.flight-chess-layout .flight-stack-option-number{
+ fill:#fff;font:800 16px/1 "Segoe UI",Arial,sans-serif;
+ paint-order:stroke;stroke:#2543576b;stroke-width:1.1px;
+ pointer-events:none;
+}
+#game.flight-chess-layout .flight-stack-picker-backdrop{
+ fill:#f8feffec;stroke:#57ae8c;stroke-width:2;
+ filter:drop-shadow(0 5px 9px #264e6240);
+}
+#game.flight-chess-layout .flight-stack-option{
+ cursor:pointer;filter:drop-shadow(0 2px 3px #1b567a47);
+}
+#game.flight-chess-layout .flight-stack-option:hover,
+#game.flight-chess-layout .flight-stack-option:focus-visible{
+ filter:drop-shadow(0 0 7px #26ba70);
+}
+#game.flight-chess-layout .flight-stack-option-number{font-size:16px}
+@keyframes p111-flight-pile-glow{
+ from{filter:drop-shadow(0 0 3px #46b97d)}
+ to{filter:drop-shadow(0 0 9px #2edc76)}
+}
+@media (prefers-reduced-motion:reduce){
+ #game.flight-chess-layout .flight-stack.can-move{animation:none}
+}
