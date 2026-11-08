@@ -286,7 +286,8 @@ const names=[
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   const availableHeight=name==="中国象棋"
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
-   :v.main.height*(v.battleship?.60:.70);
+   :v.battleship?Math.min(v.main.height*.60,Math.max(0,(v.main.width-52)/2))
+   :v.main.height*.70;
   assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
    name+" primary surface must maximize height within the symmetric side-gutter geometry: "+JSON.stringify({availableHeight,geometry:v}));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
