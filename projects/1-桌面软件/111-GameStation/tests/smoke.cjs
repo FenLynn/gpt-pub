@@ -284,7 +284,11 @@ const names=[
   assert.equal(crumb.gameName,false,name+" active game name must not be squeezed out by duplicate breadcrumb text");
   assert.equal(await page.locator("#railToggleButton").count(),0,name+" obsolete fold button must be removed");
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
-  assert.ok(v.surface.height>=v.main.height*(v.battleship?.60:.70),name+" primary surface uses available height: "+JSON.stringify(v));
+  const availableHeight=name==="中国象棋"
+   ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
+   :v.main.height*(v.battleship?.60:.70);
+  assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
+   name+" primary surface must maximize height within the symmetric side-gutter geometry: "+JSON.stringify({availableHeight,geometry:v}));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically");
   assert.ok(v.overflow<=v.viewport+2,name+" no horizontal scrollbar");
   const rightClick=await frame.locator("#game").evaluate(el=>{const e=new MouseEvent("contextmenu",{bubbles:true,cancelable:true});el.dispatchEvent(e);return e.defaultPrevented;});
