@@ -3,8 +3,10 @@
 "use strict";
 const root=document.getElementById("game"),gameId=document.body.dataset.game;
 if(!root||!gameId)return;
-/* Keep all board-game timers in their right-side accessory rails. */
-const host=root.querySelector(":scope > .game-tools");
+/* Reversi's move-time history occupies a dedicated left record rail.
+   Other board games retain their own right-side timing cards. */
+const historyRail=gameId==="reversi"?root.querySelector(":scope > .reversi-record-rail"):null;
+const host=historyRail||root.querySelector(":scope > .game-tools");
 if(!host)return;
 const panel=document.createElement("section");
 panel.id="gs-turn-clock";panel.className="gs-turn-clock";
@@ -12,9 +14,9 @@ panel.setAttribute("aria-label","本回合耗时和逐次操作记录");
 panel.innerHTML='<div class="gs-turn-clock-header"><span>本回合耗时</span><b id="gs-turn-side">—</b></div>'+
  '<strong class="gs-turn-clock-value" id="gs-turn-elapsed" role="timer">00:00</strong>'+
  '<div class="gs-turn-clock-latest" id="gs-turn-latest">暂无操作记录</div>'+
- '<details class="gs-turn-clock-history" id="gs-turn-details"><summary>操作用时 <span id="gs-turn-count">0</span></summary>'+
+ '<details class="gs-turn-clock-history" id="gs-turn-details"'+(historyRail?' open':'')+'><summary>操作用时 <span id="gs-turn-count">0</span></summary>'+
  '<ol id="gs-turn-log" aria-label="逐次操作耗时"></ol></details>';
-host.prepend(panel);
+if(historyRail)host.append(panel);else host.prepend(panel);
 root.classList.add("gs-turn-clock-enabled");
 /* Fit both special SVG stages from the REAL first-column rectangle. SVG height:auto
    otherwise falls back to 300px intrinsic width after the timer rail is introduced. */
@@ -52,6 +54,7 @@ function refresh(){
  sideNode.textContent=side;
  elapsedNode.textContent=fmt(turnMs+(running?Math.max(0,performance.now()-mark):0));
  counter.textContent=String(records.length);
+ if(historyRail)historyRail.querySelector("#reversiHistoryCount").textContent=records.length+" 步";
  root.dataset.turnClockSide=side;
  root.dataset.turnClockCount=String(records.length);
  root.dataset.turnClockRunning=String(running);
