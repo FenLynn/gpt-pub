@@ -229,7 +229,11 @@ const names=[
      "Xiangqi notation scrollbar must overlay without horizontal shifting: "+JSON.stringify(scroll));
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
      "Xiangqi wood board must not contain horizontal stripe gradients");
-   }else assert.ok(v.main.width>=v.root.width*.68,name+" right rail leaves main board wide enough");
+   }else {
+    const feasible=Math.min(v.root.height-30,v.root.width-400);
+    assert.ok(v.main.width>=feasible*.96&&v.main.width<=v.root.width,
+     name+" board must retain maximum usable playfield width inside centered symmetric side tracks: "+JSON.stringify({feasible,geometry:v}));
+   }
   }
   const header=await page.evaluate(()=>{
    const r=q=>{const a=q.getBoundingClientRect();return{x:a.x,right:a.right,y:a.y,bottom:a.bottom,width:a.width,centerX:a.x+a.width/2,centerY:a.y+a.height/2};};
