@@ -1386,3 +1386,172 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 @media(max-width:700px){
  .game-root.game-layout.flight-chess-layout>.reversi-record-rail{display:none!important}
 }
+
+
+/* R47 · user-verified three-game refinements (Battleship, Chinese Checkers,
+   Flight Chess only). The large colored stage rectangle is NOT a board. */
+.game-root.game-layout:is(.battleship-layout,.chinese-checkers-layout,.flight-chess-layout)>.game-main-board{
+ background:transparent!important;
+ border:0!important;
+ box-shadow:none!important;
+ padding:0!important;
+ border-radius:0!important
+}
+.game-root.game-layout:is(.battleship-layout,.chinese-checkers-layout,.flight-chess-layout)>.game-main-board .board-wrap{
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards :is(#enemy,#own){
+  border:0!important;border-radius:0!important;padding:0!important;
+  background:transparent!important;box-shadow:none!important;
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:clamp(8px,.8cqw,12px)!important;
+  justify-items:center!important;align-items:center!important;
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards>.fleet-board{
+  justify-content:center!important;gap:5px!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards .fleet-title{
+  min-height:25px!important;font-weight:700!important
+ }
+ /* One full sea-card is 10×10 cells plus its label. Both boards are
+    equal and their middle gap straddles the central vertical axis. */
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout .fleet-boards :is(#enemy,#own){
+  width:min(calc(50cqw - 16px),calc(100cqh - 53px))!important;
+  height:min(calc(50cqw - 16px),calc(100cqh - 53px))!important;
+  aspect-ratio:1!important;max-height:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+  --gs-board-track:min(calc(100dvh - 14px),
+   calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout>.game-main-board{
+  padding:0!important
+ }
+ .game-root.game-layout.chinese-checkers-layout #board.star-checkers-board{
+  aspect-ratio:1!important;
+  max-width:100%!important;max-height:100%!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-main-board{
+  padding:0!important
+ }
+}
+.game-root.game-layout.chinese-checkers-layout #board.star-checkers-board{
+ aspect-ratio:1!important;
+}
+.game-root.game-layout.chinese-checkers-layout .star-seat-marker.is-current{
+ transform-box:fill-box;transform-origin:center;
+ filter:drop-shadow(0 0 8px #ffd065) drop-shadow(0 0 6px #ef983e);
+ animation:p111-star-current-seat 1.25s ease-in-out infinite alternate
+}
+.game-root.game-layout.chinese-checkers-layout .star-seat-marker.is-current circle{
+ stroke:#fff4ad;stroke-width:5
+}
+@keyframes p111-star-current-seat{
+ 0%{opacity:.85;transform:scale(1.04);filter:drop-shadow(0 0 3px #efb849)}
+ 100%{opacity:1;transform:scale(1.25);filter:drop-shadow(0 0 12px #ffd44d) drop-shadow(0 0 7px #f1a23e)}
+}
+.game-root.game-layout.chinese-checkers-layout .star-seat-marker:not(.is-current){opacity:.96}
+.game-root.game-layout.chinese-checkers-layout .star-seat-number{
+ font-weight:800!important;font-size:19px!important
+}
+.game-root.game-layout.chinese-checkers-layout .reversi-side-score>.reversi-count-row[data-seat] .reversi-count-name{
+ font-size:12px!important
+}
+/* Route preview only appears for selected playable airplane after dice roll. */
+.game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls{
+ width:100%!important;box-sizing:border-box!important;
+}
+.game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls .flight-dice{
+ width:min(100%,clamp(86px,13cqh,146px))!important;
+ height:auto!important;aspect-ratio:1!important;
+ max-width:100%!important;
+ filter:drop-shadow(0 3px 8px #28608829)
+}
+.game-root.game-layout.flight-chess-layout .flight-dice-caption{
+ color:#416d89;font-size:12px;font-weight:720
+}
+.game-root.game-layout.flight-chess-layout>.game-tools>.flight-move-panel{
+ width:100%!important;box-sizing:border-box!important;
+ display:flex!important;flex-direction:column!important;
+ gap:7px!important;padding:9px!important;
+ background:linear-gradient(150deg,#fff,#edf6fb)!important;
+ border:1px solid #d3e4ed!important;border-radius:11px!important;
+ order:0!important
+}
+.game-root.game-layout.flight-chess-layout .flight-move-heading{
+ display:flex;align-items:center;justify-content:space-between;gap:5px;
+ color:#3d6985;font-size:12px
+}
+.game-root.game-layout.flight-chess-layout .flight-move-heading span{
+ font-size:11px;color:#7293a6
+}
+.game-root.game-layout.flight-chess-layout .flight-move-options{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px
+}
+.game-root.game-layout.flight-chess-layout .flight-move-choice{
+ min-width:0;min-height:27px;padding:3px 2px;
+ font:650 11px/1.3 "Segoe UI",Arial,sans-serif;
+ color:#346784;background:#f0f8fe;cursor:pointer;
+ border:1px solid #c2daeb;border-radius:7px
+}
+.game-root.game-layout.flight-chess-layout .flight-move-choice.is-selected{
+ border-color:#58b57a;background:#e5f8eb;color:#21774c;
+ box-shadow:0 0 0 2px #74d3984a
+}
+.game-root.game-layout.flight-chess-layout .flight-move-panel p{
+ margin:0;color:#7895a7;font-size:11px;line-height:1.45
+}
+.game-root.game-layout.flight-chess-layout .flight-aircraft.can-move>circle:first-child{
+ stroke:#dfffe9;stroke-width:4;
+ animation:p111-flight-ready 1.15s ease-in-out infinite alternate;
+ filter:drop-shadow(0 0 5px #3bcc81)
+}
+.game-root.game-layout.flight-chess-layout .flight-aircraft.is-selected>circle:first-child{
+ stroke:#fcdb78;stroke-width:5;
+ filter:drop-shadow(0 0 11px #ffcd60)!important;
+ animation:p111-flight-selected .8s ease-in-out infinite alternate
+}
+@keyframes p111-flight-ready{
+ 0%{stroke-width:3;filter:drop-shadow(0 0 3px #44b978)}
+ 100%{stroke-width:5;filter:drop-shadow(0 0 9px #34d77b)}
+}
+@keyframes p111-flight-selected{
+ from{stroke-width:4;filter:drop-shadow(0 0 5px #f7ba47)}
+ to{stroke-width:6;filter:drop-shadow(0 0 13px #ffd15a)}
+}
+.game-root.game-layout.flight-chess-layout .flight-preview-path{
+ fill:none;stroke:#27a65c;stroke-width:4;stroke-linecap:round;
+ stroke-dasharray:5 8;opacity:.7;pointer-events:none
+}
+.game-root.game-layout.flight-chess-layout .flight-path-step{
+ pointer-events:none
+}
+.game-root.game-layout.flight-chess-layout .flight-preview-circle{
+ fill:#f5fff7f5;stroke:#36b46a;stroke-width:3.4
+}
+.game-root.game-layout.flight-chess-layout .flight-preview-number{
+ fill:#26854f;font:800 18px/1 Arial,sans-serif;pointer-events:none
+}
+.game-root.game-layout.flight-chess-layout .flight-path-target{
+ cursor:pointer;filter:drop-shadow(0 0 6px #36b56f);
+ animation:p111-flight-target .95s ease-in-out infinite alternate
+}
+.game-root.game-layout.flight-chess-layout .flight-target-ring{
+ fill:#e7faed;stroke:#1ba658;stroke-width:5;
+}
+.game-root.game-layout.flight-chess-layout .flight-target-label{
+ fill:#19854a;font:800 17px/1 Arial,sans-serif;pointer-events:none
+}
+@keyframes p111-flight-target{
+ from{opacity:.82;filter:drop-shadow(0 0 4px #4ac87f)}
+ to{opacity:1;filter:drop-shadow(0 0 12px #31d079)}
+}
+@media(prefers-reduced-motion:reduce){
+ .game-root.game-layout.chinese-checkers-layout .star-seat-marker.is-current,
+ .game-root.game-layout.flight-chess-layout .flight-aircraft.can-move>circle:first-child,
+ .game-root.game-layout.flight-chess-layout .flight-aircraft.is-selected>circle:first-child,
+ .game-root.game-layout.flight-chess-layout .flight-path-target{animation:none!important}
+}
