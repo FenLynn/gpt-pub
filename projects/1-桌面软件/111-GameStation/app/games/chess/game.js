@@ -269,6 +269,20 @@ if(new URLSearchParams(location.search).has("p111Test")){
     board:board.map(row=>row.map(p=>p?p.c+p.t:""))};}
  };
 }
+function resign(){
+ if(paused||over)return false;
+ const loser=mode==="ai"?"w":turn,winner=loser==="w"?"b":"w";
+ const label=color=>color==="w"?"白方":"黑方";
+ over=true;paused=true;clearTimeout(aiTimer);
+ document.getElementById("promotionChooser")?.remove();
+ selected=null;legal=[];promotionChoices=null;
+ const message=mode==="ai"?"你已认输 · 黑方获胜":label(loser)+"认输 · "+label(winner)+"获胜";
+ render();document.getElementById("checkState").textContent="认输";
+ statusEl.textContent=message;GameBridge.report(message,{score:winner==="w"?1:0});
+ GameBridge.send("GAME_OVER",{message,winner:label(winner),score:winner==="w"?1:0,win:mode==="ai"?false:winner==="w"});
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({
  init(payload){mode=payload.mode==="two"?"two":"ai";difficulty=payload.difficulty||"normal";newGame();},
  newGame,pause,resume,
