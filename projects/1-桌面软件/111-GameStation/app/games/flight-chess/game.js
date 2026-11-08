@@ -94,7 +94,7 @@ function fairDie(){
  do{crypto.getRandomValues(words);}while(words[0]>=limit);
  return words[0]%6+1;
 }
-let diceAnimationTimer=null,isRolling=false,lastDie=1,pendingNoMove=false,diceCube=null;
+let diceAnimationTimer=null,isRolling=false,lastDie=1,hasRolled=false,pendingNoMove=false,diceCube=null;
 const diceOrientation={1:[0,0],2:[-90,0],3:[0,-90],4:[0,90],5:[90,0],6:[0,180]};
 const DICE_TURN_MS=180,DICE_REST_MS=500;
 function makeDiceCube(){
@@ -278,7 +278,7 @@ function draw(){
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
  document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===57).length);
  rollButton.disabled=paused||over||isRolling||roll!==null||turn===1&&mode==="ai";
- document.getElementById("flightDiceCaption").textContent=roll===null?(lastDie===1&&!history.length&&!pendingNoMove?"等待掷骰":"上次 "+lastDie+" 点"):"点数 "+roll;
+ document.getElementById("flightDiceCaption").textContent=roll===null?(hasRolled?"上次 "+lastDie+" 点":"等待掷骰"):"点数 "+roll;
  renderChoices();
  document.getElementById("undoButton").disabled=paused||over||!history.length;
  renderDice();
@@ -292,7 +292,7 @@ function throwDice(value=null){
  if(paused||over||isRolling||roll!==null)return false;
  selectedPlane=null;roll=value==null?fairDie():value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
- lastDie=roll;
+ lastDie=roll;hasRolled=true;
  const animated=value===null&&!window.matchMedia("(prefers-reduced-motion:reduce)").matches;
  isRolling=animated;
  pendingNoMove=moves().length===0;
@@ -341,7 +341,7 @@ function undo(){
  over=false;selectedPlane=null;window.GameTurnClock?.rewind(steps,turn===0?"红方":"蓝方");draw();report("已悔棋");scheduleAI();
 }
 function newGame(){
- clearTimeout(aiTimer);stopDiceAnimation();pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;lastDie=1;pendingNoMove=false;selectedPlane=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
+ clearTimeout(aiTimer);stopDiceAnimation();pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]];turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;history=[];over=false;paused=false;window.GameTurnClock?.reset("红方");draw();report("红方先行 · 掷出六点起飞");
 }
 function pauseGame(){paused=true;selectedPlane=null;clearTimeout(aiTimer);stopDiceAnimation();report("已暂停");draw();}
 function resumeGame(){paused=false;if(pendingNoMove)finishPendingNoMove();else{report("继续游戏");draw();scheduleAI();}}
@@ -351,10 +351,10 @@ document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111FlightTest={
-  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),
+  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,fairDie,pause:pauseGame,resume:resumeGame,undo,
-  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;pendingNoMove=false;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
+  setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
  };
 }
 function resign(){
