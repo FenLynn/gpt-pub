@@ -136,6 +136,17 @@ const names=[
     assert.equal(await frame.locator("#xiangqiResult[hidden]").count(),1,"Xiangqi result must begin hidden");
   }
   if(name==="飞行棋"){
+   const firstPaint=await frame.locator("#game").evaluate(root=>({
+    preloadedWorkspace:document.querySelectorAll("head #gameWorkspaceStyles").length,
+    preloadedFlightStyle:!!document.querySelector('head link[href="./flight.css"]'),
+    layoutClass:root.classList.contains("gs-tools-open"),
+    measured:root.dataset.boardMeasured==="true",
+    visibility:getComputedStyle(root).visibility,
+    guide:getComputedStyle(root.querySelector(".game-guide")).display
+   }));
+   assert.ok(firstPaint.preloadedWorkspace===1&&firstPaint.preloadedFlightStyle&&firstPaint.layoutClass&&
+    firstPaint.measured&&firstPaint.visibility==="visible"&&firstPaint.guide==="none",
+    "Flight Chess needs final head-loaded styles and board sizing before first visible frame: "+JSON.stringify(firstPaint));
    const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-side[data-face=\"1\"] .flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
    assert.equal(dice.svg,6,"Flight Chess must render six separately painted vector cube faces");
    assert.equal(dice.pips,1,"Initial Flight Chess die must show one pip");
