@@ -32,8 +32,9 @@ function advance(seat,progress,dice){
   let cell=absolute(seat,target);
   // The color-marked flight squares provide a single four-square jump.
   if(cell%4===(seat===0?0:2)&&target+4<=51){target+=4;cell=absolute(seat,target);}
-  // One mid-board flight shortcut per side, no repeat jumps in the same throw.
-  if(cell===(seat===0?12:38)&&target+12<=51)target+=12;
+  // A flight channel crosses the 52-square circuit to the opposite side.
+  // Its two endpoints are exactly 26 public-track positions apart.
+  if(cell===(seat===0?12:38)&&target+26<=51)target+=26;
  }
  return target;
 }
@@ -142,7 +143,7 @@ function throwDice(value=null){
  roll=value==null?1+Math.floor(Math.random()*6):value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
  window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","掷骰 "+roll);draw();animateDice();
- if(!moves().length){const d=roll;report("掷出 "+roll+" · 没有可移动飞机");newTurn(d);return true;}
+ if(!moves().length){const d=roll;window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","无可移动飞机");newTurn(d);report("掷出 "+d+" 点暂无可走飞机 · "+(turn===0?"红方":"蓝方")+"回合");return true;}
  report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" · 点击高亮飞机");return true;
 }
 function play(index){
