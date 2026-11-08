@@ -173,7 +173,8 @@ const names=[
      name+" right controls must dock next to the centered physical board, not the screen edge: "+JSON.stringify({proximity,view:{width,height},geometry:v}));
     const rail=await frame.locator(".game-tools").evaluate(el=>({
      border:getComputedStyle(el).borderLeftWidth,background:getComputedStyle(el).backgroundColor,
-     status:getComputedStyle(el.querySelector(".game-status")||el).display,
+     status:el.querySelector(":scope > .game-status,:scope > .turn-indicator")?
+      getComputedStyle(el.querySelector(":scope > .game-status,:scope > .turn-indicator")).display:"none",
      clock:!!el.querySelector(".gs-turn-clock"),
      buttons:[...el.querySelectorAll(":scope > button.game-btn")].map(b=>({
       id:b.id,icon:!!b.querySelector("svg"),height:b.getBoundingClientRect().height
