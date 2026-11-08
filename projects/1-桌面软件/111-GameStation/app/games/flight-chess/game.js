@@ -135,6 +135,34 @@ function draw(){
  houses.forEach((home,seat)=>home.forEach(([x,y],i)=>{const [cx,cy]=pos(x,y);el.append(svgNode("rect",{x:cx-21,y:cy-21,width:42,height:42,rx:7,fill:seat===0?"#eba69b":"#a9cbed",stroke:"#c7ab93","stroke-width":2,"data-lane":seat+"-"+i}));}));
  // A single board only: keep the center open and the home lanes unobscured.
  el.append(svgNode("circle",{cx:450,cy:450,r:37,class:"flight-center-pad"}));
+ // Numbered stepping stones belong to the chosen airplane only, never to a
+ // decorative second board. A separate green end marker commits the move.
+ const preview=selectedPlane===null||paused||over?null:routeFor(selectedPlane);
+ if(preview){
+  const coords=preview.steps.map(step=>{
+   const [x,y]=position(turn,selectedPlane,step.progress);
+   return{...step,cx:100+x*50,cy:100+y*50};
+  });
+  if(coords.length>1)el.append(svgNode("polyline",{
+   points:coords.map(p=>p.cx+","+p.cy).join(" "),class:"flight-preview-path"}));
+  for(const step of coords){
+   const marker=svgNode("g",{class:"flight-path-step","data-preview-step":step.number,
+    "aria-label":"前进第"+step.number+"格"});
+   marker.append(svgNode("circle",{cx:step.cx,cy:step.cy,r:17,class:"flight-preview-circle"}));
+   const label=svgNode("text",{x:step.cx,y:step.cy+6,"text-anchor":"middle",class:"flight-preview-number"});
+   label.textContent=String(step.number);marker.append(label);el.append(marker);
+  }
+  const [gx,gy]=position(turn,selectedPlane,preview.final),tx=100+gx*50,ty=100+gy*50;
+  const goal=svgNode("g",{class:"flight-path-target",role:"button",tabindex:"0",
+    "data-preview-to":preview.final,"aria-label":"点击确认将飞机移动到目标位置"});
+  goal.append(svgNode("circle",{cx:tx,cy:ty,r:24,class:"flight-target-ring"}));
+  const end=svgNode("text",{x:tx,y:ty+6,"text-anchor":"middle",class:"flight-target-label"});
+  end.textContent="终";goal.append(end);
+  goal.addEventListener("click",()=>play(selectedPlane));
+  goal.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();play(selectedPlane);}});
+  el.append(goal);
+ }
+
  const occupied=new Map();
  pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
   const [x,y]=position(seat,i,progress),k=x+","+y;
