@@ -1243,6 +1243,25 @@ const names=[
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("飞行棋");await start();
+  // In the real GameStation shell, changing move-option count may never
+  // move the dice/clock. The variable options panel grows from the bottom.
+  const flightLayout=()=>frame.locator("#game").evaluate(root=>{
+   const rect=q=>{const r=root.querySelector(q).getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height};};
+   return{right:rect(":scope > .game-tools"),dice:rect(".flight-play-controls"),
+    help:rect("#flightMoveHelp"),options:rect(".flight-move-panel")};
+  });
+  const beforeOptions=await flightLayout();
+  assert.ok(beforeOptions.right.height>0&&beforeOptions.help.top<beforeOptions.dice.top,
+   "Flight right rail must render fixed help above its dice: "+JSON.stringify(beforeOptions));
+  await frame.locator("#game").evaluate(()=>{Math.random=()=>.999;});
+  await frame.locator("#rollButton").click();
+  await frame.locator("#flightMoveOptions button").first().waitFor({state:"visible",timeout:3500});
+  const afterOptions=await flightLayout();
+  assert.ok(Math.abs(afterOptions.options.bottom-afterOptions.right.bottom)<6,
+   "Airplane selector must remain flush with the bottom of its right rail: "+JSON.stringify(afterOptions));
+  assert.ok(Math.abs(afterOptions.dice.top-beforeOptions.dice.top)<3,
+   "Dice panel must never shift when selectable airplane count changes: "+JSON.stringify({beforeOptions,afterOptions}));
+
   await page.locator('#modeControl button[data-mode-index="1"]').click();
   await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",{message:"蓝方获胜",win:false}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
