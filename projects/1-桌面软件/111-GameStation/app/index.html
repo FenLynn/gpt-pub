@@ -147,6 +147,19 @@
             </button>
           </div>
         </div>
+        <section class="game-result-overlay" id="gameResultOverlay" hidden aria-hidden="true" aria-label="本局结算">
+          <div class="game-result-card" id="gameResultCard" data-result="ended">
+            <div class="game-result-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg></div>
+            <span class="game-result-kicker">已结束</span>
+            <h2 id="gameResultTitle">本局结束</h2>
+            <p id="gameResultMessage">本局已结束</p>
+            <div class="game-result-score" id="gameResultScore" hidden><span id="gameResultScoreLabel">本局得分</span><strong id="gameResultScoreValue">0</strong></div>
+            <div class="game-result-actions">
+              <button type="button" id="gameResultReplay">再来一局</button>
+              <button type="button" id="gameResultLeave">离开</button>
+            </div>
+          </div>
+        </section>
       </div>
     </section>
   </main>
