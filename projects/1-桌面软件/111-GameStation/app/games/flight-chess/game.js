@@ -96,7 +96,7 @@ function fairDie(){
 }
 let diceAnimationTimer=null,isRolling=false,lastDie=1,hasRolled=false,pendingNoMove=false,diceCube=null;
 const diceOrientation={1:[0,0],2:[-90,0],3:[0,-90],4:[0,90],5:[90,0],6:[0,180]};
-const DICE_TURN_MS=180,DICE_REST_MS=500;
+const DICE_SPIN_MS=500,DICE_SETTLE_MS=500;
 function makeDiceCube(){
  diceCube=document.createElement("div");diceCube.className="flight-dice-cube";
  // Each color is associated with its physical face, not the random result.
@@ -113,11 +113,11 @@ function makeDiceCube(){
  }
  diceFace.replaceChildren(diceCube);
 }
-function renderDice(display=null,turning=false){
+function renderDice(display=null){
  const value=display??(roll??lastDie);
  if(!diceCube||!diceFace.contains(diceCube))makeDiceCube();
  const [rx,ry]=diceOrientation[value];
- diceCube.style.transition=turning?`transform ${DICE_TURN_MS}ms cubic-bezier(.23,.72,.33,1)`:"none";
+ diceCube.style.transition="none";
  diceCube.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;
  diceFace.style.setProperty("--dice-ink",diceInk[value-1]);
  diceFace.style.setProperty("--dice-paper",dicePaper[value-1]);
@@ -139,37 +139,33 @@ function finishPendingNoMove(){
  report("掷出 "+die+" 点无可移动飞机 · "+(turn===0?"红方":"蓝方")+"回合");
 }
 function animateDice(){
+ // ONE throw: an uninterrupted 500 ms 3D spin, one final result, then
+ // 500 ms of complete stillness. No intermediate stops or face announcements.
  clearTimeout(diceAnimationTimer);
- isRolling=true;diceFace.classList.add("rolling");diceFace.dataset.phase="turn";
- // Show different genuine cube sides before landing on the preselected
- // random result. Each 180 ms turn is followed by 500 ms at rest.
- const landing=roll??lastDie,faces=[],pool=[1,2,3,4,5,6].filter(n=>n!==landing);
- let previous=Number(diceFace.dataset.displayFace)||1;
- for(let i=0;i<3;i++){
-  const options=pool.filter(n=>!faces.includes(n)&&n!==previous);
-  const next=options[(fairDie()-1)%options.length];
-  faces.push(next);previous=next;
- }
- faces.push(landing);
- let step=0;
- const tick=()=>{
+ if(!diceCube||!diceFace.contains(diceCube))makeDiceCube();
+ isRolling=true;diceFace.classList.add("rolling");diceFace.dataset.phase="spin";
+ const landing=roll??lastDie;
+ const from=Number(diceFace.dataset.displayFace)||1;
+ const [fx,fy]=diceOrientation[from],[tx,ty]=diceOrientation[landing];
+ diceCube.style.transition="none";
+ diceCube.style.transform=`rotateX(${fx}deg) rotateY(${fy}deg)`;
+ // Commit starting pose before the continuous transition begins.
+ void diceCube.offsetWidth;
+ diceCube.style.transition=`transform ${DICE_SPIN_MS}ms cubic-bezier(.14,.55,.4,1)`;
+ diceCube.style.transform=`rotateX(${720+tx}deg) rotateY(${720+ty}deg)`;
+ diceFace.setAttribute("aria-label","骰子旋转中");
+ diceAnimationTimer=setTimeout(()=>{
   if(!isRolling)return;
-  if(step>=faces.length){
+  diceFace.dataset.phase="settle";
+  renderDice(landing);
+  document.getElementById("flightDiceCaption").textContent="点数 "+landing;
+  diceAnimationTimer=setTimeout(()=>{
+   if(!isRolling)return;
    stopDiceAnimation();
    if(pendingNoMove)finishPendingNoMove();
    else{draw();if(roll!==null)report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" 点 · 请选择飞机");}
-   return;
-  }
-  diceFace.dataset.phase="turn";
-  renderDice(faces[step++],true);
-  diceAnimationTimer=setTimeout(()=>{
-   if(!isRolling)return;
-   diceFace.dataset.phase="rest";
-   diceAnimationTimer=setTimeout(tick,DICE_REST_MS);
-  },DICE_TURN_MS);
- };
- // Wait for the first paint so CSS transform interpolation actually occurs.
- diceAnimationTimer=setTimeout(tick,20);
+  },DICE_SETTLE_MS);
+ },DICE_SPIN_MS);
 }
 function routeFor(index){
  const move=moves().find(m=>m.index===index);if(!move)return null;
@@ -278,10 +274,10 @@ function draw(){
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
  document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===57).length);
  rollButton.disabled=paused||over||isRolling||roll!==null||turn===1&&mode==="ai";
- document.getElementById("flightDiceCaption").textContent=roll===null?(hasRolled?"上次 "+lastDie+" 点":"等待掷骰"):"点数 "+roll;
+ document.getElementById("flightDiceCaption").textContent=isRolling?"掷骰中…":roll===null?(hasRolled?"上次 "+lastDie+" 点":"等待掷骰"):"点数 "+roll;
  renderChoices();
  document.getElementById("undoButton").disabled=paused||over||!history.length;
- renderDice();
+ if(!isRolling)renderDice();
 }
 function newTurn(dice){
  roll=null;selectedPlane=null;turn=dice===6?turn:1-turn;window.GameTurnClock?.handover(turn===0?"红方":"蓝方");
@@ -303,7 +299,7 @@ function throwDice(value=null){
  if(animated)animateDice();
  else{stopDiceAnimation();if(pendingNoMove)finishPendingNoMove();}
  if(!animated&&!pendingNoMove)report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" 点 · 点击高亮飞机");
- else if(animated)report((turn===0?"红方":"蓝方")+" 掷骰中 · 实际点数将在翻转完成后确定");
+ else if(animated)report((turn===0?"红方":"蓝方")+" 掷骰中 · 连续转动后显示结果");
  return true;
 }
 function play(index){
