@@ -694,6 +694,7 @@ const names=[
     await page.locator("#gameResultOverlay").waitFor({state:"visible"});
     await page.locator("#gameResultLeave").click();
     await page.locator("#libraryView").waitFor({state:"visible"});
+    await page.locator('[data-category="all"]').click();
    }else{
     await page.locator("#newGameButton").click();
     await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
