@@ -565,7 +565,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
    clock on right, stacked disc counts with current-player emphasis. */
 @media(min-width:701px){
  .game-root.game-layout.reversi-layout.gs-tools-open:not(.rail-collapsed){
-  --gs-board-side:clamp(260px,20vw,320px);
+  --gs-board-side:clamp(260px,20vw,320px)!important;
   --reversi-actions-width:clamp(154px,12vw,186px)
  }
  .game-root.game-layout.reversi-layout>.reversi-record-rail{
@@ -658,5 +658,14 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout.reversi-layout>.reversi-record-rail{display:none!important}
  .game-root.game-layout.reversi-layout>.game-tools>.reversi-side-score{
   display:flex!important;flex-direction:column!important
+ }
+}
+
+/* R42 cascade safeguard: stronger than the generic R40 dock selectors. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout).reversi-layout>.game-tools{
+  width:var(--reversi-actions-width)!important;justify-self:start!important;
+  align-self:center!important;height:100%!important;max-height:100%!important;
+  margin:0!important;padding:0!important;justify-content:center!important
  }
 }

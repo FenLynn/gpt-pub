@@ -184,35 +184,48 @@ const names=[
     }));
     assert.equal(rail.border,"0px",name+" right tools must not be inside a giant outer box");
     assert.equal(rail.status,"none",name+" status belongs exclusively in the top LED");
-    if(name==="黑白棋")assert.equal(rail.clock,false,"Reversi timer must move to the left rail");
-    else assert.ok(rail.clock,name+" needs one clock in the right controls");
+    assert.ok(rail.clock,name+" per-turn clock must appear on the right");
     assert.ok(rail.buttons.every(b=>b.icon&&b.height>=32),
      name+" right action buttons need the shared icon and sufficient touch area: "+JSON.stringify(rail));
    }
    if(name==="黑白棋"){
-    const v=await frame.locator("#game").evaluate(root=>{
-      const left=root.querySelector(".reversi-record-rail"),right=root.querySelector(".game-tools"),
-        board=root.querySelector("#board"),tip=right.querySelector(".gs-board-tip"),
-        stats=right.querySelector(".side-score"),btn=right.querySelector("#undoButton"),
-        clock=root.querySelector("#gs-turn-clock"),hist=left.querySelector("#gs-turn-details"),
-        ol=left.querySelector("#gs-turn-log");
-      const rect=x=>x.getBoundingClientRect(),l=rect(left),b=rect(board),r=rect(right),
-        action=rect(btn),score=rect(stats),hint=rect(tip);
-      return{gap:b.left-l.right,clockParent:clock.parentElement.className,expanded:hist.open,
-       rightCenter:Math.abs((action.top+hint.bottom-r.top-r.bottom)/2),
-       hintLast:hint.top>score.bottom,
-       labels:[...stats.querySelectorAll("span")].map(n=>n.textContent.trim()),
-       hintText:tip.textContent,overflowX:getComputedStyle(ol).overflowX,
-       scrollbar:getComputedStyle(ol).scrollbarWidth};
+    const detail=await frame.locator("#game").evaluate(root=>{
+     const left=root.querySelector(".reversi-record-rail"),right=root.querySelector(".game-tools"),
+      board=root.querySelector("#board"),clock=root.querySelector("#gs-turn-clock"),
+      tip=right.querySelector(".gs-board-tip"),stats=right.querySelector(".reversi-side-score"),
+      btn=right.querySelector("#undoButton"),list=left.querySelector("#reversiMoveList");
+     const rect=x=>x.getBoundingClientRect(),l=rect(left),b=rect(board),r=rect(right),
+      action=rect(btn),score=rect(stats),hint=rect(tip),clockRect=rect(clock);
+     const rows=[...stats.querySelectorAll(".reversi-count-row")].map(row=>{
+      const ico=rect(row.querySelector(".reversi-count-disc"));
+      return{side:row.dataset.side,label:row.querySelector(".reversi-count-name").textContent,
+       iconWidth:ico.width,iconHeight:ico.height,background:getComputedStyle(row).backgroundColor,
+       top:rect(row).top,bottom:rect(row).bottom};
+     });
+     return{leftWidth:l.width,leftHeight:l.height,boardHeight:b.height,gap:b.left-l.right,
+      clockParent:clock.parentElement.className,clockHistory:getComputedStyle(clock.querySelector(".gs-turn-clock-history")).display,
+      hasColumns:!!left.querySelector(".reversi-record-columns"),listOverflowX:getComputedStyle(list).overflowX,
+      listScrollbar:getComputedStyle(list).scrollbarWidth,
+      rightCenter:Math.abs((clockRect.top+hint.bottom-r.top-r.bottom)/2),
+      hintLast:hint.top>score.bottom,rowGap:rows[1].top-rows[0].bottom,
+      turn:root.dataset.turnSide,rows};
     });
-    assert.ok(v.gap>=-2&&v.gap<=48,"Reversi history must dock left of the centered board: "+JSON.stringify(v));
-    assert.equal(v.clockParent,"reversi-record-rail","Reversi timing and history belong on the left");
-    assert.ok(v.expanded,"Reversi history should be expanded");
-    assert.ok(v.rightCenter<=12,"Reversi buttons and indicators must be vertically centered: "+JSON.stringify(v));
-    assert.ok(v.hintLast,"Reversi legal-move explanation should be last on the right");
-    assert.deepEqual(v.labels,["黑色棋子","白色棋子"]);
-    assert.ok(v.hintText.includes("浅绿色圆点"),"Reversi green target explanation should be visible");
-    assert.equal(v.overflowX,"hidden");assert.equal(v.scrollbar,"none");
+    assert.ok(detail.leftWidth>=250&&Math.abs(detail.leftHeight-detail.boardHeight)<=2.5,
+     "Reversi history must be wide and exactly board-height: "+JSON.stringify(detail));
+    assert.ok(detail.gap>=-2&&detail.gap<=48&&detail.hasColumns,
+     "Reversi history must be adjacent to the centered board with column headings: "+JSON.stringify(detail));
+    assert.equal(detail.clockParent,"game-tools","Reversi turn clock should be on the right");
+    assert.equal(detail.clockHistory,"none","Reversi move list should exist only on the left");
+    assert.ok(detail.rightCenter<=12,"Reversi right-side tools should be centered vertically: "+JSON.stringify(detail));
+    assert.ok(detail.hintLast&&detail.rowGap>=6,"Reversi counters must stack with hint at the end");
+    assert.deepEqual(detail.rows.map(r=>r.label),["黑色棋子","白色棋子"]);
+    assert.ok(detail.rows.every(r=>r.iconWidth>=25&&Math.abs(r.iconWidth-r.iconHeight)<=1),
+     "Reversi counter icons must be large circles: "+JSON.stringify(detail.rows));
+    assert.equal(detail.turn,"black","Black goes first");
+    assert.notEqual(detail.rows[0].background,detail.rows[1].background,
+     "Current player must be distinctly highlighted: "+JSON.stringify(detail.rows));
+    assert.equal(detail.listOverflowX,"hidden");
+    assert.equal(detail.listScrollbar,"none");
    }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
@@ -873,16 +886,23 @@ const names=[
   await frame.locator(".reversi-square.legal").first().click();
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="4");
   assert.equal(await frame.locator("#white").innerText(),"1","Legal black placement must flip one white disc");
+   const activeAfterMove=await frame.locator("#game").evaluate(root=>({
+    turn:root.dataset.turnSide,
+    backgrounds:[...root.querySelectorAll(".reversi-count-row")].map(row=>getComputedStyle(row).backgroundColor)
+   }));
+   assert.equal(activeAfterMove.turn,"white","Two-player Reversi should alternate to the white side");
+   assert.notEqual(activeAfterMove.backgrounds[0],activeAfterMove.backgrounds[1],
+    "White side must become the highlighted counter");
   assert.equal(await frame.locator("#undoButton").isEnabled(),true,"Undo must enable after a move");
    assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"1 步");
-   assert.equal(await frame.locator("#gs-turn-log li").count(),1);
-   assert.ok((await frame.locator("#gs-turn-log li").first().innerText()).includes("黑色棋子"));
+   assert.equal(await frame.locator("#reversiMoveList li").count(),1);
+   assert.ok((await frame.locator("#reversiMoveList li").first().innerText()).includes("黑色棋子"));
   await frame.locator("#undoButton").click();
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="2");
   assert.equal(await frame.locator("#white").innerText(),"2","Undo must restore standard four-disc opening");
   assert.equal(await frame.locator("#undoButton").isDisabled(),true,"Undo must disable when the history is empty");
    assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"0 步");
-   assert.equal(await frame.locator("#gs-turn-log li").count(),0);
+   assert.equal(await frame.locator("#reversiMoveList li").count(),0);
   await page.screenshot({path:path.join(artifacts,"reversi-refined-playing.png")});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
