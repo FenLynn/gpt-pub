@@ -17,9 +17,9 @@ const isAI=()=>mode==="ai";
 const isComputerTurn=()=>isAI()&&turn!==0;
 const own=seat=>[...pieces.entries()].filter(entry=>entry[1]===seat).map(entry=>entry[0]);
 // Record panel matches the physical wooden circle diameter, not the SVG viewBox.
-const fit=()=>{const h=board.getBoundingClientRect().height;if(h>0)root.style.setProperty("--reversi-board-height",(h*812/900)+"px");};
+const fit=()=>{const h=board.getBoundingClientRect().height;if(h>0){root.style.setProperty("--reversi-board-height",(h*812/900)+"px");root.dataset.boardMeasured="true";}};
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fit).observe(board);
-window.addEventListener("resize",fit);requestAnimationFrame(fit);
+window.addEventListener("resize",fit);requestAnimationFrame(fit);fit();
 function options(from){
  if(!pieces.has(from))return new Map();
  const out=new Map(),origin=nodes.get(from),queue=[{k:from,path:[]}],seen=new Set([from]);
