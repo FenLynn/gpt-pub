@@ -66,13 +66,14 @@ function draw(last=null){
   }
  }
  board.dataset.pieces=String(pieces.size);board.dataset.turn=String(turn);
+ document.getElementById("undoButton").disabled=paused||over||!history.length;
 }
 function won(side){return own(side).length===10&&own(side).every(k=>nodes.get(k).arm===(side===0?3:0));}
 function apply(move){
  if(!move||pieces.get(move.from)!==turn||!options(move.from).has(move.to)||paused||over)return false;
  history.push({pieces:new Map(pieces),turn});
  pieces.delete(move.from);pieces.set(move.to,turn);window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"蓝方":"红方","走棋");selected=null;targets.clear();draw(move);
- if(won(turn)){over=true;paused=true;clearTimeout(aiTimer);const name=turn===0?"红方":"蓝方";report(name+"获胜");GameBridge.send("GAME_OVER",{message:name+"获胜",score:10,win:turn===0});return true;}
+ if(won(turn)){over=true;paused=true;document.getElementById("undoButton").disabled=true;clearTimeout(aiTimer);const name=turn===0?"红方":"蓝方";report(name+"获胜");GameBridge.send("GAME_OVER",{message:name+"获胜",score:10,win:turn===0});return true;}
  turn=1-turn;report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
 }
 function click(k){
@@ -107,7 +108,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
 }
 GameBridge.register({
  init(p){mode=p.mode==="two"?"two":"ai";difficulty=p.difficulty||"normal";newGame();},
- newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;report("对局继续");scheduleAI();},
+ newGame,pause(){paused=true;clearTimeout(aiTimer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;draw();report("对局继续");scheduleAI();},
  setMode:v=>{mode=v==="two"?"two":"ai";},setDifficulty:v=>{difficulty=v||"normal";},
  dispose(){paused=true;clearTimeout(aiTimer);}
 });
