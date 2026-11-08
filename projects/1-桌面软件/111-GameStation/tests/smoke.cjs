@@ -1386,6 +1386,39 @@ const names=[
   assert.equal(sanguoshaLayout.players.length,4,"Sanguosha must show all four seats");
   assert.ok(sanguoshaLayout.tools.left>=sanguoshaLayout.main.right-1,"Sanguosha tools must not cover the battlefield");
   assert.ok(sanguoshaLayout.players.every(p=>p.left>=sanguoshaLayout.main.left-1&&p.right<=sanguoshaLayout.main.right+1),"All four Sanguosha player cards must remain visible inside the battlefield");
+  // Fullscreen keeps only the current game surface, plus a small exit
+  // control inside its upper-right edge. Normal and Esc exit restore chrome.
+  await open("飞行棋");await start();
+  await page.locator("#fullscreenButton").click();
+  await page.waitForFunction(()=>document.fullscreenElement===document.querySelector("#appShell")&&
+   document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
+  const full=await page.evaluate(()=>{
+   const rect=id=>{const r=document.querySelector(id).getBoundingClientRect();return{left:r.left,top:r.top,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+   return{sidebar:getComputedStyle(document.querySelector("#sidebar")).display,
+    topbar:getComputedStyle(document.querySelector("#topbar")).display,
+    exit:getComputedStyle(document.querySelector("#exitFullscreenButton")).display,
+    stage:rect("#gameStage"),exitRect:rect("#exitFullscreenButton"),viewport:[innerWidth,innerHeight]};
+  });
+  assert.equal(full.sidebar,"none","Game-only fullscreen must hide navigation");
+  assert.equal(full.topbar,"none","Game-only fullscreen must hide the top game bar");
+  assert.notEqual(full.exit,"none","Fullscreen must show one in-stage exit control");
+  assert.ok(full.stage.width>=full.viewport[0]-2&&full.stage.height>=full.viewport[1]-2&&
+   Math.abs(full.stage.left)<=2&&Math.abs(full.stage.top)<=2,
+   "Only the game must fill the fullscreen viewport: "+JSON.stringify(full));
+  assert.ok(full.exitRect.right<=full.viewport[0]-8&&full.exitRect.top<=28,
+   "Game-only exit control must be in the upper-right corner");
+  await page.locator("#exitFullscreenButton").click();
+  await page.waitForFunction(()=>!document.fullscreenElement&&
+   !document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
+  assert.equal(await page.locator("#exitFullscreenButton").isVisible(),false);
+  assert.equal(await page.locator("#sidebar").isVisible(),true);
+  assert.equal(await page.locator("#topbar").isVisible(),true);
+  await page.locator("#fullscreenButton").click();
+  await page.waitForFunction(()=>!!document.fullscreenElement);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(()=>!document.fullscreenElement);
+  assert.equal(await page.locator("#topbar").isVisible(),true);
+  assert.equal(await page.locator("#sidebar").isVisible(),true);
   // Xiangqi cannon rules: exactly one screen permits capture; zero/two screens and friendly targets do not.
   const cannonPage=await browser.newPage({viewport:{width:1100,height:850}});
   cannonPage.on("pageerror",err=>errors.push("Xiangqi rules: "+err.message));
