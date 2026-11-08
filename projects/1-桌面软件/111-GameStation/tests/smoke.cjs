@@ -47,16 +47,26 @@ const names=[
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
   await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
   const geometry=await page.locator("#gamePauseResume").evaluate(el=>{
-   const icon=el.querySelector("svg"),r=el.getBoundingClientRect(),stage=document.querySelector("#gameStage").getBoundingClientRect();
-   return{icon:!!icon,centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
+   const icon=el.querySelector("svg"),r=el.closest(".game-pause-content").getBoundingClientRect(),
+    stage=document.querySelector("#gameStage").getBoundingClientRect();
+   const title=el.closest(".game-pause-content").querySelector(".game-pause-title");
+   return{icon:!!icon,title:title.textContent,buttonText:el.textContent.trim(),
+    titleBottom:title.getBoundingClientRect().bottom,buttonTop:el.getBoundingClientRect().top,
+    centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
     centerDy:Math.abs((r.top+r.bottom-stage.top-stage.bottom)/2)};
   });
-  assert.ok(geometry.icon&&geometry.centerDx<2&&geometry.centerDy<2,
-   "All games need a centered, clickable pause glyph: "+JSON.stringify(geometry));
+  assert.ok(geometry.icon&&geometry.title==="已暂停"&&geometry.buttonText==="继续"&&geometry.titleBottom<geometry.buttonTop
+    &&geometry.centerDx<2&&geometry.centerDy<2,
+   "All games need centered title-above-resume pause UI: "+JSON.stringify(geometry));
   if(game==="中国象棋")await page.screenshot({path:path.join(artifacts,"xiangqi-paused.png")});
   await page.locator("#gamePauseResume").click();
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
   assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,"Resuming must remove the pause glyph");
+  await page.locator("#gameFrame").focus();
+  await page.keyboard.press("Enter");
+  await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
+  await page.keyboard.press("Enter");
+  await page.locator("#gamePauseOverlay").waitFor({state:"hidden"});
  }
  async function viewCheck(name,width,height){
   const v=await frame.locator("#game").evaluate(el=>{
@@ -219,8 +229,8 @@ const names=[
   const stop=await page.locator("#startButton.end-action svg rect").evaluate(el=>({
    fill:getComputedStyle(el).fill,stroke:getComputedStyle(el).stroke
   }));
-  assert.equal(stop.fill,"none",name+" stop icon must use outline, not a solid square");
-  assert.notEqual(stop.stroke,"none",name+" stop icon must have a visible stroke");
+  assert.notEqual(stop.fill,"none",name+" stop icon must be a solid square");
+  assert.equal(stop.stroke,"none",name+" stop icon must not be outline-only");
   assert.ok(header.notice.right<=header.timer.x+2,name+" timer must sit to the right of the LED display");
   if(header.mode.width>0){
    assert.ok(header.timer.right<=header.mode.x+2,name+" mode switches must sit after the timer");
@@ -244,7 +254,7 @@ const names=[
       difficultyBorder:getComputedStyle(document.querySelector("#difficultyControl")).borderTopWidth};
    });
    assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=(width<=1390?165:180),"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
-   assert.ok(led.speakerWidth>=26&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
+   assert.ok(led.speakerWidth>=33&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
     "LED speaker must be large and flash three rays exactly twice for an incoming message: "+JSON.stringify(led));
    assert.ok(led.textColor==="rgb(255, 255, 255)"&&led.textFont>=14&&led.screenPaddingTop<=3,"Gomoku LED must have large white tightly-spaced text: "+JSON.stringify(led));
    assert.equal(led.modeBorder,"1px","Gomoku mode switches need a shared outline");
@@ -675,6 +685,13 @@ const names=[
   await mineFixture.close();
   await page.locator("#helpButton").click();
   await page.locator("#helpPanel").waitFor({state:"visible"});
+  const hotkeyHelp=await page.locator("#helpContent .help-chapter").first().evaluate(section=>({
+   header:section.querySelector("button")?.textContent||"",text:section.querySelector("p")?.textContent||"",
+   open:!section.querySelector("p")?.hidden
+  }));
+  assert.ok(hotkeyHelp.header.includes("快捷键")&&hotkeyHelp.text.includes("Enter")&&hotkeyHelp.text.includes("暂停")
+    &&hotkeyHelp.text.includes("继续")&&hotkeyHelp.open,
+    "Enter pause/resume must always be the first expanded help entry: "+JSON.stringify(hotkeyHelp));
   await page.keyboard.press("Escape");
   assert.ok(await page.locator("#helpPanel").isVisible(),"Escape must not close help");
   const before=await page.locator("#helpPanel").boundingBox();
