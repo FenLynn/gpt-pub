@@ -1103,3 +1103,15 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   filter:drop-shadow(0 8px 13px #72563725)!important
  }
 }
+
+
+/* R45.1 · beat the legacy R40 and R42 specificity with exact matching scope.
+   Both accessory rails truly equal the measured board height, not the iframe. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout)>.game-tools{
+  align-self:center!important;justify-self:start!important;
+  height:min(100%,var(--reversi-board-height,100%))!important;
+  max-height:100%!important;margin:0!important;
+  justify-content:space-between!important
+ }
+}
