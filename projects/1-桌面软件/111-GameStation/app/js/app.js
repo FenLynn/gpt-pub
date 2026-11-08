@@ -441,7 +441,22 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
  document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));
 $("helpButton").addEventListener("click",()=>{openHelp();});$("helpClose").addEventListener("click",closeHelp);
-$("fullscreenButton").addEventListener("click",async()=>{try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}catch(e){toast("浏览器未允许全屏");}});
+function syncGameFullscreen(){
+ const gameOnly=document.fullscreenElement===shell&&!!active&&!$("#workspaceView").classList.contains("hidden");
+ shell.classList.toggle("game-only-fullscreen",gameOnly);
+ const exit=$("#exitFullscreenButton");
+ exit.hidden=!gameOnly;
+ exit.setAttribute("aria-hidden",String(!gameOnly));
+}
+$("fullscreenButton").addEventListener("click",async()=>{
+ try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}
+ catch(e){toast("浏览器未允许全屏");}
+});
+$("exitFullscreenButton").addEventListener("click",async()=>{
+ try{if(document.fullscreenElement)await document.exitFullscreen();}
+ catch(e){toast("无法退出全屏，可按 Esc");}
+});
+document.addEventListener("fullscreenchange",syncGameFullscreen);
 $("settingsButton").addEventListener("click",openSettings);$("settingsClose").addEventListener("click",closeSettings);$("settingsDone").addEventListener("click",closeSettings);
 $("settingsBackdrop").addEventListener("click",e=>{if(e.target===$("settingsBackdrop"))closeSettings();});$("uiScale").addEventListener("change",e=>{settings.scale=e.target.value;write("settings",settings);applySettings();});
 $("exportData").addEventListener("click",exportData);$("importData").addEventListener("click",()=>$("importFile").click());$("importFile").addEventListener("change",e=>{if(e.target.files?.[0])importData(e.target.files[0]);e.target.value="";});$("clearData").addEventListener("click",clearData);
