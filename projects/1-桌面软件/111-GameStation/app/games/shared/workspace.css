@@ -1761,3 +1761,82 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   gap:clamp(8px,1.3cqh,13px)!important
  }
 }
+
+
+/* R49 · Pre-painted Jump / Flight polish and fixed side-rail geometry.
+   Leave normal active-player pulse in place; no first-frame legacy guide rail. */
+@media(min-width:701px){
+ .game-root.game-layout:is(.checkers-layout,.chinese-checkers-layout)>.game-guide{
+  display:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout).flight-chess-layout>.game-tools{
+  justify-content:flex-start!important;align-content:start!important;
+  align-items:stretch!important;
+  height:var(--reversi-board-height,100%)!important;
+  max-height:100%!important;
+  gap:clamp(5px,.8cqh,9px)!important;
+  padding:1px!important;
+  margin:0!important;
+  overflow-x:hidden!important;overflow-y:auto!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.reversi-record-rail{
+  height:var(--reversi-board-height,100%)!important;max-height:100%!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.flight-move-help{
+  height:50px!important;min-height:50px!important;max-height:50px!important;
+  padding:3px 4px!important;line-height:1.4!important;
+  margin:0!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls{
+  gap:5px!important;padding:7px!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls .flight-dice{
+  width:min(100%,clamp(98px,15dvh,158px))!important;
+  height:auto!important;max-width:100%!important;
+  aspect-ratio:1!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls #rollButton{
+  min-height:35px!important;padding:5px!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.game-btn{
+  min-height:36px!important;height:36px!important;padding:5px!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.reversi-side-score{
+  gap:5px!important
+ }
+ .game-root.game-layout.flight-chess-layout>.game-tools>.reversi-side-score>.reversi-count-row{
+  min-height:41px!important;padding:6px!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.flight-move-panel{
+  order:99!important;
+  margin-top:auto!important;
+  padding:8px!important;min-height:64px!important;
+  max-height:min(146px,23cqh)!important;
+  flex:0 0 auto!important;
+  overflow-y:auto!important
+ }
+}
+/* Restore the readable white disks the user preferred. The green
+   outline and slow glow remain while the destination hit box stays still. */
+.game-root.game-layout.flight-chess-layout .flight-preview-circle{
+ fill:#fffdf8!important;
+ stroke:#25a65b!important;
+}
+.game-root.game-layout.flight-chess-layout .flight-target-ring{
+ fill:#fff!important;
+ stroke:#169d53!important;
+}
+.game-root.game-layout.flight-chess-layout .flight-preview-number{
+ fill:#1d7d48!important;font-weight:800!important
+}
+.game-root.game-layout.flight-chess-layout .flight-target-label{
+ fill:#187b44!important;font-weight:800!important
+}
+/* Keep all resignation buttons in the same restrained in-game action style. */
+.game-root.game-layout .game-tools>#resignButton{
+ color:#a4534b!important;
+ background:#fff7f6!important;border-color:#dfc5c1!important
+}
+.game-root.game-layout .game-tools>#resignButton:hover:not(:disabled){
+ background:#fce9e6!important;border-color:#d6a69f!important
+}
