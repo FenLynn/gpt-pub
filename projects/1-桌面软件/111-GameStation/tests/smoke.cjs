@@ -933,29 +933,34 @@ const names=[
 
   // Genuine Connect Four end packets: AI uses win/loss, local duel names winner.
   await page.locator('#modeControl button[data-mode-index="0"]').click();
-  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(1));
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"红方获胜",winner:"红方",draw:false,win:true}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
   assert.equal(await page.locator("#gameResultTitle").innerText(),"获胜");
   assert.ok(!(await page.locator("#gameResultMessage").innerText()).includes("红方"));
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
-  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(2));
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"黄方获胜",winner:"黄方",draw:false,win:false}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
   assert.equal(await page.locator("#gameResultTitle").innerText(),"失败");
   assert.ok(!(await page.locator("#gameResultMessage").innerText()).includes("黄方"));
   await page.locator('#modeControl button[data-mode-index="1"]').click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
-  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(1));
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"红方获胜",winner:"红方",draw:false,win:true}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
   assert.equal(await page.locator("#gameResultTitle").innerText(),"红方获胜");
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
-  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(2));
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"黄方获胜",winner:"黄方",draw:false,win:false}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
   assert.equal(await page.locator("#gameResultTitle").innerText(),"黄方获胜");
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
-  await frame.locator("#game").evaluate(()=>window.__p111Connect4Test.forceResult(0));
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"平局",winner:null,draw:true,win:false}));
   await page.locator("#gameResultOverlay").waitFor({state:"visible"});
   assert.equal(await page.locator("#gameResultTitle").innerText(),"平局");
   await page.locator("#newGameButton").click();
