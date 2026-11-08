@@ -782,10 +782,11 @@ const names=[
     if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
      const preload=await frame.locator("#game").evaluate(root=>({
       head:!!document.querySelector("head #gameWorkspaceStyles"),
+      measured:root.dataset.boardMeasured==="true",
       columns:root.classList.contains("gs-tools-open"),
       guide:getComputedStyle(root.querySelector(".game-guide")).display
      }));
-     assert.ok(preload.head&&preload.columns&&preload.guide==="none",
+     assert.ok(preload.head&&preload.measured&&preload.columns&&preload.guide==="none",
       name+" must preload three-column CSS without a legacy left-guide flash: "+JSON.stringify(preload));
     }
 
