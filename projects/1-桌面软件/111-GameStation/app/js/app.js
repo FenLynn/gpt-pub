@@ -337,7 +337,7 @@ function newRound(){
 function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;
  const score=Number(payload.score??session.score);if(scoringGames.has(session.id)&&Number.isFinite(score))session.score=score;
  const s=statFor(session.id);if(Number.isFinite(Number(payload.score)))s.bestScore=Math.max(s.bestScore,Number(payload.score));
- const msg=String(payload.message||"");if(payload.win===true||/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg))s.wins++;
+ const msg=String(payload.message||"");if((typeof payload.win==="boolean"?payload.win:!payload.draw&&/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg)))s.wins++;
  persistStats();renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();setGameState();
  if(!nativeResultGames.has(session.id))showGameResult({...payload,score:session.score});
 }
