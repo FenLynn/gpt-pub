@@ -724,7 +724,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    "Flight shortcut must land on the opposite side, 26 track cells after the entrance");
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[10,-1,-1,-1],[37,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
-  assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
+  await flight.evaluate(()=>window.__p111FlightTest.preview(0));
+  const overPieces=await flight.locator("#board").evaluate(board=>{
+   const children=[...board.children];
+   return{target:children.indexOf(board.querySelector(".flight-path-target")),
+    opponent:children.indexOf(board.querySelector('[data-pawn="1-0"]'))};
+  });
+  assert.ok(overPieces.target>overPieces.opponent,
+   "Landing marker must be drawn over a target already occupied by an opponent");
+  await flight.locator(".flight-path-target").click();
   const captured=await flight.evaluate(()=>window.__p111FlightTest.state());
   assert.equal(captured.pawns[0][0],11,"Flight Chess moves the plane onto the collision cell");
   assert.equal(captured.pawns[1][0],-1,"Landing on an occupied unsafe square sends the opponent home");
