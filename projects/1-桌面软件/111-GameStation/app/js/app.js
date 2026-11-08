@@ -86,7 +86,7 @@ function showGameResult(payload={},manual=false){
  const localDuel=hasTwoPlayerMode&&active.modes[modeIndex]==="本机双人";
  const draw=!manual&&(payload.draw===true||/平局|和棋/.test(raw));
  const side=String(payload.winner||"").trim()||
-  raw.match(/(黑色棋子|白色棋子|黑方|白方|红方|黄方)获胜/)?.[1]||"";
+  raw.match(/(黑色棋子|白色棋子|黑方|白方|红方|黄方|蓝方|绿方)(?:将死)?获胜/)?.[1]||"";
  let title=manual?"本局结束":payload.win===true?"本局获胜":"本局结束";
  let message=manual?"本局已结束，可以再来一局或离开":raw||"本局已结束";
  let result=manual?"ended":payload.win===true?"win":payload.win===false?"loss":"ended";
