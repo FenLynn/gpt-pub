@@ -185,10 +185,23 @@ function animateDice(){
 }
 function routeFor(index){
  const move=moves().find(m=>m.index===index);if(!move)return null;
- const start=pawns[turn][index],steps=[];
- if(start<0)steps.push({progress:0,number:1});
- else for(let i=1;i<=roll;i++)steps.push({progress:start+i,number:i});
- return{move,steps,final:move.to};
+ const from=pawns[turn][index],steps=[],shortcuts=[];
+ if(from<0)steps.push({progress:0,number:1});
+ else for(let i=1;i<=roll;i++)steps.push({progress:from+i,number:i});
+ // The annotation mirrors advance(): regular dice steps, then +4, then flight.
+ let destination=from<0?0:from+roll;
+ if(destination>0&&destination<52){
+  let cell=absolute(turn,destination);
+  if(cell%4===(turn===0?0:2)&&destination+4<=51){
+   shortcuts.push({kind:"jump",from:destination,to:destination+4});
+   destination+=4;cell=absolute(turn,destination);
+  }
+  if(cell===(turn===0?12:38)&&destination+26<=51){
+   shortcuts.push({kind:"flight",from:destination,to:destination+26});
+   destination+=26;
+  }
+ }
+ return{move,steps,shortcuts,final:move.to,computedFinal:destination};
 }
 function previewPlane(index){
  if(paused||over||isRolling||roll===null||(mode==="ai"&&turn===1))return false;
