@@ -208,7 +208,7 @@ function previewPlane(index){
  if(!moves().some(m=>m.index===index))return false;
  if(selectedPlane===index)return play(index);
  expandedStackKey=null;selectedPlane=index;draw();
- report((turn===0?"红方":"蓝方")+(index+1)+"号飞机：绿色序号是路径，请点击绿色终点确认");
+ report((turn===0?"红方":"蓝方")+(index+1)+"号：绿色序号为走棋步数，虚线为跳跃；点击落点确认");
  return true;
 }
 function renderChoices(){
@@ -226,7 +226,7 @@ function renderChoices(){
   btn.onclick=()=>previewPlane(m.index);host.append(btn);
  }
  help.textContent=roll===null?"掷骰后可选择飞机。":selectedPlane!==null?
-  "已选"+(selectedPlane+1)+"号飞机；绿色圆圈标明移动路线，点“终”确认。":
+  "已选"+(selectedPlane+1)+"号：序号是骰子步数，+4/✈是额外跳跃；点绿色落点确认。":
   legal.length?"请选择发光的飞机，预览绿色编号路线。":"没有可移动的飞机。";
 }
 function draw(){
@@ -318,6 +318,26 @@ function draw(){
   });
   if(coords.length>1)el.append(svgNode("polyline",{
    points:coords.map(p=>p.cx+","+p.cy).join(" "),class:"flight-preview-path"}));
+  // Dice numbers are distinct from rule-triggered extra movement.
+  // Dashed orange = +4, dashed colored = flight across the board.
+  for(const bonus of preview.shortcuts){
+   const progressList=bonus.kind==="jump"
+    ?Array.from({length:5},(_,i)=>bonus.from+i)
+    :[bonus.from,bonus.to];
+   const points=progressList.map(p=>{
+    const [x,y]=position(turn,selectedPlane,p);return pos(x,y);
+   });
+   el.append(svgNode("polyline",{points:points.map(([x,y])=>x+","+y).join(" "),
+    class:"flight-preview-shortcut "+bonus.kind,
+    "data-shortcut":bonus.kind,"data-shortcut-from":bonus.from,
+    "data-shortcut-to":bonus.to,"aria-hidden":"true"}));
+   const [x,y]=points[points.length-1],
+    badge=svgNode("g",{class:"flight-shortcut-badge "+bonus.kind,
+     "data-shortcut-label":bonus.kind,"aria-hidden":"true"});
+   badge.append(svgNode("circle",{cx:x+12,cy:y-15,r:15}));
+   const text=svgNode("text",{x:x+12,y:y-10,"text-anchor":"middle"});
+   text.textContent=bonus.kind==="jump"?"+4":"✈";badge.append(text);el.append(badge);
+  }
   for(const step of coords){
    const marker=svgNode("g",{class:"flight-path-step","data-preview-step":step.number,
     "aria-label":"前进第"+step.number+"格"});
@@ -330,7 +350,7 @@ function draw(){
     "data-preview-to":preview.final,"aria-label":"点击确认将飞机移动到目标位置"});
   goal.append(svgNode("circle",{cx:tx,cy:ty,r:24,class:"flight-target-ring"}));
   const end=svgNode("text",{x:tx,y:ty+6,"text-anchor":"middle",class:"flight-target-label"});
-  end.textContent="终";goal.append(end);
+  end.textContent=preview.final===57?"终":"落";goal.append(end);
   goal.addEventListener("click",()=>play(selectedPlane));
   goal.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();play(selectedPlane);}});
   el.append(goal);
