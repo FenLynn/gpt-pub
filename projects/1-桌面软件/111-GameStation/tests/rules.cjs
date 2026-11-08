@@ -585,6 +585,10 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(lastRoll.state.lastDie,2,"No-move roll must retain its real value, not return to 1");
   assert.equal(lastRoll.face,"2","Visible cube must show the last real value after passing turn");
   assert.equal(lastRoll.caption,"上次 2 点","No legal move should still display the actual last die value");
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.roll(1));
+  assert.equal(await flight.locator("#flightDiceCaption").innerText(),"上次 1 点",
+   "A genuine first roll of 1 must remain visible instead of looking like the waiting-state default");
   await flight.evaluate(()=>window.__p111FlightTest.roll(6));
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.moves().length),4,"Six points unlock four possible planes");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：6点","A six-point roll must update the accessible dice value");
