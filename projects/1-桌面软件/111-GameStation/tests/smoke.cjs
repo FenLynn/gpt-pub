@@ -709,6 +709,7 @@ const names=[
   assert.equal(await page.locator("#gameResultScoreValue").innerText(),"1234");
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("score")?.textContent==="0");
   assert.equal(await frame.locator("#score").innerText(),"0","Next after scoring must reset the real in-game score");
   await open("扫雷");await start();
   const mine=frame.locator(".mine-classic");
@@ -822,6 +823,7 @@ const names=[
   await frame.locator(".gomoku-cell").nth(112).click();
   assert.equal(await frame.locator(".stone.stone-arrived").count(),1,"Gomoku last stone must animate on landing");
   await page.locator("#newGameButton").click();
+  await frame.locator(".stone").first().waitFor({state:"detached",timeout:4000});
   assert.equal(await frame.locator(".stone").count(),0,"Top-right next round must actually clear Gomoku stones");
   await frame.locator(".gomoku-cell").nth(112).click();
   assert.equal(await frame.locator(".stone").count(),1,"Gomoku must accept moves after clicking next round");
