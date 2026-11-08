@@ -236,3 +236,49 @@
 #game.flight-chess-layout .flight-center-star{font:700 11px/1 Georgia,serif;fill:#1a292c;letter-spacing:-.7px}
 #game.flight-chess-layout .flight-center-core{fill:#fff1c5;stroke:#282921}
 #game.flight-chess-layout .flight-center-outline{fill:#f6e8b5;stroke:#1d2827}
+
+/* R56 — restrained traditional aeroplane board, based on the supplied print.
+   No decorative bouncing, neon outlines or busy arrow layers. */
+#game.flight-chess-layout .flight-outline{
+ fill:#f8eed0;stroke:#3a3930;stroke-width:3;filter:none;rx:3
+}
+#game.flight-chess-layout .flight-airport-circle{
+ fill:#f8eed0;stroke:#444438;stroke-width:2.5
+}
+#game.flight-chess-layout .flight-airport-ring{
+ fill:#f8eed0;stroke:#35352b;stroke-width:2;filter:none
+}
+#game.flight-chess-layout .flight-airport-hole{stroke:none}
+#game.flight-chess-layout .flight-track-tile,
+#game.flight-chess-layout .flight-home-tile{
+ stroke:#303127;stroke-width:2.2;rx:0;stroke-linejoin:miter
+}
+#game.flight-chess-layout .flight-track-hole,
+#game.flight-chess-layout .flight-home-hole{
+ fill:#fffdf1;stroke:#696c64;stroke-width:1.6;filter:none
+}
+#game.flight-chess-layout .flight-route-arrow{opacity:0}
+#game.flight-chess-layout .flight-home-arrow{opacity:0}
+#game.flight-chess-layout .flight-track-direction{
+ stroke:none;fill:#4e5450;opacity:.85
+}
+#game.flight-chess-layout .flight-gate-icon{opacity:.3}
+#game.flight-chess-layout .flight-air-corridor{opacity:.3;stroke-width:2.2}
+#game.flight-chess-layout .flight-air-corridor-head{opacity:.3;stroke-width:2}
+#game.flight-chess-layout .flight-corner-wing{stroke:#33362d;stroke-width:2}
+#game.flight-chess-layout .flight-center-star{transform:rotate(90deg);transform-origin:450px 450px;fill:#292d2b}
+#game.flight-chess-layout .flight-aircraft-number,
+#game.flight-chess-layout .flight-stack-count,
+#game.flight-chess-layout .flight-preview-number,
+#game.flight-chess-layout .flight-target-label{
+ transform:rotate(90deg);transform-box:fill-box;transform-origin:center
+}
+#game.flight-chess-layout .flight-aircraft.can-move>circle:first-child,
+#game.flight-chess-layout .flight-aircraft.is-selected>circle:first-child,
+#game.flight-chess-layout .flight-stack.can-move{
+ animation:none!important;filter:none!important
+}
+#game.flight-chess-layout .flight-travel-ghost{pointer-events:none;filter:drop-shadow(0 1px 2px #24342f50)}
+@media(prefers-reduced-motion:reduce){
+ #game.flight-chess-layout .flight-travel-ghost{animation:none!important}
+}
