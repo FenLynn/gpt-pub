@@ -5,7 +5,7 @@ const root=document.getElementById("game"),gameId=document.body.dataset.game;
 if(!root||!gameId)return;
 /* Reversi's move-time history occupies a dedicated left record rail.
    Other board games retain their own right-side timing cards. */
-const historyRail=gameId==="reversi"?root.querySelector(":scope > .reversi-record-rail"):null;
+const historyRail=(gameId==="reversi"||gameId==="connect4")?root.querySelector(":scope > .reversi-record-rail"):null;
 const host=root.querySelector(":scope > .game-tools");
 if(!host)return;
 const panel=document.createElement("section");

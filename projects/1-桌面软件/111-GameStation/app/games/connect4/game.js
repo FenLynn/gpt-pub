@@ -1,6 +1,12 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastDrop=null;
+const el=document.getElementById("board"),status=document.getElementById("status");
+const boardRoot=document.getElementById("game");
+const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0)boardRoot.style.setProperty("--reversi-board-height",h+"px");};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
+else window.addEventListener("resize",fitHistoryHeight);
+requestAnimationFrame(fitHistoryHeight);
+let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastDrop=null;
 function copy(a){return a.map(r=>r.slice());}
 function save(){history.push({b:copy(b),turn,over});if(history.length>100)history.shift();}
 function undo(){if(paused||over||!history.length)return;clearTimeout(timer);const count=mode==="ai"?(turn===1?2:1):1;let snap=null;for(let i=0;i<count&&history.length;i++)snap=history.pop();if(!snap)return;b=copy(snap.b);turn=snap.turn;over=false;paused=false;window.GameTurnClock?.rewind(count,turn===1?"红方":"黄方");render();report("已撤销一步");if(mode==="ai"&&turn===2)scheduleAI();}
@@ -23,10 +29,15 @@ function render(){
  document.getElementById("red").textContent=b.flat().filter(v=>v===1).length;
  document.getElementById("yellow").textContent=b.flat().filter(v=>v===2).length;
  document.getElementById("undoButton").disabled=paused||over||!history.length;
+ document.getElementById("game").dataset.turnSide=turn===1?"red":"yellow";
 }
-function finish(p){over=true;const msg=p===1?"红方获胜":p===2?"黄方获胜":"平局";report(msg);GameBridge.send("GAME_OVER",{message:msg,score:b.flat().filter(v=>v===1).length,win:p===1});}
-function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const col=choose();if(col>=0){save();lastDrop={x:col,y:drop(b,col,2)};window.GameTurnClock?.record("黄方","红方","落子");}render();if(win(b,2)){finish(2);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=1;report("轮到你了");},difficulty==="easy"?220:320);}
-function play(c){if(paused||over||(mode==="ai"&&turn===2))return;if(b[0][c]!==0)return;save();const row=drop(b,c,turn);if(row<0)return;lastDrop={x:c,y:row};window.GameTurnClock?.record(turn===1?"红方":"黄方",turn===1?"黄方":"红方","落子");render();if(win(b,turn)){finish(turn);return;}if(b.every(r=>r.every(Boolean))){finish(0);return;}turn=3-turn;report(turn===1?"红方回合":mode==="ai"?"AI 思考中":"黄方回合");if(mode==="ai"&&turn===2)scheduleAI();}
+function finish(p){over=true;const msg=p===1?"红方获胜":p===2?"黄方获胜":"平局";
+ report(msg);GameBridge.send("GAME_OVER",{message:msg,winner:p===1?"红方":p===2?"黄方":null,
+ draw:p===0,score:b.flat().filter(v=>v===1).length,win:mode==="ai"?p===1:p!==0});}
+function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const col=choose();if(col>=0){save();lastDrop={x:col,y:drop(b,col,2)};window.GameTurnClock?.record("黄方","红方","落子");}if(win(b,2)){render();finish(2);return;}if(b.every(r=>r.every(Boolean))){render();finish(0);return;}turn=1;render();report("轮到你了");},difficulty==="easy"?220:320);}
+function play(c){if(paused||over||(mode==="ai"&&turn===2))return;if(b[0][c]!==0)return;save();const row=drop(b,c,turn);if(row<0)return;lastDrop={x:c,y:row};window.GameTurnClock?.record(turn===1?"红方":"黄方",turn===1?"黄方":"红方","落子");
+ if(win(b,turn)){render();finish(turn);return;}if(b.every(r=>r.every(Boolean))){render();finish(0);return;}
+ turn=3-turn;render();report(turn===1?"红方回合":mode==="ai"?"AI 思考中":"黄方回合");if(mode==="ai"&&turn===2)scheduleAI();}
 function newGame(){clearTimeout(timer);history=[];lastDrop=null;b=Array.from({length:6},()=>Array(7).fill(0));turn=1;over=false;paused=false;window.GameTurnClock?.reset("红方");render();report("红方先行");}
 document.getElementById("undoButton").addEventListener("click",undo);
 // Test-only deterministic fixture API. It is not exposed in normal gameplay.

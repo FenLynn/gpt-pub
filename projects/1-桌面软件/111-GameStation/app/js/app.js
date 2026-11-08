@@ -81,9 +81,31 @@ function hideGameResult(){const el=$("gameResultOverlay");el.hidden=true;el.setA
 function showGameResult(payload={},manual=false){
  if(!active)return;
  const el=$("gameResultOverlay"),card=$("gameResultCard"),score=Number(payload.score??session?.score??currentScore);
- card.dataset.result=manual?"ended":payload.win===true?"win":payload.win===false?"loss":"ended";
- $("gameResultTitle").textContent=manual?"本局结束":payload.win===true?"本局获胜":"本局结束";
- $("gameResultMessage").textContent=manual?"本局已结束，可以再来一局或离开":String(payload.message||"本局已结束");
+ const raw=String(payload.message||"").trim();
+ const hasTwoPlayerMode=!!active.modes?.includes("本机双人");
+ const localDuel=hasTwoPlayerMode&&active.modes[modeIndex]==="本机双人";
+ const draw=!manual&&(payload.draw===true||/平局|和棋/.test(raw));
+ const side=String(payload.winner||"").trim()||
+  raw.match(/(黑色棋子|白色棋子|黑方|白方|红方|黄方)获胜/)?.[1]||"";
+ let title=manual?"本局结束":payload.win===true?"本局获胜":"本局结束";
+ let message=manual?"本局已结束，可以再来一局或离开":raw||"本局已结束";
+ let result=manual?"ended":payload.win===true?"win":payload.win===false?"loss":"ended";
+ if(hasTwoPlayerMode&&!manual){
+  if(draw){title="平局";message="双方战成平局，可以再来一局";result="draw";}
+  else if(localDuel){
+   title=side?side+"获胜":"本局结束";
+   message=side?side+"取得胜利，可以再来一局":message;
+   result=side?"win":"ended";
+  }else{
+   title=payload.win===true?"获胜":payload.win===false?"失败":"本局结束";
+   message=payload.win===true?"恭喜获胜！可以再来一局":
+    payload.win===false?"本局失败，再挑战一次":message;
+   result=payload.win===true?"win":payload.win===false?"loss":"ended";
+  }
+ }
+ card.dataset.result=result;
+ $("gameResultTitle").textContent=title;
+ $("gameResultMessage").textContent=message;
  $("gameResultScore").hidden=!scoringGames.has(active.id);
  $("gameResultScoreLabel").textContent=active.id==="doudizhu"?"本局结算":"本局得分";
  $("gameResultScoreValue").textContent=String(Number.isFinite(score)?score:0);

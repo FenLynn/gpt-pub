@@ -40,7 +40,8 @@ function render(){
  document.getElementById("undoButton").disabled=!history.length||paused||over;
  document.getElementById("game").dataset.turnSide=turn===1?"black":"white";
 }
-function finish(){over=true;const [black,white]=counts(b),msg=black===white?"平局":black>white?"黑色棋子获胜":"白色棋子获胜";report(msg+" · "+black+":"+white);GameBridge.send("GAME_OVER",{message:msg,score:black,win:black>white});}
+function finish(){over=true;const [black,white]=counts(b),msg=black===white?"平局":black>white?"黑色棋子获胜":"白色棋子获胜";report(msg+" · "+black+":"+white);GameBridge.send("GAME_OVER",{message:msg,winner:black===white?null:black>white?"黑色棋子":"白色棋子",
+ draw:black===white,score:black,win:mode==="ai"?black>white:black!==white});}
 function scheduleAI(){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const m=choose();if(m){save();lastFlips=new Set(m.flips.map(([x,y])=>y*8+x).concat(m.y*8+m.x));apply(b,m,2);window.GameTurnClock?.record("白色棋子","黑色棋子","落子");}else window.GameTurnClock?.record("白色棋子","黑色棋子","无合法步");turn=1;next();},difficulty==="easy"?240:360);}
 function next(){if(over||paused)return;const list=moves(b,turn);if(!list.length){if(!moves(b,3-turn).length){finish();return;}const skipped=turn;turn=3-turn;window.GameTurnClock?.record(skipped===1?"黑色棋子":"白色棋子",turn===1?"黑色棋子":"白色棋子","自动跳过");report((turn===1?"黑色棋子":"白色棋子")+"无合法步，自动跳过");render();if(mode==="ai"&&turn===2)scheduleAI();return;}render();report(turn===1?"黑色棋子回合":"白色棋子回合");if(mode==="ai"&&turn===2)scheduleAI();}
 function play(x,y){if(paused||over||(mode==="ai"&&turn!==1))return;const m=moves(b,turn).find(v=>v.x===x&&v.y===y);if(!m)return;save();lastFlips=new Set(m.flips.map(([x,y])=>y*8+x).concat(m.y*8+m.x));apply(b,m,turn);const mover=turn;turn=3-turn;window.GameTurnClock?.record(mover===1?"黑色棋子":"白色棋子",turn===1?"黑色棋子":"白色棋子","落子");next();}
