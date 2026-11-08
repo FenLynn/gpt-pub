@@ -247,6 +247,9 @@ function drawClassicBoard(){
    el.append(svgNode("circle",{cx,cy,r:38,class:"flight-airport-ring",
     fill:"#fffdf7",stroke:ink[camp.name],"data-airport-pad":camp.name}));
    el.append(svgNode("circle",{cx,cy,r:29,class:"flight-airport-hole",fill:area[camp.name]}));
+    // Printed aircraft in each hangar, distinct from path tiles.
+    el.append(svgNode("path",{d:"M 0 -23 C 3 -23 5 -18 5 -13 L 5 -5 L 24 7 L 24 12 L 5 8 L 5 21 L 12 26 L 12 29 L 0 25 L -12 29 L -12 26 L -5 21 L -5 8 L -24 12 L -24 7 L -5 -5 L -5 -13 C -5 -18 -3 -23 0 -23 Z",
+     class:"flight-airport-plane",fill:ink[camp.name],transform:"translate("+cx+" "+cy+") scale(.78)","aria-hidden":"true"}));
   }
  }
  // Small four-color triangular corner flights use the otherwise empty space
@@ -285,8 +288,15 @@ function drawClassicBoard(){
   if(index===0||index===26)attributes["data-launch"]=name;
   if(index===12||index===38)attributes["data-flight-gate"]=index===12?"red":"blue";
   el.append(svgNode("rect",attributes));
-  el.append(svgNode("circle",{cx,cy,r:15,class:"flight-track-hole",
-   "data-hole-track":index,fill:"#fffdf9"}));
+  const [nx,ny]=track[(index+1)%52],heading=Math.atan2(ny-y,nx-x)*180/Math.PI;
+   if(index%4===0){
+    el.append(svgNode("path",{d:"M -12 -7 L 0 -7 L 0 -13 L 14 0 L 0 13 L 0 7 L -12 7 Z",
+     transform:"translate("+cx+" "+cy+") rotate("+heading+")",
+     class:"flight-track-direction","data-hole-track":index,fill:"#fffdf8","aria-hidden":"true"}));
+   }else{
+    el.append(svgNode("circle",{cx,cy,r:4.5,class:"flight-track-pip",
+     "data-hole-track":index,fill:"#ffffffb8","aria-hidden":"true"}));
+   }
  });
  // Four lanes converge on a four-color center. Red and blue are playable;
  // yellow and green are visual lanes only (no change to two-player rules).
@@ -304,7 +314,7 @@ function drawClassicBoard(){
    if(lane.active!==undefined)attrs["data-lane"]=lane.active+"-"+i;
    else attrs["data-decor-lane"]=lane.name+"-"+i;
    el.append(svgNode("rect",attrs));
-   el.append(svgNode("circle",{cx,cy,r:14,class:"flight-home-hole",fill:"#fffdf9"}));
+   el.append(svgNode("circle",{cx,cy,r:5,class:"flight-home-hole",fill:"#fff8e5d9"}));
   });
   const [ax,ay]=pt(...lane.squares[3]);
   el.append(svgNode("path",{d:"M -7 0 H 7 M 1 -5 L 7 0 L 1 5",
@@ -313,7 +323,7 @@ function drawClassicBoard(){
  }
  // A small compass shows the circular direction without overcrowding all
  // 52 white holes; turn markers are on eight recognizable corner squares.
- for(const index of [0,6,12,19,25,32,38,45]){
+ for(const index of [0,12,26,38]){
   const [x,y]=track[index],[nx,ny]=track[(index+1)%52],
    [cx,cy]=pt(x,y),angle=Math.atan2(ny-y,nx-x)*180/Math.PI;
   el.append(svgNode("path",{d:"M -7 0 H 6 M 0 -5 L 6 0 L 0 5",
@@ -325,9 +335,10 @@ function drawClassicBoard(){
  // positions used by advance(), not additional playable squares.
  for(const index of [12,38]){
   const [cx,cy]=pt(...track[index]);
-  const icon=svgNode("text",{x:cx,y:cy+6,"text-anchor":"middle",
-   class:"flight-gate-icon","data-gate-icon":index,"aria-hidden":"true"});
-  icon.textContent="✈";el.append(icon);
+  const icon=svgNode("path",{d:"M 0 -13 L 3 -7 L 3 -3 L 13 4 L 13 8 L 3 5 L 3 13 L 7 16 L 7 18 L 0 16 L -7 18 L -7 16 L -3 13 L -3 5 L -13 8 L -13 4 L -3 -3 L -3 -7 Z",
+   class:"flight-gate-icon","data-gate-icon":index,"aria-hidden":"true",
+   transform:"translate("+cx+" "+cy+")",fill:"#24556c"});
+  el.append(icon);
  }
  // Classic four-color destination rosette.
  const center=[
