@@ -6,7 +6,7 @@ const games=[
 {id:"reversi",name:"黑白棋",category:"board",categoryName:"棋类",icon:"⚪",description:"翻转棋子，占领更多格子。",status:"ready",entry:"./games/reversi/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"只能落在至少夹住一枚对方棋子的位置。",help:[["基本规则","双方轮流落子，夹住对方连续棋子后翻转。终局棋子较多的一方获胜。"],["操作","点击棋盘上可落子的格子。无合法步时自动跳过；双方均无合法步时结束。"],["对战设置","顶部可切换人机/双人及 AI 难度。"],["策略提示","角落非常重要；避免轻易占据会让对手获得角落的位置。"]]},
 {id:"connect4",name:"四子棋",category:"board",categoryName:"棋类",icon:"🔴",description:"先将四枚棋子连成一线。",status:"ready",entry:"./games/connect4/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"选择列落子，棋子会落到最低空位。",help:[["基本规则","双方轮流把棋子投入七列棋盘，先在横、竖或斜线上连成四枚的一方获胜。"],["操作","点击任意列，棋子落入该列最低空位。"],["对战设置","顶部可切换人机/双人和 AI 难度。"],["策略提示","优先检查立即获胜点和对手的下一步连四威胁。"]]},
 {id:"battleship",name:"海战棋",category:"board",categoryName:"棋类",icon:"🚢",description:"根据命中线索寻找隐藏舰队。",status:"ready",entry:"./games/battleship/index.html",difficulty:true,tip:"点击敌方海域攻击，击沉全部舰船即可获胜。",help:[["基本规则","敌我双方各有长度为 5、4、3、3、2 的舰船。先击沉对方全部舰船的一方获胜。"],["操作","点击敌方海域进行攻击。命中和未命中会分别标记。"],["AI 难度","简单随机搜索；中等采用命中追击；困难进一步利用舰船长度和剩余可能位置进行概率搜索。"],["策略提示","命中后优先检查相邻格，连续命中时沿直线追击。"]]},
-{id:"chinese-checkers",name:"中国跳棋",category:"board",categoryName:"棋类",icon:"🔵",description:"121 孔六角星棋盘，十枚棋子连续跳跃到对面营地。",status:"playable",entry:"./games/chinese-checkers/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"点击自己的棋子，再点击绿色落点，支持连续跨子跳跃。",help:[["玩法","将十枚棋子全部移动至正对面三角营地即可获胜。"],["走法","六方向相邻走一步，或隔一颗棋子跳过至后方空点，可以连续跳跃且不吃子。"],["难度","简单随机合法移动，中等按目标前进评分，困难加入一回合对手回应评估。"],["操作","点击棋子后选择高亮落点，工具菜单支持悔棋。"]]},
+{id:"chinese-checkers",name:"中国跳棋",category:"board",categoryName:"棋类",icon:"🔵",description:"121 孔六角星棋盘，十枚棋子连续跳跃到对面营地。",status:"playable",entry:"./games/chinese-checkers/index.html",modes:["人机对战","本机多人"],difficulty:true,tip:"1号玩家始终在下方；支持本机多人和多电脑对手，选择棋子后点绿色落点。",help:[["玩法","将十枚棋子全部移动至正对面三角营地即可获胜。"],["走法","六方向相邻走一步，或隔一颗棋子跳过至后方空点，可以连续跳跃且不吃子。"],["难度","简单随机合法移动，中等按目标前进评分，困难加入一回合对手回应评估。"],["操作","点击棋子后选择高亮落点，工具菜单支持悔棋。"]]},
 {id:"flight-chess",name:"飞行棋",category:"board",categoryName:"棋类",icon:"✈️",description:"52 格航线、六点起飞、同色跳跃、撞机与终点竞速。",status:"playable",entry:"./games/flight-chess/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"点击中央骰子，掷六点起飞；再点击高亮飞机。",help:[["目标","红蓝双方各四架飞机，率先全部精确到达终点获胜。"],["规则","掷六点可起飞并获得额外回合；同色格可前进四格，特殊标记格可飞行；非安全格撞机返回机场。"],["操作","点击中央掷骰子，然后点击可移动的飞机；工具菜单可以悔棋。"],["难度","简单随机选择飞机、中等优先快速前进与撞机、困难评估对手下一次掷骰造成的风险。"]]},
 {id:"checkers",name:"西洋跳棋（8×8）",category:"board",categoryName:"棋类",icon:"⚫",description:"跳跃吃子，升变为王。",status:"ready",entry:"./games/checkers/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"有吃子机会时必须吃子。",help:[["基本规则","棋子沿深色格斜向前进；跳过相邻敌棋并落在其后空格即可吃子。到达底线升变为王。"],["强制吃子","存在吃子机会时必须选择吃子；连续吃子应继续完成。"],["操作","点击己方棋子，再点击合法目标格。"],["对战设置","顶部切换人机/双人和简单、中等、困难。"]]},
 {id:"chess",name:"国际象棋",category:"board",categoryName:"棋类",icon:"♞",description:"标准 8×8 棋盘，支持王车易位与吃过路兵。",status:"prototype",entry:"./games/chess/index.html",modes:["人机对战","本机双人"],difficulty:true,tip:"白方先行，选择棋子后点击合法落点。",help:[["基本规则","白方先行，目标是将死对方王。兵到达底线自动升变为后。"],["特殊规则","支持王车易位、吃过路兵、升变、将军、将死和逼和。"],["操作","点击己方棋子，再点击高亮的合法落点；Esc 取消选择，U 悔棋。"],["对战设置","顶部可切换人机对战或本机双人，以及 AI 难度。"]]},
@@ -82,8 +82,8 @@ function showGameResult(payload={},manual=false){
  if(!active)return;
  const el=$("gameResultOverlay"),card=$("gameResultCard"),score=Number(payload.score??session?.score??currentScore);
  const raw=String(payload.message||"").trim();
- const hasTwoPlayerMode=!!active.modes?.includes("本机双人");
- const localDuel=hasTwoPlayerMode&&active.modes[modeIndex]==="本机双人";
+ const hasTwoPlayerMode=!!active.modes?.some(label=>label==="本机双人"||label==="本机多人");
+ const localDuel=hasTwoPlayerMode&&["本机双人","本机多人"].includes(active.modes[modeIndex]);
  const draw=!manual&&(payload.draw===true||/平局|和棋/.test(raw));
  const side=String(payload.winner||"").trim()||
   raw.match(/(黑色棋子|白色棋子|黑方|白方|红方|黄方|蓝方|绿方)(?:将死)?获胜/)?.[1]||"";
@@ -293,7 +293,7 @@ function renderGameControls(){
  const modeEl=$("modeControl"),difficultyEl=$("difficultyControl"),hasModes=Array.isArray(active?.modes)&&active.modes.length>1;
  modeEl.classList.toggle("hidden",!hasModes);modeEl.innerHTML="";
  if(hasModes)active.modes.forEach((label,index)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.modeIndex=String(index);b.setAttribute("aria-pressed",String(index===modeIndex));modeEl.appendChild(b);});
- const hasDifficulty=!!active?.difficulty,locked=hasModes&&active.modes[modeIndex]==="本机双人";
+ const hasDifficulty=!!active?.difficulty,locked=hasModes&&["本机双人","本机多人"].includes(active.modes[modeIndex]);
  difficultyEl.classList.toggle("hidden",!hasDifficulty);difficultyEl.classList.toggle("is-inactive",locked);
  difficultyEl.setAttribute("aria-disabled",String(locked));difficultyEl.title=locked?"双人对战不需要 AI 难度":"";difficultyEl.innerHTML="";
  if(hasDifficulty){const labels=active.difficultyLabels||["简单","中等","困难"],values=["easy","normal","hard"];labels.forEach((label,index)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.difficulty=values[index]||"hard";b.disabled=locked;b.setAttribute("aria-pressed",String((values[index]||"hard")===difficulty));difficultyEl.appendChild(b);});}
@@ -359,7 +359,7 @@ window.addEventListener("message",event=>{
  if(!m||m.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!==active.id)return;
  if(m.type==="READY"&&!ready){
   ready=true;
-  send("INIT",{sessionId,mode:active.modes?.[modeIndex]==="本机双人"?"two":"ai",difficulty,name:active.name,modes:active.modes||[],hasDifficulty:!!active.difficulty,difficultyLabels:active.difficultyLabels||["简单","中等","困难"]});
+  send("INIT",{sessionId,mode:["本机双人","本机多人"].includes(active.modes?.[modeIndex])?"two":"ai",difficulty,name:active.name,modes:active.modes||[],hasDifficulty:!!active.difficulty,difficultyLabels:active.difficultyLabels||["简单","中等","困难"]});
   send("PAUSE");
   paused=true;
   setGameState();
@@ -406,8 +406,8 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
   showGameNotice(m.payload?.message||"游戏模块发生错误",0,true);
  }
 });
-function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:active.modes[modeIndex]==="本机双人"?"two":"ai"});newRound();}
-function setDifficulty(value){if(!active?.difficulty||active.modes?.[modeIndex]==="本机双人"||!["easy","normal","hard"].includes(value)||value===difficulty)return;difficulty=value;renderGameControls();send("SET_DIFFICULTY",{difficulty});newRound();}
+function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:["本机双人","本机多人"].includes(active.modes[modeIndex])?"two":"ai"});newRound();}
+function setDifficulty(value){if(!active?.difficulty||["本机双人","本机多人"].includes(active.modes?.[modeIndex])||!["easy","normal","hard"].includes(value)||value===difficulty)return;difficulty=value;renderGameControls();send("SET_DIFFICULTY",{difficulty});newRound();}
 function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?[["快捷键","Enter：暂停 / 继续；P：暂停 / 继续。游戏区域右键由游戏接管。"],...active.help,...(helpSource.lines.length?[["游戏专用快捷键与鼠标",helpSource.lines.join("；")]]:[]),...(helpSource.note?[["游戏操作提醒",helpSource.note]]:[])]:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
 function openHelp(){renderHelp();$("helpPanel").classList.remove("hidden");}
 function closeHelp(){$("helpPanel").classList.add("hidden");}
