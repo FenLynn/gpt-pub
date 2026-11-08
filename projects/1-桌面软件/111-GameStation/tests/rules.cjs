@@ -23,26 +23,26 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   // Both castle directions reposition king AND rook, without creating a new piece.
   await fen("4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1");
   await move("e1","g1");
-  assert.equal(await piece("g1"),"♔");assert.equal(await piece("f1"),"♖");
+  assert.equal(await piece("g1"),"♚");assert.equal(await piece("f1"),"♜");
   assert.equal(await piece("e1"),"");assert.equal(await piece("h1"),"");
   await fen("4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1");
   await move("e1","c1");
-  assert.equal(await piece("c1"),"♔");assert.equal(await piece("d1"),"♖");
+  assert.equal(await piece("c1"),"♚");assert.equal(await piece("d1"),"♜");
   assert.equal(await piece("a1"),"");
   // Illegal castle through an attacked transit square.
   await fen("4kr2/8/8/8/8/8/8/R3K2R w KQ - 0 1");
   await move("e1","g1");
-  assert.equal(await piece("e1"),"♔","King must not castle across attacked f1");
+  assert.equal(await piece("e1"),"♚","King must not castle across attacked f1");
   // En passant is a capture from an empty destination and removes d5 pawn.
   await fen("4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1");
   await move("e5","d6");
-  assert.equal(await piece("d6"),"♙");assert.equal(await piece("d5"),"");
+  assert.equal(await piece("d6"),"♟");assert.equal(await piece("d5"),"");
   // Promotion explicitly offers four legal piece choices instead of auto-queen.
   await fen("4k3/P7/8/8/8/8/8/4K3 w - - 0 1");
   await move("a7","a8");
   assert.equal(await page.locator("#promotionChooser [data-promotion]").count(),4);
   await page.locator('#promotionChooser [data-promotion="N"]').click();
-  assert.equal(await piece("a8"),"♘");
+  assert.equal(await piece("a8"),"♞");
   assert.match(await page.locator("#moveList").innerText(),/=N/);
   // Both checkmate and stalemate, distinct outcomes.
   await fen("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1");
