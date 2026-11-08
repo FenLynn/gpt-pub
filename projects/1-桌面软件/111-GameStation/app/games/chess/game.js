@@ -8,7 +8,7 @@ const fitChessRails=()=>{
 };
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitChessRails).observe(frame);
 window.addEventListener("resize",fitChessRails);requestAnimationFrame(fitChessRails);
-const glyph={w:{K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"},b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"}};
+// Filled silhouette for BOTH sides; ivory fill + dark outline makes white visible on maple squares.\nconst glyph={w:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"},b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"}};
 const value={P:100,N:320,B:335,R:500,Q:900,K:20000},files="abcdefgh";
 let board=[],turn="w",mode="ai",difficulty="normal",paused=true,over=false,flip=false,selected=null,legal=[],history=[],moveLog=[],lastMove=null,ep=null,castle={},captured={w:[],b:[]},aiTimer=null,halfMoves=0,positions=[],promotionChoices=null;
 const opposite=c=>c==="w"?"b":"w";
