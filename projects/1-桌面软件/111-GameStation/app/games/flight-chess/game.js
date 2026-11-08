@@ -1,5 +1,9 @@
 (function(){"use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
+const layoutRoot=document.getElementById("game"),stage=layoutRoot.querySelector(".flight-stage");
+const fitHistoryHeight=()=>{const h=stage.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(stage);
+window.addEventListener("resize",fitHistoryHeight);requestAnimationFrame(fitHistoryHeight);
 const track=[
 [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
 [0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],
@@ -96,19 +100,34 @@ function draw(){
   el.append(svgNode("rect",{x:cx-22,y:cy-22,width:44,height:44,rx:7,fill,stroke:"#c9ac8e","stroke-width":2,"data-track":index}));
  });
  houses.forEach((home,seat)=>home.forEach(([x,y],i)=>{const [cx,cy]=pos(x,y);el.append(svgNode("rect",{x:cx-21,y:cy-21,width:42,height:42,rx:7,fill:seat===0?"#eba69b":"#a9cbed",stroke:"#c7ab93","stroke-width":2,"data-lane":seat+"-"+i}));}));
- el.append(svgNode("path",{d:"M380 380 L450 330 L520 380 L570 450 L520 520 L450 570 L380 520 L330 450 Z",class:"flight-center-pad"}));
+ // A single board only: keep the center open and the home lanes unobscured.
+ el.append(svgNode("circle",{cx:450,cy:450,r:37,class:"flight-center-pad"}));
+ const occupied=new Map();
  pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
-  const [x,y]=position(seat,i,progress),[cx,cy]=pos(x,y),others=row.slice(0,i).filter((p,j)=>position(seat,j,p)[0]===x&&position(seat,j,p)[1]===y).length;
-  const offset=(others%3-1)*8,selected=turn===seat&&roll!==null&&moves().some(m=>m.seat===seat&&m.index===i);
-  const group=svgNode("g",{"data-pawn":seat+"-"+i,role:"button",tabindex:"0",class:"flight-aircraft"+(selected?" can-move":"")});
-  group.append(svgNode("circle",{cx:cx+offset,cy:cy+offset,r:19,fill:colors[seat],stroke:"#fff","stroke-width":3}));
-  const shape=svgNode("path",{d:"M"+(cx+offset)+" "+(cy+offset-12)+" l-6 15 l6 -4 l6 4 Z",fill:"#fff"});
-  group.append(shape);
-  const count=svgNode("text",{x:cx+offset,y:cy+offset+12,"text-anchor":"middle",class:"flight-aircraft-number"});count.textContent=String(i+1);group.append(count);
-  group.addEventListener("click",()=>play(i));group.addEventListener("keydown",e=>{if(e.key===" "){e.preventDefault();play(i);}});
+  const [x,y]=position(seat,i,progress),k=x+","+y;
+  if(!occupied.has(k))occupied.set(k,[]);
+  occupied.get(k).push([seat,i]);
+ }));
+ const displacements=n=>n===1?[[0,0]]:n===2?[[-10,0],[10,0]]:n===3?[[0,-11],[-10,9],[10,9]]:[[-10,-10],[10,-10],[-10,10],[10,10]];
+ pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
+  const [x,y]=position(seat,i,progress),[cx,cy]=pos(x,y);
+  const stack=occupied.get(x+","+y),index=stack.findIndex(([s,p])=>s===seat&&p===i);
+  const [dx,dy]=displacements(stack.length)[index];
+  const selected=turn===seat&&roll!==null&&moves().some(m=>m.seat===seat&&m.index===i);
+  const group=svgNode("g",{"data-pawn":seat+"-"+i,role:"button",tabindex:"0",
+   "data-slot-x":cx,"data-slot-y":cy,"data-center-x":cx+dx,"data-center-y":cy+dy,
+   transform:"translate("+(cx+dx)+" "+(cy+dy)+")",
+   class:"flight-aircraft"+(selected?" can-move":"")});
+  group.append(svgNode("circle",{cx:0,cy:0,r:stack.length>1?14:19,fill:colors[seat],stroke:"#fff","stroke-width":3}));
+  group.append(svgNode("path",{d:"M0 -12 l-6 15 l6 -4 l6 4 Z",fill:"#fff"}));
+  const count=svgNode("text",{x:0,y:12,"text-anchor":"middle",class:"flight-aircraft-number"});count.textContent=String(i+1);group.append(count);
+  group.addEventListener("click",()=>play(i));group.addEventListener("keydown",e=>{if(e.key===" "||e.key==="Enter"){e.preventDefault();play(i);}});
   el.append(group);
  }));
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
+ layoutRoot.dataset.turnSide=turn===0?"red":"blue";
+ document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
+ document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===57).length);
  rollButton.disabled=paused||over||roll!==null||turn===1&&mode==="ai";
  document.getElementById("undoButton").disabled=paused||over||!history.length;
  renderDice();
@@ -164,11 +183,12 @@ function newGame(){
 function pauseGame(){paused=true;clearTimeout(aiTimer);report("已暂停");draw();}
 function resumeGame(){paused=false;report("继续游戏");draw();scheduleAI();}
 rollButton.onclick=()=>{if(mode==="ai"&&turn===1)return;throwDice();};
+diceFace.addEventListener("click",()=>rollButton.click());
 document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111FlightTest={
-  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),
+  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),position:(seat,i)=>position(seat,i),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},pause:pauseGame,resume:resumeGame,undo,
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
