@@ -41,3 +41,79 @@
 @media (prefers-reduced-motion:reduce){
  #game.flight-chess-layout .flight-stack.can-move{animation:none}
 }
+
+
+/* P111 Flight board R51 — route vocabulary matches the existing engine:
+   52 arrowed clockwise tiles, red/blue same-color +4 and dashed flyovers. */
+#game.flight-chess-layout .flight-board-flow,
+#game.flight-chess-layout .flight-route-arrow,
+#game.flight-chess-layout .flight-home-arrow,
+#game.flight-chess-layout .flight-air-corridor,
+#game.flight-chess-layout .flight-air-corridor-head,
+#game.flight-chess-layout .flight-jump-tile-label,
+#game.flight-chess-layout .flight-launch-label,
+#game.flight-chess-layout .flight-map-title,
+#game.flight-chess-layout .flight-map-legend,
+#game.flight-chess-layout .flight-preview-shortcut,
+#game.flight-chess-layout .flight-shortcut-badge{
+ pointer-events:none!important;
+}
+#game.flight-chess-layout .flight-route-arrow{
+ fill:none;stroke:#526779;stroke-opacity:.79;
+ stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round
+}
+#game.flight-chess-layout .flight-jump-tile-label{
+ fill:#405a69;font:800 11px/1 "Segoe UI",Arial,sans-serif;
+ paint-order:stroke;stroke:#f8ffffa0;stroke-width:1px
+}
+#game.flight-chess-layout .flight-launch-label{
+ fill:#fff;font:800 13px/1 "Microsoft YaHei","Segoe UI",sans-serif;
+ paint-order:stroke;stroke:#284f637a;stroke-width:1px
+}
+#game.flight-chess-layout .flight-home-arrow{
+ fill:none;stroke-width:3;stroke-linejoin:round;stroke-linecap:round
+}
+#game.flight-chess-layout [data-home-arrow^="0-"]{stroke:#a95750}
+#game.flight-chess-layout [data-home-arrow^="1-"]{stroke:#417da9}
+#game.flight-chess-layout .flight-air-corridor{
+ fill:none;stroke-width:4.5;stroke-dasharray:13 8;
+ opacity:.92;stroke-linecap:round
+}
+#game.flight-chess-layout .flight-air-corridor-head{
+ fill:none;stroke-width:5;stroke-linejoin:round;stroke-linecap:round
+}
+#game.flight-chess-layout .flight-air-corridor.red,
+#game.flight-chess-layout .flight-air-corridor-head.red{stroke:#d46258}
+#game.flight-chess-layout .flight-air-corridor.blue,
+#game.flight-chess-layout .flight-air-corridor-head.blue{stroke:#3c8ec6}
+#game.flight-chess-layout .flight-map-title{
+ font:800 20px/1 "Microsoft YaHei","Segoe UI",sans-serif;
+ fill:#43677a;letter-spacing:.8px
+}
+#game.flight-chess-layout .flight-map-legend{
+ font:600 14px/1 "Microsoft YaHei","Segoe UI",sans-serif;
+ fill:#557481;letter-spacing:.1px
+}
+#game.flight-chess-layout #board[data-preview-active="true"] .flight-route-arrow{
+ opacity:.38
+}
+#game.flight-chess-layout .flight-preview-shortcut{
+ fill:none;stroke-width:7;stroke-linejoin:round;
+ stroke-linecap:round;stroke-dasharray:14 8;
+ filter:drop-shadow(0 1px 1px #2d4d613d)
+}
+#game.flight-chess-layout .flight-preview-shortcut.jump{stroke:#e6a139}
+#game.flight-chess-layout[data-turn-side="red"] .flight-preview-shortcut.flight{stroke:#d56358}
+#game.flight-chess-layout[data-turn-side="blue"] .flight-preview-shortcut.flight{stroke:#4c93c8}
+#game.flight-chess-layout .flight-shortcut-badge circle{
+ fill:#fff9e9;stroke:#d99936;stroke-width:3;
+ filter:drop-shadow(0 2px 3px #2a435a35)
+}
+#game.flight-chess-layout .flight-shortcut-badge.flight circle{
+ fill:#edf7ff;stroke:#408bc3
+}
+#game.flight-chess-layout .flight-shortcut-badge text{
+ fill:#7b561a;font:800 14px/1 "Segoe UI",Arial,sans-serif;
+ stroke:none
+}
+#game.flight-chess-layout .flight-shortcut-badge.flight text{fill:#286795}
