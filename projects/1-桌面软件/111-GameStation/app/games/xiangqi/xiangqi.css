@@ -47,7 +47,7 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 .xiangqi-record-heading strong{font-weight:770;font-size:16px}
 .xiangqi-record-heading span{color:#849cab;font-size:11px;font-variant-numeric:tabular-nums}
 .xiangqi-record-head,.xiangqi-layout #moveList li{
- display:grid;grid-template-columns:minmax(94px,112px) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center
+ display:grid;grid-template-columns:124px minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:center
 }
 .xiangqi-record-head{flex:none;padding:11px 15px 9px;color:#8194a2;font-size:12px;text-align:center;border-bottom:1px solid #e7eef3}
 .xiangqi-record-scroll{position:relative;flex:1;min-height:0;min-width:0;overflow:hidden}
@@ -74,19 +74,14 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 }
 .xiangqi-layout #moveList li:nth-child(2n){background:#f1f6f9}
 .xiangqi-layout #moveList li:last-child{background:#e8f3fa}
-/* Never truncate elapsed times. Keep short pairs beside the turn index; move
-   long pairs onto a second line inside the same column, without side scrolling. */
+/* The turn number and both elapsed times are one atomic, single-line label.
+   Never wrap inside numeric data or let it disturb the red/black columns. */
 .xiangqi-layout #moveList li > .xiangqi-move-index{
- display:flex;align-items:center;align-content:center;justify-content:flex-start;
- flex-wrap:wrap;gap:2px 4px;min-width:0;max-width:100%;white-space:normal;
+ display:block!important;min-width:0!important;width:100%!important;
  overflow:visible!important;text-overflow:clip!important;
- color:#869dad;font-size:12px
-}
-.xiangqi-round-number{flex:0 0 auto}
-.xiangqi-step-times{
- display:inline-block;flex:0 0 auto;max-width:100%;
- font:600 10px/1.25 ui-monospace,Consolas,"Segoe UI",monospace;
- color:#8096a5;white-space:normal;overflow-wrap:anywhere;word-break:normal;
+ white-space:nowrap!important;text-align:left!important;
+ color:#869dad!important;font:600 10px/1.2 ui-monospace,Consolas,"Segoe UI",monospace!important;
+ font-variant-numeric:tabular-nums!important;letter-spacing:-.22px!important
 }
 .game-root.xiangqi-layout .gs-turn-clock-latest,
 .game-root.xiangqi-layout .gs-turn-clock-history{display:none!important}

@@ -758,36 +758,31 @@ const names=[
   }));
   assert.ok(realXiangqiClock.count>=1&&realXiangqiClock.last?.includes("兵"),
    "A real Xiangqi pawn move must record its notation and elapsed time: "+JSON.stringify(realXiangqiClock));
-  const inlineTiming=await frame.locator("#moveList li").first().evaluate(row=>({
-   index:row.querySelector(".xiangqi-move-index")?.textContent,
-   tooltip:row.querySelector(".xiangqi-step-times")?.title||"",
-   rightLog:getComputedStyle(document.querySelector(".gs-turn-clock-history")).display
-  }));
-  assert.match(inlineTiming.index,/^1\.（\d+[.:]\d+(?:\/\d+[.:]\d+)?s）$/,
-   "Xiangqi per-move time must appear in parentheses next to its round number: "+JSON.stringify(inlineTiming));
-  assert.match(inlineTiming.tooltip,/红方/,"Xiangqi per-move timing must identify its side");
-  assert.equal(inlineTiming.rightLog,"none","Xiangqi must not duplicate the operation-time list on the right");
-  const visibleTiming=await frame.locator("#moveList li").first().evaluate(row=>{
-   const index=row.querySelector(".xiangqi-move-index"),stamp=row.querySelector(".xiangqi-step-times"),
-    move=row.querySelector(".xiangqi-move-side"),original=stamp.textContent;
-   const measure=()=>{
-    const r=index.getBoundingClientRect(),next=move.getBoundingClientRect(),range=document.createRange();
-    range.selectNodeContents(stamp);
-    const ink=[...range.getClientRects()].map(x=>({left:x.left,right:x.right,top:x.top,bottom:x.bottom}));
-    return{ink,indexLeft:r.left,indexRight:r.right,nextLeft:next.left,
-     scrollWidth:index.scrollWidth,clientWidth:index.clientWidth,overflow:getComputedStyle(index).overflow};
+  const inlineTiming=await frame.locator("#moveList li").first().evaluate(row=>{
+   const index=row.querySelector(".xiangqi-move-index"),rect=index.getBoundingClientRect(),
+    next=row.querySelector(".xiangqi-move-side").getBoundingClientRect();
+   const range=document.createRange();range.selectNodeContents(index);
+   const rects=[...range.getClientRects()].map(x=>({left:x.left,right:x.right,top:x.top,bottom:x.bottom}));
+   const measure=text=>{const before=index.textContent;index.textContent=text;
+    range.selectNodeContents(index);
+    const rs=[...range.getClientRects()].map(x=>({left:x.left,right:x.right,top:x.top,bottom:x.bottom}));
+    const width=index.scrollWidth;index.textContent=before;
+    return{rects:rs,scrollWidth:width};
    };
-   const short=measure();
-   stamp.textContent="（123:45.6/987:65.4s）";
-   const long=measure();
-   stamp.textContent=original;
-   return{short,long,final:stamp.textContent};
+   return{index:index.textContent,tooltip:index.title,rects,rectLeft:rect.left,rectRight:rect.right,
+    nextLeft:next.left,whiteSpace:getComputedStyle(index).whiteSpace,
+    long:measure("1.（123:45.6/987:65.4s）"),
+    rightLog:getComputedStyle(document.querySelector(".gs-turn-clock-history")).display};
   });
-  for(const [length,v] of Object.entries({short:visibleTiming.short,long:visibleTiming.long})){
-   assert.ok(v.ink.length>0&&v.ink.every(r=>r.left>=v.indexLeft-.6&&r.right<=v.indexRight+.6)
-     &&v.scrollWidth<=v.clientWidth+1&&v.indexRight<=v.nextLeft+.6,
-    "Xiangqi "+length+" durations must be fully visible inside the round column, never clipped or horizontally scrolling: "+JSON.stringify(v));
-  }
+  assert.match(inlineTiming.index,/^1\.（\d+[.:]\d+(?:\/\d+[.:]\d+)?s）$/,
+   "Xiangqi needs an inline elapsed-time bracket after the round number: "+JSON.stringify(inlineTiming));
+  assert.match(inlineTiming.tooltip,/红方/);
+  assert.equal(inlineTiming.rightLog,"none");
+  assert.equal(inlineTiming.whiteSpace,"nowrap","Turn labels must never wrap digit by digit");
+  assert.equal(inlineTiming.rects.length,1,"The entire actual turn label must occupy one line");
+  assert.ok(inlineTiming.rects[0].right<=inlineTiming.rectRight+1&&inlineTiming.rectRight<=inlineTiming.nextLeft+.6,
+   "Actual Xiangqi turn label must fit within its own first column: "+JSON.stringify(inlineTiming));
+  assert.equal(inlineTiming.long.rects.length,1,"Long turn times must not split into several vertical lines");
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
   });

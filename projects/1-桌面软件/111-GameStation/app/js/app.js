@@ -28,7 +28,7 @@ const games=[
 ];
 const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"街机",card:"卡牌"};
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
-const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
+const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
 function gameIconMarkup(game){
  // Lorc / Game-icons.net tank, CC BY 3.0. License: assets/NOTICE.md.
  // The tank silhouette is taken from the published SVG, with its background
@@ -65,6 +65,9 @@ function showGameNotice(message,timeout=2400,persistent=false){
  const value=String(message||"").trim();if(!value)return;
  if(persistent)permanentGameStatus=value;
  clearTimeout(centerNoticeTimer);setGameNoticeText(value);
+ // Restart the two-pulse animation for every incoming message, even if identical.
+ const speaker=$("gameNotice")?.querySelector(".game-notice-speaker");
+ if(speaker){speaker.classList.remove("is-pulsing");void speaker.getBoundingClientRect().width;speaker.classList.add("is-pulsing");}
  if(timeout>0)centerNoticeTimer=setTimeout(()=>setGameNoticeText(permanentGameStatus),timeout);
 }
 function clearGameNotice(){clearTimeout(centerNoticeTimer);permanentGameStatus="";setGameNoticeText("");}
@@ -245,6 +248,7 @@ function renderLibrary(){const grid=$("gameGrid");grid.innerHTML="";const rows=g
 function send(type,payload={}){if(!active||!frame.contentWindow)return;frame.contentWindow.postMessage({channel:"gamestation",protocolVersion:1,gameId:active.id,sessionId,type,payload},"*");}
 function setBreadcrumb(){
  $("breadcrumbCategory").textContent=active.name;
+ $("breadcrumbCategory").title=active.name;
  $("crumbGameSep").classList.add("hidden");
  $("breadcrumbGame").classList.add("hidden");
 }

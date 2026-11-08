@@ -498,3 +498,43 @@
  }
 }
 
+
+/* R37: keep game titles legible and make notification arrival visible. */
+@media(min-width:901px){
+ .main-area:has(#workspaceView:not(.hidden)) .breadcrumbs>span:first-child,
+ .main-area:has(#workspaceView:not(.hidden)) #crumbCategorySep{display:none!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .breadcrumbs{
+  gap:0!important;max-width:100%!important;overflow:visible!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) #breadcrumbCategory{
+  display:block!important;white-space:nowrap!important;overflow:visible!important;
+  text-overflow:clip!important;max-width:none!important;font-size:clamp(12px,1vw,14px)!important
+ }
+}
+.main-area:has(#workspaceView:not(.hidden)) #startButton.end-action{
+ background:transparent!important;border:1px solid #ecc4bd!important;color:#b65047!important
+}
+.main-area:has(#workspaceView:not(.hidden)) #startButton.end-action svg,
+.main-area:has(#workspaceView:not(.hidden)) #startButton.end-action svg rect{
+ fill:none!important;stroke:currentColor!important;stroke-width:1.9!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
+ width:29px!important;height:29px!important;overflow:visible!important;
+ stroke:#5289a2!important;stroke-width:2.2!important;stroke-linecap:round!important;stroke-linejoin:round!important
+}
+.main-area:has(#workspaceView:not(.hidden)) .speaker-body{fill:none;stroke:inherit}
+.main-area:has(#workspaceView:not(.hidden)) .speaker-pulse-rays{
+ opacity:0;transform-origin:17px 12px
+}
+.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker.is-pulsing .speaker-pulse-rays{
+ animation:gs-notice-pulse .4s ease-out 2 both!important
+}
+@keyframes gs-notice-pulse{
+ 0%,100%{opacity:0;transform:translateX(0)}
+ 25%,65%{opacity:1;transform:translateX(2px)}
+}
+@media(prefers-reduced-motion:reduce){
+ .main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker.is-pulsing .speaker-pulse-rays{
+  animation:none!important;opacity:1!important
+ }
+}

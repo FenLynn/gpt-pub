@@ -281,16 +281,12 @@ function renderMoveList(){
  list.replaceChildren();
  for(let i=0;i<history.length;i+=2){
   const row=document.createElement("li");
-  const index=document.createElement("span"),round=document.createElement("span");
-  index.className="xiangqi-move-index";round.className="xiangqi-round-number";
-  round.textContent=String(Math.floor(i/2)+1)+".";index.appendChild(round);
+  const index=document.createElement("span");
+  index.className="xiangqi-move-index";
   const pair=times.slice(i,Math.min(i+2,history.length));
-  if(pair.length){
-   const stamp=document.createElement("span");stamp.className="xiangqi-step-times";
-   stamp.textContent="（"+pair.map(item=>compactMoveSeconds(item.ms)).join("/")+"s）";
-   stamp.title=pair.map(item=>item.side+" "+compactMoveSeconds(item.ms)+" 秒").join(" / ");
-   index.appendChild(stamp);
-  }
+  index.textContent=String(Math.floor(i/2)+1)+"."+
+   (pair.length?"（"+pair.map(item=>compactMoveSeconds(item.ms)).join("/")+"s）":"");
+  index.title=pair.map(item=>item.side+" "+compactMoveSeconds(item.ms)+" 秒").join(" / ");
   row.appendChild(index);
   for(let j=i;j<Math.min(i+2,history.length);j++){
    const h=history[j],note=document.createElement("span");
