@@ -194,3 +194,17 @@
 #game.flight-chess-layout .flight-center-outline{stroke:#665444;stroke-width:3.5}
 #game.flight-chess-layout .flight-center-sector{stroke:#fffbf3;stroke-width:2.4}
 #game.flight-chess-layout .flight-center-core{fill:#fffdf6;stroke:#846b53;stroke-width:2.5}
+
+/* R54 printed-board treatment — colored paths without 52 oversized white wells. */
+#game.flight-chess-layout .flight-track-tile,
+#game.flight-chess-layout .flight-home-tile{stroke:#fffdf3;stroke-width:1.8;rx:2}
+#game.flight-chess-layout .flight-airport-plane,
+#game.flight-chess-layout .flight-track-direction,
+#game.flight-chess-layout .flight-track-pip{pointer-events:none}
+#game.flight-chess-layout .flight-track-direction{stroke:#6b65531f;stroke-width:1.1;paint-order:stroke fill}
+#game.flight-chess-layout .flight-track-pip{opacity:.8}
+#game.flight-chess-layout .flight-airport-ring{stroke-width:3.1;filter:none}
+#game.flight-chess-layout .flight-airport-hole{stroke:#fffdf8;stroke-width:2}
+#game.flight-chess-layout .flight-airport-plane{filter:drop-shadow(0 1.4px 1px #263b4838)}
+#game.flight-chess-layout .flight-route-arrow{opacity:.6}
+#game.flight-chess-layout .flight-gate-icon{fill:#24556c;stroke:#fff9ef;stroke-width:1;paint-order:stroke fill}
