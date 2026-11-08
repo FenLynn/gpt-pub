@@ -1069,6 +1069,20 @@ const names=[
   assert.equal(await frame.locator("#moveList li").count(),1);
   await frame.locator("#undoButton").click();
   assert.equal(await frame.locator("#moveList li").count(),0);
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",{message:"白方将死获胜",win:true}));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"白方获胜",
+   "Local chess checkmate must identify the winning side rather than show generic end");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  await open("飞行棋");await start();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",{message:"蓝方获胜",win:false}));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"蓝方获胜",
+   "Local flight chess settlement must recognize the blue side");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("中国象棋");await start();assert.equal(await frame.locator(".xiangqi-cell").count(),90);
    await frame.locator("#resignButton").click();
    await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
