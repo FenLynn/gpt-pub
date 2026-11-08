@@ -523,14 +523,15 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.deepEqual((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns,beforePreview.pawns,"Preview does not automatically move the selected airplane");
   assert.ok(await flight.locator(".flight-path-step[data-preview-step]").count()>=1,"Selected airplane renders green numbered path steps");
   assert.equal(await flight.locator(".flight-path-target[data-preview-to]").count(),1,"Flight preview includes a separately clickable landing position");
+  assert.equal(await flight.locator("#flightMoveHelp").count(),1,"Flight instructions must have a single stable element");
   const pathStyle=await flight.locator(".flight-path-target").evaluate(el=>{
    const circle=el.querySelector(".flight-target-ring"),trail=document.querySelector(".flight-preview-circle");
    return{circleFill:getComputedStyle(circle).fill,trailFill:getComputedStyle(trail).fill,
     duration:parseFloat(getComputedStyle(el).animationDuration),
     reduced:matchMedia("(prefers-reduced-motion:reduce)").matches};
   });
-  assert.ok(["transparent","rgba(0, 0, 0, 0)"].includes(pathStyle.circleFill)&&["transparent","rgba(0, 0, 0, 0)"].includes(pathStyle.trailFill),
-   "Flight hints and destination must have transparent interiors: "+JSON.stringify(pathStyle));
+  assert.ok(pathStyle.circleFill==="rgb(255, 255, 255)"&&pathStyle.trailFill==="rgb(255, 253, 248)",
+   "Flight numbered hints and destination must have restored white backgrounds: "+JSON.stringify(pathStyle));
   if(!pathStyle.reduced)assert.ok(pathStyle.duration>=2,"Destination should have slow breathing animation: "+JSON.stringify(pathStyle));
 
   await flight.locator(".flight-path-target").click();
