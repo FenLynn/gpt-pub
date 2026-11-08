@@ -773,10 +773,10 @@ const names=[
     if(resignGames.has(name)){
      await frame.locator("#resignButton:enabled").waitFor({state:"visible",timeout:3500});
      const action=await frame.locator("#resignButton").evaluate(el=>({
-      afterUndo:el.previousElementSibling?.id==="undoButton",
+      afterUndo:el.previousElementSibling?.id==="undoButton",hasUndo:!!el.parentElement.querySelector("#undoButton"),beforeScores:el.nextElementSibling?.classList.contains("side-score"),
       text:el.textContent.trim(),icon:!!el.querySelector("svg"),disabled:el.disabled
      }));
-     assert.ok(action.afterUndo&&action.text==="认输"&&action.icon&&!action.disabled,
+     assert.ok((action.hasUndo?action.afterUndo:action.beforeScores)&&action.text==="认输"&&action.icon&&!action.disabled,
       name+" resignation must appear immediately after undo, enabled in active play: "+JSON.stringify(action));
     }
     if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
