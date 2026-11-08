@@ -54,12 +54,14 @@ const names=[
    return{icon:!!icon,clockIcon:!!title.querySelector("svg"),title:title.textContent,buttonText:el.textContent.trim(),
     titleBottom:title.getBoundingClientRect().bottom,buttonTop:el.getBoundingClientRect().top,
     cardWidth:r.width,cardHeight:r.height,cardBackground:style.backgroundColor,
+    cardAlpha:(()=>{const m=style.backgroundColor.match(/rgba?\(([^)]+)\)/),v=m?.[1].split(",")||[];return v.length===4?Number(v[3]):1;})(),
     centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
     centerDy:Math.abs((r.top+r.bottom-stage.top-stage.bottom)/2)};
   });
   assert.ok(geometry.icon&&geometry.clockIcon&&geometry.title==="已暂停"&&geometry.buttonText==="继续"
     &&geometry.buttonTop-geometry.titleBottom>=20&&geometry.cardWidth>=250&&geometry.cardWidth<=340
     &&geometry.cardWidth>geometry.cardHeight&&geometry.cardBackground.startsWith("rgba(")
+    &&geometry.cardAlpha>=.48&&geometry.cardAlpha<=.52
     &&geometry.centerDx<2&&geometry.centerDy<2,
    "All games need centered title-above-resume pause UI: "+JSON.stringify(geometry));
   if(game==="中国象棋")await page.screenshot({path:path.join(artifacts,"xiangqi-paused.png")});
@@ -99,7 +101,7 @@ const names=[
      count:Number(el.ownerDocument.querySelector("#game").dataset.turnClockCount),
      side:el.querySelector("#gs-turn-side").textContent};
    });
-   assert.ok(timing.visible&&timing.width>=110,"Board game must display its per-turn clock on the right: "+name+" "+JSON.stringify(timing));
+   assert.ok(timing.visible&&timing.width>=110,"Board game must display its per-turn clock: "+name+" "+JSON.stringify(timing));
    assert.equal(timing.count,0,"New board game must start with no recorded moves: "+name);
   }
   if(name==="五子棋"){
@@ -182,9 +184,35 @@ const names=[
     }));
     assert.equal(rail.border,"0px",name+" right tools must not be inside a giant outer box");
     assert.equal(rail.status,"none",name+" status belongs exclusively in the top LED");
-    assert.ok(rail.clock,name+" needs one clock in the right controls");
+    if(name==="黑白棋")assert.equal(rail.clock,false,"Reversi timer must move to the left rail");
+    else assert.ok(rail.clock,name+" needs one clock in the right controls");
     assert.ok(rail.buttons.every(b=>b.icon&&b.height>=32),
      name+" right action buttons need the shared icon and sufficient touch area: "+JSON.stringify(rail));
+   }
+   if(name==="黑白棋"){
+    const v=await frame.locator("#game").evaluate(root=>{
+      const left=root.querySelector(".reversi-record-rail"),right=root.querySelector(".game-tools"),
+        board=root.querySelector("#board"),tip=right.querySelector(".gs-board-tip"),
+        stats=right.querySelector(".side-score"),btn=right.querySelector("#undoButton"),
+        clock=root.querySelector("#gs-turn-clock"),hist=left.querySelector("#gs-turn-details"),
+        ol=left.querySelector("#gs-turn-log");
+      const rect=x=>x.getBoundingClientRect(),l=rect(left),b=rect(board),r=rect(right),
+        action=rect(btn),score=rect(stats),hint=rect(tip);
+      return{gap:b.left-l.right,clockParent:clock.parentElement.className,expanded:hist.open,
+       rightCenter:Math.abs((action.top+hint.bottom-r.top-r.bottom)/2),
+       hintLast:hint.top>score.bottom,
+       labels:[...stats.querySelectorAll("span")].map(n=>n.textContent.trim()),
+       hintText:tip.textContent,overflowX:getComputedStyle(ol).overflowX,
+       scrollbar:getComputedStyle(ol).scrollbarWidth};
+    });
+    assert.ok(v.gap>=-2&&v.gap<=48,"Reversi history must dock left of the centered board: "+JSON.stringify(v));
+    assert.equal(v.clockParent,"reversi-record-rail","Reversi timing and history belong on the left");
+    assert.ok(v.expanded,"Reversi history should be expanded");
+    assert.ok(v.rightCenter<=12,"Reversi buttons and indicators must be vertically centered: "+JSON.stringify(v));
+    assert.ok(v.hintLast,"Reversi legal-move explanation should be last on the right");
+    assert.deepEqual(v.labels,["黑色棋子","白色棋子"]);
+    assert.ok(v.hintText.includes("浅绿色圆点"),"Reversi green target explanation should be visible");
+    assert.equal(v.overflowX,"hidden");assert.equal(v.scrollbar,"none");
    }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
@@ -846,10 +874,15 @@ const names=[
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="4");
   assert.equal(await frame.locator("#white").innerText(),"1","Legal black placement must flip one white disc");
   assert.equal(await frame.locator("#undoButton").isEnabled(),true,"Undo must enable after a move");
+   assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"1 步");
+   assert.equal(await frame.locator("#gs-turn-log li").count(),1);
+   assert.ok((await frame.locator("#gs-turn-log li").first().innerText()).includes("黑色棋子"));
   await frame.locator("#undoButton").click();
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="2");
   assert.equal(await frame.locator("#white").innerText(),"2","Undo must restore standard four-disc opening");
   assert.equal(await frame.locator("#undoButton").isDisabled(),true,"Undo must disable when the history is empty");
+   assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"0 步");
+   assert.equal(await frame.locator("#gs-turn-log li").count(),0);
   await page.screenshot({path:path.join(artifacts,"reversi-refined-playing.png")});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
