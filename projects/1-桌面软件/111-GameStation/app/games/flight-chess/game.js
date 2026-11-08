@@ -317,8 +317,15 @@ function draw(){
    const [x,y]=position(turn,selectedPlane,step.progress);
    return{...step,cx:100+x*50,cy:100+y*50};
   });
-  if(coords.length>1)el.append(svgNode("polyline",{
-   points:coords.map(p=>p.cx+","+p.cy).join(" "),class:"flight-preview-path"}));
+  // Include the aircraft's current square. Even a one-step die roll
+  // must have a visible connection from the origin to square 1.
+  if(coords.length){
+   const [ox,oy]=position(turn,selectedPlane,pawns[turn][selectedPlane]);
+   const origin=pos(ox,oy);
+   el.append(svgNode("polyline",{points:[origin.join(","),
+    ...coords.map(p=>p.cx+","+p.cy)].join(" "),
+    class:"flight-preview-path","data-dice-path":coords.length}));
+  }
   // Dice numbers are distinct from rule-triggered extra movement.
   // Dashed orange = +4, dashed colored = flight across the board.
   for(const bonus of preview.shortcuts){
