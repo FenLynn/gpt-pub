@@ -14,23 +14,35 @@ const fitHistoryHeight=()=>{
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
 window.addEventListener("resize",fitHistoryHeight);
 fitHistoryHeight();requestAnimationFrame(fitHistoryHeight);
-const track=[
-[6,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
-[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],
-[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[9,6],[10,6],[11,6],[12,6],[13,6],[14,6],[14,7],
-[14,8],[13,8],[12,8],[11,8],[10,8],[9,8],[8,9],[8,10],[8,11],[8,12],[8,13],[8,14],[7,14]
+// Coordinates traced from the user's physical aeroplane board after
+// perspective correction. The 52 points are ordered clockwise; index 0
+// is the red launch tile, index 26 the opposite blue launch tile.
+const photoTrack=[
+ [417,692],[375,695],[332,695],[289,696],[245,685],[222,642],[221,600],
+ [243,551],[202,520],[155,537],[114,538],[70,523],[56,477],[56,435],
+ [56,392],[56,350],[56,309],[69,265],[111,243],[153,240],[204,260],
+ [235,219],[219,173],[219,134],[235,91],[283,73],[327,72],[370,70],
+ [413,68],[454,67],[502,78],[519,122],[519,163],[503,211],[544,244],
+ [591,223],[633,222],[676,233],[695,285],[695,328],[695,371],[695,415],
+ [696,457],[685,500],[637,522],[593,524],[543,505],[508,545],[527,593],
+ [527,633],[512,679],[461,692]
 ];
-// Four parking positions divide each 296×296 airport into a symmetric 3×3
-// spacing scheme; all four plane centers are equidistant from its edges.
-const camps=[{x:66,y:535,c:"#f4d7d2",name:"red"},{x:535,y:66,c:"#d4e7f6",name:"blue"},
- {x:66,y:66,c:"#f7ebc7",name:"yellow"},{x:535,y:535,c:"#d8ecd9",name:"green"}];
-const airportPads=({x,y})=>{
- const x1=(x+296/3-100)/50,x2=(x+592/3-100)/50;
- const y1=(y+296/3-100)/50,y2=(y+592/3-100)/50;
- return[[x1,y1],[x2,y1],[x1,y2],[x2,y2]];
-};
+const photoToGrid=([x,y])=>[(60+x*780/750-100)/50,(60+y*780/750-100)/50];
+const track=photoTrack.map(photoToGrid);
+const camps=[
+ {name:"red",cx:673,cy:675,pads:[[645,645],[699,643],[647,699],[701,697]]},
+ {name:"blue",cx:85,cy:103,pads:[[58,78],[109,73],[60,129],[112,126]]},
+ {name:"yellow",cx:84,cy:678,pads:[[58,652],[111,650],[60,705],[113,703]]},
+ {name:"green",cx:663,cy:82,pads:[[634,56],[688,52],[636,108],[690,105]]}
+];
+const airportPads=camp=>camp.pads.map(photoToGrid);
 const pads=[airportPads(camps[0]),airportPads(camps[1])];
-const houses=[[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]]];
+const houses=[
+ [[641,377],[591,377],[551,376],[507,377],[464,378],[415,382]].map(photoToGrid),
+ [[112,391],[153,390],[195,389],[239,388],[281,386],[331,384]].map(photoToGrid)
+];
+const yellowLane=[[375,641],[375,598],[375,554],[375,511],[375,465],[370,421]].map(photoToGrid);
+const greenLane=[[369,126],[369,168],[369,211],[369,254],[370,296],[370,345]].map(photoToGrid);
 const colors=["#d8584c","#4c91d2"];
 const dicePips={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,25],[72,25],[28,50],[72,50],[28,75],[72,75]]};
 let pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn=0,mode="ai",difficulty="normal",paused=true,over=false,roll=null,history=[],aiTimer=null,selectedPlane=null,expandedStackKey=null;
@@ -272,33 +284,23 @@ function drawClassicBoard(){
  const tile={red:"#dc4c48",yellow:"#e9c63d",blue:"#285cad",green:"#329553"};
  const area={red:"#fff4dd",blue:"#fff4dd",yellow:"#fff4dd",green:"#fff4dd"};
  el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:3,class:"flight-outline"}));
- // Four proper hangars, including two unused colors in a two-player match.
+ // The four circular printed airports follow the reference photograph.
  for(const camp of camps){
-  el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:22,
-   class:"flight-airport",fill:area[camp.name],"data-airport":camp.name}));
-  el.append(svgNode("rect",{x:camp.x+10,y:camp.y+10,width:276,height:276,rx:17,
-   class:"flight-airport-inset","data-airport-inner":camp.name}));
-  const airportCenterX=camp.x+148,airportCenterY=camp.y+148;
-   el.append(svgNode("circle",{cx:airportCenterX,cy:airportCenterY,r:112,
-    class:"flight-airport-circle","data-airport-circle":camp.name,fill:"#fbefd5"}));
-   for(const [x,y] of airportPads(camp)){
-   const [cx,cy]=pt(x,y);
-   el.append(svgNode("circle",{cx,cy,r:32,class:"flight-airport-ring",
-    fill:"#fff5dd",stroke:"#282923","data-airport-pad":camp.name}));
-   el.append(svgNode("circle",{cx,cy,r:26,class:"flight-airport-hole",fill:ink[camp.name]}));
-
+  const [cx,cy]=pt(...photoToGrid([camp.cx,camp.cy]));
+  el.append(svgNode("circle",{cx,cy,r:79,class:"flight-airport-circle",
+   fill:"#f8eed0","data-airport":camp.name,"data-airport-circle":camp.name}));
+  for(const [x,y] of airportPads(camp)){
+   const [px,py]=pt(x,y);
+   el.append(svgNode("circle",{cx:px,cy:py,r:23,class:"flight-airport-ring",
+    fill:"#f8eed0",stroke:"#303127","data-airport-pad":camp.name}));
+   el.append(svgNode("circle",{cx:px,cy:py,r:18,class:"flight-airport-hole",fill:ink[camp.name]}));
   }
  }
- // Small four-color triangular corner flights use the otherwise empty space
- // between each hangar and the perimeter route, as in traditional boards.
- for(const [name,points] of [
-  ["yellow","363,363 397,363 363,397"],
-  ["blue","537,363 503,363 537,397"],
-  ["red","363,537 397,537 363,503"],
-  ["green","537,537 503,537 537,503"]]){
-  el.append(svgNode("polygon",{points,class:"flight-corner-wing",
-   fill:tile[name],"data-corner-wing":name}));
- }
+ // Thick dark printed route outline under all 52 colored tiles.
+ const photoPoints=track.map(([x,y])=>pt(x,y));
+ el.append(svgNode("polyline",{points:[...photoPoints,photoPoints[0]].map(p=>p.join(",")).join(" "),
+  fill:"none",stroke:"#26302a","stroke-width":50,"stroke-linejoin":"round","stroke-linecap":"round",
+  class:"flight-outer-outline","aria-hidden":"true"}));
  // Only TWO active flying lines. Draw them under the holes and home
  // tiles, not across arrows or over tokens.
  for(const leg of [
@@ -318,7 +320,7 @@ function drawClassicBoard(){
   const [cx,cy]=pt(x,y),name=names[index%4],
    relative=(index-start(name==="blue"?1:0)+52)%52;
   const jump=(name==="red"||name==="blue")&&relative>0&&relative+4<=51?name:null;
-  const attributes={x:cx-24,y:cy-24,width:48,height:48,rx:0,
+  const attributes={x:cx-23,y:cy-23,width:46,height:46,rx:0,
    fill:tile[name],class:"flight-track-tile","data-track":index,
    "data-track-color":name};
   if(jump)attributes["data-jump-seat"]=jump;
@@ -329,7 +331,7 @@ function drawClassicBoard(){
    // The physical board has white landing circles and only four entry arrows.
    el.append(svgNode("circle",{cx,cy,r:15,class:"flight-track-hole",
      "data-hole-track":index,fill:"#fffef0","aria-hidden":"true"}));
-   if([0,12,26,38].includes(index)){
+   if([7,8,20,21,33,34,46,47].includes(index)){
     el.append(svgNode("path",{d:"M -8 -5 L 0 -5 L 0 -10 L 11 0 L 0 10 L 0 5 L -8 5 Z",
      transform:"translate("+cx+" "+cy+") rotate("+heading+")",
      class:"flight-track-direction",fill:ink[name],"aria-hidden":"true"}));
@@ -340,8 +342,8 @@ function drawClassicBoard(){
  const lanes=[
   {name:"red",squares:houses[0],dir:-90,active:0},
   {name:"blue",squares:houses[1],dir:90,active:1},
-  {name:"yellow",squares:Array.from({length:6},(_,i)=>[1+i,7]),dir:0},
-  {name:"green",squares:Array.from({length:6},(_,i)=>[13-i,7]),dir:180}
+  {name:"yellow",squares:yellowLane,dir:0},
+  {name:"green",squares:greenLane,dir:180}
  ];
  for(const lane of lanes){
   lane.squares.forEach(([x,y],i)=>{
@@ -377,20 +379,24 @@ function drawClassicBoard(){
    transform:"translate("+cx+" "+cy+")",fill:"#24556c"});
   el.append(icon);
  }
- // Classic four-color destination rosette.
+ // Four inward HOME sectors, drawn as in the user's round pinwheel.
  const center=[
-  {name:"blue",d:"M 450 450 L 422 422 A 40 40 0 0 1 478 422 Z"},
-  {name:"green",d:"M 450 450 L 478 422 A 40 40 0 0 1 478 478 Z"},
-  {name:"red",d:"M 450 450 L 478 478 A 40 40 0 0 1 422 478 Z"},
-  {name:"yellow",d:"M 450 450 L 422 478 A 40 40 0 0 1 422 422 Z"}
+  {name:"blue",d:"M 450 450 L 393 393 A 80 80 0 0 0 393 507 Z",x:408,y:450},
+  {name:"green",d:"M 450 450 L 393 393 A 80 80 0 0 1 507 393 Z",x:450,y:408},
+  {name:"red",d:"M 450 450 L 507 393 A 80 80 0 0 1 507 507 Z",x:492,y:450},
+  {name:"yellow",d:"M 450 450 L 507 507 A 80 80 0 0 1 393 507 Z",x:450,y:492}
  ];
- el.append(svgNode("circle",{cx:450,cy:450,r:43,class:"flight-center-outline"}));
- for(const sector of center)el.append(svgNode("path",{d:sector.d,
-  class:"flight-center-sector",fill:tile[sector.name],"data-center-seat":sector.name}));
- el.append(svgNode("circle",{cx:450,cy:450,r:19,class:"flight-center-core"}));
- const star=svgNode("text",{x:450,y:456,"text-anchor":"middle",
-  class:"flight-center-star","aria-hidden":"true"});
- star.textContent="HOME";el.append(star);
+ el.append(svgNode("circle",{cx:450,cy:450,r:80,class:"flight-center-outline"}));
+ for(const sector of center){
+  el.append(svgNode("path",{d:sector.d,class:"flight-center-sector",
+   fill:tile[sector.name],"data-center-seat":sector.name}));
+  el.append(svgNode("circle",{cx:sector.x,cy:sector.y,r:20,
+   class:"flight-center-core",fill:"#fffbea"}));
+  const label=svgNode("text",{x:sector.x,y:sector.y+4,
+   "text-anchor":"middle",class:"flight-center-star","aria-hidden":"true"});
+  label.textContent="HOME";el.append(label);
+ }
+
 }
 
 function draw(){
@@ -535,9 +541,8 @@ function draw(){
  // Labels and the clickable landing marker must stay visible even if another
  // plane already occupies the destination (capture preview).
  for(const marker of previewMarkers)el.append(marker);
- // Rotate the printed board to align airport colors and destination lanes
- // with the supplied reference, preserving all 52 engine positions.
- const boardScene=svgNode("g",{class:"flight-scene",transform:"translate(0 900) rotate(-90)"});
+ // The photographed 52-slot geometry is already in reference orientation.
+ const boardScene=svgNode("g",{class:"flight-scene"});
  boardScene.append(...Array.from(el.childNodes));el.append(boardScene);
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
