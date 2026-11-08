@@ -2,7 +2,14 @@
 "use strict";
 const enemyEl=document.getElementById("enemy"),ownEl=document.getElementById("own"),status=document.getElementById("status");
 const layoutRoot=document.getElementById("game");
-const fitHistoryHeight=()=>{const h=enemyEl.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+// Use the full sea-card visual extent (title and 10×10 grid), not the
+// oversized stage container. History and right controls align to that height.
+const fitHistoryHeight=()=>{
+ const grid=enemyEl.getBoundingClientRect();
+ const title=enemyEl.closest(".fleet-board").querySelector(".fleet-title").getBoundingClientRect();
+ const h=grid.bottom-title.top;
+ if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+};
 window.addEventListener("resize",fitHistoryHeight);
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(enemyEl);
 requestAnimationFrame(fitHistoryHeight);
