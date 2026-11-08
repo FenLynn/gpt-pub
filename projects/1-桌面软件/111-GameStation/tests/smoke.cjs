@@ -18,6 +18,7 @@ const names=[
   args:["--no-sandbox","--disable-dev-shm-usage","--allow-file-access-from-files"]});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
  const remote=[],errors=[];
+ const resignGames=new Set(["五子棋","黑白棋","四子棋","国际象棋","西洋跳棋（8×8）","中国跳棋","飞行棋","海战棋"]);
  let game="host";
  page.on("request",req=>{if(/^https?:/i.test(req.url()))remote.push(req.url());});
  page.on("pageerror",err=>errors.push(game+": "+err.message));
@@ -156,15 +157,15 @@ const names=[
     if(name==="飞行棋"){
     const geometry=await frame.locator("#game").evaluate(root=>{
      const box=q=>{const r=root.querySelector(q).getBoundingClientRect();return{width:r.width,height:r.height,left:r.left,top:r.top,bottom:r.bottom}};
-     const stage=box(".flight-stage"),record=box(".reversi-record-rail"),right=box(".game-tools");
+     const stage=box(".flight-stage"),svg=box("svg.flight-board"),record=box(".reversi-record-rail"),right=box(".game-tools");
      const first=root.querySelector('[data-pawn="0-0"]');
-     return{stage,record,right,history:root.querySelector("#reversiMoveList")!==null,
+     return{stage,svg,record,right,helpCount:root.querySelectorAll("#flightMoveHelp").length,history:root.querySelector("#reversiMoveList")!==null,
        singleBoard:root.querySelectorAll("svg.flight-board").length===1&&!root.querySelector(".flight-center"),
        centeredPawn:Math.abs(Number(first.dataset.centerX)-Number(first.dataset.slotX))<.1&&Math.abs(Number(first.dataset.centerY)-Number(first.dataset.slotY))<.1};
     });
     assert.ok(geometry.singleBoard&&geometry.history&&geometry.centeredPawn,
      "Flight Chess needs a single board with centered solitary planes: "+JSON.stringify(geometry));
-    assert.ok(Math.abs(geometry.record.height-geometry.stage.height)<3&&Math.abs(geometry.right.top+geometry.right.bottom-geometry.stage.top*2-geometry.stage.height)<6,
+    assert.ok(Math.abs(geometry.record.height-geometry.svg.height*.9)<3&&Math.abs(geometry.right.height-geometry.svg.height*.9)<3&&Math.abs(geometry.record.top-(geometry.svg.top+geometry.svg.height*.05))<4&&geometry.helpCount===1,
      "Flight Chess rails should align around board: "+JSON.stringify(geometry));
    }
   if(name==="飞行棋"||name==="西洋跳棋（8×8）"||name==="国际象棋"){
@@ -769,6 +770,25 @@ const names=[
    await library();
    for(const name of names){
     await open(name);await start();await pauseResume();
+    if(resignGames.has(name)){
+     await frame.locator("#resignButton:enabled").waitFor({state:"visible",timeout:3500});
+     const action=await frame.locator("#resignButton").evaluate(el=>({
+      afterUndo:el.previousElementSibling?.id==="undoButton",
+      text:el.textContent.trim(),icon:!!el.querySelector("svg"),disabled:el.disabled
+     }));
+     assert.ok(action.afterUndo&&action.text==="认输"&&action.icon&&!action.disabled,
+      name+" resignation must appear immediately after undo, enabled in active play: "+JSON.stringify(action));
+    }
+    if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
+     const preload=await frame.locator("#game").evaluate(root=>({
+      head:!!document.querySelector("head #gameWorkspaceStyles"),
+      columns:root.classList.contains("gs-tools-open"),
+      guide:getComputedStyle(root.querySelector(".game-guide")).display
+     }));
+     assert.ok(preload.head&&preload.columns&&preload.guide==="none",
+      name+" must preload three-column CSS without a legacy left-guide flash: "+JSON.stringify(preload));
+    }
+
     const controls=await page.evaluate(()=>{
       const bar=document.querySelector("#topbar").getBoundingClientRect();
       const modes=[...document.querySelectorAll("#modeControl button")],levels=[...document.querySelectorAll("#difficultyControl button")];
@@ -1300,6 +1320,22 @@ const names=[
    await page.locator("#libraryView").waitFor({state:"visible",timeout:4000});
     await page.locator('[data-category="all"]').click();
    
+  // Test actual host termination, not just the existence of resign buttons.
+  for(const title of resignGames){
+   await open(title);await start();
+   await frame.locator("#resignButton:enabled").waitFor({state:"visible",timeout:3500});
+   await frame.locator("#resignButton").click();
+   await page.locator("#startButton:disabled").waitFor({state:"visible",timeout:4000});
+   const outcome=await page.locator("#gameNotice").innerText();
+   assert.match(outcome,/认输/,title+" must report a real resignation result");
+   if(title==="五子棋"){
+    await frame.locator("#gomokuResult:not([hidden])").waitFor({state:"visible",timeout:4000});
+    assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"loss",
+     "AI Gomoku resignation must show its native defeat animation");
+   }
+   if(title==="国际象棋")
+    assert.match(await frame.locator("#turnText").innerText(),/黑方获胜/);
+  }
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
   await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
    {message:"积分结算测试",score:-90,win:false}));
