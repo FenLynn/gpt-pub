@@ -486,6 +486,21 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
   assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The right turn rail must show the current player");
+  // Real roll animation cycles through several visible pips AND ink/paper colors.
+  const diceFrames=await flight.evaluate(async()=>{
+   window.__p111FlightTest.animateDice();
+   const faces=new Set(),colors=new Set(),el=document.getElementById("diceFace");
+   for(let i=0;i<11;i++){
+    faces.add(el.dataset.displayFace);
+    colors.add(el.style.getPropertyValue("--dice-ink"));
+    await new Promise(resolve=>setTimeout(resolve,80));
+   }
+   return{faces:[...faces],colors:[...colors]};
+  });
+  assert.ok(diceFrames.faces.length>=4&&diceFrames.colors.length>=4,
+   "Dice roll must display different numbered faces and distinct colored inks: "+JSON.stringify(diceFrames));
+  await flight.waitForFunction(()=>!document.getElementById("diceFace")?.classList.contains("rolling"),null,{timeout:3500});
+
   assert.equal(await flight.locator(".flight-center").count(),0,"Flight Chess must have no second inner board");
   assert.equal(await flight.locator(".reversi-record-rail").count(),1,"Flight Chess must have a left move history");
   const firstPlane=await flight.locator('[data-pawn="0-0"]').evaluate(el=>({x:Number(el.dataset.slotX),y:Number(el.dataset.slotY),cx:Number(el.dataset.centerX),cy:Number(el.dataset.centerY)}));
@@ -494,11 +509,31 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   // Selecting previews without moving; a green target confirms landing.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(6));
+  const dynamicRail=()=>flight.evaluate(()=>{
+   const box=s=>{const r=document.querySelector(s).getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height};};
+   return{right:box("#game > .game-tools"),dice:box(".flight-play-controls"),options:box(".flight-move-panel"),
+    help:box("#flightMoveHelp")};
+  });
+  const expandedRail=await dynamicRail();
+  assert.ok(expandedRail.help.top<expandedRail.dice.top&&expandedRail.dice.bottom<expandedRail.options.top,
+   "Flight instructions precede fixed dice controls; variable airplane options belong at the bottom: "+JSON.stringify(expandedRail));
+  assert.ok(Math.abs(expandedRail.options.bottom-expandedRail.right.bottom)<=5,
+   "Variable-height plane options must stay docked to right rail bottom: "+JSON.stringify(expandedRail));
   const beforePreview=await flight.evaluate(()=>window.__p111FlightTest.state());
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.preview(0)),true);
   assert.deepEqual((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns,beforePreview.pawns,"Preview does not automatically move the selected airplane");
   assert.ok(await flight.locator(".flight-path-step[data-preview-step]").count()>=1,"Selected airplane renders green numbered path steps");
   assert.equal(await flight.locator(".flight-path-target[data-preview-to]").count(),1,"Flight preview includes a separately clickable landing position");
+  const pathStyle=await flight.locator(".flight-path-target").evaluate(el=>{
+   const circle=el.querySelector(".flight-target-ring"),trail=document.querySelector(".flight-preview-circle");
+   return{circleFill:getComputedStyle(circle).fill,trailFill:getComputedStyle(trail).fill,
+    duration:parseFloat(getComputedStyle(el).animationDuration),
+    reduced:matchMedia("(prefers-reduced-motion:reduce)").matches};
+  });
+  assert.ok(["transparent","rgba(0, 0, 0, 0)"].includes(pathStyle.circleFill)&&["transparent","rgba(0, 0, 0, 0)"].includes(pathStyle.trailFill),
+   "Flight hints and destination must have transparent interiors: "+JSON.stringify(pathStyle));
+  if(!pathStyle.reduced)assert.ok(pathStyle.duration>=2,"Destination should have slow breathing animation: "+JSON.stringify(pathStyle));
+
   await flight.locator(".flight-path-target").click();
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],0,"Clicking the green landing circle executes the move");
 
