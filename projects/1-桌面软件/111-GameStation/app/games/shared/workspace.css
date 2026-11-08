@@ -1747,3 +1747,15 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  overflow:hidden!important;white-space:nowrap!important;
  text-overflow:ellipsis!important
 }
+
+/* R48.1: beat R40's equally-important, more-specific right-rail stretch. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.checkers-layout,.chess-layout)>.game-tools{
+  align-self:center!important;justify-self:stretch!important;
+  height:var(--reversi-board-height,100%)!important;
+  max-height:100%!important;width:100%!important;
+  justify-content:center!important;
+  margin:0!important;padding:1px!important;
+  gap:clamp(8px,1.3cqh,13px)!important
+ }
+}
