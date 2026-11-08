@@ -301,6 +301,20 @@ function drawClassicBoard(){
  el.append(svgNode("polyline",{points:[...photoPoints,photoPoints[0]].map(p=>p.join(",")).join(" "),
   fill:"none",stroke:"#26302a","stroke-width":50,"stroke-linejoin":"round","stroke-linecap":"round",
   class:"flight-outer-outline","aria-hidden":"true"}));
+ // Carry both neighboring printed colors through the eight diagonal turns.
+ // The dark perimeter stays a thin keyline, not a filled black corner.
+ const ribbon=["red","yellow","blue","green"];
+ track.forEach((p,i)=>{
+  const [sx,sy]=pt(...p),[ex,ey]=pt(...track[(i+1)%52]);
+  const mx=(sx+ex)/2,my=(sy+ey)/2;
+  for(const [x1,y1,x2,y2,name] of [
+   [sx,sy,mx,my,ribbon[i%4]],
+   [mx,my,ex,ey,ribbon[(i+1)%52%4]]]){
+   el.append(svgNode("line",{x1,y1,x2,y2,stroke:tile[name],
+    "stroke-width":43,"stroke-linecap":"butt",
+    class:"flight-route-ribbon","aria-hidden":"true"}));
+  }
+ });
  // Only TWO active flying lines. Draw them under the holes and home
  // tiles, not across arrows or over tokens.
  for(const leg of [
