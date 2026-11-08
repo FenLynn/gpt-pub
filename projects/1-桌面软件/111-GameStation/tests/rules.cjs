@@ -433,7 +433,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(state.playerCount,count,"Selected number of participants must apply");
    assert.equal(state.pieces,count*10,"Each participant needs ten marbles");
    assert.equal(new Set(state.activeArms).size,count,"All active camps must be distinct");
-   assert.equal(await star.locator(".star-seat-marker").count(),6,"All six seat numbers must be visible");
+   assert.equal(await star.locator(".star-seat-marker").count(),count,"Only occupied Chinese Checkers seats get numbers");
+   assert.deepEqual(await star.locator(".star-seat-marker").evaluateAll(els=>els.map(el=>Number(el.dataset.position))),Array.from({length:count},(_,i)=>i+1),"Seat numbers progress counterclockwise from player 1");
+   assert.equal(await star.locator(".star-seat-marker.is-current").count(),1,"Only one active seat flashes");
    assert.equal(await star.locator("#starCounters .reversi-count-row").count(),count,"Each player gets a scoreboard row");
    const backgrounds=await star.locator("#starCounters .star-count-disc").evaluateAll(els=>els.map(el=>getComputedStyle(el).backgroundImage));
    assert.equal(new Set(backgrounds).size,count,"All active sides must have distinct marble colors");
@@ -443,9 +445,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.ok(sixMove,"Six players must be able to start playing");
   assert.equal(await star.evaluate(m=>window.__p111StarTest.move(m),sixMove),true);
   assert.equal((await starState()).turn,1,"Six-player moves must rotate to the next seat");
-  assert.equal((await starState()).viewSeat,1,"The current local player's camp should face down");
+  assert.equal((await starState()).viewSeat,0,"The Chinese Checkers board must never rotate after a turn");
+  assert.equal(await star.locator(".star-seat-marker.is-current").getAttribute("data-position"),"2","Current turn highlights seat 2 without rotating the board");
   await star.evaluate(()=>window.__p111StarTest.undo());
-  assert.equal((await starState()).viewSeat,0,"Undo must restore the perspective");
+  assert.equal((await starState()).viewSeat,0,"Undo must preserve the fixed board direction");
+  assert.equal(await star.locator(".star-seat-marker.is-current").getAttribute("data-position"),"1","Undo restores seat-one highlight");
+  await star.evaluate(()=>{const t=window.__p111StarTest;t.players(6);t.mode("ai");});
+  const humanMove=await star.evaluate(()=>window.__p111StarTest.moves(0)[0]);
+  assert.equal(await star.evaluate(m=>window.__p111StarTest.move(m),humanMove),true);
+  assert.equal(await star.evaluate(()=>window.__p111StarTest.computer()),true,"AI mode takes all nonhuman seats");
+  assert.equal(await star.evaluate(()=>window.__p111StarTest.ai()),true,"Seat 2 AI must move");
+  assert.equal((await starState()).turn,2,"After AI seat 2, seat 3 is next");
+  await star.evaluate(()=>window.__p111StarTest.mode("two"));
   await star.evaluate(()=>window.__p111StarTest.players(2));
 
   const starProfiles=await star.evaluate(()=>["easy","normal","hard"].map(level=>window.__p111StarTest.aiProfile(level)));
@@ -480,6 +491,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const firstPlane=await flight.locator('[data-pawn="0-0"]').evaluate(el=>({x:Number(el.dataset.slotX),y:Number(el.dataset.slotY),cx:Number(el.dataset.centerX),cy:Number(el.dataset.centerY)}));
   assert.equal(firstPlane.x,firstPlane.cx,"A solitary plane must be centered horizontally");
   assert.equal(firstPlane.y,firstPlane.cy,"A solitary plane must be centered vertically");
+  // Selecting previews without moving; a green target confirms landing.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.roll(6));
+  const beforePreview=await flight.evaluate(()=>window.__p111FlightTest.state());
+  assert.equal(await flight.evaluate(()=>window.__p111FlightTest.preview(0)),true);
+  assert.deepEqual((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns,beforePreview.pawns,"Preview does not automatically move the selected airplane");
+  assert.ok(await flight.locator(".flight-path-step[data-preview-step]").count()>=1,"Selected airplane renders green numbered path steps");
+  assert.equal(await flight.locator(".flight-path-target[data-preview-to]").count(),1,"Flight preview includes a separately clickable landing position");
+  await flight.locator(".flight-path-target").click();
+  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],0,"Clicking the green landing circle executes the move");
+
 
   // All eight planes may occupy one safe cell. No NaN coordinates, no missing glyphs.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[26,26,26,26]]));
