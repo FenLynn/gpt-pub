@@ -282,3 +282,26 @@
 @media(prefers-reduced-motion:reduce){
  #game.flight-chess-layout .flight-travel-ghost{animation:none!important}
 }
+
+/* R57 — coordinate-traced physical print, no board rotation needed. */
+#game.flight-chess-layout .flight-center-star,
+#game.flight-chess-layout .flight-aircraft-number,
+#game.flight-chess-layout .flight-stack-count,
+#game.flight-chess-layout .flight-preview-number,
+#game.flight-chess-layout .flight-target-label{
+ transform:none!important
+}
+#game.flight-chess-layout .flight-outer-outline{pointer-events:none;stroke:#252b27}
+#game.flight-chess-layout .flight-airport-circle{fill:#f8eed0;stroke:#383c32;stroke-width:2.4}
+#game.flight-chess-layout .flight-airport-ring{fill:#f8eed0;stroke:#394138;stroke-width:2}
+#game.flight-chess-layout .flight-home-tile,
+#game.flight-chess-layout .flight-track-tile{stroke:#29332e;stroke-width:1.9}
+#game.flight-chess-layout .flight-home-hole,
+#game.flight-chess-layout .flight-track-hole{stroke:#606b65;stroke-width:1.45}
+#game.flight-chess-layout .flight-air-corridor,
+#game.flight-chess-layout .flight-air-corridor-head,
+#game.flight-chess-layout .flight-gate-icon{opacity:0}
+#game.flight-chess-layout .flight-center-outline{fill:#eadbba;stroke:#2f3730;stroke-width:3}
+#game.flight-chess-layout .flight-center-sector{stroke:#f9efd8;stroke-width:1.7}
+#game.flight-chess-layout .flight-center-core{fill:#fff8e4;stroke:#4e594d;stroke-width:1.5}
+#game.flight-chess-layout .flight-center-star{font:700 10px/1 Arial,sans-serif;fill:#2d3f37;letter-spacing:-.3px}
