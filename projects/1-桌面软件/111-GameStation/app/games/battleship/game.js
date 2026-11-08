@@ -1,6 +1,18 @@
 (function(){
 "use strict";
 const enemyEl=document.getElementById("enemy"),ownEl=document.getElementById("own"),status=document.getElementById("status");
+const layoutRoot=document.getElementById("game"),fleetMain=layoutRoot.querySelector(".fleet-boards"),
+ ownPreview=layoutRoot.querySelector("#ownFleetPreview"),ownPanel=ownEl.closest(".fleet-board");
+const fitHistoryHeight=()=>{const h=enemyEl.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+const syncOwnFleetPosition=()=>{
+ if(window.matchMedia("(min-width:701px)").matches){if(ownPanel.parentElement!==ownPreview)ownPreview.append(ownPanel);}
+ else if(ownPanel.parentElement!==fleetMain)fleetMain.append(ownPanel);
+ fitHistoryHeight();
+};
+syncOwnFleetPosition();
+window.addEventListener("resize",syncOwnFleetPosition);
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(enemyEl);
+requestAnimationFrame(fitHistoryHeight);
 let ownFleet,enemyFleet,own,enemy,remainingShips,shots,hits,paused=false,over=false,aiTimer=null,difficulty="normal",lastShot=null;
 const fleetLengths=[5,4,3,3,2];
 function fleet(){const grid=Array.from({length:10},()=>Array(10).fill(0)),lengths={};let id=1;for(const len of fleetLengths){let ok=false,tries=0;while(!ok&&tries++<1500){const horizontal=Math.random()<.5,x=Math.floor(Math.random()*(horizontal?11-len:10)),y=Math.floor(Math.random()*(horizontal?10:11-len));let valid=true;for(let k=0;k<len;k++){const xx=x+(horizontal?k:0),yy=y+(horizontal?0:k);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const ax=xx+dx,ay=yy+dy;if(ax>=0&&ax<10&&ay>=0&&ay<10&&grid[ay][ax])valid=false;}}if(valid){for(let k=0;k<len;k++)grid[y+(horizontal?0:k)][x+(horizontal?k:0)]=id;lengths[id]=len;id++;ok=true;}}}return {grid,lengths};}

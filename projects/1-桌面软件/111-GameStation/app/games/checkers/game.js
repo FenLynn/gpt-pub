@@ -1,6 +1,11 @@
 (function(){
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("status");
+const layoutRoot=document.getElementById("game");
+const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
+else window.addEventListener("resize",fitHistoryHeight);
+requestAnimationFrame(fitHistoryHeight);
 let b,turn=1,selected=null,legal=[],continuing=null,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastHop=null;
 const side=v=>(v===1||v===3)?1:(v===2||v===4)?2:0;
 function clone(a){return a.map(r=>r.slice());}
@@ -33,8 +38,12 @@ function render(){
   cell.addEventListener("click",()=>click(x,y));el.appendChild(cell);
  }
  const [r,k]=counts(b);document.getElementById("red").textContent=r;document.getElementById("black").textContent=k;document.getElementById("undoButton").disabled=paused||over||!history.length;
+ layoutRoot.dataset.turnSide=turn===1?"red":"black";
 }
-function switchTurn(){continuing=null;selected=null;legal=[];turn=3-turn;if(finishIfNeeded())return;if(mode==="ai"&&turn===2){report("黑方思考中");scheduleAI();}else{legal=moves(b,turn);render();report(turn===1?"红方回合":"黑方回合");}}
+function switchTurn(){continuing=null;selected=null;legal=[];turn=3-turn;
+ if(finishIfNeeded()){render();return;}render();
+ if(mode==="ai"&&turn===2){report("黑方思考中");scheduleAI();}
+ else{legal=moves(b,turn);render();report(turn===1?"红方回合":"黑方回合");}}
 function afterStep(m,result){const mover=turn;const continuation=!!(result.capture&&!result.promoted&&pieceMoves(b,m.tx,m.ty).some(x=>x.capture));window.GameTurnClock?.record(mover===1?"红方":"黑方",continuation?(mover===1?"红方":"黑方"):(mover===1?"黑方":"红方"),result.capture?"吃子":"走棋");if(result.capture&&!result.promoted){const more=pieceMoves(b,m.tx,m.ty).filter(x=>x.capture);if(more.length){continuing={x:m.tx,y:m.ty};selected=continuing;legal=more;render();report(turn===1?"必须继续吃子":"AI 连续吃子");if(turn===2)scheduleAI(true);return;}}switchTurn();}
 function scheduleAI(chain){clearTimeout(timer);if(paused||over||mode!=="ai"||turn!==2)return;timer=setTimeout(()=>{if(paused||over||turn!==2)return;const ms=chain&&continuing?pieceMoves(b,continuing.x,continuing.y).filter(m=>m.capture):moves(b,2);if(!ms.length){switchTurn();return;}if(!chain)saveTurn();const m=choose(ms),result=apply(b,m);lastHop={x:m.tx,y:m.ty};afterStep(m,result);},difficulty==="easy"?220:360);}
 function click(x,y){if(paused||over||(mode==="ai"&&turn===2))return;const v=b[y][x];if(selected){const m=legal.find(m=>m.x===selected.x&&m.y===selected.y&&m.tx===x&&m.ty===y);if(m){if(!continuing)saveTurn();const result=apply(b,m);lastHop={x:m.tx,y:m.ty};afterStep(m,result);return;}}if(side(v)===turn&&(!continuing||(continuing.x===x&&continuing.y===y))){selected={x,y};legal=continuing?pieceMoves(b,x,y).filter(m=>m.capture):moves(b,turn).filter(m=>m.x===x&&m.y===y);render();}else if(!continuing){selected=null;legal=[];render();}}

@@ -1,5 +1,10 @@
 (function(){"use strict";
 const board=document.getElementById("board"),status=document.getElementById("status"),key=(q,r)=>q+","+r;
+const layoutRoot=document.getElementById("game");
+const fitHistoryHeight=()=>{const h=board.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(board);
+else window.addEventListener("resize",fitHistoryHeight);
+requestAnimationFrame(fitHistoryHeight);
 const directions=[[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]],nodes=new Map(),arms=Array.from({length:6},()=>[]);
 const rotate=(q,r)=>[-r,q+r];
 for(let q=-4;q<=4;q++)for(let r=Math.max(-4,-q-4);r<=Math.min(4,-q+4);r++)nodes.set(key(q,r),{q,r,arm:-1});
@@ -66,6 +71,9 @@ function draw(last=null){
   }
  }
  board.dataset.pieces=String(pieces.size);board.dataset.turn=String(turn);
+ layoutRoot.dataset.turnSide=turn===0?"red":"blue";
+ document.getElementById("redArrived").textContent=own(0).filter(k=>nodes.get(k).arm===3).length;
+ document.getElementById("blueArrived").textContent=own(1).filter(k=>nodes.get(k).arm===0).length;
  document.getElementById("undoButton").disabled=paused||over||!history.length;
 }
 function won(side){return own(side).length===10&&own(side).every(k=>nodes.get(k).arm===(side===0?3:0));}
@@ -74,7 +82,7 @@ function apply(move){
  history.push({pieces:new Map(pieces),turn});
  pieces.delete(move.from);pieces.set(move.to,turn);window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"蓝方":"红方","走棋");selected=null;targets.clear();draw(move);
  if(won(turn)){over=true;paused=true;document.getElementById("undoButton").disabled=true;clearTimeout(aiTimer);const name=turn===0?"红方":"蓝方";report(name+"获胜");GameBridge.send("GAME_OVER",{message:name+"获胜",score:10,win:turn===0});return true;}
- turn=1-turn;report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
+ turn=1-turn;draw();report(turn===0?"红方回合":"蓝方回合");scheduleAI();return true;
 }
 function click(k){
  if(paused||over||(mode==="ai"&&turn===1))return;
