@@ -441,29 +441,44 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  $("difficultyControl").addEventListener("click",e=>{const b=e.target.closest("button[data-difficulty]");if(b)setDifficulty(b.dataset.difficulty);});
  document.querySelectorAll("[data-home-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.homeCategory)));
 $("helpButton").addEventListener("click",()=>{openHelp();});$("helpClose").addEventListener("click",closeHelp);
+let gameFullscreenRequested=false,nativeGameFullscreen=false;
 function syncGameFullscreen(){
- const gameOnly=document.fullscreenElement===shell&&!!active&&!$("#workspaceView").classList.contains("hidden");
- shell.classList.toggle("game-only-fullscreen",gameOnly);
- const exit=$("#exitFullscreenButton");
- exit.hidden=!gameOnly;
- exit.setAttribute("aria-hidden",String(!gameOnly));
+ const on=gameFullscreenRequested&&!!active&&!$("#workspaceView").classList.contains("hidden");
+ shell.classList.toggle("game-only-fullscreen",on);
+ const exit=$("#exitFullscreenButton");exit.hidden=!on;
+ exit.setAttribute("aria-hidden",String(!on));
+}
+async function exitGameFullscreen(){
+ gameFullscreenRequested=false;syncGameFullscreen();
+ if(document.fullscreenElement){
+  try{await document.exitFullscreen();}catch(e){/* CSS exit always works */ }
+ }
 }
 $("fullscreenButton").addEventListener("click",async()=>{
- try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}
- catch(e){toast("浏览器未允许全屏");}
+ if(gameFullscreenRequested){await exitGameFullscreen();return;}
+ if(active&&!$("#workspaceView").classList.contains("hidden")){
+  // CSS-only fallback is immediate and works in file:// and restricted UIs.
+  // Native fullscreen still takes precedence where the browser permits it.
+  gameFullscreenRequested=true;syncGameFullscreen();
+  try{if(shell.requestFullscreen)await shell.requestFullscreen();}catch(e){/* retain game-only stage */ }
+ }else{
+  try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}
+  catch(e){toast("浏览器未允许全屏");}
+ }
 });
-$("exitFullscreenButton").addEventListener("click",async()=>{
- try{if(document.fullscreenElement)await document.exitFullscreen();}
- catch(e){toast("无法退出全屏，可按 Esc");}
+$("exitFullscreenButton").addEventListener("click",exitGameFullscreen);
+document.addEventListener("fullscreenchange",()=>{
+ if(document.fullscreenElement===shell){nativeGameFullscreen=gameFullscreenRequested;return;}
+ if(nativeGameFullscreen){nativeGameFullscreen=false;gameFullscreenRequested=false;}
+ syncGameFullscreen();
 });
-document.addEventListener("fullscreenchange",syncGameFullscreen);
 $("settingsButton").addEventListener("click",openSettings);$("settingsClose").addEventListener("click",closeSettings);$("settingsDone").addEventListener("click",closeSettings);
 $("settingsBackdrop").addEventListener("click",e=>{if(e.target===$("settingsBackdrop"))closeSettings();});$("uiScale").addEventListener("change",e=>{settings.scale=e.target.value;write("settings",settings);applySettings();});
 $("exportData").addEventListener("click",exportData);$("importData").addEventListener("click",()=>$("importFile").click());$("importFile").addEventListener("change",e=>{if(e.target.files?.[0])importData(e.target.files[0]);e.target.value="";});$("clearData").addEventListener("click",clearData);
 document.querySelectorAll("[data-ranking]").forEach(b=>b.addEventListener("click",()=>{rankingType=b.dataset.ranking;document.querySelectorAll("[data-ranking]").forEach(x=>{const on=x===b;x.classList.toggle("active",on);x.setAttribute("aria-selected",String(on));});renderRanking();}));
 document.addEventListener("click",e=>{if(shell.classList.contains("menu-open")&&!e.target.closest(".sidebar")&&!e.target.closest("#mobileMenu"))shell.classList.remove("menu-open");});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){closeSettings();}
+ if(e.key==="Escape"){closeSettings();if(gameFullscreenRequested){e.preventDefault();exitGameFullscreen();}}
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
