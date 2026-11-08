@@ -106,6 +106,21 @@ const actionGlyphs={
  hint:"M9 18h6m-5 4h4m-8-11a6 6 0 1 1 12 0c0 3-3 4-3 7H9c0-3-3-4-3-7",
  check:"M20 6 9 17l-5-5"
 };
+// Add the same right-rail resignation action to board games that lacked it.
+// Xiangqi already has its own button and native winner/loser animation.
+const resignGames=new Set(["gomoku","reversi","connect4","chess","checkers","chinese-checkers","flight-chess","battleship"]);
+function ensureResignAction(){
+ const side=root.querySelector(".game-tools");
+ if(!side||!resignGames.has(gameId)||side.querySelector("#resignButton"))return;
+ const button=document.createElement("button");
+ button.type="button";button.id="resignButton";button.className="game-btn";
+ button.textContent="认输";button.setAttribute("aria-label","认输结束本局");
+ button.disabled=true;
+ button.addEventListener("click",()=>window.dispatchEvent(new Event("gamestation:resign")));
+ const undo=side.querySelector("#undoButton");
+ if(undo)undo.insertAdjacentElement("afterend",button);
+ else side.appendChild(button);
+}
 function enhancePageActions(){
  const side=root.querySelector(".game-tools");if(!side)return;
  side.querySelectorAll(":scope > button.game-btn").forEach(button=>{
@@ -120,6 +135,7 @@ function enhancePageActions(){
 
 function setup(){
  if(hud)return;
+ ensureResignAction();
  enhancePageActions();
  hud=document.createElement("section");
  hud.className="gs-hud";
@@ -236,6 +252,8 @@ function updateHud(payload){
  pause.textContent=started&&paused?"继续":"暂停";
  pause.disabled=!state.ready||!started||finished;
  next.disabled=!state.ready;
+ const resign=root.querySelector(".game-tools #resignButton");
+ if(resign&&resignGames.has(gameId))resign.disabled=!state.ready||!started||paused||finished;
  renderOptions();
  syncUrgentTools?.();
  root.dataset.gsPaused=String(paused);
