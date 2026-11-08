@@ -935,6 +935,14 @@ const names=[
     await page.locator('[data-category="all"]').click();
    
   await open("斗地主");await start();assert.equal(await frame.locator(".playing-card").count(),17);
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",
+   {message:"积分结算测试",score:-90,win:false}));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultScoreLabel").innerText(),"本局结算");
+  assert.equal(await page.locator("#gameResultScoreValue").innerText(),"-90",
+   "Doudizhu settlement must preserve negative losses rather than show zero points");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("麻将");await start();assert.equal(await frame.locator("#hand .playing-card").count(),14);
   await open("三国杀");await start();assert.equal(await frame.locator(".playing-card").count(),6);
   await page.locator("#pauseButton").click();
