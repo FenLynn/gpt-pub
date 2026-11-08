@@ -927,6 +927,45 @@ const names=[
   await frame.locator(".enemy-sea:not(:disabled)").first().click();
   assert.equal(await frame.locator(".enemy-sea.shot-impact,.enemy-sea.shot-splash").count(),1,
    "Battleship hit or miss must mark the latest shot for a nonblocking in-board animation");
+  assert.ok(Number((await frame.locator("#reversiHistoryCount").innerText()).match(/\d+/)?.[0])>=1,
+   "Battleship attacks must record time in the left full-height history");
+  assert.equal(await frame.locator(".fleet-own-preview #own").count(),1,
+   "Own fleet must remain visible as the secondary left map");
+  await page.screenshot({path:path.join(artifacts,"battleship-height-first-enemy.png")});
+  // Western checkers: a real legal move changes side highlight and timed history.
+  await open("西洋跳棋（8×8）");await start();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  await frame.locator(".checkers-square:has(.checkers-disc.red)").first().click();
+  assert.ok(await frame.locator(".checkers-square.valid").count()>0,
+   "Western Checkers must expose legal targets after selecting a red piece");
+  await frame.locator(".checkers-square.valid").first().click();
+  assert.equal(await frame.locator("#reversiMoveList li").count(),1,
+   "Western Checkers must record one timed move");
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"black",
+   "Western Checkers current side should highlight black after red moves");
+  await frame.locator("#undoButton").click();
+  assert.equal(await frame.locator("#reversiMoveList li").count(),0,
+   "Western Checkers undo must rewind move history");
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"red");
+  await page.screenshot({path:path.join(artifacts,"western-checkers-height-first.png")});
+  // Chinese checkers: genuine token travel updates history, active camp and undo.
+  await open("中国跳棋");await start();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  const redStars=await frame.locator(".star-token[data-player='0']").evaluateAll(nodes=>nodes.map(n=>n.dataset.position));
+  let starSelected=false;
+  for(const spot of redStars){
+   await frame.locator('.star-hole[data-spot="'+spot+'"]').click();
+   if(await frame.locator(".star-hole.target").count()>0){starSelected=true;break;}
+  }
+  assert.ok(starSelected,"Chinese Checkers must offer an actual playable move from the opening camp");
+  await frame.locator(".star-hole.target").first().click();
+  assert.equal(await frame.locator("#reversiMoveList li").count(),1,
+   "Chinese Checkers move must enter the left history");
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"blue");
+  await frame.locator("#undoButton").click();
+  assert.equal(await frame.locator("#reversiMoveList li").count(),0);
+  assert.equal(await frame.locator("#game").getAttribute("data-turn-side"),"red");
+  await page.screenshot({path:path.join(artifacts,"chinese-checkers-height-first.png")});
   // Reversi: demonstrate actual legal moves and undo, not merely an attractive board.
   await open("黑白棋");await start();
   await page.locator('#modeControl button[data-mode-index="1"]').click();
@@ -1023,6 +1062,19 @@ const names=[
   assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"7 步");
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  // At the requested wide desktop proportions, the Four-in-a-Row board must
+  // actually fill most of the available height, not merely appear centered.
+  await page.setViewportSize({width:1671,height:892});
+  await open("四子棋");await start();
+  await page.waitForTimeout(100);
+  const tallFour=await frame.locator("#board").evaluate(board=>{
+   const b=board.getBoundingClientRect(),root=board.closest(".game-root").getBoundingClientRect();
+   return{boardHeight:b.height,stageHeight:root.height,ratio:b.height/root.height};
+  });
+  assert.ok(tallFour.ratio>=.90,
+   "Wide desktop Connect Four must prioritize height just like Xiangqi: "+JSON.stringify(tallFour));
+  await page.screenshot({path:path.join(artifacts,"connect4-height-first-1671x892.png")});
+  await page.setViewportSize({width:1440,height:1000});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
    lines:el.querySelectorAll(".gomoku-lines line").length,
