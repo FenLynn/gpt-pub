@@ -480,6 +480,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const firstPlane=await flight.locator('[data-pawn="0-0"]').evaluate(el=>({x:Number(el.dataset.slotX),y:Number(el.dataset.slotY),cx:Number(el.dataset.centerX),cy:Number(el.dataset.centerY)}));
   assert.equal(firstPlane.x,firstPlane.cx,"A solitary plane must be centered horizontally");
   assert.equal(firstPlane.y,firstPlane.cy,"A solitary plane must be centered vertically");
+
+  // All eight planes may occupy one safe cell. No NaN coordinates, no missing glyphs.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[26,26,26,26]]));
+  const stackGeometry=await flight.locator("#board .flight-aircraft").evaluateAll(els=>els.map(el=>({
+   x:Number(el.dataset.centerX),y:Number(el.dataset.centerY),
+   slotX:Number(el.dataset.slotX),slotY:Number(el.dataset.slotY)})));
+  assert.equal(stackGeometry.length,8,"Flight Chess preserves every stacked plane");
+  assert.ok(stackGeometry.every(p=>[p.x,p.y,p.slotX,p.slotY].every(Number.isFinite)),
+   "Eight safe-cell planes must have finite centered positions");
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
+
   await flight.evaluate(()=>window.__p111FlightTest.pause());
   assert.equal(await flight.locator("#turnText").innerText(),"已暂停","Pause must be reflected in the board center");
   await flight.evaluate(()=>window.__p111FlightTest.resume());
