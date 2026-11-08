@@ -2,9 +2,15 @@
    All selectors are scoped to Tetris. No global workspace/deploy styles are touched. */
 .tetris-layout .game-main-board>.canvas-panel{overflow:hidden!important}
 .tetris-layout .tetris-stage{
+ /* Center the falling-block canvas, not the canvas-plus-preview combination.
+    Both the preview width and gap are CSS-responsive and contribute half of
+    the original group offset. The preview remains alongside the main game. */
+ --tetris-sidebar-width:clamp(132px,11.5vw,172px);
+ --tetris-stage-gap:clamp(10px,1.15vw,18px);
  display:flex!important;align-items:stretch!important;justify-content:center!important;
- gap:clamp(10px,1.15vw,18px);width:max-content;max-width:calc(100% - 24px);
- height:calc(100% - 18px);max-height:920px;margin:auto;min-width:0;min-height:0
+ gap:var(--tetris-stage-gap);width:max-content;max-width:calc(100% - 24px);
+ height:calc(100% - 18px);max-height:920px;margin:auto;min-width:0;min-height:0;
+ transform:translateX(calc((var(--tetris-sidebar-width) + var(--tetris-stage-gap)) / 2))
 }
 .tetris-layout .tetris-playfield{
  position:relative;flex:0 0 auto;min-width:0;min-height:0;
