@@ -28,7 +28,7 @@ const games=[
 ];
 const categoryNames={all:"全部游戏",board:"棋类",puzzle:"益智",arcade:"街机",card:"卡牌"};
 const $=id=>document.getElementById(id),shell=$("appShell"),homeView=$("homeView"),libraryView=$("libraryView"),workspaceView=$("workspaceView"),frame=$("gameFrame"),storePrefix="gamestation.";
-const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="none" stroke="currentColor"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
+const icons={play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">开始</span>',stop:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></svg><span class="action-label">结束</span>',pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg><span class="action-label">暂停</span>',resume:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg><span class="action-label">继续</span>',next:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg><span class="action-label">下一局</span>'};
 function gameIconMarkup(game){
  // Lorc / Game-icons.net tank, CC BY 3.0. License: assets/NOTICE.md.
  // The tank silhouette is taken from the published SVG, with its background
@@ -322,7 +322,7 @@ window.addEventListener("message",event=>{
   return;
  }
  if(m.sessionId!==sessionId)return;
- if(m.type==="HOTKEY"){if(["toggle","pause","start"].includes(m.payload?.action))toggleGamePause();return;}
+ if(m.type==="HOTKEY"){if(started&&!session?.finished&&["toggle","pause","start"].includes(m.payload?.action))togglePause();return;}
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="leave")showLibrary(active.category);else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}
@@ -361,7 +361,7 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
 });
 function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:active.modes[modeIndex]==="本机双人"?"two":"ai"});newRound();}
 function setDifficulty(value){if(!active?.difficulty||!["easy","normal","hard"].includes(value)||value===difficulty)return;difficulty=value;renderGameControls();send("SET_DIFFICULTY",{difficulty});newRound();}
-function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?[...active.help,...(helpSource.lines.length?[["快捷键与鼠标",helpSource.lines.join("；")]]:[]),...(helpSource.note?[["游戏操作提醒",helpSource.note]]:[]),["统一操作","Enter 暂停/继续；游戏区域右键由游戏接管。"]]:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
+function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?[["快捷键","Enter：暂停 / 继续；P：暂停 / 继续。游戏区域右键由游戏接管。"],...active.help,...(helpSource.lines.length?[["游戏专用快捷键与鼠标",helpSource.lines.join("；")]]:[]),...(helpSource.note?[["游戏操作提醒",helpSource.note]]:[])]:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
 function openHelp(){renderHelp();$("helpPanel").classList.remove("hidden");}
 function closeHelp(){$("helpPanel").classList.add("hidden");}
 function dragHelp(){const panel=$("helpPanel"),header=$("helpHeader");let dragging=false,startX=0,startY=0,left=0,top=0;header.addEventListener("pointerdown",e=>{if(e.target.closest("button"))return;dragging=true;const r=panel.getBoundingClientRect();left=r.left;top=r.top;startX=e.clientX;startY=e.clientY;panel.style.left=left+"px";panel.style.top=top+"px";panel.style.right="auto";header.setPointerCapture(e.pointerId);});header.addEventListener("pointermove",e=>{if(!dragging)return;const x=Math.max(8,Math.min(window.innerWidth-panel.offsetWidth-8,left+e.clientX-startX));const y=Math.max(8,Math.min(window.innerHeight-48,top+e.clientY-startY));panel.style.left=x+"px";panel.style.top=y+"px";});header.addEventListener("pointerup",()=>dragging=false);header.addEventListener("pointercancel",()=>dragging=false);}
@@ -395,8 +395,8 @@ document.addEventListener("keydown",e=>{
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
- if(!active||!ready||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
- e.preventDefault();toggleGamePause();
+ if(!active||!ready||!started||session?.finished||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
+ e.preventDefault();togglePause();
 });
 
 document.addEventListener("contextmenu",e=>{if(e.target instanceof Element&&e.target.closest("#workspaceView"))e.preventDefault();},true);
