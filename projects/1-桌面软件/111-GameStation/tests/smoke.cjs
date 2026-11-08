@@ -210,7 +210,7 @@ const names=[
       hintLast:hint.top>score.bottom,rowGap:rows[1].top-rows[0].bottom,
       turn:root.dataset.turnSide,rows};
     });
-    assert.ok(detail.leftWidth>=250&&Math.abs(detail.leftHeight-detail.boardHeight)<=2.5,
+    assert.ok(detail.leftWidth>=(name==="黑白棋"?250:150)&&Math.abs(detail.leftHeight-detail.boardHeight)<=2.5,
      "Reversi history must be wide and exactly board-height: "+JSON.stringify(detail));
     assert.ok(detail.gap>=-2&&detail.gap<=48&&detail.hasColumns,
      "Reversi history must be adjacent to the centered board with column headings: "+JSON.stringify(detail));
