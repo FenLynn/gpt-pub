@@ -1799,7 +1799,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   min-height:35px!important;padding:5px!important
  }
  .game-root.game-layout.flight-chess-layout>.game-tools>.game-btn{
-  min-height:36px!important;height:36px!important;padding:5px!important
+  min-height:44px!important;height:44px!important;padding:6px!important
  }
  .game-root.game-layout.flight-chess-layout>.game-tools>.reversi-side-score{
   gap:5px!important
@@ -1839,4 +1839,11 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 }
 .game-root.game-layout .game-tools>#resignButton:hover:not(:disabled){
  background:#fce9e6!important;border-color:#d6a69f!important
+}
+
+/* R49.1 · New board-game surrender buttons meet the minimum 42px action
+   height; keep Xiangqi's existing native button size unchanged. */
+.game-root.game-layout:not(.xiangqi-layout)>.game-tools>#resignButton{
+ min-height:44px!important;height:44px!important;
+ padding:6px 8px!important;
 }
