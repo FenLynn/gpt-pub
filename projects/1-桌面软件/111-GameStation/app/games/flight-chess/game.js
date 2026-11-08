@@ -232,24 +232,25 @@ function renderChoices(){
 
 function drawClassicBoard(){
  const pt=(x,y)=>[100+x*50,100+y*50];
- const ink={red:"#ce675e",blue:"#548ec6",yellow:"#d2aa4b",green:"#5b9e75"};
- const tile={red:"#e99188",yellow:"#eecb73",blue:"#83b7e0",green:"#94c8a2"};
- const area={red:"#f5ded7",blue:"#dceaf6",yellow:"#f9ecc7",green:"#dcefdc"};
- el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:28,class:"flight-outline"}));
+ const ink={red:"#c92f32",blue:"#165cba",yellow:"#d9b200",green:"#159441"};
+ const tile={red:"#ec4848",yellow:"#f6cf22",blue:"#2666c7",green:"#22ae54"};
+ const area={red:"#fff4dd",blue:"#fff4dd",yellow:"#fff4dd",green:"#fff4dd"};
+ el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:12,class:"flight-outline"}));
  // Four proper hangars, including two unused colors in a two-player match.
  for(const camp of camps){
   el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:22,
    class:"flight-airport",fill:area[camp.name],"data-airport":camp.name}));
   el.append(svgNode("rect",{x:camp.x+10,y:camp.y+10,width:276,height:276,rx:17,
    class:"flight-airport-inset","data-airport-inner":camp.name}));
-  for(const [x,y] of airportPads(camp)){
+  const airportCenterX=camp.x+148,airportCenterY=camp.y+148;
+   el.append(svgNode("circle",{cx:airportCenterX,cy:airportCenterY,r:130,
+    class:"flight-airport-circle","data-airport-circle":camp.name,fill:"#fbefd5"}));
+   for(const [x,y] of airportPads(camp)){
    const [cx,cy]=pt(x,y);
    el.append(svgNode("circle",{cx,cy,r:38,class:"flight-airport-ring",
-    fill:"#fffdf7",stroke:ink[camp.name],"data-airport-pad":camp.name}));
-   el.append(svgNode("circle",{cx,cy,r:29,class:"flight-airport-hole",fill:area[camp.name]}));
-    // Printed aircraft in each hangar, distinct from path tiles.
-    el.append(svgNode("path",{d:"M 0 -23 C 3 -23 5 -18 5 -13 L 5 -5 L 24 7 L 24 12 L 5 8 L 5 21 L 12 26 L 12 29 L 0 25 L -12 29 L -12 26 L -5 21 L -5 8 L -24 12 L -24 7 L -5 -5 L -5 -13 C -5 -18 -3 -23 0 -23 Z",
-     class:"flight-airport-plane",fill:ink[camp.name],transform:"translate("+cx+" "+cy+") scale(.78)","aria-hidden":"true"}));
+    fill:"#fff5dd",stroke:"#282923","data-airport-pad":camp.name}));
+   el.append(svgNode("circle",{cx,cy,r:29,class:"flight-airport-hole",fill:ink[camp.name]}));
+
   }
  }
  // Small four-color triangular corner flights use the otherwise empty space
@@ -351,9 +352,9 @@ function drawClassicBoard(){
  for(const sector of center)el.append(svgNode("path",{d:sector.d,
   class:"flight-center-sector",fill:tile[sector.name],"data-center-seat":sector.name}));
  el.append(svgNode("circle",{cx:450,cy:450,r:19,class:"flight-center-core"}));
- const star=svgNode("text",{x:450,y:458,"text-anchor":"middle",
+ const star=svgNode("text",{x:450,y:456,"text-anchor":"middle",
   class:"flight-center-star","aria-hidden":"true"});
- star.textContent="★";el.append(star);
+ star.textContent="HOME";el.append(star);
 }
 
 function draw(){
