@@ -172,6 +172,18 @@ if(new URLSearchParams(location.search).has("p111Test")){
   undo,moves:seat=>allMoves(seat),move:m=>apply(m),aiProfile,mode:v=>{mode=v;draw();scheduleAI();},difficulty:v=>{difficulty=v;},computer:()=>isComputerTurn(),ai:()=>{const m=chooseAI(turn);return m?apply(m):false;}
  };
 }
+function resign(){
+ if(paused||over)return false;
+ const loser=mode==="ai"?0:turn,winner=playerCount===2?1-loser:null;
+ clearTimeout(aiTimer);paused=true;over=true;selected=null;targets.clear();
+ const message=names[loser]+"认输 · "+(winner===null?"其余玩家获胜":names[winner]+"获胜");
+ draw();report(message);
+ GameBridge.send("GAME_OVER",{message,winner:winner===null?"其余玩家":names[winner],
+  score:own(0).filter(k=>nodes.get(k).arm===targetArm(0)).length,
+  win:mode==="ai"?false:winner===0});
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({
  init(p){mode=p.mode==="two"?"two":"ai";difficulty=p.difficulty||"normal";newGame();},
  newGame,pause(){paused=true;clearTimeout(aiTimer);document.getElementById("undoButton").disabled=true;report("已暂停");},
