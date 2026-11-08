@@ -499,6 +499,12 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const flightState=await flight.evaluate(()=>window.__p111FlightTest.state());
   assert.equal(flightState.pawns[1][0],0,"Six brings an opposing plane onto its start square");
   assert.equal(flightState.turn,1,"Rolling a six grants an extra turn");
+  // A same-color landing at progress 8 jumps to 12 and crosses the board to progress 38.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[7,-1,-1,-1],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.roll(1));
+  assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
+  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],38,
+   "Flight shortcut must land on the opposite side, 26 track cells after the entrance");
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[10,-1,-1,-1],[37,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
