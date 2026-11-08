@@ -255,15 +255,15 @@ const names=[
       top=box(timer),bottom=box(hint);
      return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
       main:box(root.querySelector(".game-main-board")).height,
-      physicalHeight:kind==="中国跳棋"?b.height*812/900:kind==="海战棋"?b.bottom-box(root.querySelector(".fleet-boards .fleet-board .fleet-title")).top:b.height,
-      physicalTop:kind==="中国跳棋"?b.top+(b.height-b.height*812/900)/2:kind==="海战棋"?box(root.querySelector(".fleet-boards .fleet-board .fleet-title")).top:b.top,
+      physicalHeight:kind==="中国跳棋"?b.height*812/900:b.height,
+      physicalTop:kind==="中国跳棋"?b.top+(b.height-b.height*812/900)/2:b.top,
       physicalBottom:kind==="中国跳棋"?b.bottom-(b.height-b.height*812/900)/2:b.bottom,
       primaryCenter:kind==="海战棋"?box(root.querySelector(".fleet-boards")).left+box(root.querySelector(".fleet-boards")).width/2:b.left+b.width/2,
       ownBoardInStage:kind==="海战棋"?root.querySelector(".fleet-boards").contains(root.querySelector("#own")):null,
       ownCenter:kind==="海战棋"?box(root.querySelector("#own")).left+box(root.querySelector("#own")).width/2:null,
       rightHeight:r.height,
       stageTexture:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
-      left:{width:left.width,height:left.height,gap:b.left-left.right},
+      left:{width:left.width,height:left.height,top:left.top,bottom:left.bottom,gap:b.left-left.right},
       center:box(root).left+box(root).width/2,
       rowLabels:[...scores.querySelectorAll(".reversi-count-name")].map(x=>x.textContent.trim()),
       rowCount:scores.querySelectorAll(".reversi-count-row").length,
@@ -285,7 +285,7 @@ const names=[
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
     assert.ok(Math.abs(detail.rightHeight-detail.physicalHeight)<=3,
      name+" right tools must match physical board height: "+JSON.stringify(detail));
-    assert.ok((name==="海战棋"||name==="中国跳棋")?detail.stageTexture==="none":detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
+    assert.ok(["海战棋","中国跳棋","西洋跳棋（8×8）"].includes(name)?detail.stageTexture==="none":detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
      name+" stage must not contain an unnecessary central colored frame: "+JSON.stringify(detail));
     assert.ok(detail.rowCount===2&&detail.verticalGap<=15,
      name+" two stacked stats and right-side timer must center vertically: "+JSON.stringify(detail));
@@ -296,6 +296,7 @@ const names=[
       assert.ok(detail.ownCenter<detail.center&&detail.board.center>detail.center&&Math.abs((detail.ownCenter+detail.board.center)/2-detail.center)<3,
        "Battleship sea centers must symmetrically flank the stage: "+JSON.stringify(detail));
      assert.deepEqual(detail.rowLabels,["命中次数","攻击次数"]);
+      assert.ok(Math.abs(detail.left.top-detail.physicalTop)<=3&&Math.abs(detail.left.bottom-detail.physicalBottom)<=3,"Sea history must match grid edges: "+JSON.stringify(detail));
     }else if(name==="西洋跳棋（8×8）"){
      assert.deepEqual(detail.rowLabels,["红方棋子","黑方棋子"]);
      assert.equal(detail.currentSide,"red");
@@ -303,6 +304,21 @@ const names=[
      assert.deepEqual(detail.rowLabels,["1号玩家入营","2号玩家入营"]);
      assert.equal(detail.currentSide,"red");
     }
+   }
+   if(name==="国际象棋"){
+    const info=await frame.locator("#game").evaluate(root=>{
+     const rect=x=>{const r=root.querySelector(x).getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height,left:r.left,right:r.right};};
+     return{board:rect(".chess-frame"),history:rect(".chess-notation-rail"),tools:rect(".game-tools"),
+      image:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
+      left:root.querySelector(".chess-notation-rail #moveList")!==null,
+      right:root.querySelector(".game-tools #moveList")!==null};
+    });
+    assert.ok(info.left&&!info.right,"Chess notation belongs only on the left");
+    assert.ok(Math.abs(info.history.height-info.board.height)<=3&&Math.abs(info.tools.height-info.board.height)<=3,
+     "Chess history and right controls equal actual board height: "+JSON.stringify(info));
+    assert.ok(info.history.right<=info.board.left+2&&info.board.right<=info.tools.left+2,
+     "Chess must have left history, center board and right controls: "+JSON.stringify(info));
+    assert.equal(info.image,"none","Chess stage must have no middle texture");
    }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
@@ -765,6 +781,14 @@ const names=[
      });
      const dualModes=new Set(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","西洋跳棋（8×8）","中国跳棋","飞行棋"]);
      assert.equal(controls.modes,dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
+      if(name==="海战棋"){
+       const mode=await page.locator("#modeControl").evaluate(el=>({
+        hidden:el.hidden,rects:el.getClientRects().length,display:getComputedStyle(el).display,
+        count:el.querySelectorAll("button").length
+       }));
+       assert.ok(mode.hidden&&mode.rects===0&&mode.display==="none"&&mode.count===0,
+        "Battleship AI-only mode must not display a placeholder: "+JSON.stringify(mode));
+      }
      assert.equal(controls.levels,["2048","推箱子"].includes(name)?0:name==="经典纸牌"?2:3,name+" difficulty choices must match implemented gameplay");
      assert.equal(controls.selectedModes,controls.modes?1:0,name+" exactly one mode must be selected");
      assert.equal(controls.selectedLevels,controls.levels?1:0,name+" exactly one difficulty must be selected");
@@ -963,13 +987,14 @@ const names=[
    const own=root.querySelector("#own"),enemy=root.querySelector("#enemy"),record=root.querySelector(".reversi-record-rail");
    return{frame:getComputedStyle(enemy).borderWidth,stage:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
     a:own.getBoundingClientRect().right,b:enemy.getBoundingClientRect().left,
-    history:record.getBoundingClientRect().height,
+    history:record.getBoundingClientRect().height,historyTop:record.getBoundingClientRect().top,
+    squareHeight:enemy.getBoundingClientRect().height,squareTop:enemy.getBoundingClientRect().top,
     title:root.querySelector(".fleet-board .fleet-title").getBoundingClientRect().top,
     bottom:own.getBoundingClientRect().bottom};
   });
   assert.equal(seaFrame.frame,"0px","Battleship removes redundant blue grid outline");
   assert.equal(seaFrame.stage,"none","Battleship removes colored middle-stage box");
-  assert.ok(Math.abs(seaFrame.history-(seaFrame.bottom-seaFrame.title))<3,"Sea history matches full title-plus-board height");
+  assert.ok(Math.abs(seaFrame.history-seaFrame.squareHeight)<3&&Math.abs(seaFrame.historyTop-seaFrame.squareTop)<3,"Sea history must match 10×10 grid not title: "+JSON.stringify(seaFrame));
   assert.ok(seaFrame.b>seaFrame.a,"Sea boards must remain separate around the central axis");
   await page.screenshot({path:path.join(artifacts,"battleship-height-first-enemy.png")});
   // Western checkers: a real legal move changes side highlight and timed history.
