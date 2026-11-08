@@ -8,7 +8,7 @@ const fitHistoryHeight=()=>{
  if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
   layoutRoot.style.setProperty("--reversi-board-height",h+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
-  if(document.getElementById("gs-turn-clock"))layoutRoot.dataset.boardMeasured="true";
+  if(document.getElementById("gs-turn-clock")&&el.childElementCount>0)layoutRoot.dataset.boardMeasured="true";
  }
 };
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
@@ -344,6 +344,7 @@ function draw(){
  renderChoices();
  document.getElementById("undoButton").disabled=paused||over||!history.length;
  if(!isRolling)renderDice();
+ fitHistoryHeight(); // Only reveal when the board has actually been drawn.
 }
 function newTurn(dice){
  roll=null;selectedPlane=null;expandedStackKey=null;turn=dice===6?turn:1-turn;window.GameTurnClock?.handover(turn===0?"红方":"蓝方");
