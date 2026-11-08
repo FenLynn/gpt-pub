@@ -1,8 +1,13 @@
 (function(){"use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
-const layoutRoot=document.getElementById("game"),stage=layoutRoot.querySelector(".flight-stage");
-const fitHistoryHeight=()=>{const h=stage.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
-if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(stage);
+const layoutRoot=document.getElementById("game");
+// Align both side rails with the visible 810-unit wooden board frame,
+// rather than the 900-unit SVG stage with blank drawing margins.
+const fitHistoryHeight=()=>{
+ const h=el.getBoundingClientRect().height*810/900;
+ if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
 window.addEventListener("resize",fitHistoryHeight);requestAnimationFrame(fitHistoryHeight);
 const track=[
 [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],
