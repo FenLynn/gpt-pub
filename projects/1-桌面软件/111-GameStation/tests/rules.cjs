@@ -604,7 +604,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   }
   // Four planes on one square consolidate into a readable x4 badge.
   // No token may be lost: clicking the pile fans out its four real plane IDs.
-  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[26,26,26,26]]));
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[0,0,0,0]]));
   const stacks=await flight.locator("#board .flight-stack").evaluateAll(els=>els.map(el=>({
    count:Number(el.dataset.stackCount),members:el.dataset.stackMembers.split(","),
    key:el.dataset.stackKey})));
@@ -613,6 +613,18 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    "Each pile must retain all four actual planes, labeled with a count: "+JSON.stringify(stacks));
   assert.equal(await flight.locator(".flight-aircraft").count(),0,
    "Overlapping individual sprites must not obscure pile numbers");
+  // Despite the different starting directions, blue progress 26 occupies
+  // the same *physical* square as red progress 0. Eight planes become ONE pile.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[26,26,26,26]]));
+  const eight=await flight.locator(".flight-stack").evaluateAll(els=>els.map(el=>({
+   count:Number(el.dataset.stackCount),members:el.dataset.stackMembers.split(","),
+   half:!!el.querySelector("path")
+  })));
+  assert.equal(eight.length,1,"Eight aircraft on one physical square must form one merged pile");
+  assert.equal(eight[0].count,8,"The pile count must report all eight aircraft");
+  assert.equal(eight[0].members.length,8,"No aircraft identity may disappear in an eight-plane pile");
+  assert.equal(eight[0].half,true,"An eight-plane mixed-color pile must show both teams");
+
   // Different colors can occupy a safe square: the pile must show both colors.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,-1,-1,-1],[26,-1,-1,-1]]));
   assert.equal(await flight.locator(".flight-stack[data-stack-count='2'] path").count(),1,
