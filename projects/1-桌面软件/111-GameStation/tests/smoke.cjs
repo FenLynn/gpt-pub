@@ -136,8 +136,8 @@ const names=[
     assert.equal(await frame.locator("#xiangqiResult[hidden]").count(),1,"Xiangqi result must begin hidden");
   }
   if(name==="飞行棋"){
-   const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
-   assert.equal(dice.svg,1,"Flight Chess must use a vector dice face");
+   const dice=await frame.locator("#diceFace").evaluate(el=>({svg:el.querySelectorAll("svg.flight-dice-svg").length,pips:el.querySelectorAll(".flight-dice-side[data-face=\"1\"] .flight-dice-pip").length,label:el.getAttribute("aria-label"),turn:el.ownerDocument.querySelector("#turnText").textContent.trim()}));
+   assert.equal(dice.svg,6,"Flight Chess must render six separately painted vector cube faces");
    assert.equal(dice.pips,1,"Initial Flight Chess die must show one pip");
    assert.equal(dice.label,"骰子：1点","Flight Chess die must expose its value accessibly");
    assert.equal(await frame.locator("#diceFace").getAttribute("role"),"img","Flight Chess die must expose an image role");
@@ -1264,22 +1264,32 @@ const names=[
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("飞行棋");await start();
-  // In the real GameStation shell, changing move-option count may never
-  // move the dice/clock. The variable options panel grows from the bottom.
+  // Flight right-side panels must be packed together with no blank gap; dice
+  // and clock remain fixed while available aircraft options appear below stats.
   const flightLayout=()=>frame.locator("#game").evaluate(root=>{
    const rect=q=>{const r=root.querySelector(q).getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height};};
    return{right:rect(":scope > .game-tools"),dice:rect(".flight-play-controls"),
-    help:rect("#flightMoveHelp"),options:rect(".flight-move-panel")};
+    help:rect("#flightMoveHelp"),options:rect(".flight-move-panel"),scores:rect(".reversi-side-score")};
   });
   const beforeOptions=await flightLayout();
   assert.ok(beforeOptions.right.height>0&&beforeOptions.help.top<beforeOptions.dice.top,
    "Flight right rail must render fixed help above its dice: "+JSON.stringify(beforeOptions));
-  await frame.locator("#game").evaluate(()=>{Math.random=()=>.999;});
+  await frame.locator("#game").evaluate(()=>{
+   // Force a real six at the crypto source for this layout acceptance test.
+   const cryptoObj=window.crypto,real=cryptoObj.getRandomValues.bind(cryptoObj);
+   let calls=0;
+   Object.defineProperty(cryptoObj,"getRandomValues",{configurable:true,value:array=>{
+    if(calls++===0){array[0]=5;return array;}
+    return real(array);
+   }});
+  });
   await frame.locator("#rollButton").click();
-  await frame.locator("#flightMoveOptions button").first().waitFor({state:"visible",timeout:3500});
+  await frame.locator("#flightMoveOptions button").first().waitFor({state:"visible",timeout:6000});
   const afterOptions=await flightLayout();
-  assert.ok(Math.abs(afterOptions.options.bottom-afterOptions.right.bottom)<6,
-   "Airplane selector must remain flush with the bottom of its right rail: "+JSON.stringify(afterOptions));
+  assert.ok(afterOptions.options.top-afterOptions.scores.bottom>=-2&&afterOptions.options.top-afterOptions.scores.bottom<24,
+   "Aircraft options must follow the score cards directly, not float at the bottom: "+JSON.stringify(afterOptions));
+  assert.ok(afterOptions.options.bottom<=afterOptions.right.bottom+5,
+   "Packed right rail must not overflow the actual board height: "+JSON.stringify(afterOptions));
   assert.ok(Math.abs(afterOptions.dice.top-beforeOptions.dice.top)<3,
    "Dice panel must never shift when selectable airplane count changes: "+JSON.stringify({beforeOptions,afterOptions}));
 
