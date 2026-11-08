@@ -1332,3 +1332,49 @@ body{font-size:15px}
  #homeView .hero-metric strong{font-size:11px}
  #homeView .hero-metric-label{font-size:8px}
 }
+
+/* P111 R51 · Game-only fullscreen. Native Esc restores both desktop chrome
+   regions; stage-only exit remains independently clickable above the iframe. */
+#appShell.game-only-fullscreen{
+ width:100vw!important;height:100dvh!important;
+ grid-template-columns:minmax(0,1fr)!important;
+}
+#appShell.game-only-fullscreen #sidebar,
+#appShell.game-only-fullscreen #topbar{
+ display:none!important;
+}
+#appShell.game-only-fullscreen .main-area{
+ display:grid!important;
+ grid-template-rows:minmax(0,1fr)!important;
+ min-width:0!important;min-height:0!important;
+ width:100%!important;height:100%!important;
+}
+#appShell.game-only-fullscreen #workspaceView{
+ display:block!important;
+ width:100%!important;height:100%!important;
+ min-width:0!important;min-height:0!important;
+}
+#appShell.game-only-fullscreen #gameStage,
+#appShell.game-only-fullscreen #gameFrame{
+ width:100%!important;height:100%!important;
+}
+#appShell.game-only-fullscreen .help-panel,
+#appShell.game-only-fullscreen #helpPanel{
+ display:none!important;
+}
+.game-fullscreen-exit{
+ position:absolute;top:12px;right:14px;z-index:80;
+ height:36px;padding:0 12px;
+ display:flex;align-items:center;gap:7px;
+ border:1px solid #c6dce9;border-radius:9px;
+ background:#f9fdfff0;color:#285873;
+ box-shadow:0 2px 13px #1c47632e;
+ font:650 12px/1 "Microsoft YaHei","Segoe UI",sans-serif;
+ cursor:pointer;
+}
+.game-fullscreen-exit svg{
+ width:17px;height:17px;fill:none;stroke:currentColor;
+ stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round
+}
+.game-fullscreen-exit:hover{background:#e4f2fb;border-color:#98c4db}
+.game-fullscreen-exit[hidden]{display:none!important}
