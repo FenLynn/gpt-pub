@@ -72,7 +72,7 @@ function draw(last=null){
  board.append(node("circle",{cx:500,cy:450,r:390,class:"star-center"}));
  for(let arm=0;arm<6;arm++){
   const tip=nodes.get(arms[arm][arms[arm].length-1]),xy=projection(tip.q,tip.r,angle);
-  const radial=Math.atan2(xy[1]-450,xy[0]-500),x=500+Math.cos(radial)*389,y=450+Math.sin(radial)*389;
+  const radial=Math.atan2(xy[1]-450,xy[0]-500),x=500+Math.cos(radial)*426,y=450+Math.sin(radial)*426;
   const label=node("g",{class:"star-seat-marker","data-arm":arm,"data-position":arm+1});
   const seat=activeArms().indexOf(arm),bg=seat>=0?paint[seat]:"#a9aa9e";
   label.append(node("circle",{cx:x,cy:y,r:17,fill:bg,stroke:"#fffaf0","stroke-width":3}));
