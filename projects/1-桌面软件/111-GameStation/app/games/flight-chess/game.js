@@ -109,7 +109,11 @@ function draw(){
   if(!occupied.has(k))occupied.set(k,[]);
   occupied.get(k).push([seat,i]);
  }));
- const displacements=n=>n===1?[[0,0]]:n===2?[[-10,0],[10,0]]:n===3?[[0,-11],[-10,9],[10,9]]:[[-10,-10],[10,-10],[-10,10],[10,10]];
+ const displacements=n=>{
+  if(n===1)return [[0,0]];
+  const columns=Math.ceil(Math.sqrt(n)),rows=Math.ceil(n/columns),step=n>4?12:18;
+  return Array.from({length:n},(_,i)=>[(i%columns-(columns-1)/2)*step,(Math.floor(i/columns)-(rows-1)/2)*step]);
+ };
  pawns.forEach((row,seat)=>row.forEach((progress,i)=>{
   const [x,y]=position(seat,i,progress),[cx,cy]=pos(x,y);
   const stack=occupied.get(x+","+y),index=stack.findIndex(([s,p])=>s===seat&&p===i);
