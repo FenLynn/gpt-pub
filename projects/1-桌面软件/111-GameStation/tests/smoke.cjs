@@ -206,6 +206,21 @@ const names=[
   });
   assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
   assert.ok(header.crumb.right<=header.notice.x+2,name+" LED notice must sit after the game breadcrumb");
+  if(width>=901){
+   const title=await page.locator("#breadcrumbCategory").evaluate(el=>{
+    const text=el.getBoundingClientRect(),notice=document.querySelector("#gameNotice").getBoundingClientRect();
+    return{label:el.textContent,available:el.clientWidth,required:el.scrollWidth,
+     actualRight:text.right,noticeLeft:notice.left,tooltip:el.title};
+   });
+   assert.equal(title.tooltip,name,name+" game title must provide a full-name fallback");
+   assert.ok(title.required<=title.available+2&&title.actualRight<=title.noticeLeft+2,
+    name+" game title must fit the left header without truncation or overlapping LED: "+JSON.stringify(title));
+  }
+  const stop=await page.locator("#startButton.end-action svg rect").evaluate(el=>({
+   fill:getComputedStyle(el).fill,stroke:getComputedStyle(el).stroke
+  }));
+  assert.equal(stop.fill,"none",name+" stop icon must use outline, not a solid square");
+  assert.notEqual(stop.stroke,"none",name+" stop icon must have a visible stroke");
   assert.ok(header.notice.right<=header.timer.x+2,name+" timer must sit to the right of the LED display");
   if(header.mode.width>0){
    assert.ok(header.timer.right<=header.mode.x+2,name+" mode switches must sit after the timer");
@@ -220,12 +235,17 @@ const names=[
     const speaker=box.querySelector(".game-notice-speaker"),window=box.querySelector(".game-notice-window"),
       label=box.querySelector(".game-notice-text"),screen=getComputedStyle(window),text=getComputedStyle(label);
     return{speakerRight:speaker.getBoundingClientRect().right,screenLeft:window.getBoundingClientRect().left,
+      speakerWidth:speaker.getBoundingClientRect().width,rays:speaker.querySelectorAll(".speaker-pulse-rays path").length,
+      pulseName:getComputedStyle(speaker.querySelector(".speaker-pulse-rays")).animationName,
+      pulseCount:getComputedStyle(speaker.querySelector(".speaker-pulse-rays")).animationIterationCount,
       screenWidth:window.getBoundingClientRect().width,textColor:text.color,textFont:parseFloat(text.fontSize),
       screenPaddingTop:parseFloat(screen.paddingTop),screenBackground:screen.backgroundColor,
       modeBorder:getComputedStyle(document.querySelector("#modeControl")).borderTopWidth,
       difficultyBorder:getComputedStyle(document.querySelector("#difficultyControl")).borderTopWidth};
    });
    assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=(width<=1390?165:180),"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
+   assert.ok(led.speakerWidth>=26&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
+    "LED speaker must be large and flash three rays exactly twice for an incoming message: "+JSON.stringify(led));
    assert.ok(led.textColor==="rgb(255, 255, 255)"&&led.textFont>=14&&led.screenPaddingTop<=3,"Gomoku LED must have large white tightly-spaced text: "+JSON.stringify(led));
    assert.equal(led.modeBorder,"1px","Gomoku mode switches need a shared outline");
    assert.equal(led.difficultyBorder,"1px","Gomoku difficulty switches need a shared outline");

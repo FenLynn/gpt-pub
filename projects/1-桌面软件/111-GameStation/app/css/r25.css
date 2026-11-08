@@ -518,8 +518,9 @@
 .main-area:has(#workspaceView:not(.hidden)) #startButton.end-action svg rect{
  fill:none!important;stroke:currentColor!important;stroke-width:1.9!important
 }
+.main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){gap:4px!important}
 .main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
- width:29px!important;height:29px!important;overflow:visible!important;
+ width:27px!important;height:27px!important;overflow:visible!important;
  stroke:#5289a2!important;stroke-width:2.2!important;stroke-linecap:round!important;stroke-linejoin:round!important
 }
 .main-area:has(#workspaceView:not(.hidden)) .speaker-body{fill:none;stroke:inherit}
