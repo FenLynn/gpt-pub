@@ -271,7 +271,9 @@ const names=[
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
      "Xiangqi wood board must not contain horizontal stripe gradients");
    }else {
-    const feasible=Math.min(v.root.height-30,v.root.width-400);
+    const feasible=name==="黑白棋"
+    ?Math.min(v.root.height-30,v.root.width-2*(await frame.locator(".reversi-record-rail").evaluate(el=>el.getBoundingClientRect().width))-38)
+    :Math.min(v.root.height-30,v.root.width-400);
     assert.ok(v.main.width>=feasible*.96&&v.main.width<=v.root.width,
      name+" board must retain maximum usable playfield width inside centered symmetric side tracks: "+JSON.stringify({feasible,geometry:v}));
    }
