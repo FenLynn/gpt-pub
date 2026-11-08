@@ -147,3 +147,32 @@
  fill:#7b561a;font:800 14px/1 "Segoe UI",Arial,sans-serif
 }
 #game.flight-chess-layout .flight-shortcut-badge.flight text{fill:#286795}
+
+/* Fit the entire right rail beside the board at 1366×768 without
+   clipping the variable aircraft selector. Scoped to Flight Chess only. */
+@media (min-width:701px) and (max-height:840px){
+ #game.flight-chess-layout>.game-tools{gap:4px!important;overflow-y:auto!important}
+ #game.flight-chess-layout>.game-tools>.flight-move-help{
+  min-height:32px!important;max-height:32px!important;height:32px!important;
+  overflow:hidden!important;padding:2px 3px!important;line-height:1.35!important
+ }
+ #game.flight-chess-layout>.game-tools>.flight-play-controls{
+  gap:3px!important;padding:4px!important
+ }
+ #game.flight-chess-layout>.game-tools>.flight-play-controls .flight-dice{
+  width:min(100%,99px)!important;max-width:99px!important
+ }
+ #game.flight-chess-layout>.game-tools>.flight-play-controls #rollButton{
+  min-height:32px!important;padding:3px!important
+ }
+ #game.flight-chess-layout>.game-tools>.reversi-side-score{
+  gap:4px!important
+ }
+ #game.flight-chess-layout>.game-tools>.reversi-side-score>.reversi-count-row{
+  min-height:38px!important;padding:4px!important
+ }
+ #game.flight-chess-layout>.game-tools>.flight-move-panel{
+  min-height:42px!important;max-height:135px!important;
+  padding:5px!important;gap:4px!important
+ }
+}
