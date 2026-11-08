@@ -311,6 +311,7 @@ function draw(){
  // Numbered stepping stones belong to the chosen airplane only, never to a
  // decorative second board. A separate green end marker commits the move.
  const preview=selectedPlane===null||paused||over?null:routeFor(selectedPlane);
+ const previewMarkers=[];
  el.dataset.previewActive=preview?"true":"false";
  if(preview){
   const coords=preview.steps.map(step=>{
@@ -344,14 +345,14 @@ function draw(){
      "data-shortcut-label":bonus.kind,"aria-hidden":"true"});
    badge.append(svgNode("circle",{cx:x+12,cy:y-15,r:15}));
    const text=svgNode("text",{x:x+12,y:y-10,"text-anchor":"middle"});
-   text.textContent=bonus.kind==="jump"?"+4":"✈";badge.append(text);el.append(badge);
+   text.textContent=bonus.kind==="jump"?"+4":"✈";badge.append(text);previewMarkers.push(badge);
   }
   for(const step of coords){
    const marker=svgNode("g",{class:"flight-path-step","data-preview-step":step.number,
     "aria-label":"前进第"+step.number+"格"});
    marker.append(svgNode("circle",{cx:step.cx,cy:step.cy,r:17,class:"flight-preview-circle"}));
    const label=svgNode("text",{x:step.cx,y:step.cy+6,"text-anchor":"middle",class:"flight-preview-number"});
-   label.textContent=String(step.number);marker.append(label);el.append(marker);
+   label.textContent=String(step.number);marker.append(label);previewMarkers.push(marker);
   }
   const [gx,gy]=position(turn,selectedPlane,preview.final),tx=100+gx*50,ty=100+gy*50;
   const goal=svgNode("g",{class:"flight-path-target",role:"button",tabindex:"0",
@@ -361,7 +362,7 @@ function draw(){
   end.textContent=preview.final===57?"终":"落";goal.append(end);
   goal.addEventListener("click",()=>play(selectedPlane));
   goal.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();play(selectedPlane);}});
-  el.append(goal);
+  previewMarkers.push(goal);
  }
 
  // A cell represents one or more airplanes. A pile never draws four
@@ -442,6 +443,9 @@ function draw(){
    el.append(picker);
   }else expandedStackKey=null;
  }
+ // Labels and the clickable landing marker must stay visible even if another
+ // plane already occupies the destination (capture preview).
+ for(const marker of previewMarkers)el.append(marker);
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
