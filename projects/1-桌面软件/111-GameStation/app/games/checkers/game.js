@@ -2,10 +2,10 @@
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("status");
 const layoutRoot=document.getElementById("game");
-const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
+const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0){layoutRoot.style.setProperty("--reversi-board-height",h+"px");layoutRoot.dataset.boardMeasured="true";}};
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
 else window.addEventListener("resize",fitHistoryHeight);
-requestAnimationFrame(fitHistoryHeight);
+requestAnimationFrame(fitHistoryHeight);fitHistoryHeight();
 let b,turn=1,selected=null,legal=[],continuing=null,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastHop=null;
 const side=v=>(v===1||v===3)?1:(v===2||v===4)?2:0;
 function clone(a){return a.map(r=>r.slice());}
