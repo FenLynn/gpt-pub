@@ -626,7 +626,20 @@ const names=[
      if(controls.modes){
       await page.locator('#modeControl button[data-mode-index="1"]').click();
       assert.equal(await page.locator('#modeControl button[aria-pressed="true"]').getAttribute("data-mode-index"),"1",name+" mode switching must work");
+      const duel=await page.locator("#difficultyControl").evaluate(el=>({
+       disabled:el.getAttribute("aria-disabled"),opacity:parseFloat(getComputedStyle(el).opacity),
+       buttons:[...el.querySelectorAll("button")].every(x=>x.disabled),
+       selected:el.querySelector('[aria-pressed="true"]')?.dataset.difficulty
+      }));
+      assert.ok(duel.disabled==="true"&&duel.buttons&&duel.opacity<=.55,
+       name+" two-player mode must visibly disable AI difficulty: "+JSON.stringify(duel));
+      await page.locator('#difficultyControl button[data-difficulty="hard"]').evaluate(el=>el.click());
+      assert.equal(await page.locator('#difficultyControl button[aria-pressed="true"]').getAttribute("data-difficulty"),duel.selected,
+       name+" a disabled difficulty button must not change the selected level");
       await page.locator('#modeControl button[data-mode-index="0"]').click();
+      assert.equal(await page.locator("#difficultyControl").getAttribute("aria-disabled"),"false",
+       name+" switching back to AI must re-enable difficulty");
+      assert.equal(await page.locator("#difficultyControl button:not([disabled])").count(),3);
      }
      if(controls.levels){
       await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
@@ -659,11 +672,43 @@ const names=[
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
     noticeChecked=true;
    }
-   await page.locator("#newGameButton").click();
+   if(size.width===1440){
+    await page.locator("#startButton").click();
+    await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+    const summary=await page.locator("#gameResultOverlay").evaluate(el=>({
+     status:el.querySelector(".game-result-kicker").textContent,
+     title:el.querySelector("#gameResultTitle").textContent,
+     actions:[...el.querySelectorAll(".game-result-actions button")].map(x=>x.textContent),
+     points:getComputedStyle(el.querySelector("#gameResultScore")).display!=="none"
+    }));
+    const hasPoints=new Set(["2048","记忆翻牌","俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克","斗地主","麻将","三国杀"]);
+    assert.equal(summary.status,"已结束",name+" manual ending should say 已结束");
+    assert.deepEqual(summary.actions,["再来一局","离开"],name+" must offer restart and exit");
+    assert.equal(summary.points,hasPoints.has(name),name+" show score only for games with genuine points");
+    assert.ok((await page.locator("#gameNoticeText").innerText()).includes("已结束"),name+" LED should announce termination");
+    if(name==="五子棋")await page.screenshot({path:path.join(artifacts,"gomoku-manual-ended.png")});
+    await page.locator("#gameResultReplay").click();
+    await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
     await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
+    await page.locator("#startButton").click();
+    await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+    await page.locator("#gameResultLeave").click();
+    await page.locator("#libraryView").waitFor({state:"visible"});
+   }else{
+    await page.locator("#newGameButton").click();
+    await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="暂停");
+   }
    }
   }
   await page.setViewportSize({width:1440,height:1000});
+  // A natural GAME_OVER for a point-scoring game must show its final points.
+  await open("俄罗斯方块");await start();
+  await frame.locator("#game").evaluate(()=>window.GameBridge.send("GAME_OVER",{message:"测试结算",score:1234,win:false}));
+  await page.locator("#gameResultOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gameResultScoreValue").innerText(),"1234");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  assert.equal(await frame.locator("#score").innerText(),"0","Next after scoring must reset the real in-game score");
   await open("扫雷");await start();
   const mine=frame.locator(".mine-classic");
   async function fitMine(){
@@ -775,6 +820,10 @@ const names=[
   assert.ok(Math.abs(goGrid.shape-1)<.015,"Gomoku board must remain square");
   await frame.locator(".gomoku-cell").nth(112).click();
   assert.equal(await frame.locator(".stone.stone-arrived").count(),1,"Gomoku last stone must animate on landing");
+  await page.locator("#newGameButton").click();
+  assert.equal(await frame.locator(".stone").count(),0,"Top-right next round must actually clear Gomoku stones");
+  await frame.locator(".gomoku-cell").nth(112).click();
+  assert.equal(await frame.locator(".stone").count(),1,"Gomoku must accept moves after clicking next round");
   assert.equal(await frame.locator("#gameWorkspaceStyles").count(),1,"Gomoku shared stylesheet must be preloaded");
   assert.equal(await frame.locator(".game-guide").evaluate(el=>getComputedStyle(el).display),"none","Legacy left guide must never be visible");
   assert.equal(await frame.locator("#status").evaluate(el=>getComputedStyle(el).display),"none","Right-side paused status must be removed");
@@ -792,6 +841,13 @@ const names=[
   await page.screenshot({path:path.join(artifacts,"gomoku-win-1440x1000.png")});
   await frame.locator("#gomokuReplay").click();
   await frame.locator("#gomokuResult").waitFor({state:"hidden",timeout:4000});
+  await frame.locator('#game').evaluate(()=>window.__p111GomokuTest.forceFinish(1));
+  await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
+  await page.locator("#newGameButton").click();
+  await frame.locator("#gomokuResult").waitFor({state:"hidden",timeout:4000});
+  assert.equal(await frame.locator(".stone").count(),0,"Next after a win must dismiss Gomoku result and clear stones");
+  await frame.locator(".gomoku-cell").nth(112).click();
+  assert.equal(await frame.locator(".stone").count(),1,"Next after a win must remain playable");
   await frame.locator('#game').evaluate(()=>window.__p111GomokuTest.forceFinish(-1));
   await frame.locator("#gomokuResult:not([hidden])").waitFor({timeout:4000});
   assert.equal(await frame.locator("#gomokuResult").getAttribute("data-result"),"loss");
