@@ -965,6 +965,16 @@ const names=[
   assert.equal(await page.locator("#gameResultTitle").innerText(),"平局");
   await page.locator("#newGameButton").click();
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
+  // Natural win, not an injected packet: red makes four vertically in column 1.
+  for(const col of [0,1,0,1,0,1,0]){
+   await frame.locator('.connect4-slot[data-column="'+col+'"]').first().click();
+  }
+  await page.locator("#gameResultOverlay").waitFor({state:"visible",timeout:4000});
+  assert.equal(await page.locator("#gameResultTitle").innerText(),"红方获胜",
+   "A real four-in-a-column local duel must announce the side that connected four");
+  assert.equal(await frame.locator("#reversiHistoryCount").innerText(),"7 步");
+  await page.locator("#newGameButton").click();
+  await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
    lines:el.querySelectorAll(".gomoku-lines line").length,
