@@ -311,6 +311,7 @@ function draw(){
  // Numbered stepping stones belong to the chosen airplane only, never to a
  // decorative second board. A separate green end marker commits the move.
  const preview=selectedPlane===null||paused||over?null:routeFor(selectedPlane);
+ el.dataset.previewActive=preview?"true":"false";
  if(preview){
   const coords=preview.steps.map(step=>{
    const [x,y]=position(turn,selectedPlane,step.progress);
