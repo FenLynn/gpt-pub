@@ -579,14 +579,56 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],0,"Clicking the green landing circle executes the move");
 
 
-  // All eight planes may occupy one safe cell. No NaN coordinates, no missing glyphs.
+  // Airport grid is a symmetric 2x2 layout in each 296x296 airport.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
+  const airportGeometry=await flight.locator("#board").evaluate(svg=>{
+   const camps=[{x:66,y:535},{x:535,y:66}],result=[];
+   for(let seat=0;seat<2;seat++){
+    const points=Array.from({length:4},(_,i)=>{
+     const pawn=svg.querySelector('[data-pawn="'+seat+'-'+i+'"]');
+     return{x:Number(pawn.dataset.centerX),y:Number(pawn.dataset.centerY)};
+    });
+    const xs=[...new Set(points.map(p=>p.x))].sort((a,b)=>a-b);
+    const ys=[...new Set(points.map(p=>p.y))].sort((a,b)=>a-b);
+    result.push({marginsX:[xs[0]-camps[seat].x,xs[1]-xs[0],camps[seat].x+296-xs[1]],
+     marginsY:[ys[0]-camps[seat].y,ys[1]-ys[0],camps[seat].y+296-ys[1]],
+     unique:new Set(points.map(p=>p.x+","+p.y)).size});
+   }
+   return result;
+  });
+  for(const g of airportGeometry){
+   assert.equal(g.unique,4,"All four parked planes must occupy separate airport positions");
+   assert.ok(Math.max(...g.marginsX)-Math.min(...g.marginsX)<.1&&
+    Math.max(...g.marginsY)-Math.min(...g.marginsY)<.1,
+    "Each airport must place planes at equal edge/internal spacing: "+JSON.stringify(g));
+  }
+  // Four planes on one square consolidate into a readable x4 badge.
+  // No token may be lost: clicking the pile fans out its four real plane IDs.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[26,26,26,26]]));
-  const stackGeometry=await flight.locator("#board .flight-aircraft").evaluateAll(els=>els.map(el=>({
-   x:Number(el.dataset.centerX),y:Number(el.dataset.centerY),
-   slotX:Number(el.dataset.slotX),slotY:Number(el.dataset.slotY)})));
-  assert.equal(stackGeometry.length,8,"Flight Chess preserves every stacked plane");
-  assert.ok(stackGeometry.every(p=>[p.x,p.y,p.slotX,p.slotY].every(Number.isFinite)),
-   "Eight safe-cell planes must have finite centered positions");
+  const stacks=await flight.locator("#board .flight-stack").evaluateAll(els=>els.map(el=>({
+   count:Number(el.dataset.stackCount),members:el.dataset.stackMembers.split(","),
+   key:el.dataset.stackKey})));
+  assert.equal(stacks.length,2,"Two same-color piles should render as two readable group badges");
+  assert.ok(stacks.every(g=>g.count===4&&g.members.length===4&&g.key),
+   "Each pile must retain all four actual planes, labeled with a count: "+JSON.stringify(stacks));
+  assert.equal(await flight.locator(".flight-aircraft").count(),0,
+   "Overlapping individual sprites must not obscure pile numbers");
+  // Different colors can occupy a safe square: the pile must show both colors.
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,-1,-1,-1],[26,-1,-1,-1]]));
+  assert.equal(await flight.locator(".flight-stack[data-stack-count='2'] path").count(),1,
+   "A mixed-color pile must visibly split its badge between player colors");
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[0,0,0,0],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.roll(6));
+  await flight.locator(".flight-stack.can-move").click();
+  assert.equal(await flight.locator(".flight-stack-option").count(),4,
+   "Clicking a movable four-plane pile must reveal four separated numbered choices");
+  await flight.locator('[data-stack-choice="0-2"]').click();
+  assert.equal(await flight.locator(".flight-path-target").count(),1,
+   "Picking one plane from a pile must preview its independent route");
+  await flight.locator(".flight-path-target").click();
+  const unstacked=await flight.evaluate(()=>window.__p111FlightTest.state().pawns[0]);
+  assert.ok(unstacked[2]>0&&unstacked.filter(p=>p===0).length===3,
+   "Only the chosen third plane moves; the other three remain stacked");
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
 
   await flight.evaluate(()=>window.__p111FlightTest.pause());
