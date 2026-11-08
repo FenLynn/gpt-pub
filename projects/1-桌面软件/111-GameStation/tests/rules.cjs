@@ -697,9 +697,28 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const flightState=await flight.evaluate(()=>window.__p111FlightTest.state());
   assert.equal(flightState.pawns[1][0],0,"Six brings an opposing plane onto its start square");
   assert.equal(flightState.turn,1,"Rolling a six grants an extra turn");
-  // A same-color landing at progress 8 jumps to 12 and crosses the board to progress 38.
+  // Progress 8 jumps +4 to 12, then flies across the board to 38.
+  // The full preview must show BOTH extra legs instead of teleporting.
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[7,-1,-1,-1],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
+  const route=await flight.evaluate(()=>window.__p111FlightTest.route(0));
+  assert.deepEqual(route.shortcuts,[{kind:"jump",from:8,to:12},{kind:"flight",from:12,to:38}],
+   "Shortcuts must explicitly include the +4 leg and the across-board flying leg");
+  assert.equal(route.computedFinal,route.move.to,"Preview destination must match the existing move engine");
+  assert.equal(await flight.evaluate(()=>window.__p111FlightTest.preview(0)),true);
+  const renderedRoute=await flight.locator("#board").evaluate(board=>({
+   legs:[...board.querySelectorAll(".flight-preview-shortcut")].map(el=>el.dataset.shortcut),
+   badges:[...board.querySelectorAll(".flight-shortcut-badge text")].map(el=>el.textContent),
+   target:Number(board.querySelector(".flight-path-target").dataset.previewTo),
+   label:board.querySelector(".flight-path-target .flight-target-label").textContent,
+   focused:board.dataset.previewActive
+  }));
+  assert.deepEqual(renderedRoute.legs,["jump","flight"],
+   "Both bonus path segments should be visibly distinguished");
+  assert.deepEqual(renderedRoute.badges,["+4","✈"]);
+  assert.equal(renderedRoute.target,38);
+  assert.equal(renderedRoute.label,"落","Ordinary landing must not be mistaken for the real finish");
+  assert.equal(renderedRoute.focused,"true");
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],38,
    "Flight shortcut must land on the opposite side, 26 track cells after the entrance");
@@ -720,6 +739,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],56,"Finishing requires an exact die roll");
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[56,57,57,57],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
+  await flight.evaluate(()=>window.__p111FlightTest.preview(0));
+  assert.equal(await flight.locator(".flight-path-target .flight-target-label").textContent(),"终",
+   "Only the actual progress-57 finish square should display the finish label");
   await flight.evaluate(()=>window.__p111FlightTest.move(0));
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).over,true,"All four planes completing home lane ends the flight game");
   await flight.close();
