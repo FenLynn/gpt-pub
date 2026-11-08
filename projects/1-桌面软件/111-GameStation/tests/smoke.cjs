@@ -153,6 +153,20 @@ const names=[
    assert.equal(geometry.tokenCount,20,"Chinese Checkers must render both ten-piece camps");
    assert.ok(geometry.maxTokenDelta<=.5,"All Chinese Checkers tokens must remain circular: "+JSON.stringify(geometry));
   }
+    if(name==="飞行棋"){
+    const geometry=await frame.locator("#game").evaluate(root=>{
+     const box=q=>{const r=root.querySelector(q).getBoundingClientRect();return{width:r.width,height:r.height,left:r.left,top:r.top,bottom:r.bottom}};
+     const stage=box(".flight-stage"),record=box(".reversi-record-rail"),right=box(".game-tools");
+     const first=root.querySelector('[data-pawn="0-0"]');
+     return{stage,record,right,history:root.querySelector("#reversiMoveList")!==null,
+       singleBoard:root.querySelectorAll("svg.flight-board").length===1&&!root.querySelector(".flight-center"),
+       centeredPawn:Math.abs(Number(first.dataset.centerX)-Number(first.dataset.slotX))<.1&&Math.abs(Number(first.dataset.centerY)-Number(first.dataset.slotY))<.1};
+    });
+    assert.ok(geometry.singleBoard&&geometry.history&&geometry.centeredPawn,
+     "Flight Chess needs a single board with centered solitary planes: "+JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.record.height-geometry.stage.height)<3&&Math.abs(geometry.right.top+geometry.right.bottom-geometry.stage.top*2-geometry.stage.height)<6,
+     "Flight Chess rails should align around board: "+JSON.stringify(geometry));
+   }
   if(name==="飞行棋"||name==="西洋跳棋（8×8）"||name==="国际象棋"){
    const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect();return{ratio:r.width/r.height,width:r.width,height:r.height};});
    assert.ok(Math.abs(geometry.ratio-1)<=.015,name+" board must preserve a square playing surface: "+JSON.stringify(geometry));
@@ -241,6 +255,9 @@ const names=[
       top=box(timer),bottom=box(hint);
      return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
       main:box(root.querySelector(".game-main-board")).height,
+      primaryCenter:kind==="海战棋"?box(root.querySelector(".fleet-boards")).left+box(root.querySelector(".fleet-boards")).width/2:b.left+b.width/2,
+      ownBoardInStage:kind==="海战棋"?root.querySelector(".fleet-boards").contains(root.querySelector("#own")):null,
+      ownCenter:kind==="海战棋"?box(root.querySelector("#own")).left+box(root.querySelector("#own")).width/2:null,
       rightHeight:r.height,
       stageTexture:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
       left:{width:left.width,height:left.height,gap:b.left-left.right},
@@ -254,12 +271,12 @@ const names=[
       ownSquare:kind==="海战棋"?box(root.querySelector("#own")).width:null};
     },name);
     const wantedRatio=name==="四子棋"?7/6:name==="中国跳棋"?10/9:1;
-    const minHeightShare=name==="四子棋"?.74:name==="中国跳棋"?.72:.80;
+    const minHeightShare=name==="海战棋"?.35:name==="四子棋"?.74:name==="中国跳棋"?.72:.80;
     assert.ok(Math.abs(detail.board.width/detail.board.height-wantedRatio)<.03,
      name+" must retain actual board aspect ratio: "+JSON.stringify(detail));
     assert.ok(detail.board.height>=detail.main*minHeightShare,
      name+" must prioritize the available height instead of a shallow board: "+JSON.stringify(detail));
-    assert.ok(Math.abs(detail.board.center-detail.center)<=2.5,
+    assert.ok(Math.abs(detail.primaryCenter-detail.center)<=2.5,
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
     assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.board.height)<=3,
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
@@ -271,8 +288,10 @@ const names=[
      name+" two stacked stats and right-side timer must center vertically: "+JSON.stringify(detail));
     assert.equal(detail.listOverflow,"hidden",name+" move history must never horizontally scroll");
     if(name==="海战棋"){
-     assert.ok(detail.hasOwnPreview&&detail.ownSquare>=130,
-      "Battleship must keep a visible own-fleet preview in the left rail: "+JSON.stringify(detail));
+     assert.ok(detail.ownBoardInStage&&!detail.hasOwnPreview&&detail.ownSquare>=130&&Math.abs(detail.ownSquare-detail.board.width)<=2,
+       "Battleship two full-sized seas must sit in the main stage: "+JSON.stringify(detail));
+      assert.ok(detail.ownCenter<detail.center&&detail.board.center>detail.center&&Math.abs((detail.ownCenter+detail.board.center)/2-detail.center)<3,
+       "Battleship sea centers must symmetrically flank the stage: "+JSON.stringify(detail));
      assert.deepEqual(detail.rowLabels,["命中次数","攻击次数"]);
     }else if(name==="西洋跳棋（8×8）"){
      assert.deepEqual(detail.rowLabels,["红方棋子","黑方棋子"]);
@@ -410,9 +429,9 @@ const names=[
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
    :name==="黑白棋"?Math.min(v.main.height,Math.max(0,v.main.width-18))
    :name==="四子棋"?Math.min(v.main.height,Math.max(0,(v.main.width-18)*6/7))
-   :v.battleship?Math.min(v.main.height*.60,Math.max(0,(v.main.width-52)/2))
+   :v.battleship?Math.min(v.main.height-58,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
-  assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
+  assert.ok(v.surface.height>=(v.battleship?Math.min(v.main.height*.45,availableHeight)*.90:Math.min(v.main.height*.70,availableHeight)-1),
    name+" primary surface must maximize height within the symmetric side-gutter geometry: "+JSON.stringify({availableHeight,geometry:v}));
   assert.ok(v.surface.y>=v.main.y-1&&v.surface.bottom<=v.main.bottom+1,name+" game content must not clip vertically: "+JSON.stringify(v));
   assert.ok(v.overflow<=v.viewport+2,name+" no horizontal scrollbar");
@@ -935,8 +954,8 @@ const names=[
    "Battleship hit or miss must mark the latest shot for a nonblocking in-board animation");
   assert.ok(Number((await frame.locator("#reversiHistoryCount").innerText()).match(/\d+/)?.[0])>=1,
    "Battleship attacks must record time in the left full-height history");
-  assert.equal(await frame.locator(".fleet-own-preview #own").count(),1,
-   "Own fleet must remain visible as the secondary left map");
+  assert.equal(await frame.locator(".fleet-boards #own").count(),1,
+    "Own fleet must remain beside enemy sea at full size");
   await page.screenshot({path:path.join(artifacts,"battleship-height-first-enemy.png")});
   // Western checkers: a real legal move changes side highlight and timed history.
   await open("西洋跳棋（8×8）");await start();
