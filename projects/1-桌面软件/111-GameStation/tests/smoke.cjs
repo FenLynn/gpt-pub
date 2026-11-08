@@ -138,7 +138,7 @@ const names=[
   if(name==="飞行棋"){
    const firstPaint=await frame.locator("#game").evaluate(root=>({
     preloadedWorkspace:document.querySelectorAll("head #gameWorkspaceStyles").length,
-    preloadedFlightStyle:!!document.querySelector('head link[href="./flight.css"]'),
+    preloadedFlightStyle:!!document.querySelector('head link[href^="./flight.css"]'),
     layoutClass:root.classList.contains("gs-tools-open"),
     measured:root.dataset.boardMeasured==="true",
     visibility:getComputedStyle(root).visibility,
