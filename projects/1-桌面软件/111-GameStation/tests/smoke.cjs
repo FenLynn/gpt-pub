@@ -353,6 +353,7 @@ const names=[
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   const availableHeight=name==="中国象棋"
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
+   :name==="黑白棋"?Math.min(v.main.height,Math.max(0,v.main.width-18))
    :v.battleship?Math.min(v.main.height*.60,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
   assert.ok(v.surface.height>=Math.min(v.main.height*(v.battleship?.60:.70),availableHeight)-1,
