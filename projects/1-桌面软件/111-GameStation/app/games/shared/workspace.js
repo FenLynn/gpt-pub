@@ -119,6 +119,7 @@ function ensureResignAction(){
  button.addEventListener("click",()=>window.dispatchEvent(new Event("gamestation:resign")));
  const undo=side.querySelector("#undoButton");
  if(undo)undo.insertAdjacentElement("afterend",button);
+ else if(side.querySelector(".side-score"))side.querySelector(".side-score").insertAdjacentElement("beforebegin",button);
  else side.appendChild(button);
 }
 function enhancePageActions(){
