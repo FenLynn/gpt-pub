@@ -5,7 +5,7 @@ const root=document.getElementById("game"),gameId=document.body.dataset.game;
 if(!root||!gameId)return;
 /* Reversi's move-time history occupies a dedicated left record rail.
    Other board games retain their own right-side timing cards. */
-const historyRail=(["reversi","connect4","battleship","checkers","chinese-checkers"].includes(gameId))?
+const historyRail=(["reversi","connect4","battleship","checkers","chinese-checkers","flight-chess"].includes(gameId))?
  root.querySelector(":scope > .reversi-record-rail"):null;
 const host=root.querySelector(":scope > .game-tools");
 if(!host)return;
@@ -29,7 +29,7 @@ if(gameId==="chinese-checkers"||gameId==="flight-chess"){
  if(wrap&&board){
   const fit=()=>{
    const bounds=wrap.getBoundingClientRect();
-   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio);
+   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio)*(gameId==="chinese-checkers"?.92:1);
    if(width>0){
     board.style.setProperty("width",width+"px","important");
     board.style.setProperty("height",width/ratio+"px","important");
