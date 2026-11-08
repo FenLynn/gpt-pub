@@ -64,5 +64,15 @@ if(new URLSearchParams(location.search).has("p111Test")){
   undo(){undo();return this.state();}
  };
 }
+function resign(){
+ if(paused||over)return false;
+ const loser=mode==="ai"?1:turn,winner=3-loser;
+ const label=s=>s===1?"黑色棋子":"白色棋子";
+ clearTimeout(timer);over=true;paused=true;lastFlips=new Set();
+ render();const message=label(loser)+"认输 · "+label(winner)+"获胜";
+ report(message);GameBridge.send("GAME_OVER",{message,winner:label(winner),score:counts(b)[0],win:mode==="ai"?false:winner===1});
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;next();},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
