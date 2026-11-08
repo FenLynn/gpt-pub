@@ -1,6 +1,13 @@
 (function(){
 "use strict";
 const boardEl=document.getElementById("board"),frame=document.querySelector(".chess-frame"),statusEl=document.getElementById("turnText");
+const layoutRoot=document.getElementById("game");
+const fitChessRails=()=>{
+ const r=frame.getBoundingClientRect();
+ if(r.height>0)layoutRoot.style.setProperty("--reversi-board-height",r.height+"px");
+};
+if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitChessRails).observe(frame);
+window.addEventListener("resize",fitChessRails);requestAnimationFrame(fitChessRails);
 const glyph={w:{K:"♔",Q:"♕",R:"♖",B:"♗",N:"♘",P:"♙"},b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"}};
 const value={P:100,N:320,B:335,R:500,Q:900,K:20000},files="abcdefgh";
 let board=[],turn="w",mode="ai",difficulty="normal",paused=true,over=false,flip=false,selected=null,legal=[],history=[],moveLog=[],lastMove=null,ep=null,castle={},captured={w:[],b:[]},aiTimer=null,halfMoves=0,positions=[],promotionChoices=null;
@@ -190,7 +197,9 @@ function render(){
  document.getElementById("whiteCaptured").textContent=captured.w.length?captured.w.map(t=>glyph.b[t]).join(" "):"—";
  document.getElementById("blackCaptured").textContent=captured.b.length?captured.b.map(t=>glyph.w[t]).join(" "):"—";
  document.getElementById("moveNumber").textContent=String(moveNo);
- const list=document.getElementById("moveList");list.innerHTML="";moveLog.slice(-24).forEach(row=>{const li=document.createElement("li");li.textContent=row;list.appendChild(li);});
+ const list=document.getElementById("moveList");list.innerHTML="";moveLog.forEach(row=>{const li=document.createElement("li");li.textContent=row;list.appendChild(li);});
+ document.getElementById("chessHistoryCount").textContent=moveLog.length+" 步";
+ list.scrollTop=list.scrollHeight;
  document.getElementById("undoButton").disabled=!history.length||paused||over;
  document.getElementById("checkState").textContent=inCheck(board,turn)?"将军":"正常";
  const claim=document.getElementById("drawClaimButton");if(claim){claim.disabled=!canClaimDraw()||paused||over;claim.title=halfMoves>=100?"可按 50 回合规则要求和棋":"可按三次重复局面要求和棋";}
