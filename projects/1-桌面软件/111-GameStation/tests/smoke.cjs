@@ -228,6 +228,53 @@ const names=[
     assert.equal(detail.listOverflowX,"hidden");
     assert.equal(detail.listScrollbar,"none");
    }
+   if(["四子棋","海战棋","西洋跳棋（8×8）","中国跳棋"].includes(name)){
+    const detail=await frame.locator("#game").evaluate((root,kind)=>{
+     const board=root.querySelector(kind==="海战棋"?"#enemy":"#board"),
+      record=root.querySelector(".reversi-record-rail"),
+      right=root.querySelector(".game-tools"),
+      timer=right.querySelector("#gs-turn-clock"),
+      scores=right.querySelector(".reversi-side-score"),hint=right.querySelector(".gs-board-tip"),
+      list=record.querySelector("#reversiMoveList");
+     const box=e=>e.getBoundingClientRect(),b=box(board),left=box(record),r=box(right),
+      top=box(timer),bottom=box(hint);
+     return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
+      main:box(root.querySelector(".game-main-board")).height,
+      left:{width:left.width,height:left.height,gap:b.left-left.right},
+      center:box(root).left+box(root).width/2,
+      rowLabels:[...scores.querySelectorAll(".reversi-count-name")].map(x=>x.textContent.trim()),
+      rowCount:scores.querySelectorAll(".reversi-count-row").length,
+      currentSide:root.dataset.turnSide||"",
+      verticalGap:Math.abs((top.top+bottom.bottom-r.top-r.bottom)/2),
+      listOverflow:getComputedStyle(list).overflowX,
+      hasOwnPreview:kind==="海战棋"?record.contains(root.querySelector("#own")):null,
+      ownSquare:kind==="海战棋"?box(root.querySelector("#own")).width:null};
+    },name);
+    const wantedRatio=name==="四子棋"?7/6:name==="中国跳棋"?10/9:1;
+    const minHeightShare=name==="四子棋"?.74:name==="中国跳棋"?.72:.80;
+    assert.ok(Math.abs(detail.board.width/detail.board.height-wantedRatio)<.03,
+     name+" must retain actual board aspect ratio: "+JSON.stringify(detail));
+    assert.ok(detail.board.height>=detail.main*minHeightShare,
+     name+" must prioritize the available height instead of a shallow board: "+JSON.stringify(detail));
+    assert.ok(Math.abs(detail.board.center-detail.center)<=2.5,
+     name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
+    assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.board.height)<=3,
+     name+" full-height left history must align with actual board: "+JSON.stringify(detail));
+    assert.ok(detail.rowCount===2&&detail.verticalGap<=15,
+     name+" two stacked stats and right-side timer must center vertically: "+JSON.stringify(detail));
+    assert.equal(detail.listOverflow,"hidden",name+" move history must never horizontally scroll");
+    if(name==="海战棋"){
+     assert.ok(detail.hasOwnPreview&&detail.ownSquare>=130,
+      "Battleship must keep a visible own-fleet preview in the left rail: "+JSON.stringify(detail));
+     assert.deepEqual(detail.rowLabels,["命中次数","攻击次数"]);
+    }else if(name==="西洋跳棋（8×8）"){
+     assert.deepEqual(detail.rowLabels,["红方棋子","黑方棋子"]);
+     assert.equal(detail.currentSide,"red");
+    }else if(name==="中国跳棋"){
+     assert.deepEqual(detail.rowLabels,["红方入营","蓝方入营"]);
+     assert.equal(detail.currentSide,"red");
+    }
+   }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
     assert.ok(v.main.width>=v.root.width*.46,"Gomoku board must retain enough playfield width: "+JSON.stringify(v));
