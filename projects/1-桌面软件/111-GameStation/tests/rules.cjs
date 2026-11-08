@@ -738,7 +738,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   await flight.evaluate(()=>window.__p111FlightTest.preview(0));
   const overPieces=await flight.locator("#board").evaluate(board=>{
-   const children=[...board.children];
+   const stage=board.querySelector(".flight-scene")||board;
+   const children=[...stage.children];
    return{target:children.indexOf(board.querySelector(".flight-path-target")),
     opponent:children.indexOf(board.querySelector('[data-pawn="1-0"]'))};
   });
