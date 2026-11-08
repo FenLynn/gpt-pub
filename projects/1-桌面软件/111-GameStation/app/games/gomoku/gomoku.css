@@ -8,6 +8,20 @@
  grid-template-rows:minmax(0,1fr)!important;justify-content:center!important;align-items:stretch!important;
  column-gap:18px!important;padding:8px 12px!important;overflow:hidden!important
 }
+/* Override the R19 workspace desktop rails: they otherwise reassign both
+   main board and tools to columns 1/2 even after the symmetric grid wins. */
+.game-root.game-layout.gomoku-layout>.game-main-board,
+.game-root.game-layout.gomoku-layout.gs-tools-open>.game-main-board,
+.game-root.game-layout.gomoku-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board,
+.game-root.game-layout.gomoku-layout.rail-collapsed>.game-main-board{
+ grid-column:2!important;grid-row:1!important;
+}
+.game-root.game-layout.gomoku-layout>.game-tools,
+.game-root.game-layout.gomoku-layout.gs-tools-open>.game-tools,
+.game-root.game-layout.gomoku-layout.gs-tools-open:not(.rail-collapsed)>.game-tools,
+.game-root.game-layout.gomoku-layout.rail-collapsed>.game-tools{
+ grid-column:3!important;grid-row:1!important;position:relative!important;
+}
 .game-root.gomoku-layout>.game-guide{display:none!important}
 .game-root.gomoku-layout>.game-main-board,
 .game-root.gomoku-layout.gs-tools-open>.game-main-board{
