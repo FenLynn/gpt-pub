@@ -6,7 +6,7 @@ if(!root||!gameId)return;
 /* Reversi's move-time history occupies a dedicated left record rail.
    Other board games retain their own right-side timing cards. */
 const historyRail=gameId==="reversi"?root.querySelector(":scope > .reversi-record-rail"):null;
-const host=historyRail||root.querySelector(":scope > .game-tools");
+const host=root.querySelector(":scope > .game-tools");
 if(!host)return;
 const panel=document.createElement("section");
 panel.id="gs-turn-clock";panel.className="gs-turn-clock";
@@ -14,9 +14,9 @@ panel.setAttribute("aria-label","本回合耗时和逐次操作记录");
 panel.innerHTML='<div class="gs-turn-clock-header"><span>本回合耗时</span><b id="gs-turn-side">—</b></div>'+
  '<strong class="gs-turn-clock-value" id="gs-turn-elapsed" role="timer">00:00</strong>'+
  '<div class="gs-turn-clock-latest" id="gs-turn-latest">暂无操作记录</div>'+
- '<details class="gs-turn-clock-history" id="gs-turn-details"'+(historyRail?' open':'')+'><summary>操作用时 <span id="gs-turn-count">0</span></summary>'+
+ '<details class="gs-turn-clock-history" id="gs-turn-details"><summary>操作用时 <span id="gs-turn-count">0</span></summary>'+
  '<ol id="gs-turn-log" aria-label="逐次操作耗时"></ol></details>';
-if(historyRail)host.append(panel);else host.prepend(panel);
+host.prepend(panel);
 root.classList.add("gs-turn-clock-enabled");
 /* Fit both special SVG stages from the REAL first-column rectangle. SVG height:auto
    otherwise falls back to 300px intrinsic width after the timer rail is introduced. */
@@ -66,6 +66,21 @@ function refresh(){
   name.textContent=String(i+1)+". "+item.side+" · "+item.label;
   time.textContent=fmt(item.ms);
   li.append(name,time);list.appendChild(li);
+ }
+ if(historyRail){
+  const leftList=historyRail.querySelector("#reversiMoveList");
+  leftList.replaceChildren();
+  for(let i=0;i<records.length;i++){
+   const item=records[i],li=document.createElement("li"),
+    index=document.createElement("span"),action=document.createElement("span"),
+    time=document.createElement("time");
+   index.className="reversi-move-index";index.textContent=String(i+1)+".";
+   action.className="reversi-move-action";action.textContent=item.side+" · "+item.label;
+   time.textContent=fmt(item.ms);
+   li.title=index.textContent+" "+action.textContent+" "+time.textContent;
+   li.append(index,action,time);leftList.appendChild(li);
+  }
+  if(records.length)leftList.scrollTop=leftList.scrollHeight;
  }
 }
 function reset(nextSide){

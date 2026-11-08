@@ -1,6 +1,12 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status");let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastFlips=new Set();
+const el=document.getElementById("board"),status=document.getElementById("status");
+const boardRoot=document.getElementById("game");
+const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0)boardRoot.style.setProperty("--reversi-board-height",h+"px");};
+if(typeof ResizeObserver!=="undefined"){new ResizeObserver(fitHistoryHeight).observe(el);}
+else window.addEventListener("resize",fitHistoryHeight);
+requestAnimationFrame(fitHistoryHeight);
+let b,turn=1,mode="ai",paused=false,over=false,difficulty="normal",timer=null,history=[],lastFlips=new Set();
 const dirs=[[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
 function copy(a){return a.map(r=>r.slice());}
 function save(){history.push({b:copy(b),turn,over});if(history.length>100)history.shift();}
