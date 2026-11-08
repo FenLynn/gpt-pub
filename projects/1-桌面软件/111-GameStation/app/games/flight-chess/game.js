@@ -299,7 +299,7 @@ function drawClassicBoard(){
  // Thick dark printed route outline under all 52 colored tiles.
  const photoPoints=track.map(([x,y])=>pt(x,y));
  el.append(svgNode("polyline",{points:[...photoPoints,photoPoints[0]].map(p=>p.join(",")).join(" "),
-  fill:"none",stroke:"#26302a","stroke-width":50,"stroke-linejoin":"round","stroke-linecap":"round",
+  fill:"none",stroke:"#26302a","stroke-width":47.5,"stroke-linejoin":"round","stroke-linecap":"round",
   class:"flight-outer-outline","aria-hidden":"true"}));
  // Carry both neighboring printed colors through the eight diagonal turns.
  // The dark perimeter stays a thin keyline, not a filled black corner.
@@ -311,7 +311,7 @@ function drawClassicBoard(){
    [sx,sy,mx,my,ribbon[i%4]],
    [mx,my,ex,ey,ribbon[(i+1)%52%4]]]){
    el.append(svgNode("line",{x1,y1,x2,y2,stroke:tile[name],
-    "stroke-width":43,"stroke-linecap":"butt",
+    "stroke-width":47,"stroke-linecap":"round",
     class:"flight-route-ribbon","aria-hidden":"true"}));
   }
  });
