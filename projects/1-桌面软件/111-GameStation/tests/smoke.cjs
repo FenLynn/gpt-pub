@@ -767,6 +767,27 @@ const names=[
    "Xiangqi per-move time must appear in parentheses next to its round number: "+JSON.stringify(inlineTiming));
   assert.match(inlineTiming.tooltip,/红方/,"Xiangqi per-move timing must identify its side");
   assert.equal(inlineTiming.rightLog,"none","Xiangqi must not duplicate the operation-time list on the right");
+  const visibleTiming=await frame.locator("#moveList li").first().evaluate(row=>{
+   const index=row.querySelector(".xiangqi-move-index"),stamp=row.querySelector(".xiangqi-step-times"),
+    move=row.querySelector(".xiangqi-move-side"),original=stamp.textContent;
+   const measure=()=>{
+    const r=index.getBoundingClientRect(),next=move.getBoundingClientRect(),range=document.createRange();
+    range.selectNodeContents(stamp);
+    const ink=[...range.getClientRects()].map(x=>({left:x.left,right:x.right,top:x.top,bottom:x.bottom}));
+    return{ink,indexLeft:r.left,indexRight:r.right,nextLeft:next.left,
+     scrollWidth:index.scrollWidth,clientWidth:index.clientWidth,overflow:getComputedStyle(index).overflow};
+   };
+   const short=measure();
+   stamp.textContent="（123:45.6/987:65.4s）";
+   const long=measure();
+   stamp.textContent=original;
+   return{short,long,final:stamp.textContent};
+  });
+  for(const [length,v] of Object.entries({short:visibleTiming.short,long:visibleTiming.long})){
+   assert.ok(v.ink.length>0&&v.ink.every(r=>r.left>=v.indexLeft-.6&&r.right<=v.indexRight+.6)
+     &&v.scrollWidth<=v.clientWidth+1&&v.indexRight<=v.nextLeft+.6,
+    "Xiangqi "+length+" durations must be fully visible inside the round column, never clipped or horizontally scrolling: "+JSON.stringify(v));
+  }
   const xiangqiRatio=await frame.locator(".xiangqi-piece").first().evaluate(el=>{
    const r=el.getBoundingClientRect();return{width:r.width,height:r.height,round:getComputedStyle(el).borderRadius};
   });

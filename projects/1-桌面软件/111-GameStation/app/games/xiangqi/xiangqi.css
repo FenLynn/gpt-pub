@@ -74,9 +74,20 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 }
 .xiangqi-layout #moveList li:nth-child(2n){background:#f1f6f9}
 .xiangqi-layout #moveList li:last-child{background:#e8f3fa}
-.xiangqi-move-index{display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;white-space:nowrap;color:#869dad;font-size:12px}
-.xiangqi-round-number{flex:none}
-.xiangqi-step-times{font:600 10px/1 ui-monospace,Consolas,"Segoe UI",monospace;color:#8096a5;white-space:nowrap}
+/* Never truncate elapsed times. Keep short pairs beside the turn index; move
+   long pairs onto a second line inside the same column, without side scrolling. */
+.xiangqi-layout #moveList li > .xiangqi-move-index{
+ display:flex;align-items:center;align-content:center;justify-content:flex-start;
+ flex-wrap:wrap;gap:2px 4px;min-width:0;max-width:100%;white-space:normal;
+ overflow:visible!important;text-overflow:clip!important;
+ color:#869dad;font-size:12px
+}
+.xiangqi-round-number{flex:0 0 auto}
+.xiangqi-step-times{
+ display:inline-block;flex:0 0 auto;max-width:100%;
+ font:600 10px/1.25 ui-monospace,Consolas,"Segoe UI",monospace;
+ color:#8096a5;white-space:normal;overflow-wrap:anywhere;word-break:normal;
+}
 .game-root.xiangqi-layout .gs-turn-clock-latest,
 .game-root.xiangqi-layout .gs-turn-clock-history{display:none!important}
 .xiangqi-move-side{display:block;min-width:0;font-weight:740}
