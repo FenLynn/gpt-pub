@@ -919,11 +919,14 @@ const names=[
    assert.equal(await frame.locator("#moveCount").innerText(),"0 步",
     "Replay must reset notation");
     await page.locator("#startButton").click();
-    await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
-    assert.equal(await frame.locator("#xiangqiResultTitle").innerText(),"本局结束",
-     "Top-level end action must show replay/leave without misreporting a win");
-    await frame.locator("#xiangqiReplay").click();
-    await frame.locator("#xiangqiResult").waitFor({state:"hidden",timeout:4000});
+    await page.locator("#gameResultOverlay").waitFor({state:"visible",timeout:4000});
+    assert.equal(await page.locator("#gameResultTitle").innerText(),"本局结束",
+     "Manual Xiangqi end must use the host's unified ending card, without misreporting victory");
+    assert.equal(await frame.locator("#xiangqiResult").isVisible(),false,
+     "Manual end must not duplicate the native Xiangqi win/loss card");
+    await page.locator("#gameResultReplay").click();
+    await page.locator("#gameResultOverlay").waitFor({state:"hidden",timeout:4000});
+    await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.querySelectorAll(".xiangqi-piece").length===32);
     assert.equal(await frame.locator(".xiangqi-piece").count(),32);
    await frame.locator("#resignButton").click();
    await frame.locator("#xiangqiResult:not([hidden])").waitFor({timeout:4000});
