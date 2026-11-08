@@ -292,6 +292,14 @@ function setBreadcrumb(){
 function renderGameControls(){
  const modeEl=$("modeControl"),difficultyEl=$("difficultyControl"),hasModes=Array.isArray(active?.modes)&&active.modes.length>1;
  modeEl.classList.toggle("hidden",!hasModes);modeEl.innerHTML="";
+ // Battleship implements AI-only play: remove the unused mode placeholder entirely.
+ if(active?.id==="battleship"){
+  modeEl.hidden=true;modeEl.setAttribute("aria-hidden","true");
+  modeEl.style.setProperty("display","none","important");
+ }else{
+  modeEl.hidden=!hasModes;modeEl.removeAttribute("aria-hidden");
+  modeEl.style.removeProperty("display");
+ }
  if(hasModes)active.modes.forEach((label,index)=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.modeIndex=String(index);b.setAttribute("aria-pressed",String(index===modeIndex));modeEl.appendChild(b);});
  const hasDifficulty=!!active?.difficulty,locked=hasModes&&["本机双人","本机多人"].includes(active.modes[modeIndex]);
  difficultyEl.classList.toggle("hidden",!hasDifficulty);difficultyEl.classList.toggle("is-inactive",locked);
