@@ -287,6 +287,18 @@ if(new URLSearchParams(location.search).has("p111Test")){
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
  };
 }
+function resign(){
+ if(paused||over)return false;
+ const loser=mode==="ai"?0:turn,winner=1-loser;
+ clearTimeout(aiTimer);stopDiceAnimation();
+ over=true;paused=true;selectedPlane=null;roll=null;turn=winner;
+ const label=s=>s===0?"红方":"蓝方";
+ draw();const message=label(loser)+"认输 · "+label(winner)+"获胜";
+ report(message);GameBridge.send("GAME_OVER",{message,winner:label(winner),score:pawns[0].filter(p=>p===57).length,
+  win:mode==="ai"?false:winner===0});
+ return true;
+}
+window.addEventListener("gamestation:resign",resign);
 GameBridge.register({
  init(p){mode=p.mode==="two"?"two":"ai";difficulty=p.difficulty||"normal";newGame();},newGame,
  pause:pauseGame,
