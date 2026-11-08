@@ -457,10 +457,11 @@ async function exitGameFullscreen(){
 $("fullscreenButton").addEventListener("click",async()=>{
  if(gameFullscreenRequested){await exitGameFullscreen();return;}
  if(active&&!$("#workspaceView").classList.contains("hidden")){
-  // CSS-only fallback is immediate and works in file:// and restricted UIs.
-  // Native fullscreen still takes precedence where the browser permits it.
+  // The user's fullscreen action means an immersive, game-only layout.
+  // Never depend on the browser's native Fullscreen API: it is disabled by
+  // some file:// hosts and remote desktops, and can exit spontaneously.
+  // The shell now fills the viewport while hiding both navigation regions.
   gameFullscreenRequested=true;syncGameFullscreen();
-  try{if(shell.requestFullscreen)await shell.requestFullscreen();}catch(e){/* retain game-only stage */ }
  }else{
   try{if(!document.fullscreenElement)await shell.requestFullscreen();else await document.exitFullscreen();}
   catch(e){toast("浏览器未允许全屏");}
