@@ -52,7 +52,11 @@ if(new URLSearchParams(location.search).has("p111Test")){
   play(column){play(column);return this.state();},
   choose(){return choose();},
   setDifficulty(v){difficulty=v||"normal";},
-  undo(){undo();return this.state();}
+  undo(){undo();return this.state();},
+  forceResult(winner){
+   if(![0,1,2].includes(winner))throw new Error("Invalid Connect Four result");
+   finish(winner);return this.state();
+  }
  };
 }
 GameBridge.register({init(p){difficulty=p.difficulty||"normal";mode=p.mode||"ai";newGame();},newGame,pause(){paused=true;clearTimeout(timer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;render();if(turn===2&&mode==="ai")scheduleAI();else report("继续游戏");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
