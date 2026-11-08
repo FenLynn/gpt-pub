@@ -305,3 +305,6 @@
 #game.flight-chess-layout .flight-center-sector{stroke:#f9efd8;stroke-width:1.7}
 #game.flight-chess-layout .flight-center-core{fill:#fff8e4;stroke:#4e594d;stroke-width:1.5}
 #game.flight-chess-layout .flight-center-star{font:700 10px/1 Arial,sans-serif;fill:#2d3f37;letter-spacing:-.3px}
+
+/* Reference runway color fills are purely decorative, never hit targets. */
+#game.flight-chess-layout .flight-route-ribbon{pointer-events:none!important}
