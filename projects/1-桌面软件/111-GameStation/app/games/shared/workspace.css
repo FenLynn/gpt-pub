@@ -433,3 +433,56 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout .game-tools .game-action-group .game-btn:hover,
  .game-root.game-layout .game-tools .rule-toggle-list .game-btn:hover{transform:none!important}
 }
+
+/* R40: center the PLAYING BOARD and dock its tools immediately beside it.
+   The established Gomoku and Xiangqi layouts deliberately remain untouched. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout){
+  --gs-board-side:clamp(150px,11.8vw,178px);
+  --gs-board-gap:clamp(10px,1vw,15px);
+  --gs-board-track:min(calc(100dvh - 15px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px));
+  grid-template-columns:var(--gs-board-side) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
+  column-gap:var(--gs-board-gap)!important;justify-content:center!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout{
+  --gs-board-track:min(calc(116.6667dvh - 17px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+  --gs-board-track:min(calc(111.1111dvh - 17px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-main-board{
+  grid-column:2!important;grid-row:1!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools{
+  grid-column:3!important;grid-row:1!important;align-self:start!important;justify-self:start!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  width:100%!important;height:calc(100% - 12px)!important;max-height:calc(100% - 12px)!important;
+  min-width:0!important;min-height:0!important;margin:6px 0!important;padding:1px!important;
+  border:0!important;border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;gap:12px!important;overflow-y:auto!important;
+  overflow-x:hidden!important;scrollbar-width:none!important
+ }
+}
+.game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools>.game-status,
+.game-root.game-layout.chess-layout>.game-tools>.turn-indicator{display:none!important}
+.game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools>.gs-turn-clock{
+ order:-10!important;flex:none!important
+}
+.game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools>.game-btn{order:0!important}
+.game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools>.side-score{
+ order:2!important;flex:none!important
+}
+.game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chinese-checkers-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools>.move-panel{
+ order:3!important
+}
+.game-root.game-layout.reversi-layout .game-tools>.gs-board-tip{
+ order:-5!important;color:#567d8d;font-size:12px;line-height:1.65;padding:2px 4px;flex:none
+}
+.game-root.game-layout.reversi-layout .game-tools>.gs-board-tip .reversi-hint-dot{
+ display:inline-block;width:11px;height:11px;margin-right:5px;vertical-align:middle;
+ border-radius:50%;background:#e3efc8;box-shadow:0 0 0 2px #83af94
+}
+.reversi-layout[data-turn-side="black"] .game-tools>.side-score>div:first-child,
+.reversi-layout[data-turn-side="white"] .game-tools>.side-score>div:nth-child(2){
+ background:rgba(229,244,236,.9)!important;box-shadow:inset 0 2px #5aa48b
+}
