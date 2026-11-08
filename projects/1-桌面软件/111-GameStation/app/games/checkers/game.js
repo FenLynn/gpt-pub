@@ -5,7 +5,7 @@ let b,turn=1,selected=null,legal=[],continuing=null,mode="ai",paused=false,over=
 const side=v=>(v===1||v===3)?1:(v===2||v===4)?2:0;
 function clone(a){return a.map(r=>r.slice());}
 function saveTurn(){history.push({board:clone(b),turn});if(history.length>100)history.shift();}
-function undo(){if(!history.length)return;clearTimeout(timer);const count=mode==="ai"?(turn===1?2:1):1;let snap=null;for(let i=0;i<count&&history.length;i++)snap=history.pop();if(!snap)return;b=clone(snap.board);turn=snap.turn;selected=null;legal=moves(b,turn);continuing=null;over=false;paused=false;window.GameTurnClock?.rewind(count,turn===1?"红方":"黑方");render();report("已撤销本回合");if(mode==="ai"&&turn===2)scheduleAI();}
+function undo(){if(paused||over||!history.length)return;clearTimeout(timer);const count=mode==="ai"?(turn===1?2:1):1;let snap=null;for(let i=0;i<count&&history.length;i++)snap=history.pop();if(!snap)return;b=clone(snap.board);turn=snap.turn;selected=null;legal=moves(b,turn);continuing=null;over=false;paused=false;window.GameTurnClock?.rewind(count,turn===1?"红方":"黑方");render();report("已撤销本回合");if(mode==="ai"&&turn===2)scheduleAI();}
 function pieceMoves(a,x,y){const out=[],caps=[],v=a[y][x],p=side(v);if(!p)return out;const king=v===3||v===4,dirs=king?[-1,1]:[p===1?-1:1];for(const dy of dirs)for(const dx of [-1,1]){const xx=x+dx,yy=y+dy;if(xx<0||xx>7||yy<0||yy>7)continue;if(!a[yy][xx])out.push({x,y,tx:xx,ty:yy});else if(side(a[yy][xx])!==p){const x2=x+2*dx,y2=y+2*dy;if(x2>=0&&x2<8&&y2>=0&&y2<8&&!a[y2][x2])caps.push({x,y,tx:x2,ty:y2,capture:[xx,yy]});}}return caps.length?caps:out;}
 function moves(a,p){const out=[],caps=[];for(let y=0;y<8;y++)for(let x=0;x<8;x++)if(side(a[y][x])===p){for(const m of pieceMoves(a,x,y)){if(m.capture)caps.push(m);else out.push(m);}}return caps.length?caps:out;}
 function apply(a,m){let v=a[m.y][m.x];a[m.y][m.x]=0;a[m.ty][m.tx]=v;if(m.capture)a[m.capture[1]][m.capture[0]]=0;let promoted=false;if((v===1&&m.ty===0)||(v===2&&m.ty===7)){a[m.ty][m.tx]=v===1?3:4;promoted=true;}return {promoted,capture:!!m.capture};}
@@ -32,7 +32,7 @@ function render(){
   cell.setAttribute("aria-label",(x+1)+"列"+(y+1)+"行"+(v?((side(v)===1?"红":"黑")+(v>2?"王棋":"方棋")):"空位"));
   cell.addEventListener("click",()=>click(x,y));el.appendChild(cell);
  }
- const [r,k]=counts(b);document.getElementById("red").textContent=r;document.getElementById("black").textContent=k;
+ const [r,k]=counts(b);document.getElementById("red").textContent=r;document.getElementById("black").textContent=k;document.getElementById("undoButton").disabled=paused||over||!history.length;
 }
 function switchTurn(){continuing=null;selected=null;legal=[];turn=3-turn;if(finishIfNeeded())return;if(mode==="ai"&&turn===2){report("黑方思考中");scheduleAI();}else{legal=moves(b,turn);render();report(turn===1?"红方回合":"黑方回合");}}
 function afterStep(m,result){const mover=turn;const continuation=!!(result.capture&&!result.promoted&&pieceMoves(b,m.tx,m.ty).some(x=>x.capture));window.GameTurnClock?.record(mover===1?"红方":"黑方",continuation?(mover===1?"红方":"黑方"):(mover===1?"黑方":"红方"),result.capture?"吃子":"走棋");if(result.capture&&!result.promoted){const more=pieceMoves(b,m.tx,m.ty).filter(x=>x.capture);if(more.length){continuing={x:m.tx,y:m.ty};selected=continuing;legal=more;render();report(turn===1?"必须继续吃子":"AI 连续吃子");if(turn===2)scheduleAI(true);return;}}switchTurn();}
@@ -63,5 +63,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   undo(){undo();return fixtureState();}
  };
 }
-GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");},resume(){paused=false;if(turn===2&&mode==="ai")scheduleAI(!!continuing);else report(turn===1?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
+GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;render();if(turn===2&&mode==="ai")scheduleAI(!!continuing);else report(turn===1?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
 })();
