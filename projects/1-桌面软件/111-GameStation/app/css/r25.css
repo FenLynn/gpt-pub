@@ -610,3 +610,11 @@
  cursor:not-allowed!important;box-shadow:none!important;pointer-events:none!important
 }
 @media(prefers-reduced-motion:reduce){#gameStage .game-result-card{animation:none!important}}
+
+/* Game-only fullscreen is deliberately stronger than the in-game topbar
+   display:flex!important rules above. Never render host chrome in this mode. */
+#appShell.game-only-fullscreen .main-area:has(#workspaceView:not(.hidden)) #topbar{
+ display:none!important;
+ height:0!important;min-height:0!important;
+ padding:0!important;border:0!important;
+}
