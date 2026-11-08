@@ -360,7 +360,7 @@ function openGame(id){
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
 }
-function closeGame(){hideGameResult();if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;$("gamePauseOverlay").hidden=true;$("gamePauseOverlay").setAttribute("aria-hidden","true");$("hostGameTimer").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("helpButton").classList.add("hidden");clearGameNotice();$("gameNotice").classList.add("hidden");}
+function closeGame(){hideGameResult();if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;if(gameFullscreenRequested){gameFullscreenRequested=false;syncGameFullscreen();}$("gamePauseOverlay").hidden=true;$("gamePauseOverlay").setAttribute("aria-hidden","true");$("hostGameTimer").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("helpButton").classList.add("hidden");clearGameNotice();$("gameNotice").classList.add("hidden");}
 window.addEventListener("message",event=>{
  if(!active||event.source!==frame.contentWindow)return;
  const m=event.data;
