@@ -176,3 +176,21 @@
   padding:5px!important;gap:4px!important
  }
 }
+
+/* R53 — physical-board clarity: stronger airport identity, crisp continuous
+   route squares, and clearly separated ivory landing holes. No game geometry
+   or rules are changed; 52 indexed positions remain exactly aligned. */
+#game.flight-chess-layout .flight-outline{fill:#fff9e9;stroke:#ac8867;stroke-width:11;filter:drop-shadow(0 5px 8px #65462b45)}
+#game.flight-chess-layout .flight-airport{stroke:#ffffff;stroke-width:5;filter:drop-shadow(0 2px 3px #312c2640)}
+#game.flight-chess-layout .flight-airport-inset{stroke:#fffefd;stroke-width:3}
+#game.flight-chess-layout .flight-airport-ring{stroke-width:4;filter:drop-shadow(0 2px 2px #362d2540)}
+#game.flight-chess-layout .flight-airport-hole{stroke:#fffdf8;stroke-width:2.6}
+#game.flight-chess-layout .flight-track-tile,
+#game.flight-chess-layout .flight-home-tile{stroke:#fff8e9;stroke-width:2.6;stroke-linejoin:round}
+#game.flight-chess-layout .flight-track-hole,
+#game.flight-chess-layout .flight-home-hole{stroke:#6d6a5d;stroke-width:1.8;filter:drop-shadow(0 1px 1px #3a302b2f)}
+#game.flight-chess-layout .flight-route-arrow,
+#game.flight-chess-layout .flight-home-arrow{stroke-width:2.5;opacity:.74}
+#game.flight-chess-layout .flight-center-outline{stroke:#665444;stroke-width:3.5}
+#game.flight-chess-layout .flight-center-sector{stroke:#fffbf3;stroke-width:2.4}
+#game.flight-chess-layout .flight-center-core{fill:#fffdf6;stroke:#846b53;stroke-width:2.5}
