@@ -166,6 +166,25 @@ const names=[
   }
   if(v.toolsVisible){
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
+   const classicBoards=new Set(["黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋","国际象棋"]);
+   if(classicBoards.has(name)){
+    const proximity=v.tools.x-v.primary.right;
+    assert.ok(proximity>=-2&&proximity<=48,
+     name+" right controls must dock next to the centered physical board, not the screen edge: "+JSON.stringify({proximity,view:{width,height},geometry:v}));
+    const rail=await frame.locator(".game-tools").evaluate(el=>({
+     border:getComputedStyle(el).borderLeftWidth,background:getComputedStyle(el).backgroundColor,
+     status:getComputedStyle(el.querySelector(".game-status")||el).display,
+     clock:!!el.querySelector(".gs-turn-clock"),
+     buttons:[...el.querySelectorAll(":scope > button.game-btn")].map(b=>({
+      id:b.id,icon:!!b.querySelector("svg"),height:b.getBoundingClientRect().height
+     }))
+    }));
+    assert.equal(rail.border,"0px",name+" right tools must not be inside a giant outer box");
+    assert.equal(rail.status,"none",name+" status belongs exclusively in the top LED");
+    assert.ok(rail.clock,name+" needs one clock in the right controls");
+    assert.ok(rail.buttons.every(b=>b.icon&&b.height>=32),
+     name+" right action buttons need the shared icon and sufficient touch area: "+JSON.stringify(rail));
+   }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
     assert.ok(v.main.width>=v.root.width*.46,"Gomoku board must retain enough playfield width: "+JSON.stringify(v));
@@ -809,6 +828,24 @@ const names=[
   await frame.locator(".enemy-sea:not(:disabled)").first().click();
   assert.equal(await frame.locator(".enemy-sea.shot-impact,.enemy-sea.shot-splash").count(),1,
    "Battleship hit or miss must mark the latest shot for a nonblocking in-board animation");
+  // Reversi: demonstrate actual legal moves and undo, not merely an attractive board.
+  await open("黑白棋");await start();
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.querySelectorAll(".reversi-square.legal").length===4);
+  assert.equal(await frame.locator(".reversi-square.legal").count(),4,
+   "Black must have exactly four legal moves at the standard Othello opening");
+  assert.equal(await frame.locator("#undoButton").isDisabled(),true,
+   "Reversi undo must be disabled before the first move");
+  assert.equal(await frame.locator(".gs-board-tip").isVisible(),true,"Reversi must explain the highlighted legal moves");
+  await frame.locator(".reversi-square.legal").first().click();
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="4");
+  assert.equal(await frame.locator("#white").innerText(),"1","Legal black placement must flip one white disc");
+  assert.equal(await frame.locator("#undoButton").isEnabled(),true,"Undo must enable after a move");
+  await frame.locator("#undoButton").click();
+  await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("black")?.textContent==="2");
+  assert.equal(await frame.locator("#white").innerText(),"2","Undo must restore standard four-disc opening");
+  assert.equal(await frame.locator("#undoButton").isDisabled(),true,"Undo must disable when the history is empty");
+  await page.screenshot({path:path.join(artifacts,"reversi-refined-playing.png")});
   await open("五子棋");await start();
   const goGrid=await frame.locator("#board").evaluate(el=>({
    lines:el.querySelectorAll(".gomoku-lines line").length,
