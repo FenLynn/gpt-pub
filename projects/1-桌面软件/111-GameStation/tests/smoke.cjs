@@ -79,7 +79,8 @@ const names=[
    const box=x=>{const r=x.getBoundingClientRect();return{x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,height:r.height};};
    const main=el.querySelector(".game-main-board"),tools=el.querySelector(".game-tools");
    const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||
-    el.querySelector(".xiangqi-board")||el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||
+    el.querySelector(".xiangqi-board")||el.querySelector(".chess-frame")||
+     (el.classList.contains("battleship-layout")?el.querySelector("#enemy"):null)||el.querySelector(".fleet-board .game-grid")||
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
    return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
