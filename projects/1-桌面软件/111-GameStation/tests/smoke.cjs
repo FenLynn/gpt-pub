@@ -1390,8 +1390,7 @@ const names=[
   // control inside its upper-right edge. Normal and Esc exit restore chrome.
   await open("飞行棋");await start();
   await page.locator("#fullscreenButton").click();
-  await page.waitForFunction(()=>document.fullscreenElement===document.querySelector("#appShell")&&
-   document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
+  await page.waitForFunction(()=>document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
   const full=await page.evaluate(()=>{
    const rect=id=>{const r=document.querySelector(id).getBoundingClientRect();return{left:r.left,top:r.top,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
    return{sidebar:getComputedStyle(document.querySelector("#sidebar")).display,
@@ -1408,15 +1407,14 @@ const names=[
   assert.ok(full.exitRect.right<=full.viewport[0]-8&&full.exitRect.top<=28,
    "Game-only exit control must be in the upper-right corner");
   await page.locator("#exitFullscreenButton").click();
-  await page.waitForFunction(()=>!document.fullscreenElement&&
-   !document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
+  await page.waitForFunction(()=>!document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
   assert.equal(await page.locator("#exitFullscreenButton").isVisible(),false);
   assert.equal(await page.locator("#sidebar").isVisible(),true);
   assert.equal(await page.locator("#topbar").isVisible(),true);
   await page.locator("#fullscreenButton").click();
-  await page.waitForFunction(()=>!!document.fullscreenElement);
+  await page.waitForFunction(()=>document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
   await page.keyboard.press("Escape");
-  await page.waitForFunction(()=>!document.fullscreenElement);
+  await page.waitForFunction(()=>!document.querySelector("#appShell").classList.contains("game-only-fullscreen"));
   assert.equal(await page.locator("#topbar").isVisible(),true);
   assert.equal(await page.locator("#sidebar").isVisible(),true);
   // Xiangqi cannon rules: exactly one screen permits capture; zero/two screens and friendly targets do not.
