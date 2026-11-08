@@ -29,7 +29,7 @@ if(gameId==="chinese-checkers"||gameId==="flight-chess"){
  if(wrap&&board){
   const fit=()=>{
    const bounds=wrap.getBoundingClientRect();
-   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio)*(gameId==="chinese-checkers"?.92:1);
+   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio)*(gameId==="chinese-checkers"?.94:1);
    if(width>0){
     board.style.setProperty("width",width+"px","important");
     board.style.setProperty("height",width/ratio+"px","important");
