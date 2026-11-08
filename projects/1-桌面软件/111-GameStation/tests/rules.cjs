@@ -486,40 +486,53 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
   assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The right turn rail must show the current player");
-  // Secure random source must reach all six faces. Animation must turn in
-  // <=200ms, rest for about 500ms, and finish on a genuine 3D cube face.
+  // One physical throw = exactly one uninterrupted 500 ms rotation,
+  // one visible landing result, then 500 ms of stillness.
   const dieSamples=await flight.evaluate(()=>Array.from({length:600},()=>window.__p111FlightTest.fairDie()));
   assert.deepEqual([...new Set(dieSamples)].sort(),[1,2,3,4,5,6],
-   "Secure die must produce all six equiprobable values across real samples");
-  const diceFrames=await flight.evaluate(async()=>{
-   window.__p111FlightTest.animateDice();
-   const faces=new Set(),inks=new Set(),transitions=new Set(),restStarts=[],turnStarts=[],el=document.getElementById("diceFace");
-   let previous="";
-   for(let i=0;i<45;i++){
-    faces.add(Number(el.dataset.displayFace));
-    inks.add(el.style.getPropertyValue("--dice-ink"));
-    const duration=parseFloat(getComputedStyle(el.querySelector(".flight-dice-cube")).transitionDuration);
-    if(el.dataset.phase==="turn")transitions.add(duration);
-    if(previous!==el.dataset.phase){
-     if(el.dataset.phase==="rest")restStarts.push(performance.now());
-     if(el.dataset.phase==="turn")turnStarts.push(performance.now());
-     previous=el.dataset.phase;
-    }
-    await new Promise(resolve=>setTimeout(resolve,80));
+   "Secure die must be able to produce every value 1–6");
+  const diceRun=await flight.evaluate(async()=>{
+   const api=window.__p111FlightTest;
+   api.setPawns([[0,-1,-1,-1],[-1,-1,-1,-1]]);
+   const el=document.getElementById("diceFace"),caption=document.getElementById("flightDiceCaption");
+   const started=performance.now();
+   api.roll();
+   const outcome=api.state().roll,log=[];
+   for(let i=0;i<35;i++){
+    const cube=el.querySelector(".flight-dice-cube");
+    log.push({ms:performance.now()-started,phase:el.dataset.phase,
+     face:Number(el.dataset.displayFace),caption:caption.textContent,
+     transform:getComputedStyle(cube).transform});
+    await new Promise(resolve=>setTimeout(resolve,40));
    }
-   return{faces:[...faces],inks:[...inks],transitions:[...transitions],
-    restDurations:restStarts.map((t,i)=>turnStarts[i+1]?turnStarts[i+1]-t:null).filter(n=>n!==null),
-    cubeFaces:el.querySelectorAll(".flight-dice-side").length,
-    final:el.dataset.displayFace};
+   return{outcome,log,faces:el.querySelectorAll(".flight-dice-side").length,
+    final:el.dataset.displayFace,phase:el.dataset.phase,
+    state:api.state()};
   });
-  assert.equal(diceFrames.cubeFaces,6,"The die must remain a physical six-sided 3D cube");
-  assert.ok(diceFrames.faces.length>=4&&diceFrames.inks.length>=4,
-   "3D dice must land on four distinct painted faces: "+JSON.stringify(diceFrames));
-  assert.ok(diceFrames.transitions.every(x=>x<=.2),"Every face turn must take no more than 200ms: "+JSON.stringify(diceFrames));
-  assert.ok(diceFrames.restDurations.length>=2&&diceFrames.restDurations.every(n=>n>=460),
-   "Each separate turn must be separated by a half-second readable rest: "+JSON.stringify(diceFrames));
-  await flight.waitForFunction(()=>!document.getElementById("diceFace")?.classList.contains("rolling"),null,{timeout:5000});
-
+  assert.equal(diceRun.faces,6,"Flight die retains its six 3D faces");
+  const phases=diceRun.log.map(x=>x.phase).filter((x,i,a)=>i===0||x!==a[i-1]);
+  assert.deepEqual(phases,["spin","settle","idle"],
+   "One throw may only spin continuously, settle once and finish: "+JSON.stringify(phases));
+  const settled=diceRun.log.find(x=>x.phase==="settle");
+  const idle=diceRun.log.find(x=>x.phase==="idle");
+  assert.ok(settled.ms>=460&&settled.ms<=720,
+   "Uninterrupted 3D spin should last 500 ms: "+settled.ms);
+  assert.ok(idle.ms-settled.ms>=430&&idle.ms-settled.ms<=720,
+   "A single 500 ms stationary hold follows landing: "+(idle.ms-settled.ms));
+  const spinFrames=diceRun.log.filter(x=>x.phase==="spin");
+  assert.ok(new Set(spinFrames.map(x=>x.transform)).size>=5,
+   "Cube must visibly rotate throughout its uninterrupted spin");
+  assert.ok(spinFrames.every(x=>x.caption==="掷骰中…"),
+   "Actual die result must not be announced during spin");
+  assert.ok(diceRun.log.filter(x=>x.phase==="settle").every(x=>
+   x.face===diceRun.outcome&&x.caption==="点数 "+diceRun.outcome),
+   "The stationary half-second shows one final result, not several intermediate results");
+  assert.ok(diceRun.log.filter(x=>x.phase==="settle").every(x=>
+   x.transform===diceRun.log.find(t=>t.phase==="settle").transform),
+   "Die must remain motionless throughout the final hold");
+  assert.equal(Number(diceRun.final),diceRun.outcome,"Displayed face must match actual random roll");
+  assert.equal(diceRun.state.isRolling,false,"A round ends after the 500+500 ms sequence");
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
   assert.equal(await flight.locator(".flight-center").count(),0,"Flight Chess must have no second inner board");
   assert.equal(await flight.locator(".reversi-record-rail").count(),1,"Flight Chess must have a left move history");
   const firstPlane=await flight.locator('[data-pawn="0-0"]').evaluate(el=>({x:Number(el.dataset.slotX),y:Number(el.dataset.slotY),cx:Number(el.dataset.centerX),cy:Number(el.dataset.centerY)}));
