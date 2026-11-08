@@ -1665,13 +1665,13 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 }
 /* Flight: static instructions and controls stay put; the fluctuating list
    ALWAYS grows upwards from the bottom of the right rail. */
-.game-root.game-layout.flight-chess-layout>.game-tools>.flight-move-help{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.flight-move-help{
  order:-9!important;flex:none!important;box-sizing:border-box!important;
- width:100%!important;min-height:48px!important;max-height:76px!important;
+ width:100%!important;height:64px!important;min-height:64px!important;max-height:64px!important;
  margin:0!important;padding:6px 3px!important;overflow-y:auto!important;
  color:#6c899a!important;font-size:11px!important;line-height:1.5!important
 }
-.game-root.game-layout.flight-chess-layout>.game-tools>.flight-play-controls{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.flight-play-controls{
  order:-8!important;flex:none!important;align-items:center!important;
  padding:9px!important
 }
@@ -1679,16 +1679,16 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  width:min(100%,170px)!important;height:auto!important;
  max-height:none!important;aspect-ratio:1!important
 }
-.game-root.game-layout.flight-chess-layout>.game-tools>.game-btn{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.game-btn{
  order:-7!important;flex:none!important
 }
-.game-root.game-layout.flight-chess-layout>.game-tools>.reversi-side-score{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.reversi-side-score{
  order:-6!important;flex:none!important
 }
-.game-root.game-layout.flight-chess-layout>.game-tools>.gs-board-tip{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.gs-board-tip{
  order:-5!important;flex:none!important
 }
-.game-root.game-layout.flight-chess-layout>.game-tools>.flight-move-panel{
+.game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout>.game-tools>.flight-move-panel{
  order:99!important;flex:none!important;margin-top:auto!important;
  max-height:min(170px,25cqh)!important;min-height:80px!important;
  overflow-y:auto!important;scrollbar-width:none!important
@@ -1737,4 +1737,13 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout.flight-chess-layout .flight-path-target{
   animation:none!important
  }
+}
+
+.game-root.game-layout.checkers-layout #board{
+ background:#70543d!important;background-image:none!important
+}
+.game-root.game-layout:is(.battleship-layout,.flight-chess-layout,.checkers-layout,.chess-layout)>.game-tools .gs-turn-clock-latest{
+ min-height:17px!important;max-height:17px!important;
+ overflow:hidden!important;white-space:nowrap!important;
+ text-overflow:ellipsis!important
 }
