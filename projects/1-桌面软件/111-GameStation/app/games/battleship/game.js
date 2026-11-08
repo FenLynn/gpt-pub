@@ -1,16 +1,9 @@
 (function(){
 "use strict";
 const enemyEl=document.getElementById("enemy"),ownEl=document.getElementById("own"),status=document.getElementById("status");
-const layoutRoot=document.getElementById("game"),fleetMain=layoutRoot.querySelector(".fleet-boards"),
- ownPreview=layoutRoot.querySelector("#ownFleetPreview"),ownPanel=ownEl.closest(".fleet-board");
+const layoutRoot=document.getElementById("game");
 const fitHistoryHeight=()=>{const h=enemyEl.getBoundingClientRect().height;if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");};
-const syncOwnFleetPosition=()=>{
- if(window.matchMedia("(min-width:701px)").matches){if(ownPanel.parentElement!==ownPreview)ownPreview.append(ownPanel);}
- else if(ownPanel.parentElement!==fleetMain)fleetMain.append(ownPanel);
- fitHistoryHeight();
-};
-syncOwnFleetPosition();
-window.addEventListener("resize",syncOwnFleetPosition);
+window.addEventListener("resize",fitHistoryHeight);
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(enemyEl);
 requestAnimationFrame(fitHistoryHeight);
 let ownFleet,enemyFleet,own,enemy,remainingShips,shots,hits,paused=false,over=false,aiTimer=null,difficulty="normal",lastShot=null;
