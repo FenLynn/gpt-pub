@@ -143,10 +143,11 @@ function animateDice(){
  isRolling=true;diceFace.classList.add("rolling");diceFace.dataset.phase="turn";
  // Show different genuine cube sides before landing on the preselected
  // random result. Each 180 ms turn is followed by 500 ms at rest.
- const landing=roll??lastDie,faces=[];
+ const landing=roll??lastDie,faces=[],pool=[1,2,3,4,5,6].filter(n=>n!==landing);
  let previous=Number(diceFace.dataset.displayFace)||1;
  for(let i=0;i<3;i++){
-  const next=1+(previous+fairDie()-1)%6;
+  const options=pool.filter(n=>!faces.includes(n)&&n!==previous);
+  const next=options[(fairDie()-1)%options.length];
   faces.push(next);previous=next;
  }
  faces.push(landing);
@@ -156,7 +157,7 @@ function animateDice(){
   if(step>=faces.length){
    stopDiceAnimation();
    if(pendingNoMove)finishPendingNoMove();
-   else{draw();report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" 点 · 请选择飞机");}
+   else{draw();if(roll!==null)report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" 点 · 请选择飞机");}
    return;
   }
   diceFace.dataset.phase="turn";
@@ -350,7 +351,7 @@ document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111FlightTest={
-  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,over,paused}),position:(seat,i)=>position(seat,i),
+  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,fairDie,pause:pauseGame,resume:resumeGame,undo,
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;pendingNoMove=false;selectedPlane=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
