@@ -113,7 +113,8 @@ function renderChoices(){
   const btn=document.createElement("button");btn.type="button";
   btn.className="flight-move-choice"+(selectedPlane===m.index?" is-selected":"");
   btn.dataset.pawn=String(m.index);
-  btn.textContent=(turn===0?"红方":"蓝方")+" "+(m.index+1)+"号飞机";
+  btn.textContent=(m.index+1)+"号飞机";
+  btn.setAttribute("aria-label",(turn===0?"红方":"蓝方")+(m.index+1)+"号飞机，可选择预览");
   btn.setAttribute("aria-pressed",String(selectedPlane===m.index));
   btn.onclick=()=>previewPlane(m.index);host.append(btn);
  }
