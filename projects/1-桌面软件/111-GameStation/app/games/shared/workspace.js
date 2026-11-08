@@ -100,6 +100,7 @@ const actionGlyphs={
  undoButton:"M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6",undo:"M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6",
  flip:"M3 10a9 9 0 0 1 15-5l3 3M21 3v5h-5M21 14a9 9 0 0 1-15 5l-3-3M3 21v-5h5",
  flipButton:"M3 10a9 9 0 0 1 15-5l3 3M21 3v5h-5M21 14a9 9 0 0 1-15 5l-3-3M3 21v-5h5",
+ drawClaimButton:"M5 12l4 4L19 6M4 21h16",
  resignButton:"M5 21V4m0 1q5-4 9 0t7 0v10q-5 4-9 0t-7 0",
  reset:"M3 11a9 9 0 1 1 2 6M3 4v7h7",next:"M5 4v16m5-16 9 8-9 8z",
  hint:"M9 18h6m-5 4h4m-8-11a6 6 0 1 1 12 0c0 3-3 4-3 7H9c0-3-3-4-3-7",
@@ -248,6 +249,7 @@ window.addEventListener("message",event=>{
  if(!message||message.channel!=="gamestation"||message.protocolVersion!==1||message.gameId!==gameId)return;
  if(message.type==="INIT"){
   initHud(message.payload||{});
+  enhancePageActions();
   const hasActions=!!root.querySelector(".game-tools button,.game-tools select,.game-tools input,.game-tools summary");
   window.GameBridge?.send("TOOLS_META",{hasActions});
   return;
