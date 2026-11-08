@@ -3,8 +3,8 @@
 "use strict";
 const root=document.getElementById("game"),gameId=document.body.dataset.game;
 if(!root||!gameId)return;
-const onExistingRail=gameId==="xiangqi"||gameId==="gomoku";
-const host=onExistingRail?root.querySelector(":scope > .game-tools"):root.querySelector(":scope > .game-main-board");
+/* Keep all board-game timers in their right-side accessory rails. */
+const host=root.querySelector(":scope > .game-tools");
 if(!host)return;
 const panel=document.createElement("section");
 panel.id="gs-turn-clock";panel.className="gs-turn-clock";
@@ -14,7 +14,7 @@ panel.innerHTML='<div class="gs-turn-clock-header"><span>本回合耗时</span><
  '<div class="gs-turn-clock-latest" id="gs-turn-latest">暂无操作记录</div>'+
  '<details class="gs-turn-clock-history" id="gs-turn-details"><summary>操作用时 <span id="gs-turn-count">0</span></summary>'+
  '<ol id="gs-turn-log" aria-label="逐次操作耗时"></ol></details>';
-if(onExistingRail)host.prepend(panel);else host.appendChild(panel);
+host.prepend(panel);
 root.classList.add("gs-turn-clock-enabled");
 /* Fit both special SVG stages from the REAL first-column rectangle. SVG height:auto
    otherwise falls back to 300px intrinsic width after the timer rail is introduced. */

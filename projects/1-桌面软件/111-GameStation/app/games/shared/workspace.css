@@ -360,6 +360,26 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 }
 
 
+/* R38: symmetric stage gutters keep the actual main window at x=50%.
+   Right tool rails remain attached at the board edge; unlike the old R19
+   asymmetric two-column layout, they never displace the main playfield. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout){
+  --gs-side-gutter:clamp(150px,14vw,180px);
+  grid-template-columns:var(--gs-side-gutter) minmax(0,1fr) var(--gs-side-gutter)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout)>.game-main-board{
+  grid-column:2!important;grid-row:1!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout)>.game-tools{
+  grid-column:3!important;grid-row:1!important;position:relative!important;
+  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  align-self:start!important;justify-self:start!important;
+  width:calc(100% - 8px)!important;min-width:0!important;max-width:100%!important;
+  margin:8px 8px 8px 0!important
+ }
+}
+
 /* R33: align the in-page game action buttons with Gomoku's proven action language. */
 .game-root.game-layout:not(.gomoku-layout)>.game-tools>.game-btn{
  display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;
