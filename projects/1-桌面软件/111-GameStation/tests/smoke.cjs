@@ -50,12 +50,16 @@ const names=[
    const icon=el.querySelector("svg"),r=el.closest(".game-pause-content").getBoundingClientRect(),
     stage=document.querySelector("#gameStage").getBoundingClientRect();
    const title=el.closest(".game-pause-content").querySelector(".game-pause-title");
-   return{icon:!!icon,title:title.textContent,buttonText:el.textContent.trim(),
+   const style=getComputedStyle(el.closest(".game-pause-content"));
+   return{icon:!!icon,clockIcon:!!title.querySelector("svg"),title:title.textContent,buttonText:el.textContent.trim(),
     titleBottom:title.getBoundingClientRect().bottom,buttonTop:el.getBoundingClientRect().top,
+    cardWidth:r.width,cardHeight:r.height,cardBackground:style.backgroundColor,
     centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
     centerDy:Math.abs((r.top+r.bottom-stage.top-stage.bottom)/2)};
   });
-  assert.ok(geometry.icon&&geometry.title==="已暂停"&&geometry.buttonText==="继续"&&geometry.titleBottom<geometry.buttonTop
+  assert.ok(geometry.icon&&geometry.clockIcon&&geometry.title==="已暂停"&&geometry.buttonText==="继续"
+    &&geometry.buttonTop-geometry.titleBottom>=20&&geometry.cardWidth>=250&&geometry.cardWidth<=340
+    &&geometry.cardWidth>geometry.cardHeight&&geometry.cardBackground.startsWith("rgba(")
     &&geometry.centerDx<2&&geometry.centerDy<2,
    "All games need centered title-above-resume pause UI: "+JSON.stringify(geometry));
   if(game==="中国象棋")await page.screenshot({path:path.join(artifacts,"xiangqi-paused.png")});
@@ -75,12 +79,15 @@ const names=[
    const surface=el.querySelector(".arcade-canvas")||el.querySelector("canvas")||el.querySelector(".gomoku-board")||
     el.querySelector(".xiangqi-board")||el.querySelector(".chess-frame")||el.querySelector(".fleet-board .game-grid")||
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
-   return {root:box(el),main:box(main),surface:box(surface),tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
+   const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
+   return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
     guide:el.querySelector(".game-guide")?getComputedStyle(el.querySelector(".game-guide")).display:"none",
     hudVisible:!!el.querySelector("#gs-hud")&&getComputedStyle(el.querySelector("#gs-hud")).display!=="none",
     noticeVisible:!!el.querySelector("#gs-notice")&&getComputedStyle(el.querySelector("#gs-notice")).display!=="none",
     battleship:el.classList.contains("battleship-layout"),overflow:document.documentElement.scrollWidth,viewport:innerWidth};
   });
+  const centerOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.root.x+v.root.width/2));
+  assert.ok(centerOffset<=2.5,name+" primary playing window must center horizontally in the lower game area: "+JSON.stringify({centerOffset,view:{width,height},geometry:v}));
   assert.equal(v.guide,"none",name+" guide should not consume playfield space");
   assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
@@ -254,7 +261,7 @@ const names=[
       difficultyBorder:getComputedStyle(document.querySelector("#difficultyControl")).borderTopWidth};
    });
    assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=(width<=1390?165:180),"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
-   assert.ok(led.speakerWidth>=33&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
+   assert.ok(led.speakerWidth>=38&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
     "LED speaker must be large and flash three rays exactly twice for an incoming message: "+JSON.stringify(led));
    assert.ok(led.textColor==="rgb(255, 255, 255)"&&led.textFont>=14&&led.screenPaddingTop<=3,"Gomoku LED must have large white tightly-spaced text: "+JSON.stringify(led));
    assert.equal(led.modeBorder,"1px","Gomoku mode switches need a shared outline");

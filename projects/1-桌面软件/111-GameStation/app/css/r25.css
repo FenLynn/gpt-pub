@@ -425,11 +425,19 @@
 #gameStage>.game-pause-overlay[hidden]{display:none!important}
 #gameStage .game-pause-content{
  display:flex;flex-direction:column;align-items:center;justify-content:center;
- gap:17px;pointer-events:none;min-width:160px
+ gap:27px;pointer-events:none;box-sizing:border-box;
+ width:min(316px,calc(100% - 32px));min-height:183px;padding:21px 24px;
+ border:1px solid rgba(176,203,219,.85);border-radius:17px;
+ background:rgba(234,243,250,.86);backdrop-filter:blur(12px);
+ box-shadow:0 14px 38px rgba(38,68,91,.22),inset 0 1px rgba(255,255,255,.93)
 }
 #gameStage .game-pause-title{
- font-size:28px;line-height:1.2;font-weight:780;letter-spacing:.08em;color:#295570;
- text-shadow:0 2px 9px #fff,0 2px 18px #ffffffc7
+ display:flex;align-items:center;justify-content:center;gap:10px;
+ font-size:28px;line-height:1.2;font-weight:780;letter-spacing:.08em;color:#295570
+}
+#gameStage .game-pause-title svg{
+ display:block;width:27px;height:27px;fill:none;stroke:currentColor;
+ stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none
 }
 #gameStage .game-pause-resume{
  pointer-events:auto;display:flex;flex-direction:row;align-items:center;justify-content:center;
@@ -528,7 +536,7 @@
 .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){gap:4px!important}
 .main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
  width:27px!important;height:27px!important;overflow:visible!important;
- transform:translateX(-2px) scale(1.25)!important;transform-origin:center!important;
+ transform:translateX(-6px) scale(1.44)!important;transform-origin:center!important;
  stroke:#5289a2!important;stroke-width:2.2!important;stroke-linecap:round!important;stroke-linejoin:round!important
 }
 .main-area:has(#workspaceView:not(.hidden)) .speaker-body{fill:none;stroke:inherit}
