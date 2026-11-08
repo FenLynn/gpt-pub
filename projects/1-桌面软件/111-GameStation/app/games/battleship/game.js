@@ -2,13 +2,15 @@
 "use strict";
 const enemyEl=document.getElementById("enemy"),ownEl=document.getElementById("own"),status=document.getElementById("status");
 const layoutRoot=document.getElementById("game");
-// Use the full sea-card visual extent (title and 10×10 grid), not the
-// oversized stage container. History and right controls align to that height.
+// Only the 10×10 square determines the record-rail height. The sea titles
+// sit outside the square; align the left rail to the actual grid top/bottom.
 const fitHistoryHeight=()=>{
  const grid=enemyEl.getBoundingClientRect();
- const title=enemyEl.closest(".fleet-board").querySelector(".fleet-title").getBoundingClientRect();
- const h=grid.bottom-title.top;
- if(h>0)layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+ const stage=layoutRoot.querySelector(".game-main-board").getBoundingClientRect();
+ if(grid.height>0){
+  layoutRoot.style.setProperty("--reversi-board-height",grid.height+"px");
+  layoutRoot.style.setProperty("--battleship-rail-offset",((grid.top+grid.bottom-stage.top-stage.bottom)/2)+"px");
+ }
 };
 window.addEventListener("resize",fitHistoryHeight);
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(enemyEl);
