@@ -25,11 +25,11 @@ let boardFitObserver=null;
 if(gameId==="chinese-checkers"||gameId==="flight-chess"){
  const wrap=root.querySelector(".board-wrap");
  const board=gameId==="chinese-checkers"?root.querySelector("#board.star-checkers-board"):root.querySelector(".flight-stage");
- const ratio=gameId==="chinese-checkers"?10/9:1;
+ const ratio=1; // Both square SVG viewBox and flight stage occupy maximum safe height.
  if(wrap&&board){
   const fit=()=>{
    const bounds=wrap.getBoundingClientRect();
-   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio)*(gameId==="chinese-checkers"?.94:1);
+   const width=Math.min(Math.max(0,bounds.width-10),Math.max(0,bounds.height-10)*ratio);
    if(width>0){
     board.style.setProperty("width",width+"px","important");
     board.style.setProperty("height",width/ratio+"px","important");
