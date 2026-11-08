@@ -232,10 +232,10 @@ function renderChoices(){
 
 function drawClassicBoard(){
  const pt=(x,y)=>[100+x*50,100+y*50];
- const ink={red:"#c92f32",blue:"#165cba",yellow:"#d9b200",green:"#159441"};
- const tile={red:"#ec4848",yellow:"#f6cf22",blue:"#2666c7",green:"#22ae54"};
+ const ink={red:"#bb3e39",blue:"#224fa8",yellow:"#dfb72b",green:"#228b47"};
+ const tile={red:"#dc4c48",yellow:"#e9c63d",blue:"#285cad",green:"#329553"};
  const area={red:"#fff4dd",blue:"#fff4dd",yellow:"#fff4dd",green:"#fff4dd"};
- el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:12,class:"flight-outline"}));
+ el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:3,class:"flight-outline"}));
  // Four proper hangars, including two unused colors in a two-player match.
  for(const camp of camps){
   el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:22,
@@ -243,13 +243,13 @@ function drawClassicBoard(){
   el.append(svgNode("rect",{x:camp.x+10,y:camp.y+10,width:276,height:276,rx:17,
    class:"flight-airport-inset","data-airport-inner":camp.name}));
   const airportCenterX=camp.x+148,airportCenterY=camp.y+148;
-   el.append(svgNode("circle",{cx:airportCenterX,cy:airportCenterY,r:130,
+   el.append(svgNode("circle",{cx:airportCenterX,cy:airportCenterY,r:112,
     class:"flight-airport-circle","data-airport-circle":camp.name,fill:"#fbefd5"}));
    for(const [x,y] of airportPads(camp)){
    const [cx,cy]=pt(x,y);
-   el.append(svgNode("circle",{cx,cy,r:38,class:"flight-airport-ring",
+   el.append(svgNode("circle",{cx,cy,r:32,class:"flight-airport-ring",
     fill:"#fff5dd",stroke:"#282923","data-airport-pad":camp.name}));
-   el.append(svgNode("circle",{cx,cy,r:29,class:"flight-airport-hole",fill:ink[camp.name]}));
+   el.append(svgNode("circle",{cx,cy,r:26,class:"flight-airport-hole",fill:ink[camp.name]}));
 
   }
  }
@@ -282,7 +282,7 @@ function drawClassicBoard(){
   const [cx,cy]=pt(x,y),name=names[index%4],
    relative=(index-start(name==="blue"?1:0)+52)%52;
   const jump=(name==="red"||name==="blue")&&relative>0&&relative+4<=51?name:null;
-  const attributes={x:cx-22,y:cy-22,width:44,height:44,rx:4,
+  const attributes={x:cx-24,y:cy-24,width:48,height:48,rx:0,
    fill:tile[name],class:"flight-track-tile","data-track":index,
    "data-track-color":name};
   if(jump)attributes["data-jump-seat"]=jump;
@@ -290,13 +290,13 @@ function drawClassicBoard(){
   if(index===12||index===38)attributes["data-flight-gate"]=index===12?"red":"blue";
   el.append(svgNode("rect",attributes));
   const [nx,ny]=track[(index+1)%52],heading=Math.atan2(ny-y,nx-x)*180/Math.PI;
-   if(index%4===0){
-    el.append(svgNode("path",{d:"M -12 -7 L 0 -7 L 0 -13 L 14 0 L 0 13 L 0 7 L -12 7 Z",
+   // The physical board has white landing circles and only four entry arrows.
+   el.append(svgNode("circle",{cx,cy,r:15,class:"flight-track-hole",
+     "data-hole-track":index,fill:"#fffef0","aria-hidden":"true"}));
+   if([0,12,26,38].includes(index)){
+    el.append(svgNode("path",{d:"M -8 -5 L 0 -5 L 0 -10 L 11 0 L 0 10 L 0 5 L -8 5 Z",
      transform:"translate("+cx+" "+cy+") rotate("+heading+")",
-     class:"flight-track-direction","data-hole-track":index,fill:"#fffdf8","aria-hidden":"true"}));
-   }else{
-    el.append(svgNode("circle",{cx,cy,r:4.5,class:"flight-track-pip",
-     "data-hole-track":index,fill:"#ffffffb8","aria-hidden":"true"}));
+     class:"flight-track-direction",fill:ink[name],"aria-hidden":"true"}));
    }
  });
  // Four lanes converge on a four-color center. Red and blue are playable;
@@ -310,12 +310,12 @@ function drawClassicBoard(){
  for(const lane of lanes){
   lane.squares.forEach(([x,y],i)=>{
    const [cx,cy]=pt(x,y),
-    attrs={x:cx-21,y:cy-21,width:42,height:42,rx:4,
+    attrs={x:cx-24,y:cy-24,width:48,height:48,rx:0,
      class:"flight-home-tile",fill:tile[lane.name]};
    if(lane.active!==undefined)attrs["data-lane"]=lane.active+"-"+i;
    else attrs["data-decor-lane"]=lane.name+"-"+i;
    el.append(svgNode("rect",attrs));
-   el.append(svgNode("circle",{cx,cy,r:5,class:"flight-home-hole",fill:"#fff8e5d9"}));
+   el.append(svgNode("circle",{cx,cy,r:15,class:"flight-home-hole",fill:"#fffef0"}));
   });
   const [ax,ay]=pt(...lane.squares[3]);
   el.append(svgNode("path",{d:"M -7 0 H 7 M 1 -5 L 7 0 L 1 5",
@@ -499,6 +499,10 @@ function draw(){
  // Labels and the clickable landing marker must stay visible even if another
  // plane already occupies the destination (capture preview).
  for(const marker of previewMarkers)el.append(marker);
+ // Rotate the printed board to align airport colors and destination lanes
+ // with the supplied reference, preserving all 52 engine positions.
+ const boardScene=svgNode("g",{class:"flight-scene",transform:"translate(0 900) rotate(-90)"});
+ boardScene.append(...Array.from(el.childNodes));el.append(boardScene);
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
  document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
