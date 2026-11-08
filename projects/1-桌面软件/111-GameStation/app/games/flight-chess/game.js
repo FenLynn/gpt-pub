@@ -22,8 +22,8 @@ const track=[
 ];
 // Four parking positions divide each 296×296 airport into a symmetric 3×3
 // spacing scheme; all four plane centers are equidistant from its edges.
-const camps=[{x:66,y:535,c:"#eea49b"},{x:535,y:66,c:"#a5cde8"},
- {x:66,y:66,c:"#c2e1b5"},{x:535,y:535,c:"#f4e1a2"}];
+const camps=[{x:66,y:535,c:"#f4d7d2",name:"red"},{x:535,y:66,c:"#d4e7f6",name:"blue"},
+ {x:66,y:66,c:"#f7ebc7",name:"yellow"},{x:535,y:535,c:"#d8ecd9",name:"green"}];
 const airportPads=({x,y})=>{
  const x1=(x+296/3-100)/50,x2=(x+592/3-100)/50;
  const y1=(y+296/3-100)/50,y2=(y+592/3-100)/50;
@@ -229,85 +229,126 @@ function renderChoices(){
   "已选"+(selectedPlane+1)+"号：序号是骰子步数，+4/✈是额外跳跃；点绿色落点确认。":
   legal.length?"请选择发光的飞机，预览绿色编号路线。":"没有可移动的飞机。";
 }
+
+function drawClassicBoard(){
+ const pt=(x,y)=>[100+x*50,100+y*50];
+ const ink={red:"#ce675e",blue:"#548ec6",yellow:"#d2aa4b",green:"#5b9e75"};
+ const tile={red:"#e99188",yellow:"#eecb73",blue:"#83b7e0",green:"#94c8a2"};
+ const area={red:"#f5ded7",blue:"#dceaf6",yellow:"#f9ecc7",green:"#dcefdc"};
+ el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:28,class:"flight-outline"}));
+ // Four proper hangars, including two unused colors in a two-player match.
+ for(const camp of camps){
+  el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:22,
+   class:"flight-airport",fill:area[camp.name],"data-airport":camp.name}));
+  el.append(svgNode("rect",{x:camp.x+10,y:camp.y+10,width:276,height:276,rx:17,
+   class:"flight-airport-inset","data-airport-inner":camp.name}));
+  for(const [x,y] of airportPads(camp)){
+   const [cx,cy]=pt(x,y);
+   el.append(svgNode("circle",{cx,cy,r:38,class:"flight-airport-ring",
+    fill:"#fffdf7",stroke:ink[camp.name],"data-airport-pad":camp.name}));
+   el.append(svgNode("circle",{cx,cy,r:29,class:"flight-airport-hole",fill:area[camp.name]}));
+  }
+ }
+ // Small four-color triangular corner flights use the otherwise empty space
+ // between each hangar and the perimeter route, as in traditional boards.
+ for(const [name,points] of [
+  ["yellow","363,363 397,363 363,397"],
+  ["blue","537,363 503,363 537,397"],
+  ["red","363,537 397,537 363,503"],
+  ["green","537,537 503,537 537,503"]]){
+  el.append(svgNode("polygon",{points,class:"flight-corner-wing",
+   fill:tile[name],"data-corner-wing":name}));
+ }
+ // Only TWO active flying lines. Draw them under the holes and home
+ // tiles, not across arrows or over tokens.
+ for(const leg of [
+  {seat:"red",from:12,to:38,d:"M 108 440 Q 450 421 792 440",
+   head:"M 780 435 l 12 5 l -12 5"},
+  {seat:"blue",from:38,to:12,d:"M 792 460 Q 450 479 108 460",
+   head:"M 120 455 l -12 5 l 12 5"}]){
+  el.append(svgNode("path",{d:leg.d,class:"flight-air-corridor "+leg.seat,
+   "data-flight-from":leg.from,"data-flight-to":leg.to,"aria-hidden":"true"}));
+  el.append(svgNode("path",{d:leg.head,class:"flight-air-corridor-head "+leg.seat,
+   "aria-hidden":"true"}));
+ }
+ // Ring: 52 real engine squares, four clean pastel colors and one white
+ // round landing hole per square. No 52 overprinted arrows/+4 labels.
+ const names=["red","yellow","blue","green"];
+ track.forEach(([x,y],index)=>{
+  const [cx,cy]=pt(x,y),name=names[index%4],
+   relative=(index-start(name==="blue"?1:0)+52)%52;
+  const jump=(name==="red"||name==="blue")&&relative>0&&relative+4<=51?name:null;
+  const attributes={x:cx-22,y:cy-22,width:44,height:44,rx:4,
+   fill:tile[name],class:"flight-track-tile","data-track":index,
+   "data-track-color":name};
+  if(jump)attributes["data-jump-seat"]=jump;
+  if(index===0||index===26)attributes["data-launch"]=name;
+  if(index===12||index===38)attributes["data-flight-gate"]=index===12?"red":"blue";
+  el.append(svgNode("rect",attributes));
+  el.append(svgNode("circle",{cx,cy,r:15,class:"flight-track-hole",
+   "data-hole-track":index,fill:"#fffdf9"}));
+ });
+ // Four lanes converge on a four-color center. Red and blue are playable;
+ // yellow and green are visual lanes only (no change to two-player rules).
+ const lanes=[
+  {name:"red",squares:houses[0],dir:-90,active:0},
+  {name:"blue",squares:houses[1],dir:90,active:1},
+  {name:"yellow",squares:Array.from({length:6},(_,i)=>[1+i,7]),dir:0},
+  {name:"green",squares:Array.from({length:6},(_,i)=>[13-i,7]),dir:180}
+ ];
+ for(const lane of lanes){
+  lane.squares.forEach(([x,y],i)=>{
+   const [cx,cy]=pt(x,y),
+    attrs={x:cx-21,y:cy-21,width:42,height:42,rx:4,
+     class:"flight-home-tile",fill:tile[lane.name]};
+   if(lane.active!==undefined)attrs["data-lane"]=lane.active+"-"+i;
+   else attrs["data-decor-lane"]=lane.name+"-"+i;
+   el.append(svgNode("rect",attrs));
+   el.append(svgNode("circle",{cx,cy,r:14,class:"flight-home-hole",fill:"#fffdf9"}));
+  });
+  const [ax,ay]=pt(...lane.squares[3]);
+  el.append(svgNode("path",{d:"M -7 0 H 7 M 1 -5 L 7 0 L 1 5",
+   transform:"translate("+ax+" "+ay+") rotate("+lane.dir+")",
+   class:"flight-home-arrow","data-home-arrow":lane.name}));
+ }
+ // A small compass shows the circular direction without overcrowding all
+ // 52 white holes; turn markers are on eight recognizable corner squares.
+ for(const index of [0,6,12,19,25,32,38,45]){
+  const [x,y]=track[index],[nx,ny]=track[(index+1)%52],
+   [cx,cy]=pt(x,y),angle=Math.atan2(ny-y,nx-x)*180/Math.PI;
+  el.append(svgNode("path",{d:"M -7 0 H 6 M 0 -5 L 6 0 L 0 5",
+   transform:"translate("+cx+" "+cy+") rotate("+angle+")",
+   class:"flight-route-arrow","data-flow-index":index,
+   "data-flow-next":(index+1)%52,"aria-hidden":"true"}));
+ }
+ // The gate aircraft icons deliberately identify the same two shortcut
+ // positions used by advance(), not additional playable squares.
+ for(const index of [12,38]){
+  const [cx,cy]=pt(...track[index]);
+  const icon=svgNode("text",{x:cx,y:cy+6,"text-anchor":"middle",
+   class:"flight-gate-icon","data-gate-icon":index,"aria-hidden":"true"});
+  icon.textContent="✈";el.append(icon);
+ }
+ // Classic four-color destination rosette.
+ const center=[
+  {name:"blue",d:"M 450 450 L 422 422 A 40 40 0 0 1 478 422 Z"},
+  {name:"green",d:"M 450 450 L 478 422 A 40 40 0 0 1 478 478 Z"},
+  {name:"red",d:"M 450 450 L 478 478 A 40 40 0 0 1 422 478 Z"},
+  {name:"yellow",d:"M 450 450 L 422 478 A 40 40 0 0 1 422 422 Z"}
+ ];
+ el.append(svgNode("circle",{cx:450,cy:450,r:43,class:"flight-center-outline"}));
+ for(const sector of center)el.append(svgNode("path",{d:sector.d,
+  class:"flight-center-sector",fill:tile[sector.name],"data-center-seat":sector.name}));
+ el.append(svgNode("circle",{cx:450,cy:450,r:19,class:"flight-center-core"}));
+ const star=svgNode("text",{x:450,y:458,"text-anchor":"middle",
+  class:"flight-center-star","aria-hidden":"true"});
+ star.textContent="★";el.append(star);
+}
+
 function draw(){
  el.replaceChildren();
  const pos=(x,y)=>[100+x*50,100+y*50];
- el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:28,class:"flight-outline"}));
- for(const camp of camps)el.append(svgNode("rect",{x:camp.x,y:camp.y,width:296,height:296,rx:26,fill:camp.c,opacity:".7"}));
- // Match visible colors to advance(): red = index % 4 === 0,
- // blue = index % 4 === 2. Others remain subdued reserve colors.
- const palette=["#efb8af","#f3dfb8","#b4d4ef","#c7e3d0"],
-  borders=["#d48179","#d5b887","#83afcf","#a4cdb1"];
- track.forEach(([x,y],index)=>{
-  const [cx,cy]=pos(x,y),shade=index%4,
-   relative=(index-start(shade===2?1:0)+52)%52;
-  const jump=(shade===0||shade===2)&&relative>0&&relative+4<=51?
-   (shade===0?"red":"blue"):null;
-  const launch=index===0?"red":index===26?"blue":null;
-  const attributes={x:cx-22,y:cy-22,width:44,height:44,rx:6,
-   fill:index===0?"#e99487":index===26?"#80b8e8":palette[shade],
-   stroke:borders[shade],"stroke-width":2,"data-track":index,
-   "data-track-color":["red","yellow","blue","green"][shade]};
-  if(jump)attributes["data-jump-seat"]=jump;
-  if(launch)attributes["data-launch"]=launch;
-  if(index===12||index===38)attributes["data-flight-gate"]=index===12?"red":"blue";
-  el.append(svgNode("rect",attributes));
- });
- const arrows=svgNode("g",{class:"flight-board-flow","aria-hidden":"true"});
- track.forEach(([x,y],index)=>{
-  const [nx,ny]=track[(index+1)%52],[cx,cy]=pos(x,y),
-   angle=Math.atan2(ny-y,nx-x)*180/Math.PI;
-  arrows.append(svgNode("path",{d:"M -8 0 H 7 M 1 -5 L 7 0 L 1 5",
-   transform:"translate("+cx+" "+cy+") rotate("+angle+")",
-   class:"flight-route-arrow","data-flow-index":index,
-   "data-flow-next":(index+1)%52}));
-  const shade=index%4,relative=(index-start(shade===2?1:0)+52)%52;
-  if((shade===0||shade===2)&&relative>0&&relative+4<=51){
-   const tag=svgNode("text",{x:cx+18,y:cy+18,"text-anchor":"end",
-    class:"flight-jump-tile-label","data-jump-label":index});
-   tag.textContent="+4";arrows.append(tag);
-  }
-  if(index===0||index===26){
-   const tag=svgNode("text",{x:cx-18,y:cy-11,
-    class:"flight-launch-label","data-start-label":index});
-   tag.textContent="起";arrows.append(tag);
-  }
- });
- el.append(arrows);
- houses.forEach((home,seat)=>home.forEach(([x,y],i)=>{
-  const [cx,cy]=pos(x,y);
-  el.append(svgNode("rect",{x:cx-21,y:cy-21,width:42,height:42,rx:7,
-   fill:seat===0?"#e89a8d":"#9ec5e9",
-   stroke:seat===0?"#cf887c":"#75add5","stroke-width":2,
-   "data-lane":seat+"-"+i}));
-  el.append(svgNode("path",{d:"M -8 0 H 6 M 1 -5 L 6 0 L 1 5",
-   transform:"translate("+cx+" "+cy+") rotate("+(seat===0?-90:90)+")",
-   class:"flight-home-arrow","data-home-arrow":seat+"-"+i}));
- }));
- // Two continuous cross-board flight lanes correspond to the real
- // shortcuts: left red gate #12 -> right #38 and the reverse for blue.
- el.append(svgNode("circle",{cx:450,cy:450,r:37,class:"flight-center-pad"}));
- const corridors=[
-  {seat:"red",from:12,to:38,d:"M 108 435 Q 450 390 792 435",head:[755,427,0]},
-  {seat:"blue",from:38,to:12,d:"M 792 465 Q 450 510 108 465",head:[145,473,180]}];
- for(const r of corridors){
-  el.append(svgNode("path",{d:r.d,class:"flight-air-corridor "+r.seat,
-   "data-flight-from":r.from,"data-flight-to":r.to,"aria-hidden":"true"}));
-  const [x,y,angle]=r.head;
-  el.append(svgNode("path",{d:"M -11 -7 L 0 0 L -11 7",
-   transform:"translate("+x+" "+y+") rotate("+angle+")",
-   class:"flight-air-corridor-head "+r.seat,"aria-hidden":"true"}));
- }
- const legend=[
-  ["路线说明",215,161,"flight-map-title"],
-  ["→  沿格内箭头行进",215,195,"flight-map-legend"],
-  ["+4  落同色格可跳跃",215,228,"flight-map-legend"],
-  ["✈  虚线表示跨区飞行",215,261,"flight-map-legend"],
-  ["红、蓝终点道通往中央",683,692,"flight-map-legend"]];
- for(const [value,x,y,cls] of legend){
-  const label=svgNode("text",{x,y,"text-anchor":"middle",class:cls,"aria-hidden":"true"});
-  label.textContent=value;el.append(label);
- }
+ drawClassicBoard();
  // Numbered stepping stones belong to the chosen airplane only, never to a
  // decorative second board. A separate green end marker commits the move.
  const preview=selectedPlane===null||paused||over?null:routeFor(selectedPlane);
