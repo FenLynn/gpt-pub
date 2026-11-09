@@ -61,6 +61,10 @@ jobs:
           test -s "$APP/js/app.js"
           test -s "$APP/games/shared/bridge.js"
           test -s "$APP/games/shared/game.css"
+          grep -qE 'css/app\.css\?v=p111-icons-[^"]+' "$APP/index.html"
+          grep -qE 'css/r25\.css\?v=p111-icons-[^"]+' "$APP/index.html"
+          grep -q 'font-variant-emoji:emoji' "$APP/css/app.css"
+          grep -q 'Cache-Control: no-cache' "$APP/_headers"
           for game in gomoku xiangqi minesweeper solitaire tetris snake; do
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
