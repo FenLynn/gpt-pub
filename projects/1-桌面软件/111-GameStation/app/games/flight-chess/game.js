@@ -546,7 +546,9 @@ function throwDice(value=null){
  selectedPlane=null;expandedStackKey=null;roll=value==null?fairDie():value;
  if(!Number.isInteger(roll)||roll<1||roll>6){roll=null;return false;}
  lastDie=roll;hasRolled=true;
- const animated=value===null&&!window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+ // Dice feedback is a core game action: always run its short, bounded
+ // 500 ms 3D roll. Other piece/board animations still honor reduced motion.
+ const animated=value===null;
  isRolling=animated;
  pendingNoMove=moves().length===0;
  window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","掷骰 "+roll);
