@@ -763,6 +763,13 @@ const names=[
   assert.equal(await page.locator(".game-card").count(),24);
   assert.equal(await page.locator("#homeView .ranking-trophy svg").count(),1,"Leaderboard trophy must be a bundled SVG, not an OS emoji");
   assert.equal(await page.locator(".game-card .game-vector-icon").count(),24,"All 24 game icons must use bundled vector artwork");
+  const catalogIconLayout=await page.locator(".game-card-icon").first().evaluate(node=>({
+    background:getComputedStyle(node).backgroundColor,
+    width:node.getBoundingClientRect().width,
+    svgWidth:node.querySelector(".game-vector-icon")?.getBoundingClientRect().width||0
+  }));
+  assert.ok(catalogIconLayout.background==="rgba(0, 0, 0, 0)"||catalogIconLayout.background==="transparent","Catalog icons must not sit inside a redundant uniform background tile");
+  assert.ok(catalogIconLayout.svgWidth>=45,"Desktop catalog SVG artwork must render at full 46px size, not the old 32px thumbnail");
   const iconAudit=await page.locator(".game-card-icon").evaluateAll(nodes=>nodes.map(node=>{
     const svg=node.querySelector(".game-vector-icon");
     return{id:node.dataset.game,svgGame:svg?.dataset.game,style:svg?.dataset.iconStyle,viewBox:svg?.getAttribute("viewBox"),
