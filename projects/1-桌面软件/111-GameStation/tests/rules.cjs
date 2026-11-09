@@ -556,9 +556,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    launch:[...board.querySelectorAll("[data-launch]")].map(el=>Number(el.dataset.track))
   }));
   assert.ok(mapGuide.asset?.startsWith("./board.svg"),"The exact supplied SVG must be the visible board artwork");
-  assert.deepEqual(mapGuide.points.filter((_,i)=>[0,13,26,39].includes(i)),
-   [[1024,550],[550,1024],[76,550],[550,76]],"The four start squares must match the original board");
-  assert.deepEqual(mapGuide.launch,[0,26],"The active red/blue takeoff squares remain opposite");
+  assert.deepEqual(mapGuide.points.filter((_,i)=>[3,16,29,42].includes(i)),
+   [[1018,782],[318,1018],[82,318],[782,82]],"The four START arrows must map to their actual track squares");
+  assert.deepEqual(mapGuide.launch,[3,29],"The active red/blue takeoff squares match the printed START markers");
   assert.deepEqual(mapGuide.colors,[
    "red","blue","yellow","green","yellow","red","blue","green",
    "blue","yellow","red","green","red","yellow","green","yellow",
@@ -580,22 +580,22 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.deepEqual(mapGuide.corridors,[{from:20,to:32},{from:46,to:6}],
    "The red and blue flight corridors must follow the printed arrows by 12 squares");
   assert.equal(mapGuide.jumps.filter(j=>j.seat==="red").length,11,
-   "Only red-colored ordinary jump squares (excluding start and flight gate) trigger +4");
+   "Only red-colored ordinary jump squares (excluding start, home entry and flight gate) trigger +4");
   assert.equal(mapGuide.jumps.filter(j=>j.seat==="blue").length,10,
-   "Only blue-colored ordinary jump squares (excluding start and flight gate) trigger +4");
+   "Only blue-colored ordinary jump squares (excluding start, home entry and flight gate) trigger +4");
   assert.equal(mapGuide.clutter,0,"The original printed board must remain free of added legend clutter");
   const mappedRules=await flight.evaluate(()=>{
    const api=window.__p111FlightTest;
    return{
-    redJump:api.advance(0,4,1),blueJump:api.advance(1,4,1),
-    redFlight:api.advance(0,19,1),blueFlight:api.advance(1,19,1),
-    blueJumpThenFlight:api.advance(1,15,1),
-    exactFinishOverflow:api.advance(0,56,2),
-    safe:[0,13,26,39].map(api.safe)
+    redJump:api.advance(0,1,1),blueJump:api.advance(1,1,1),
+    redFlight:api.advance(0,16,1),blueFlight:api.advance(1,16,1),
+    blueJumpThenFlight:api.advance(1,12,1),
+    exactFinishOverflow:api.advance(0,54,2),
+    safe:[3,16,29,42].map(api.safe)
    };
   });
-  assert.deepEqual(mappedRules,{redJump:9,blueJump:9,redFlight:32,blueFlight:32,
-   blueJumpThenFlight:32,exactFinishOverflow:null,safe:[true,true,true,true]},
+  assert.deepEqual(mappedRules,{redJump:6,blueJump:6,redFlight:29,blueFlight:29,
+   blueJumpThenFlight:29,exactFinishOverflow:null,safe:[true,true,true,true]},
    "Color jumps, 12-square flights, safe starts and exact finish must use this map's own indexing");
 
   assert.equal(await flight.locator("#diceFace .flight-dice-side svg.flight-dice-svg").count(),6,"Real 3D flight die must have six local SVG faces");
@@ -808,10 +808,10 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(flightState.turn,1,"Rolling a six grants an extra turn");
   // The original SVG's ordinary own-color jump is +4; its arrow gate is
   // a separate +12 flight. The preview and move engine must agree exactly.
-  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[4,-1,-1,-1],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[1,-1,-1,-1],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   const route=await flight.evaluate(()=>window.__p111FlightTest.route(0));
-  assert.deepEqual(route.shortcuts,[{kind:"jump",from:5,to:9}],
+  assert.deepEqual(route.shortcuts,[{kind:"jump",from:2,to:6}],
    "A red landing on its printed red square must jump four positions");
   assert.equal(route.computedFinal,route.move.to,"Preview destination must match the movement engine");
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.preview(0)),true);
@@ -824,19 +824,19 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   }));
   assert.deepEqual(renderedRoute.legs,["jump"]);
   assert.deepEqual(renderedRoute.badges,["+4"]);
-  assert.equal(renderedRoute.target,9);
+  assert.equal(renderedRoute.target,6);
   assert.equal(renderedRoute.label,"落","Ordinary landing must not be mistaken for the real finish");
   assert.equal(renderedRoute.focused,"true");
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
-  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],9,
+  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],6,
    "The four-square jump must land on the mapped destination");
-  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[19,-1,-1,-1],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[16,-1,-1,-1],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   const flightRoute=await flight.evaluate(()=>window.__p111FlightTest.route(0));
-  assert.deepEqual(flightRoute.shortcuts,[{kind:"flight",from:20,to:32}],
+  assert.deepEqual(flightRoute.shortcuts,[{kind:"flight",from:17,to:29}],
    "Landing directly on the red arrow gate must fly 12 positions, not 26");
   assert.equal(await flight.evaluate(()=>window.__p111FlightTest.move(0)),true);
-  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],32,
+  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],29,
    "The red plane must land at the other end of its printed red corridor");
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[10,-1,-1,-1],[37,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
@@ -859,14 +859,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   await flight.evaluate(()=>window.__p111FlightTest.move(0));
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[1][0],39,"Flight Chess safe square prevents collision");
-  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[56,57,57,57],[-1,-1,-1,-1]]));
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[54,55,55,55],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(2));
-  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],56,"Finishing requires an exact die roll");
-  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[56,57,57,57],[-1,-1,-1,-1]]));
+  assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).pawns[0][0],54,"Finishing requires an exact die roll");
+  await flight.evaluate(()=>window.__p111FlightTest.setPawns([[54,55,55,55],[-1,-1,-1,-1]]));
   await flight.evaluate(()=>window.__p111FlightTest.roll(1));
   await flight.evaluate(()=>window.__p111FlightTest.preview(0));
   assert.equal(await flight.locator(".flight-path-target .flight-target-label").textContent(),"终",
-   "Only the actual progress-57 finish square should display the finish label");
+   "Only the actual progress-55 finish square should display the finish label");
   await flight.evaluate(()=>window.__p111FlightTest.move(0));
   assert.equal((await flight.evaluate(()=>window.__p111FlightTest.state())).over,true,"All four planes completing home lane ends the flight game");
   await flight.close();
