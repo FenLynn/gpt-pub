@@ -1,4 +1,4 @@
-/* P111 Minesweeper R29 — authentic Windows 7 blue glass and bottom-only HUD.
+/* P111 Minesweeper R30 — authentic Windows 7 blue glass and bottom-only HUD.
    Scoped to Minesweeper; no shared-game styling changes. */
 body[data-game="minesweeper"] #game.minesweeper-layout{
  --mine-ink:#274965;
@@ -160,15 +160,20 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  color:#4e7493;font-size:20px;font-weight:700;
  box-shadow:inset 0 0 0 2px #fff8,0 1px 2px #4067834d;
 }
-#game.minesweeper-layout .mine-bottom-panel .mine-flag-medallion{color:#c8494b;font-size:24px}
-#game.minesweeper-layout .mine-bottom-panel .mine-time-medallion{color:#45789b;font-size:24px}
+#game.minesweeper-layout .mine-bottom-panel .mine-medallion svg{display:block;width:22px;height:22px;overflow:visible}
+#game.minesweeper-layout .mine-bottom-panel .mine-flag-medallion svg{width:24px;height:24px}
+#game.minesweeper-layout .mine-bottom-panel .mine-time-medallion svg{width:22px;height:22px}
 #game.minesweeper-layout .mine-bottom-panel .mine-face{
  width:36px;height:36px;flex:0 0 36px;
  display:grid;place-items:center;border:1px solid #8dacc3;border-radius:50%;
  background:radial-gradient(circle at 34% 20%,#fff 0%,#edf7fc 45%,#bcd2e1 94%);
  box-shadow:inset 0 0 0 2px #ffffffbc,0 2px 4px #4c698045;
- font-size:22px;line-height:1;cursor:pointer;
+ line-height:1;cursor:pointer;
 }
+#game.minesweeper-layout .mine-bottom-panel .mine-face svg{display:block;width:27px;height:27px;overflow:visible}
+#game.minesweeper-layout .mine-bottom-panel .mine-face[data-face="pressed"] svg{filter:brightness(1.02)}
+#game.minesweeper-layout .mine-bottom-panel .mine-face[data-face="won"] svg{filter:drop-shadow(0 0 2px #f2cb62)}
+#game.minesweeper-layout .mine-bottom-panel .mine-face[data-face="lost"] svg{filter:grayscale(.15)}
 #game.minesweeper-layout .mine-bottom-panel .mine-face:hover{
  filter:brightness(1.05);
 }
@@ -196,6 +201,7 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  #game.minesweeper-layout .mine-bottom-stat{gap:3px}
  #game.minesweeper-layout .mine-bottom-panel .mine-counter{width:46px;height:29px;font-size:19px}
  #game.minesweeper-layout .mine-bottom-panel .mine-face{width:32px;height:32px;flex-basis:32px}
+ #game.minesweeper-layout .mine-bottom-panel .mine-face svg{width:24px;height:24px}
  #game.minesweeper-layout .mine-status-summary{max-width:90px;font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){
