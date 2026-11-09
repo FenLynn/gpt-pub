@@ -23,6 +23,17 @@ const RECORD_KEY="p111-minesweeper-records-v1";
 const levelNames={easy:"初级",normal:"中级",hard:"高级"};
 const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 27V5" fill="none" stroke="#53677e" stroke-width="2.5" stroke-linecap="round"/><path d="M11 6h17l-5 7 5 7H11z" fill="#df4949" stroke="#a42e35" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 28h13" stroke="#4b6278" stroke-width="3" stroke-linecap="round"/></svg>';
 const bombSVG='<svg class="mine-symbol mine-bomb-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2v5M16 25v5M2 16h5M25 16h5M6.2 6.2l3.5 3.5M22.3 22.3l3.5 3.5M25.8 6.2l-3.5 3.5M9.7 22.3l-3.5 3.5" stroke="#344c5f" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="9.2" fill="#24313d" stroke="#131e2b" stroke-width="1.5"/><circle cx="12.9" cy="12.6" r="2.7" fill="#a8b9c4"/></svg>';
+const faceSVG={
+ normal:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><path d="M10.5 12.5h.2M21.3 12.5h.2" stroke="#493b2a" stroke-width="2.8" stroke-linecap="round"/><path d="M9.5 18.2q6.5 8 13 0" fill="none" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/></svg>',
+ pressed:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><circle cx="10.8" cy="12.2" r="1.8" fill="#493b2a"/><circle cx="21.2" cy="12.2" r="1.8" fill="#493b2a"/><ellipse cx="16" cy="20" rx="3.1" ry="4" fill="#493b2a"/></svg>',
+ won:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><path d="M8.8 13q2.2-3.2 4.4 0M18.8 13q2.2-3.2 4.4 0" fill="none" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/><path d="M9.5 18q6.5 9 13 0" fill="none" stroke="#493b2a" stroke-width="2.2" stroke-linecap="round"/><path d="M5 5l2 2M27 5l-2 2" stroke="#e4a832" stroke-width="1.7" stroke-linecap="round"/></svg>',
+ lost:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><path d="M9 10l4 4m0-4l-4 4m10-4l4 4m0-4l-4 4" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/><path d="M10 24q6-8 12 0" fill="none" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/></svg>'
+};
+const faceLabels={normal:"重新开始扫雷",pressed:"正在翻开方格",won:"扫雷胜利",lost:"扫雷失败"};
+function setFace(state="normal"){
+ const key=Object.prototype.hasOwnProperty.call(faceSVG,state)?state:"normal";
+ face.dataset.face=key;face.innerHTML=faceSVG[key];face.setAttribute("aria-label",faceLabels[key]);
+}
 let cells=[],nodes=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,triggerMine=-1;
 let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null,flashTimer=null,middleTarget=-1,dualTarget=-1;
 function emptyRecord(){return{played:0,won:0,best:null,streak:0};}
@@ -193,7 +204,7 @@ function makeBoard(){
  recount();
  started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
  elapsedMs=0;runningSince=null;triggerMine=-1;
- face.textContent="🙂";face.setAttribute("aria-label","重新开始扫雷");
+ setFace("normal");
  render();renderRecords();fitBoard();report("点击任意方格开始");
 }
 function protectFirstClick(index){
@@ -236,7 +247,7 @@ function conclude(won,exploded=-1){
  if(over)return;
  over=true;triggerMine=won?-1:exploded;
  stopTimer();
- face.textContent=won?"😎":"😵";
+ setFace(won?"won":"lost");
  const item=records[difficulty];
  if(won){
   item.won++;item.streak++;
@@ -351,10 +362,10 @@ boardEl.addEventListener("dblclick",event=>{
  event.preventDefault();previewChord(i);
 });
 boardEl.addEventListener("pointerdown",event=>{
- if(event.button===0&&!over&&!paused&&started)face.textContent="😮";
+ if(event.button===0&&!over&&!paused&&started)setFace("pressed");
 });
 window.addEventListener("pointerup",()=>{
- if(!over)face.textContent="🙂";
+ if(!over)setFace("normal");
 });
 boardEl.addEventListener("keydown",event=>{
  const i=cellFromEvent(event);if(i<0||paused||over)return;
@@ -393,7 +404,7 @@ if(isFixture){
    }
    recount();started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
    elapsedMs=0;runningSince=null;triggerMine=-1;
-   face.textContent="🙂";nodes=[];render();fitBoard();report("测试局面");
+   setFace("normal");nodes=[];render();fitBoard();report("测试局面");
    return fixtureState();
   },
   state:fixtureState,
