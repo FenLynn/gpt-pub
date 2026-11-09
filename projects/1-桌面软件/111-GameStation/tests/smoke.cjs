@@ -760,6 +760,22 @@ const names=[
   assert.equal(await page.locator(".game-card").count(),24);
   assert.equal(await page.locator("#homeView .ranking-trophy svg").count(),1,"Leaderboard trophy must be a bundled SVG, not an OS emoji");
   assert.equal(await page.locator(".game-card .game-vector-icon").count(),24,"All 24 game icons must use bundled vector artwork");
+  const iconAudit=await page.locator(".game-card-icon").evaluateAll(nodes=>nodes.map(node=>{
+    const svg=node.querySelector(".game-vector-icon");
+    return{id:node.dataset.game,svgGame:svg?.dataset.game,style:svg?.dataset.iconStyle,viewBox:svg?.getAttribute("viewBox"),
+      shapeCount:svg?.querySelectorAll("path,rect,circle,ellipse,polygon,line,polyline").length||0,
+      ids:[...(svg?.querySelectorAll("[id]")||[])].map(el=>el.id),
+      unresolved:svg?.outerHTML.includes("__ID__")||false,
+      pieces:[...(svg?.querySelectorAll("[data-piece]")||[])].map(el=>el.getAttribute("data-piece"))};
+  }));
+  assert.equal(new Set(iconAudit.map(icon=>icon.id)).size,24,"Every game must retain its own distinct icon identity");
+  assert.ok(iconAudit.every(icon=>icon.svgGame===icon.id&&icon.style==="soft-cute"&&icon.shapeCount>=2&&!icon.unresolved),"All 24 icons must render as complete soft-cute SVG artwork");
+  const iconIds=iconAudit.flatMap(icon=>icon.ids);
+  assert.ok(iconIds.length>=300&&new Set(iconIds).size===iconIds.length,"SVG gradient IDs must be unique across every rendered icon instance");
+  assert.equal(iconAudit.filter(icon=>icon.viewBox==="0 0 64 64").length,23,"All standard icons must use a consistent 64×64 viewBox");
+  assert.equal(iconAudit.find(icon=>icon.id==="tank").viewBox,"0 0 512 512","The attributed tank source must retain its original viewBox");
+  assert.ok(iconAudit.find(icon=>icon.id==="gomoku").pieces.includes("black")&&iconAudit.find(icon=>icon.id==="gomoku").pieces.includes("white"),"Gomoku must visibly distinguish its black and white stones");
+  assert.ok(iconAudit.find(icon=>icon.id==="checkers").pieces.includes("red")&&iconAudit.find(icon=>icon.id==="checkers").pieces.includes("dark"),"Western Checkers must visibly distinguish its red and dark pieces");
   assert.equal(await page.locator(".game-card .game-icon-glyph").count(),0,"Game icons must not depend on OS emoji fonts");
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
   const tankVector=await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').evaluate(svg=>({
