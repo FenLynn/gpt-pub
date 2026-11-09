@@ -1,4 +1,4 @@
-/* P111 Minesweeper R29 — classic blue glass board, reliable rules and records.
+/* P111 Minesweeper R30 — classic blue glass board, reliable rules and records.
    No network or external assets; all gameplay remains local to this iframe. */
 (function(){
 "use strict";
