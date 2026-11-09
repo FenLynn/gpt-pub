@@ -574,6 +574,19 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await flight.locator("#diceFace").getAttribute("role"),"img","Dice face must expose an image role to assistive technology");
   assert.equal(await flight.locator("#diceFace").getAttribute("aria-label"),"骰子：1点","Dice face must expose an accessible value");
   assert.equal(await flight.locator("#turnText").innerText(),"红方回合","The right turn rail must show the current player");
+
+  const diceGeometry=await flight.locator("#diceFace").evaluate(el=>{
+   const cube=el.querySelector(".flight-dice-cube"),faces=[...cube.querySelectorAll(".flight-dice-side")];
+   return{perspective:getComputedStyle(el).perspective,transformStyle:getComputedStyle(cube).transformStyle,
+    faces:faces.map(face=>{const s=getComputedStyle(face);return{position:s.position,backface:s.backfaceVisibility,transform:s.transform};})};
+  });
+  assert.notEqual(diceGeometry.perspective,"none","Flight die must have real perspective depth");
+  assert.equal(diceGeometry.transformStyle,"preserve-3d","Flight die cube must preserve its 3D child faces");
+  assert.equal(diceGeometry.faces.length,6,"Flight die must contain six faces");
+  assert.ok(diceGeometry.faces.every(face=>face.position==="absolute"&&face.backface==="hidden"),
+   "Six die faces must occupy cube planes and hide their reverse sides: "+JSON.stringify(diceGeometry));
+  assert.equal(new Set(diceGeometry.faces.map(face=>face.transform)).size,6,
+   "Each pip count must occupy a distinct physical face: "+JSON.stringify(diceGeometry));
   // One physical throw = exactly one uninterrupted 500 ms rotation,
   // one visible landing result, then 500 ms of stillness.
   const dieSamples=await flight.evaluate(()=>Array.from({length:600},()=>window.__p111FlightTest.fairDie()));
