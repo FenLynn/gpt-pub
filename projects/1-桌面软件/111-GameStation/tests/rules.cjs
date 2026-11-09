@@ -302,14 +302,50 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(4));
    assert.equal(mineState.opened,9);assert.equal(mineState.over,true,"Flood fill must reveal every safe cell on an empty board");
    mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[1]}));
-   mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));
+   // A numbered tile is supplied directly: first-click zero protection
+   // would otherwise legitimately relocate the adjacent test mine.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
    mineState=await mine.evaluate(()=>window.__p111MineTest.toggleFlag(1));
    assert.equal(mineState.flags,1);mineState=await mine.evaluate(()=>window.__p111MineTest.chord(0));
    assert.equal(mineState.over,false);assert.equal(mineState.cells[3].open,true);assert.equal(mineState.cells[4].open,true,"A correctly flagged chord must open covered neighbours");
    mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[1]}));
-   mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));mineState=await mine.evaluate(()=>window.__p111MineTest.toggleFlag(3));
+   mineState=await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
+   mineState=await mine.evaluate(()=>window.__p111MineTest.toggleFlag(3));
    mineState=await mine.evaluate(()=>window.__p111MineTest.chord(0));
    assert.equal(mineState.over,true);assert.equal(mineState.cells[1].open,true,"An incorrectly flagged chord must reveal the mine and end the game");
+   assert.equal(await mine.locator(".mine-cell.exploded").count(),1,"Triggered mine must be highlighted");
+   assert.equal(await mine.locator(".mine-cell.wrong-flag").count(),1,"Incorrect flags must be crossed out");
+   const wrongFlag=await mine.locator(".mine-cell.wrong-flag").innerHTML();
+   assert.ok(wrongFlag.includes("mine-false-mark"),"Wrong flag must display a visible correction marker");
+
+   // First click protects its complete adjacent 3x3 region when possible.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:9,height:9,mines:[0,1,9,10,40]}));
+   mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));
+   assert.equal(mineState.cells.filter(c=>c.mine).length,5,"First click must preserve the exact mine count");
+   assert.equal(mineState.cells[0].open,true);
+   assert.equal(mineState.cells[0].n,0,"First click should open a zero-neighbour area");
+   assert.ok([0,1,9,10].every(i=>!mineState.cells[i].mine),"No mines may remain in the protected first-click region");
+
+   // Dense boards fall back to protecting only the clicked tile.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:2,height:2,mines:[0,1,2]}));
+   mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));
+   assert.equal(mineState.cells[0].mine,false,"Even crowded boards must guarantee a safe first click");
+   assert.equal(mineState.cells.filter(c=>c.mine).length,3);
+
+   // The number tile's left click performs chording, while ordinary tiles
+   // retain stable DOM identity across updates (no full-grid rebuild).
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:4,height:4,mines:[1,15]}));
+   await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
+   const firstMineNode=await mine.evaluate(()=>{window.__mineNodeProbe=window.__p111MineTest.nodeIdentity(0);return !!window.__mineNodeProbe;});
+   assert.equal(firstMineNode,true);
+   await mine.locator(".mine-cell").nth(1).click({button:"right"});
+   await mine.locator(".mine-cell").nth(0).click();
+   const nodeStable=await mine.evaluate(()=>window.__p111MineTest.nodeIdentity(0)===window.__mineNodeProbe);
+   assert.equal(nodeStable,true,"Cell DOM must stay mounted across reveals and flag changes");
+   mineState=await mine.evaluate(()=>window.__p111MineTest.state());
+   assert.equal(mineState.cells[4].open,true,"Clicking an open numbered cell must chord correctly");
+   assert.ok(mineState.records.normal.played>=0,"Per-difficulty local records must be exposed");
+
    await mine.close();
 
    // Battleship: fleet geometry, hit/miss, duplicate-shot rejection, victory and target pursuit.
