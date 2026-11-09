@@ -350,7 +350,7 @@ if(isFixture){
   stopTimer,
   forceFlag(index){if(cells[index]){cells[index].flag=true;render();}return fixtureState();},
   forceMine(index){
-   cells.forEach(c=>{c.open=false;c.mine=false;c.flag=false;});
+   cells.forEach(c=>{c.open=false;c.mine=false;});
    if(cells[index]){cells[index].mine=true;cells[index].open=true;render();}
    return fixtureState();
   },
