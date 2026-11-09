@@ -51,7 +51,7 @@ const gameIconAssets=Object.freeze({
  contra:{file:"contra.svg",source:"twemoji"},
  mario:{file:"mario.svg",source:"twemoji"},
  tank:{file:"tank.svg",source:"game-icons.net"},
- solitaire:{file:"solitaire.svg",source:"twemoji"},
+ solitaire:{file:"solitaire.svg",source:"custom-game-object"},
  doudizhu:{file:"doudizhu.svg",source:"custom-game-object"},
  mahjong:{file:"mahjong.svg",source:"twemoji"},
  sanguosha:{file:"sanguosha.svg",source:"twemoji"}

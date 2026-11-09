@@ -4,7 +4,7 @@
 
 The following local SVG symbols are copied from Twemoji by Twitter, Inc. and contributors:
 
-- battleship, minesweeper, memory, sokoban, snake, pong, contra, mario, solitaire, mahjong, sanguosha and flight-chess
+- battleship, minesweeper, memory, sokoban, snake, pong, contra, mario, mahjong, sanguosha and flight-chess
 - Source repository: github.com/twitter/twemoji
 - Graphics license: Creative Commons Attribution 4.0 International (CC BY 4.0)
 - The SVG files are bundled locally; the application does not load emoji fonts or contact a CDN.
@@ -19,6 +19,6 @@ The following local SVG symbols are copied from Twemoji by Twitter, Inc. and con
 
 ## Original game-object drawings
 
-The following simple diagrams were drawn specifically to depict familiar game equipment, not to create replacement game logos: gomoku board and stones, Chinese chess pieces, Reversi board, Connect Four rack, Chinese-checkers star board, Western-checkers board, Sudoku grid, 2048 tiles and Tetris blocks.
+The following simple diagrams were drawn specifically to depict familiar game equipment, not to create replacement game logos: gomoku board and stones, Chinese chess pieces, Reversi board, Connect Four rack, Chinese-checkers star board, Western-checkers board, Sudoku grid, 2048 tiles, Tetris blocks, Doudizhu card fan and the Solitaire Ace of Spades card.
 
 All icon files are stored in app/assets/icons/ and are available offline.

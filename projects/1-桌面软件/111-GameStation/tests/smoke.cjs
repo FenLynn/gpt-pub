@@ -780,8 +780,8 @@ const names=[
    assert.equal(new Set(iconAudit.map(icon=>icon.id)).size,24,"Every game must retain its own distinct icon identity");
    assert.ok(iconAudit.every(icon=>icon.game===icon.id&&icon.style==="familiar-cute"&&icon.tag==="IMG"&&icon.src.startsWith("./assets/icons/")&&icon.complete&&icon.naturalWidth>0&&icon.naturalHeight>0&&icon.alt===""),"All 24 local SVG assets must load, match their game identity and have no OS-font dependency");
    assert.equal(new Set(iconAudit.map(icon=>icon.src)).size,24,"Every game must use its own icon asset");
-   assert.equal(iconAudit.filter(icon=>icon.source==="twemoji").length,12,"Twelve familiar symbols must come from bundled Twemoji artwork");
-   assert.equal(iconAudit.filter(icon=>icon.source==="custom-game-object").length,10,"Ten board/puzzle icons must depict their actual game objects");
+   assert.equal(iconAudit.filter(icon=>icon.source==="twemoji").length,11,"Twelve familiar symbols must come from bundled Twemoji artwork");
+   assert.equal(iconAudit.filter(icon=>icon.source==="custom-game-object").length,11,"Ten board/puzzle icons must depict their actual game objects");
    assert.equal(iconAudit.filter(icon=>icon.source==="game-icons.net").length,2,"Chess and tank must use the attributed Game-icons.net vectors");
    const iconDir=path.join(root,"assets/icons");
    assert.equal(fs.readdirSync(iconDir).filter(file=>file.endsWith(".svg")).length,24,"The offline icon directory must contain exactly 24 SVG assets");
@@ -796,6 +796,8 @@ const names=[
    assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use its sourced local tank SVG");
    assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-vector-icon').count(),1,"Minesweeper must use its local bomb SVG");
    assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-vector-icon').count(),1,"Mahjong must use its local mahjong-tile SVG");
+   const solitaireSvg=fs.readFileSync(path.join(iconDir,"solitaire.svg"),"utf8");
+   assert.ok(solitaireSvg.includes('font-size="15"')&&solitaireSvg.includes('fill="#202d38"'),"Classic Solitaire must show an Ace of Spades card, not a Joker portrait");
    const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
    assert.deepEqual(iconCategories,["board","arcade"],"Local SVG icons must retain their board/arcade category metadata");
    const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
