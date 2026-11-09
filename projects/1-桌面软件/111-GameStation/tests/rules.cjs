@@ -355,6 +355,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(mineState.cells[4].open,true,"Double-clicking an open numbered cell must chord correctly");
    assert.ok(mineState.records.normal.played>=0,"Per-difficulty local records must be exposed");
 
+   // A single middle click on a revealed number performs the same chord.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[1]}));
+   await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
+   await mine.evaluate(()=>window.__p111MineTest.toggleFlag(1));
+   await mine.locator(".mine-cell").nth(0).click({button:"middle"});
+   mineState=await mine.evaluate(()=>window.__p111MineTest.state());
+   assert.equal(mineState.cells[4].open,true,"Middle-clicking an open numbered cell must chord correctly");
+
    await mine.close();
 
    // Battleship: fleet geometry, hit/miss, duplicate-shot rejection, victory and target pursuit.
