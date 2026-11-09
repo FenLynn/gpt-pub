@@ -123,8 +123,8 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  animation:mine-chord-flash 170ms ease-in-out 2;
 }
 @keyframes mine-chord-flash{
- 0%,100%{filter:brightness(1);box-shadow:inset 1px 1px #ffffffed,inset -2px -2px #245c8e88}
- 50%{filter:brightness(1.3);background:linear-gradient(135deg,#fff 0%,#d7efff 35%,#a4d4f2 100%)!important;outline:2px solid #f5fcff;outline-offset:-3px}
+ 0%,100%{filter:brightness(1);outline-color:transparent}
+ 50%{filter:brightness(1.42);outline:2px solid #f5fcff;outline-offset:-3px}
 }
 #game.minesweeper-layout .mine-cell:focus-visible{
  outline:3px solid #e4b95d!important;outline-offset:-3px;z-index:1;
