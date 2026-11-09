@@ -1,5 +1,5 @@
-/* P111 Minesweeper R28 — scoped Windows 7 glass-blue refinement.
-   Keep the board tall, controls below the field, and every tile crisp. */
+/* P111 Minesweeper R29 — authentic Windows 7 blue glass and bottom-only HUD.
+   Scoped to Minesweeper; no shared-game styling changes. */
 body[data-game="minesweeper"] #game.minesweeper-layout{
  --mine-ink:#274965;
  --mine-line:#6c91b2;
@@ -16,15 +16,10 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  box-shadow:inset 0 1px #ffffffeb,inset 0 0 0 3px #ffffff35,0 8px 22px #35536c23!important;
  overflow:hidden!important;
 }
-#game.minesweeper-layout .mine-status-strip{
- width:100%;height:27px;flex:0 0 27px;
- display:flex;align-items:center;justify-content:space-between;gap:12px;
- padding:0 6px;color:#456782;min-width:0;
- font:600 11px/1.2 "Segoe UI","Microsoft YaHei",sans-serif;
- user-select:none;
-}
 #game.minesweeper-layout .mine-status-summary{
- display:inline-flex;align-items:center;gap:8px;min-width:0;overflow:hidden;
+ display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:min(20vw,260px);overflow:hidden;
+ color:#456782;font:600 11px/1.2 "Segoe UI","Microsoft YaHei",sans-serif;
+ user-select:none;
 }
 #game.minesweeper-layout .mine-status-summary strong{
  font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -41,11 +36,22 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  font-size:11px;font-weight:650;color:#5a7d98;
  white-space:nowrap;flex:none;
 }
+#game.minesweeper-layout .mine-status-summary strong{
+ font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#game.minesweeper-layout .mine-status-led{
+ width:7px;height:7px;flex:0 0 7px;border-radius:50%;
+ background:#69a5c6;box-shadow:0 0 0 3px #ffffff80;
+}
+#game.minesweeper-layout[data-phase="playing"] .mine-status-led{background:#4eb188}
+#game.minesweeper-layout[data-phase="won"] .mine-status-led{background:#2db77a}
+#game.minesweeper-layout[data-phase="lost"] .mine-status-led{background:#dc6b6b}
+#game.minesweeper-layout[data-phase="paused"] .mine-status-led{background:#d4aa60}
 #game.minesweeper-layout .mine-grid{
  order:1;flex:none;gap:1px!important;
  border:2px solid #6389ad!important;border-radius:3px!important;
  padding:4px!important;max-width:100%!important;max-height:none!important;
- background:#6b9fc8!important;overflow:hidden!important;
+ background:#4f83ad!important;overflow:hidden!important;
  box-shadow:inset 0 0 0 1px #c7e3f4,0 1px 3px #3b688552!important;
 }
 #game.minesweeper-layout .mine-cell{
@@ -59,12 +65,12 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  font-size:clamp(11px,calc(var(--mine-cell-size) * .71),33px)!important;
  font-weight:850!important;line-height:1;user-select:none;
  text-shadow:0 1px 1px #ffffffa6!important;
- box-shadow:inset 1px 1px #ffffffd9,inset -1px -1px #27588e65!important;
+ box-shadow:inset 1px 1px #ffffffed,inset -2px -2px #245c8e88!important;
  cursor:pointer;transition:background-color .1s ease,border-color .1s ease;
  touch-action:manipulation;
 }
 #game.minesweeper-layout .mine-cell:hover:not(.open){
- background:linear-gradient(140deg,#f0faff,#c6e7f9 33%,#87bce6 70%,#5d97ce)!important;
+ background:linear-gradient(135deg,#f4fbff 0%,#d1eafb 30%,#91c4e9 68%,#5d9bd1 100%)!important;
  border-color:#3975a8!important;
 }
 #game.minesweeper-layout .mine-cell:active:not(.open){
@@ -112,16 +118,30 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
  font-size:calc(var(--mine-cell-size) * .87);font-weight:850;line-height:1;
  text-shadow:0 1px #fff5;pointer-events:none;
 }
+#game.minesweeper-layout .mine-cell.chord-flash{
+ position:relative;z-index:2;
+ animation:mine-chord-flash 170ms ease-in-out 2;
+}
+@keyframes mine-chord-flash{
+ 0%,100%{filter:brightness(1);box-shadow:inset 1px 1px #ffffffed,inset -2px -2px #245c8e88}
+ 50%{filter:brightness(1.3);background:linear-gradient(135deg,#fff 0%,#d7efff 35%,#a4d4f2 100%)!important;outline:2px solid #f5fcff;outline-offset:-3px}
+}
 #game.minesweeper-layout .mine-cell:focus-visible{
  outline:3px solid #e4b95d!important;outline-offset:-3px;z-index:1;
 }
 #game.minesweeper-layout .mine-bottom-panel{
- order:2;flex:0 0 44px!important;height:44px!important;min-height:44px!important;
- padding:3px 5px!important;gap:8px!important;
+ order:2;flex:0 0 48px!important;height:48px!important;min-height:48px!important;
+ padding:4px 8px!important;gap:8px!important;
  background:transparent!important;border:0!important;
- display:flex;align-items:center;justify-content:space-between;
+ display:grid;grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr);
+ align-items:center;justify-content:stretch;
  box-shadow:none!important;
 }
+#game.minesweeper-layout .mine-bottom-left{justify-self:start;max-width:100%;overflow:hidden}
+#game.minesweeper-layout .mine-bottom-right{justify-self:end;justify-content:flex-end;max-width:100%;overflow:hidden}
+#game.minesweeper-layout .mine-bottom-panel .mine-status-summary{flex:1 1 auto}
+#game.minesweeper-layout .mine-bottom-panel .mine-personal-best{margin-right:2px}
+#game.minesweeper-layout .mine-bottom-panel .mine-face{justify-self:center}
 #game.minesweeper-layout .mine-bottom-stat{
  display:flex;align-items:center;gap:8px;min-width:0;
 }
@@ -164,19 +184,19 @@ body[data-game="minesweeper"] #game.minesweeper-layout{
 #game.minesweeper-layout .mine-side-stats>div:nth-child(odd){border-right:1px solid #edf1f4}
 #game.minesweeper-layout .mine-side-stats>div:nth-child(5){border-bottom:0}
 @media(max-width:980px){
- #game.minesweeper-layout .mine-status-strip{height:25px;flex-basis:25px}
  #game.minesweeper-layout .mine-bottom-stat{gap:5px}
  #game.minesweeper-layout .mine-bottom-panel .mine-counter{width:53px;height:32px;font-size:22px}
  #game.minesweeper-layout .mine-bottom-panel .mine-medallion{width:26px;height:26px;flex-basis:26px}
+ #game.minesweeper-layout .mine-status-summary{max-width:16vw;font-size:10px}
 }
 @media(max-width:700px){
- #game.minesweeper-layout .mine-status-strip{padding:0 2px;gap:6px;font-size:10px}
- #game.minesweeper-layout .mine-personal-best{font-size:10px}
- #game.minesweeper-layout .mine-bottom-panel{gap:4px!important}
+ #game.minesweeper-layout .mine-personal-best{display:none}
+ #game.minesweeper-layout .mine-bottom-panel{gap:4px!important;padding:3px 4px!important;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr)}
  #game.minesweeper-layout .mine-bottom-panel .mine-medallion{display:none}
  #game.minesweeper-layout .mine-bottom-stat{gap:3px}
  #game.minesweeper-layout .mine-bottom-panel .mine-counter{width:46px;height:29px;font-size:19px}
  #game.minesweeper-layout .mine-bottom-panel .mine-face{width:32px;height:32px;flex-basis:32px}
+ #game.minesweeper-layout .mine-status-summary{max-width:90px;font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){
  #game.minesweeper-layout .mine-cell{transition:none!important}
