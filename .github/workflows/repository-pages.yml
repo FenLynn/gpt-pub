@@ -168,7 +168,10 @@ jobs:
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
-          if grep -RInE 'https?://' "$APP"; then
+          # SVG namespace identifiers are XML vocabulary, not remote fetches.
+          URL_MATCHES="$(grep -RInE 'https?://' "$APP" | sed 's#http://www\\.w3\\.org/2000/svg##g' | grep -E 'https?://' || true)"
+          if [[ -n "$URL_MATCHES" ]]; then
+            echo "$URL_MATCHES"
             echo "::error::P111 runtime contains a remote URL"
             exit 1
           fi
