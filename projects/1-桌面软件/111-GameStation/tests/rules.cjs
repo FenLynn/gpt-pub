@@ -616,6 +616,24 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    "Six die faces must occupy cube planes and hide their reverse sides: "+JSON.stringify(diceGeometry));
   assert.equal(new Set(diceGeometry.faces.map(face=>face.transform)).size,6,
    "Each pip count must occupy a distinct physical face: "+JSON.stringify(diceGeometry));
+  const faceOrientation=await flight.locator("#diceFace").evaluate(el=>{
+   const cube=el.querySelector(".flight-dice-cube"),faces=[...cube.querySelectorAll(".flight-dice-side")];
+   const before={transform:cube.style.transform,transition:cube.style.transition};
+   cube.style.transition="none";
+   const targets=[[0,0],[90,0],[0,-90],[0,90],[-90,0],[0,180]];
+   const normals=targets.map(([x,y],i)=>{
+    cube.style.transform="rotateX("+x+"deg) rotateY("+y+"deg)";
+    const parent=new DOMMatrix(getComputedStyle(cube).transform);
+    const face=new DOMMatrix(getComputedStyle(faces[i]).transform);
+    const combined=parent.multiply(face);
+    return [combined.m13,combined.m23,combined.m33];
+   });
+   cube.style.transform=before.transform;cube.style.transition=before.transition;
+   return normals;
+  });
+  assert.ok(faceOrientation.every(n=>Math.abs(n[0])<0.01&&Math.abs(n[1])<0.01&&n[2]>0.99),
+   "The displayed pip face must match each of the six requested results: "+JSON.stringify(faceOrientation));
+
   // One physical throw = exactly one uninterrupted 500 ms rotation,
   // one visible landing result, then 500 ms of stillness.
   const dieSamples=await flight.evaluate(()=>Array.from({length:600},()=>window.__p111FlightTest.fairDie()));
