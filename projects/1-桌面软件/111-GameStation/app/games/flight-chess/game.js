@@ -2,9 +2,10 @@
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
 const layoutRoot=document.getElementById("game");
 const BOARD_SCALE=900/1100;
-// Preserve the established 90%-height side-rail alignment around the board.
+// The wooden board perimeter spans SVG coordinates 16–1084 (including
+// the outer frame stroke). Center the history rail on that exact visible edge.
 const fitHistoryHeight=()=>{
- const rect=el.getBoundingClientRect(),h=rect.height*810/900;
+ const rect=el.getBoundingClientRect(),h=rect.height*(1068/1100);
  if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
   layoutRoot.style.setProperty("--reversi-board-height",h+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
@@ -131,7 +132,7 @@ function fairDie(){
  do{crypto.getRandomValues(words);}while(words[0]>=limit);
  return words[0]%6+1;
 }
-let diceAnimationTimer=null,isRolling=false,lastDie=1,hasRolled=false,pendingNoMove=false,diceCube=null;
+let diceAnimationTimer=null,diceRollAnimation=null,isRolling=false,lastDie=1,hasRolled=false,pendingNoMove=false,diceCube=null;
 let isMoving=false,travelAnimation=null,travelMarker=null;
 function cancelTravel(){
  const old=travelAnimation;travelAnimation=null;if(old)old.cancel();
@@ -200,6 +201,7 @@ function renderDice(display=null){
 }
 function stopDiceAnimation(){
  clearTimeout(diceAnimationTimer);diceAnimationTimer=null;
+ if(diceRollAnimation){diceRollAnimation.cancel();diceRollAnimation=null;}
  isRolling=false;diceFace.classList.remove("rolling");
  diceFace.dataset.phase="idle";
  renderDice();
@@ -212,23 +214,27 @@ function finishPendingNoMove(){
  report("掷出 "+die+" 点无可移动飞机 · "+(turn===0?"红方":"蓝方")+"回合");
 }
 function animateDice(){
- // ONE throw: an uninterrupted 500 ms 3D spin, one final result, then
- // 500 ms of complete stillness. No intermediate stops or face announcements.
- clearTimeout(diceAnimationTimer);
+ // ONE throw: an uninterrupted 500 ms physical 3D cube roll, one final
+ // result, then 500 ms of complete stillness. Web Animations is deliberate:
+ // OS reduced-motion CSS must not silently turn the die into a static tile.
+ clearTimeout(diceAnimationTimer);diceAnimationTimer=null;
+ if(diceRollAnimation){diceRollAnimation.cancel();diceRollAnimation=null;}
  if(!diceCube||!diceFace.contains(diceCube))makeDiceCube();
  isRolling=true;diceFace.classList.add("rolling");diceFace.dataset.phase="spin";
  const landing=roll??lastDie;
  const from=Number(diceFace.dataset.displayFace)||1;
  const [fx,fy]=diceOrientation[from],[tx,ty]=diceOrientation[landing];
+ const startTransform=`rotateX(${fx}deg) rotateY(${fy}deg)`;
+ const endTransform=`rotateX(${720+tx}deg) rotateY(${720+ty}deg)`;
  diceCube.style.transition="none";
- diceCube.style.transform=`rotateX(${fx}deg) rotateY(${fy}deg)`;
- // Commit starting pose before the continuous transition begins.
+ diceCube.style.transform=startTransform;
+ // Commit the initial pose before the browser starts interpolating the cube.
  void diceCube.offsetWidth;
- diceCube.style.transition=`transform ${DICE_SPIN_MS}ms cubic-bezier(.14,.55,.4,1)`;
- diceCube.style.transform=`rotateX(${720+tx}deg) rotateY(${720+ty}deg)`;
  diceFace.setAttribute("aria-label","骰子旋转中");
- diceAnimationTimer=setTimeout(()=>{
+ const finishSpin=()=>{
   if(!isRolling)return;
+  if(diceRollAnimation){diceRollAnimation.cancel();diceRollAnimation=null;}
+  diceCube.style.transform=`rotateX(${tx}deg) rotateY(${ty}deg)`;
   diceFace.dataset.phase="settle";
   renderDice(landing);
   document.getElementById("flightDiceCaption").textContent="点数 "+landing;
@@ -239,7 +245,24 @@ function animateDice(){
    if(pendingNoMove)finishPendingNoMove();
    else{draw();if(roll!==null)report((turn===0?"红方":"蓝方")+" 掷出 "+roll+" 点 · 请选择飞机");}
   },DICE_SETTLE_MS);
- },DICE_SPIN_MS);
+ };
+ if(typeof diceCube.animate==="function"){
+  const animation=diceCube.animate(
+   [{transform:startTransform},{transform:endTransform}],
+   {duration:DICE_SPIN_MS,easing:"cubic-bezier(.14,.55,.4,1)",fill:"forwards"}
+  );
+  diceRollAnimation=animation;
+  animation.onfinish=()=>{
+   if(diceRollAnimation!==animation)return;
+   finishSpin();
+  };
+ }else{
+  // Older-browser fallback; force the transition inline even when an
+  // accessibility stylesheet disables ordinary CSS transitions.
+  diceCube.style.setProperty("transition",`transform ${DICE_SPIN_MS}ms cubic-bezier(.14,.55,.4,1)`,"important");
+  diceCube.style.transform=endTransform;
+  diceAnimationTimer=setTimeout(finishSpin,DICE_SPIN_MS);
+ }
 }
 function routeFor(index){
  const move=moves().find(m=>m.index===index);if(!move)return null;
