@@ -1396,3 +1396,19 @@ body{font-size:15px}
 @media(prefers-reduced-motion:reduce){
   .game-card-icon .game-vector-icon{transition:none!important}
 }
+
+/* P111 R34 · remove the redundant uniform tile and let each game pictogram read at full size. */
+.game-card-icon{
+  width:48px!important;height:48px!important;flex:0 0 48px!important;
+  border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;padding:0!important;
+}
+.game-card-icon .game-vector-icon{
+  width:46px!important;height:46px!important;max-width:none;max-height:none;
+}
+#gameGrid .game-card-icon{flex-basis:48px!important}
+@media(max-width:620px){
+  .game-card-icon{width:42px!important;height:42px!important;flex-basis:42px!important}
+  .game-card-icon .game-vector-icon{width:40px!important;height:40px!important}
+  #gameGrid .game-card-icon{flex-basis:42px!important}
+}
