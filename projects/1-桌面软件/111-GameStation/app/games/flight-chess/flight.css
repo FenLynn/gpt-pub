@@ -351,10 +351,10 @@
   -webkit-backface-visibility:hidden;
 }
 #game.flight-chess-layout .flight-dice-side[data-face="1"]{transform:translateZ(calc(var(--flight-dice-size)/2))}
-#game.flight-chess-layout .flight-dice-side[data-face="2"]{transform:rotateX(90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="2"]{transform:rotateX(-90deg) translateZ(calc(var(--flight-dice-size)/2))}
 #game.flight-chess-layout .flight-dice-side[data-face="3"]{transform:rotateY(90deg) translateZ(calc(var(--flight-dice-size)/2))}
 #game.flight-chess-layout .flight-dice-side[data-face="4"]{transform:rotateY(-90deg) translateZ(calc(var(--flight-dice-size)/2))}
-#game.flight-chess-layout .flight-dice-side[data-face="5"]{transform:rotateX(-90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="5"]{transform:rotateX(90deg) translateZ(calc(var(--flight-dice-size)/2))}
 #game.flight-chess-layout .flight-dice-side[data-face="6"]{transform:rotateY(180deg) translateZ(calc(var(--flight-dice-size)/2))}
 #game.flight-chess-layout .flight-dice-svg{display:block;width:100%;height:100%;overflow:visible;filter:none}
 #game.flight-chess-layout .flight-dice-body{fill:var(--dice-paper)!important;stroke:var(--dice-ink)!important;stroke-width:4}
