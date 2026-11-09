@@ -1,6 +1,7 @@
 (function(){"use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
 const layoutRoot=document.getElementById("game");
+const BOARD_SCALE=900/1100;
 // Align both side rails with the visible 867-unit source-board frame,
 // scaled from the supplied 1100-unit SVG board.
 const fitHistoryHeight=()=>{
@@ -16,7 +17,6 @@ window.addEventListener("resize",fitHistoryHeight);
 fitHistoryHeight();requestAnimationFrame(fitHistoryHeight);
 // Exact mapping to the supplied 1100×1100 SVG board. The playable ring is
 // clockwise from red: 48 outer holes + four colored launch squares.
-const BOARD_SCALE=900/1100;
 const scalePoint=([x,y])=>[x*BOARD_SCALE,y*BOARD_SCALE];
 const rawTrack=[
  [1024,550],[1022,628],[1022,708],[1018,782],[944,786],[864,786],
