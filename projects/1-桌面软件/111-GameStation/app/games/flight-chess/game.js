@@ -5,9 +5,10 @@ const BOARD_SCALE=900/1100;
 // The wooden board perimeter spans SVG coordinates 16–1084 (including
 // the outer frame stroke). Center the history rail on that exact visible edge.
 const fitHistoryHeight=()=>{
- const rect=el.getBoundingClientRect(),h=rect.height*(1068/1100);
- if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
-  layoutRoot.style.setProperty("--reversi-board-height",h+"px");
+ const rect=el.getBoundingClientRect(),recordHeight=rect.height*(1068/1100),toolsHeight=rect.height*.9;
+ if(recordHeight>0&&layoutRoot.classList.contains("gs-tools-open")){
+  layoutRoot.style.setProperty("--flight-record-height",recordHeight+"px");
+  layoutRoot.style.setProperty("--reversi-board-height",toolsHeight+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
   if(document.getElementById("gs-turn-clock")&&el.querySelector(".flight-board-art")?.dataset.loaded==="true")layoutRoot.dataset.boardMeasured="true";
  }
