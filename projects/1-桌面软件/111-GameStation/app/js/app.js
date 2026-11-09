@@ -58,7 +58,8 @@ const gameVectorArt={
 function gameIconMarkup(game){
  const body=gameVectorArt[game.id]||gameVectorArt.gomoku;
  const tankClass=game.id==="tank"?" game-tank-icon":"";
- return '<svg class="game-vector-icon'+tankClass+'" viewBox="0 0 64 64" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">'+body+'</svg>';
+ const viewBox=game.id==="tank"?"0 0 512 512":"0 0 64 64";
+ return '<svg class="game-vector-icon'+tankClass+'" viewBox="'+viewBox+'" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">'+body+'</svg>';
 }
 
 function read(key,fallback){if(location.search.includes("p111Test=1")){try{const fixture=new URLSearchParams(location.search).get("p111State");if(fixture){const state=JSON.parse(fixture);if(Object.prototype.hasOwnProperty.call(state,key))return state[key];}}catch(e){}}try{const v=JSON.parse(localStorage.getItem(storePrefix+key));return v===null||v===undefined?fallback:v;}catch(e){return fallback;}}
