@@ -168,7 +168,7 @@ function animateTravel(seat,index,from,route,to){
   cancelTravel();draw();scheduleAI();
  };
 }
-const diceOrientation={1:[0,0],2:[-90,0],3:[0,-90],4:[0,90],5:[90,0],6:[0,180]};
+const diceOrientation={1:[0,0],2:[90,0],3:[0,-90],4:[0,90],5:[-90,0],6:[0,180]};
 const DICE_SPIN_MS=500,DICE_SETTLE_MS=500;
 function makeDiceCube(){
  diceCube=document.createElement("div");diceCube.className="flight-dice-cube";
@@ -586,7 +586,7 @@ document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111FlightTest={
-  track:()=>track.length,trackColors:()=>trackColors.slice(),profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),advance:(seat,progress,dice)=>advance(seat,progress,dice),safe,
+  track:()=>track.length,trackColors:()=>trackColors.slice(),diceOrientation,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),advance:(seat,progress,dice)=>advance(seat,progress,dice),safe,
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,fairDie,pause:pauseGame,resume:resumeGame,undo,
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;expandedStackKey=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
