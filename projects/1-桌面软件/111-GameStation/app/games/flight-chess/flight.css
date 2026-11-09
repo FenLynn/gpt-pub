@@ -370,10 +370,14 @@
 @media(min-width:701px){
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed){
   --gs-history-width:clamp(184px,14vw,228px)!important;
-  --gs-board-track:min(calc(100dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
-  grid-template-columns:var(--gs-history-width) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
+  /* Keep symmetric grid tracks so the board stays centered. The wider
+     history card expands outward into the left gutter instead of shifting it. */
+  --gs-board-track:min(calc(100dvh - 16px),calc(100% - var(--gs-board-side) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
+  grid-template-columns:var(--gs-board-side) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
  }
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.reversi-record-rail{
+  width:var(--gs-history-width)!important;position:relative!important;
+  left:calc(var(--gs-board-side) - var(--gs-history-width))!important;
   height:var(--flight-record-height,100%)!important;max-height:100%!important;align-self:center!important
  }
  #game.flight-chess-layout .flight-dice.rolling{animation:none!important}
