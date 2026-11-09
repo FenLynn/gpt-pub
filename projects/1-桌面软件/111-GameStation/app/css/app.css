@@ -1376,3 +1376,23 @@ body{font-size:15px}
 }
 .game-fullscreen-exit:hover{background:#e4f2fb;border-color:#98c4db}
 .game-fullscreen-exit[hidden]{display:none!important}
+
+/* P111 R33 · cohesive soft-cute vector artwork: rounded contours, gentle depth and consistent highlights. */
+.game-vector-icon{
+  shape-rendering:geometricPrecision;
+  filter:drop-shadow(0 1.2px 1.2px rgba(39,61,79,.19));
+}
+.game-card-icon .game-vector-icon{
+  transform:translateY(0);
+  transition:transform .18s ease,filter .18s ease;
+}
+.game-card:hover .game-card-icon .game-vector-icon{
+  transform:translateY(-1px) scale(1.035);
+  filter:drop-shadow(0 2px 2px rgba(39,61,79,.23));
+}
+#homeView .recent-icon .game-vector-icon{
+  filter:drop-shadow(0 1.4px 1.4px rgba(39,61,79,.2));
+}
+@media(prefers-reduced-motion:reduce){
+  .game-card-icon .game-vector-icon{transition:none!important}
+}
