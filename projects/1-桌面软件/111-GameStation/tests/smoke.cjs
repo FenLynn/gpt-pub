@@ -757,7 +757,8 @@ const names=[
   let noticeChecked=false;
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
-  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),23,"All 23 non-tank games must keep their existing pictograms");
+  assert.equal(await page.locator(".game-card .game-vector-icon").count(),24,"All 24 game icons must use bundled vector artwork");
+  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),0,"Game icons must not depend on OS emoji fonts");
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
   const tankVector=await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').evaluate(svg=>({
     ns:svg.namespaceURI,viewBox:svg.getAttribute("viewBox"),path:!!svg.querySelector("path"),
@@ -767,11 +768,11 @@ const names=[
   assert.equal(tankVector.ns,"http://www.w3.org/2000/svg","The sourced 90 Tank icon must be crisp native SVG");
   assert.equal(tankVector.viewBox,"0 0 512 512");
   assert.ok(tankVector.path&&tankVector.pathLength>900&&tankVector.width>24&&tankVector.height>24,"90 Tank must render the detailed armored tank vehicle, not a tank-top clothing icon");
-  assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-icon-glyph').innerText(),"💣","Minesweeper must use the familiar bomb pictogram");
-  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use a sourced tank-top SVG");
-  assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-icon-glyph').innerText(),"🀄","Mahjong must use the familiar mahjong tile pictogram");
+  assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-vector-icon').count(),1,"Minesweeper must use a bundled bomb SVG");
+  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use its sourced tank SVG");
+  assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-vector-icon').count(),1,"Mahjong must use a bundled tile SVG");
   const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
-  assert.deepEqual(iconCategories,["board","arcade"],"System pictograms must retain their board/arcade category metadata");
+  assert.deepEqual(iconCategories,["board","arcade"],"Bundled SVG icons must retain their board/arcade category metadata");
   assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"The 90 tank library icon must show the non-rasterized vector");
   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
@@ -938,6 +939,11 @@ const names=[
   const mineFixture=await browser.newPage({viewport:{width:1000,height:800}});
   await mineFixture.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href+"?p111Test=1");
   await mineFixture.waitForFunction(()=>!!window.__p111MineTest);
+  assert.equal(await mineFixture.locator("#reset svg").count(),1,"Minesweeper reset face must be a local SVG");
+  assert.equal(await mineFixture.locator("#reset").getAttribute("data-face"),"normal","Minesweeper reset face must initialize deterministically");
+  assert.equal(await mineFixture.locator("#reset").textContent(),"","Minesweeper must not render an OS emoji glyph");
+  assert.equal(await mineFixture.locator(".mine-flag-medallion svg").count(),1,"Minesweeper flag medallion must be SVG");
+  assert.equal(await mineFixture.locator(".mine-time-medallion svg").count(),1,"Minesweeper clock medallion must be SVG");
   await mineFixture.evaluate(()=>{window.__p111MineTest.forceFlag(0);window.__p111MineTest.forceMine(1);window.__p111MineTest.forceNumber(2,8);});
   const symbols=await mineFixture.locator(".mine-cell").evaluateAll(cells=>cells.slice(0,3).map(cell=>{
    const svg=cell.querySelector("svg"),r=svg?.getBoundingClientRect(),b=cell.getBoundingClientRect();
