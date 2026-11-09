@@ -1323,6 +1323,7 @@ body{font-size:15px}
 #homeView .ranking-trophy svg{display:block;width:1em;height:1em;overflow:visible}
  #homeView .ranking-row:nth-child(-n+3) .ranking-rank{color:inherit}
  #homeView .ranking-rank.ranking-medal{font-size:17px;line-height:1}
+#homeView .ranking-rank.ranking-medal svg{display:block;width:18px;height:18px;overflow:visible}
 }
 @media(min-width:701px) and (max-width:1120px){
  #homeView .home-hero .date-line span{font-size:16px}
