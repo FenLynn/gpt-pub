@@ -1,10 +1,10 @@
 (function(){"use strict";
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
 const layoutRoot=document.getElementById("game");
-// Align both side rails with the visible 810-unit wooden board frame,
-// rather than the 900-unit SVG stage with blank drawing margins.
+// Align both side rails with the visible 867-unit source-board frame,
+// scaled from the supplied 1100-unit SVG board.
 const fitHistoryHeight=()=>{
- const rect=el.getBoundingClientRect(),h=rect.height*810/900;
+ const rect=el.getBoundingClientRect(),h=rect.height*(1060*BOARD_SCALE)/900;
  if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
   layoutRoot.style.setProperty("--reversi-board-height",h+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
@@ -14,41 +14,51 @@ const fitHistoryHeight=()=>{
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
 window.addEventListener("resize",fitHistoryHeight);
 fitHistoryHeight();requestAnimationFrame(fitHistoryHeight);
-// Coordinates traced from the user's physical aeroplane board after
-// perspective correction. The 52 points are ordered clockwise; index 0
-// is the red launch tile, index 26 the opposite blue launch tile.
-const photoTrack=[
- [417,692],[375,695],[332,695],[289,696],[245,685],[222,642],[221,600],
- [243,551],[202,520],[155,537],[114,538],[70,523],[56,477],[56,435],
- [56,392],[56,350],[56,309],[69,265],[111,243],[153,240],[204,260],
- [235,219],[219,173],[219,134],[235,91],[283,73],[327,72],[370,70],
- [413,68],[454,67],[502,78],[519,122],[519,163],[503,211],[544,244],
- [591,223],[633,222],[676,233],[695,285],[695,328],[695,371],[695,415],
- [696,457],[685,500],[637,522],[593,524],[543,505],[508,545],[527,593],
- [527,633],[512,679],[461,692]
+// Exact mapping to the supplied 1100×1100 SVG board. The playable ring is
+// clockwise from red: 48 outer holes + four colored launch squares.
+const BOARD_SCALE=900/1100;
+const scalePoint=([x,y])=>[x*BOARD_SCALE,y*BOARD_SCALE];
+const rawTrack=[
+ [1024,550],[1022,628],[1022,708],[1018,782],[944,786],[864,786],
+ [802,772],[772,802],[786,864],[786,944],[782,1018],[708,1022],
+ [628,1022],[550,1024],[472,1022],[392,1022],[318,1018],[314,944],
+ [314,864],[328,802],[298,772],[236,786],[156,786],[82,782],
+ [78,708],[78,628],[76,550],[78,472],[78,392],[82,318],
+ [156,314],[236,314],[298,328],[328,298],[314,236],[314,156],
+ [318,82],[392,78],[472,78],[550,76],[628,78],[708,78],
+ [782,82],[786,156],[786,236],[772,298],[802,328],[864,314],
+ [944,314],[1018,318],[1022,392],[1022,472]
 ];
-const photoToGrid=([x,y])=>[(60+x*780/750-100)/50,(60+y*780/750-100)/50];
-const track=photoTrack.map(photoToGrid);
-const camps=[
- {name:"red",cx:673,cy:675,pads:[[645,645],[699,643],[647,699],[701,697]]},
- {name:"blue",cx:85,cy:103,pads:[[58,78],[109,73],[60,129],[112,126]]},
- {name:"yellow",cx:84,cy:678,pads:[[58,652],[111,650],[60,705],[113,703]]},
- {name:"green",cx:663,cy:82,pads:[[634,56],[688,52],[636,108],[690,105]]}
+const track=rawTrack.map(scalePoint);
+const trackColors=[
+ "red","blue","yellow","green","yellow","red","blue","green",
+ "blue","yellow","red","green","red","yellow","green","yellow",
+ "green","red","yellow","green","red","blue","green","red",
+ "yellow","red","blue","yellow","red","green","yellow","blue",
+ "red","yellow","blue","green","red","yellow","blue","green",
+ "yellow","blue","blue","red","yellow","yellow","blue","green",
+ "red","yellow","blue","yellow"
 ];
-const airportPads=camp=>camp.pads.map(photoToGrid);
-const pads=[airportPads(camps[0]),airportPads(camps[1])];
+const airportData=[
+ {name:"red",cx:968,cy:968,pads:[[936,936],[1000,936],[936,1000],[1000,1000]]},
+ {name:"blue",cx:132,cy:132,pads:[[100,100],[164,100],[100,164],[164,164]]},
+ {name:"yellow",cx:132,cy:968,pads:[[100,936],[164,936],[100,1000],[164,1000]]},
+ {name:"green",cx:968,cy:132,pads:[[936,100],[1000,100],[936,164],[1000,164]]}
+];
+const pads=[airportData[0].pads.map(scalePoint),airportData[1].pads.map(scalePoint)];
 const houses=[
- [[641,377],[591,377],[551,376],[507,377],[464,378],[415,382]].map(photoToGrid),
- [[112,391],[153,390],[195,389],[239,388],[281,386],[331,384]].map(photoToGrid)
+ [[952,550],[880,550],[808,550],[736,550],[664,550],[592,550]].map(scalePoint),
+ [[148,550],[220,550],[292,550],[364,550],[436,550],[508,550]].map(scalePoint)
 ];
-const yellowLane=[[375,641],[375,598],[375,554],[375,511],[375,465],[370,421]].map(photoToGrid);
-const greenLane=[[369,126],[369,168],[369,211],[369,254],[370,296],[370,345]].map(photoToGrid);
-const colors=["#d8584c","#4c91d2"];
+const seatColor=["red","blue"];
+const SAFE_TRACK_CELLS=new Set([0,13,26,39]);
+const FLIGHT_GATE_PROGRESS=20,FLIGHT_DISTANCE=12;
+const colors=["#d92523","#0c57c4"];
 const dicePips={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,25],[72,25],[28,50],[72,50],[28,75],[72,75]]};
 let pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn=0,mode="ai",difficulty="normal",paused=true,over=false,roll=null,history=[],aiTimer=null,selectedPlane=null,expandedStackKey=null;
 const start=seat=>seat===0?0:26;
 const absolute=(seat,progress)=>progress<52?(start(seat)+progress)%52:-1;
-const safe=cell=>cell%13===0||cell%4===0;
+const safe=cell=>SAFE_TRACK_CELLS.has(cell);
 function position(seat,i,progress=pawns[seat][i]){
  if(progress<0)return pads[seat][i];
  if(progress<=51)return track[absolute(seat,progress)];
@@ -59,13 +69,14 @@ function advance(seat,progress,dice){
  if(progress===-1&&dice!==6)return null;
  let target=progress===-1?0:progress+dice;
  if(target>57)return null;
- if(target>0&&target<52){
-  let cell=absolute(seat,target);
-  // The color-marked flight squares provide a single four-square jump.
-  if(cell%4===(seat===0?0:2)&&target+4<=51){target+=4;cell=absolute(seat,target);}
-  // A flight channel crosses the 52-square circuit to the opposite side.
-  // Its two endpoints are exactly 26 public-track positions apart.
-  if(cell===(seat===0?12:38)&&target+26<=51)target+=26;
+ if(progress>=0&&target>0&&target<52){
+  // A direct landing on the arrow gate flies first. If a normal +4 jump
+  // lands on that gate, the flight follows the jump. Flight never jumps again.
+  if(target===FLIGHT_GATE_PROGRESS)target+=FLIGHT_DISTANCE;
+  else if(trackColors[absolute(seat,target)]===seatColor[seat]&&target+4<=51){
+   target+=4;
+   if(target===FLIGHT_GATE_PROGRESS)target+=FLIGHT_DISTANCE;
+  }
  }
  return target;
 }
@@ -136,7 +147,7 @@ function animateTravel(seat,index,from,route,to){
   isMoving=false;draw();scheduleAI();return;
  }
  const seq=[from,...route.steps.map(x=>x.progress),...route.shortcuts.map(x=>x.to),to];
- const points=seq.map(p=>position(seat,index,p)).map(([x,y])=>[100+x*50,100+y*50])
+ const points=seq.map(p=>position(seat,index,p)).map(([x,y])=>[x,y])
   .filter((p,i,all)=>i===0||p[0]!==all[i-1][0]||p[1]!==all[i-1][1]);
  if(points.length<2){isMoving=false;draw();scheduleAI();return;}
  const ghost=last.cloneNode(true);ghost.removeAttribute("data-pawn");
@@ -236,17 +247,18 @@ function routeFor(index){
  const from=pawns[turn][index],steps=[],shortcuts=[];
  if(from<0)steps.push({progress:0,number:1});
  else for(let i=1;i<=roll;i++)steps.push({progress:from+i,number:i});
- // The annotation mirrors advance(): regular dice steps, then +4, then flight.
  let destination=from<0?0:from+roll;
- if(destination>0&&destination<52){
-  let cell=absolute(turn,destination);
-  if(cell%4===(turn===0?0:2)&&destination+4<=51){
+ if(from>=0&&destination>0&&destination<52){
+  if(destination===FLIGHT_GATE_PROGRESS){
+   shortcuts.push({kind:"flight",from:destination,to:destination+FLIGHT_DISTANCE});
+   destination+=FLIGHT_DISTANCE;
+  }else if(trackColors[absolute(turn,destination)]===seatColor[turn]&&destination+4<=51){
    shortcuts.push({kind:"jump",from:destination,to:destination+4});
-   destination+=4;cell=absolute(turn,destination);
-  }
-  if(cell===(turn===0?12:38)&&destination+26<=51){
-   shortcuts.push({kind:"flight",from:destination,to:destination+26});
-   destination+=26;
+   destination+=4;
+   if(destination===FLIGHT_GATE_PROGRESS){
+    shortcuts.push({kind:"flight",from:destination,to:destination+FLIGHT_DISTANCE});
+    destination+=FLIGHT_DISTANCE;
+   }
   }
  }
  return{move,steps,shortcuts,final:move.to,computedFinal:destination};
@@ -279,143 +291,74 @@ function renderChoices(){
 }
 
 function drawClassicBoard(){
- const pt=(x,y)=>[100+x*50,100+y*50];
- const ink={red:"#bb3e39",blue:"#224fa8",yellow:"#dfb72b",green:"#228b47"};
- const tile={red:"#dc4c48",yellow:"#e9c63d",blue:"#285cad",green:"#329553"};
- const area={red:"#fff4dd",blue:"#fff4dd",yellow:"#fff4dd",green:"#fff4dd"};
- el.append(svgNode("rect",{x:45,y:45,width:810,height:810,rx:3,class:"flight-outline"}));
- // The four circular printed airports follow the reference photograph.
- for(const camp of camps){
-  const [cx,cy]=pt(...photoToGrid([camp.cx,camp.cy]));
-  el.append(svgNode("circle",{cx,cy,r:79,class:"flight-airport-circle",
-   fill:"#f8eed0","data-airport":camp.name,"data-airport-circle":camp.name}));
-  for(const [x,y] of airportPads(camp)){
-   const [px,py]=pt(x,y);
-   el.append(svgNode("circle",{cx:px,cy:py,r:23,class:"flight-airport-ring",
-    fill:"#f8eed0",stroke:"#303127","data-airport-pad":camp.name}));
-   el.append(svgNode("circle",{cx:px,cy:py,r:18,class:"flight-airport-hole",fill:ink[camp.name]}));
-  }
- }
- // Thick dark printed route outline under all 52 colored tiles.
- const photoPoints=track.map(([x,y])=>pt(x,y));
- el.append(svgNode("polyline",{points:[...photoPoints,photoPoints[0]].map(p=>p.join(",")).join(" "),
-  fill:"none",stroke:"#26302a","stroke-width":47.5,"stroke-linejoin":"round","stroke-linecap":"round",
-  class:"flight-outer-outline","aria-hidden":"true"}));
- // Carry both neighboring printed colors through the eight diagonal turns.
- // The dark perimeter stays a thin keyline, not a filled black corner.
- const ribbon=["red","yellow","blue","green"];
- track.forEach((p,i)=>{
-  const [sx,sy]=pt(...p),[ex,ey]=pt(...track[(i+1)%52]);
-  const mx=(sx+ex)/2,my=(sy+ey)/2;
-  for(const [x1,y1,x2,y2,name] of [
-   [sx,sy,mx,my,ribbon[i%4]],
-   [mx,my,ex,ey,ribbon[(i+1)%52%4]]]){
-   el.append(svgNode("line",{x1,y1,x2,y2,stroke:tile[name],
-    "stroke-width":47,"stroke-linecap":"round",
-    class:"flight-route-ribbon","aria-hidden":"true"}));
-  }
+ const artwork=svgNode("image",{x:0,y:0,width:900,height:900,
+  href:"./board.svg?v=flight-board-r60",preserveAspectRatio:"xMidYMid meet",
+  class:"flight-board-art","aria-hidden":"true"});
+ artwork.addEventListener("load",()=>{artwork.dataset.loaded="true";});
+ artwork.addEventListener("error",()=>{artwork.dataset.error="true";});
+ el.append(artwork);
+ const meta=svgNode("g",{class:"flight-rule-map","aria-hidden":"true"});
+ track.forEach(([cx,cy],index)=>{
+  const attrs={cx,cy,r:11,fill:"none",stroke:"none",class:"flight-track-meta",
+   "data-track":index,"data-track-color":trackColors[index],"data-hole-track":index,
+   "data-track-source-x":rawTrack[index][0],"data-track-source-y":rawTrack[index][1]};
+  if(index===0||index===26)attrs["data-launch"]=index===0?"red":"blue";
+  if(trackColors[index]==="red"&&index!==0&&index!==20)attrs["data-jump-seat"]="red";
+  if(trackColors[index]==="blue"&&index!==26&&index!==46)attrs["data-jump-seat"]="blue";
+  meta.append(svgNode("circle",attrs));
  });
- // Only TWO active flying lines. Draw them under the holes and home
- // tiles, not across arrows or over tokens.
- for(const leg of [
-  {seat:"red",from:12,to:38,d:"M 108 440 Q 450 421 792 440",
-   head:"M 780 435 l 12 5 l -12 5"},
-  {seat:"blue",from:38,to:12,d:"M 792 460 Q 450 479 108 460",
-   head:"M 120 455 l -12 5 l 12 5"}]){
-  el.append(svgNode("path",{d:leg.d,class:"flight-air-corridor "+leg.seat,
-   "data-flight-from":leg.from,"data-flight-to":leg.to,"aria-hidden":"true"}));
-  el.append(svgNode("path",{d:leg.head,class:"flight-air-corridor-head "+leg.seat,
-   "aria-hidden":"true"}));
+ for(const camp of airportData){
+  const [cx,cy]=scalePoint([camp.cx,camp.cy]);
+  meta.append(svgNode("circle",{cx,cy,r:82*BOARD_SCALE,fill:"none",stroke:"none",
+   class:"flight-airport-meta","data-airport":camp.name,"data-airport-circle":camp.name}));
+  camp.pads.forEach(([x,y])=>{
+   const [px,py]=scalePoint([x,y]);
+   meta.append(svgNode("circle",{cx:px,cy:py,r:21*BOARD_SCALE,fill:"none",stroke:"none",
+    "data-airport-pad":camp.name}));
+  });
  }
- // Ring: 52 real engine squares, four clean pastel colors and one white
- // round landing hole per square. No 52 overprinted arrows/+4 labels.
- const names=["red","yellow","blue","green"];
- track.forEach(([x,y],index)=>{
-  const [cx,cy]=pt(x,y),name=names[index%4],
-   relative=(index-start(name==="blue"?1:0)+52)%52;
-  const jump=(name==="red"||name==="blue")&&relative>0&&relative+4<=51?name:null;
-  const attributes={x:cx-23,y:cy-23,width:46,height:46,rx:0,
-   fill:tile[name],class:"flight-track-tile","data-track":index,
-   "data-track-color":name};
-  if(jump)attributes["data-jump-seat"]=jump;
-  if(index===0||index===26)attributes["data-launch"]=name;
-  if(index===12||index===38)attributes["data-flight-gate"]=index===12?"red":"blue";
-  el.append(svgNode("rect",attributes));
-  const [nx,ny]=track[(index+1)%52],heading=Math.atan2(ny-y,nx-x)*180/Math.PI;
-   // The physical board has white landing circles and only four entry arrows.
-   el.append(svgNode("circle",{cx,cy,r:15,class:"flight-track-hole",
-     "data-hole-track":index,fill:"#fffef0","aria-hidden":"true"}));
-   if([7,8,20,21,33,34,46,47].includes(index)){
-    el.append(svgNode("path",{d:"M -8 -5 L 0 -5 L 0 -10 L 11 0 L 0 10 L 0 5 L -8 5 Z",
-     transform:"translate("+cx+" "+cy+") rotate("+heading+")",
-     class:"flight-track-direction",fill:ink[name],"aria-hidden":"true"}));
-   }
- });
- // Four lanes converge on a four-color center. Red and blue are playable;
- // yellow and green are visual lanes only (no change to two-player rules).
  const lanes=[
-  {name:"red",squares:houses[0],dir:-90,active:0},
-  {name:"blue",squares:houses[1],dir:90,active:1},
-  {name:"yellow",squares:yellowLane,dir:0},
-  {name:"green",squares:greenLane,dir:180}
+  {name:"red",points:[[1024,550],[952,550],[880,550],[808,550],[736,550],[664,550]],active:0,dir:180},
+  {name:"blue",points:[[76,550],[148,550],[220,550],[292,550],[364,550],[436,550]],active:1,dir:0},
+  {name:"yellow",points:[[550,1024],[550,952],[550,880],[550,808],[550,736],[550,664]],dir:-90},
+  {name:"green",points:[[550,76],[550,148],[550,220],[550,292],[550,364],[550,436]],dir:90}
  ];
  for(const lane of lanes){
-  lane.squares.forEach(([x,y],i)=>{
-   const [cx,cy]=pt(x,y),
-    attrs={x:cx-24,y:cy-24,width:48,height:48,rx:0,
-     class:"flight-home-tile",fill:tile[lane.name]};
+  lane.points.forEach(([x,y],i)=>{
+   const [cx,cy]=scalePoint([x,y]),attrs={x:cx-20,y:cy-20,width:40,height:40,
+    fill:"none",stroke:"none",class:"flight-home-tile"};
    if(lane.active!==undefined)attrs["data-lane"]=lane.active+"-"+i;
    else attrs["data-decor-lane"]=lane.name+"-"+i;
-   el.append(svgNode("rect",attrs));
-   el.append(svgNode("circle",{cx,cy,r:15,class:"flight-home-hole",fill:"#fffef0"}));
+   meta.append(svgNode("rect",attrs));
   });
-  const [ax,ay]=pt(...lane.squares[3]);
-  el.append(svgNode("path",{d:"M -7 0 H 7 M 1 -5 L 7 0 L 1 5",
+  const [ax,ay]=scalePoint(lane.points[3]);
+  meta.append(svgNode("path",{d:"M -7 0 H 7 M 1 -5 L 7 0 L 1 5",
    transform:"translate("+ax+" "+ay+") rotate("+lane.dir+")",
-   class:"flight-home-arrow","data-home-arrow":lane.name}));
+   fill:"none",stroke:"none","data-home-arrow":lane.name}));
  }
- // A small compass shows the circular direction without overcrowding all
- // 52 white holes; turn markers are on eight recognizable corner squares.
- for(const index of [0,12,26,38]){
-  const [x,y]=track[index],[nx,ny]=track[(index+1)%52],
-   [cx,cy]=pt(x,y),angle=Math.atan2(ny-y,nx-x)*180/Math.PI;
-  el.append(svgNode("path",{d:"M -7 0 H 6 M 0 -5 L 6 0 L 0 5",
-   transform:"translate("+cx+" "+cy+") rotate("+angle+")",
-   class:"flight-route-arrow","data-flow-index":index,
-   "data-flow-next":(index+1)%52,"aria-hidden":"true"}));
+ for(const [name,x,y] of [
+  ["green",550,508],["red",592,550],["yellow",550,592],["blue",508,550]
+ ]){
+  const [cx,cy]=scalePoint([x,y]);
+  meta.append(svgNode("circle",{cx,cy,r:17,fill:"none",stroke:"none","data-center-seat":name}));
  }
- // The gate aircraft icons deliberately identify the same two shortcut
- // positions used by advance(), not additional playable squares.
- for(const index of [12,38]){
-  const [cx,cy]=pt(...track[index]);
-  const icon=svgNode("path",{d:"M 0 -13 L 3 -7 L 3 -3 L 13 4 L 13 8 L 3 5 L 3 13 L 7 16 L 7 18 L 0 16 L -7 18 L -7 16 L -3 13 L -3 5 L -13 8 L -13 4 L -3 -3 L -3 -7 Z",
-   class:"flight-gate-icon","data-gate-icon":index,"aria-hidden":"true",
-   transform:"translate("+cx+" "+cy+")",fill:"#24556c"});
-  el.append(icon);
+ for(const index of [0,13,26,39]){
+  const [x,y]=track[index],[nx,ny]=track[(index+1)%52];
+  meta.append(svgNode("path",{d:"M "+x+" "+y+" L "+nx+" "+ny,
+   fill:"none",stroke:"none",class:"flight-route-arrow",
+   "data-flow-index":index,"data-flow-next":(index+1)%52}));
  }
- // Four inward HOME sectors, drawn as in the user's round pinwheel.
- const center=[
-  {name:"blue",d:"M 450 450 L 393 393 A 80 80 0 0 0 393 507 Z",x:408,y:450},
-  {name:"green",d:"M 450 450 L 393 393 A 80 80 0 0 1 507 393 Z",x:450,y:408},
-  {name:"red",d:"M 450 450 L 507 393 A 80 80 0 0 1 507 507 Z",x:492,y:450},
-  {name:"yellow",d:"M 450 450 L 507 507 A 80 80 0 0 1 393 507 Z",x:450,y:492}
- ];
- el.append(svgNode("circle",{cx:450,cy:450,r:80,class:"flight-center-outline"}));
- for(const sector of center){
-  el.append(svgNode("path",{d:sector.d,class:"flight-center-sector",
-   fill:tile[sector.name],"data-center-seat":sector.name}));
-  el.append(svgNode("circle",{cx:sector.x,cy:sector.y,r:20,
-   class:"flight-center-core",fill:"#fffbea"}));
-  const label=svgNode("text",{x:sector.x,y:sector.y+4,
-   "text-anchor":"middle",class:"flight-center-star","aria-hidden":"true"});
-  label.textContent="HOME";el.append(label);
+ for(const leg of [{seat:"red",from:20,to:32},{seat:"blue",from:46,to:6}]){
+  const [x1,y1]=track[leg.from],[x2,y2]=track[leg.to];
+  meta.append(svgNode("path",{d:"M "+x1+" "+y1+" L "+x2+" "+y2,
+   fill:"none",stroke:"none",class:"flight-air-corridor "+leg.seat,
+   "data-flight-from":leg.from,"data-flight-to":leg.to}));
  }
-
+ el.append(meta);
 }
-
 function draw(){
  el.replaceChildren();
- const pos=(x,y)=>[100+x*50,100+y*50];
+ const pos=(x,y)=>[x,y];
  drawClassicBoard();
  // Numbered stepping stones belong to the chosen airplane only, never to a
  // decorative second board. A separate green end marker commits the move.
@@ -425,7 +368,7 @@ function draw(){
  if(preview){
   const coords=preview.steps.map(step=>{
    const [x,y]=position(turn,selectedPlane,step.progress);
-   return{...step,cx:100+x*50,cy:100+y*50};
+   return{...step,cx:x,cy:y};
   });
   // Include the aircraft's current square. Even a one-step die roll
   // must have a visible connection from the origin to square 1.
@@ -463,7 +406,7 @@ function draw(){
    const label=svgNode("text",{x:step.cx,y:step.cy+6,"text-anchor":"middle",class:"flight-preview-number"});
    label.textContent=String(step.number);marker.append(label);previewMarkers.push(marker);
   }
-  const [gx,gy]=position(turn,selectedPlane,preview.final),tx=100+gx*50,ty=100+gy*50;
+  const [gx,gy]=position(turn,selectedPlane,preview.final),tx=gx,ty=gy;
   const goal=svgNode("g",{class:"flight-path-target",role:"button",tabindex:"0",
     "data-preview-to":preview.final,"aria-label":"点击确认将飞机移动到目标位置"});
   goal.append(svgNode("circle",{cx:tx,cy:ty,r:24,class:"flight-target-ring"}));
@@ -643,7 +586,7 @@ document.getElementById("undoButton").onclick=undo;
 if(new URLSearchParams(location.search).has("p111Test")){
  newGame();
  window.__p111FlightTest={
-  track:()=>track.length,profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),
+  track:()=>track.length,trackColors:()=>trackColors.slice(),profile,state:()=>({pawns:pawns.map(r=>r.slice()),turn,roll,lastDie,hasRolled,pendingNoMove,isRolling,over,paused}),position:(seat,i)=>position(seat,i),advance:(seat,progress,dice)=>advance(seat,progress,dice),safe,
   roll:v=>throwDice(v),move:i=>play(i),moves:()=>moves(),preview:i=>previewPlane(i),route:i=>routeFor(i),
   setMode:v=>{mode=v;},setDifficulty:v=>{difficulty=v;},animateDice,stopDiceAnimation,fairDie,pause:pauseGame,resume:resumeGame,undo,
   setPawns:v=>{pawns=v.map(r=>r.slice());turn=0;roll=null;lastDie=1;hasRolled=false;pendingNoMove=false;selectedPlane=null;expandedStackKey=null;paused=false;over=false;history=[];window.GameTurnClock?.reset("红方");draw();}
