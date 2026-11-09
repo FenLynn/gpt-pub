@@ -315,7 +315,7 @@ function renderChoices(){
 
 function drawClassicBoard(){
  const artwork=svgNode("image",{x:0,y:0,width:900,height:900,
-  href:"./board.svg?v=flight-board-r60",preserveAspectRatio:"xMidYMid meet",
+  href:"./board.svg?v=flight-board-r69",preserveAspectRatio:"xMidYMid meet",
   class:"flight-board-art","aria-hidden":"true"});
  artwork.addEventListener("load",()=>{artwork.dataset.loaded="true";fitHistoryHeight();});
  artwork.addEventListener("error",()=>{artwork.dataset.error="true";});
