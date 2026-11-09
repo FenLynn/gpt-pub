@@ -339,7 +339,7 @@ boardEl.addEventListener("mouseup",event=>{
  }
  if(dualTarget>=0&&event.buttons!==3){
   const target=dualTarget;dualTarget=-1;
-  if(i===target)chord(target);
+  if(i===target)previewChord(target);
  }
 });
 boardEl.addEventListener("auxclick",event=>{
