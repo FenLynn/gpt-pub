@@ -176,8 +176,11 @@ const names=[
     });
     assert.ok(geometry.singleBoard&&geometry.history&&geometry.centeredPawn,
      "Flight Chess needs a single board with centered solitary planes: "+JSON.stringify(geometry));
-    assert.ok(Math.abs(geometry.record.height-geometry.svg.height*.9)<3&&Math.abs(geometry.right.height-geometry.svg.height*.9)<3&&Math.abs(geometry.record.top-(geometry.svg.top+geometry.svg.height*.05))<4&&geometry.helpCount===1,
-     "Flight Chess rails should align around board: "+JSON.stringify(geometry));
+    assert.ok(Math.abs(geometry.record.height-geometry.svg.height*(1068/1100))<3&&
+     Math.abs(geometry.record.top-(geometry.svg.top+geometry.svg.height*(16/1100)))<4&&
+     Math.abs(geometry.right.height-geometry.svg.height*.9)<3&&
+     geometry.record.width>geometry.right.width+8&&geometry.helpCount===1,
+     "Flight Chess history rail must match the wooden board perimeter and be slightly wider than the right rail: "+JSON.stringify(geometry));
    }
   if(name==="飞行棋"||name==="西洋跳棋（8×8）"||name==="国际象棋"){
    const geometry=await frame.locator("#board").evaluate(el=>{const r=el.getBoundingClientRect();return{ratio:r.width/r.height,width:r.width,height:r.height};});
