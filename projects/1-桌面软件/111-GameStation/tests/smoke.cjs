@@ -913,7 +913,10 @@ const names=[
   await page.locator("#gameResultOverlay").waitFor({state:"hidden"});
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("score")?.textContent==="0");
   assert.equal(await frame.locator("#score").innerText(),"0","Next after scoring must reset the real in-game score");
-  await open("扫雷");await start();
+  await open("扫雷");
+  assert.equal(await page.locator("#modeControl").isVisible(),false,"Minesweeper must not show an empty battle-mode label");
+  assert.equal(await page.locator("#difficultyControl").isVisible(),true,"Minesweeper must retain its difficulty selector");
+  await start();
   const mine=frame.locator(".mine-classic");
   async function fitMine(){
    const f=await mine.evaluate(el=>{
