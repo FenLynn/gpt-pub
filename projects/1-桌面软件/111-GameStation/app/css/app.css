@@ -1123,19 +1123,14 @@ body{font-size:15px}
  #homeView .recent-copy strong{font-size:9px}
  #homeView .recent-empty{font-size:11px}
 }
-/* P111 R22 · use familiar system pictograms instead of custom-drawn game logos. */
-.game-icon-glyph{
- display:inline-block;line-height:1;vertical-align:middle;
- font-family:"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji","Segoe UI Symbol",sans-serif;
- font-variant-emoji:emoji
-}
-.game-card-icon{padding:0;font-size:clamp(22px,2vw,27px)}
-#homeView .recent-icon{font-size:clamp(70px,6vw,108px)!important}
-#homeView .recent-icon .game-icon-glyph{display:inline-flex;align-items:center;justify-content:center;
- line-height:1.16;overflow:visible;white-space:nowrap}
-.game-tank-icon{display:block;width:100%;height:100%;overflow:visible;fill:#447e56}
-.game-card-icon .game-tank-icon{width:32px;height:32px;flex:none}
-@media(max-width:700px){#homeView .recent-icon{font-size:28px!important}}
+/* P111 R30 · deterministic, bundled SVG pictograms; no OS emoji-font dependency. */
+.game-vector-icon{display:block;width:100%;height:100%;max-width:100%;max-height:100%;overflow:visible;flex:none}
+.game-card-icon{padding:0;font-family:inherit!important;font-variant-emoji:normal!important}
+.game-card-icon .game-vector-icon{width:32px;height:32px;flex:none}
+#homeView .recent-icon{font-size:0!important}
+#homeView .recent-icon .game-vector-icon{width:100%;height:100%;object-fit:contain}
+.game-tank-icon{fill:#447e56}
+@media(max-width:700px){#homeView .recent-icon .game-vector-icon{width:100%;height:100%}}
 /* P111 R21.4 · center the session clock and float status notices over the game surface. */
 @media(min-width:1101px){
  .main-area:has(#workspaceView:not(.hidden)) .topbar{
