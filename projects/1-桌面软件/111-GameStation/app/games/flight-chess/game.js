@@ -51,25 +51,25 @@ const houses=[
  [[148,550],[220,550],[292,550],[364,550],[436,550],[508,550]].map(scalePoint)
 ];
 const seatColor=["red","blue"];
-const SAFE_TRACK_CELLS=new Set([0,13,26,39]);
-const FLIGHT_GATE_PROGRESS=20,FLIGHT_DISTANCE=12;
+const SAFE_TRACK_CELLS=new Set([3,16,29,42]);
+const FLIGHT_GATE_PROGRESS=17,FLIGHT_DISTANCE=12;
 const colors=["#d92523","#0c57c4"];
 const dicePips={1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,25],[72,25],[28,50],[72,50],[28,75],[72,75]]};
 let pawns=[[-1,-1,-1,-1],[-1,-1,-1,-1]],turn=0,mode="ai",difficulty="normal",paused=true,over=false,roll=null,history=[],aiTimer=null,selectedPlane=null,expandedStackKey=null;
-const start=seat=>seat===0?0:26;
-const absolute=(seat,progress)=>progress<52?(start(seat)+progress)%52:-1;
+const start=seat=>seat===0?3:29;
+const absolute=(seat,progress)=>progress<50?(start(seat)+progress)%52:-1;
 const safe=cell=>SAFE_TRACK_CELLS.has(cell);
 function position(seat,i,progress=pawns[seat][i]){
  if(progress<0)return pads[seat][i];
- if(progress<=51)return track[absolute(seat,progress)];
- return houses[seat][Math.min(5,progress-52)];
+ if(progress<=49)return track[absolute(seat,progress)];
+ return houses[seat][Math.min(5,progress-50)];
 }
 function advance(seat,progress,dice){
- if(progress===57)return null;
+ if(progress===55)return null;
  if(progress===-1&&dice!==6)return null;
  let target=progress===-1?0:progress+dice;
- if(target>57)return null;
- if(progress>=0&&target>0&&target<52){
+ if(target>55)return null;
+ if(progress>=0&&target>0&&target<49){
   // A direct landing on the arrow gate flies first. If a normal +4 jump
   // lands on that gate, the flight follows the jump. Flight never jumps again.
   if(target===FLIGHT_GATE_PROGRESS)target+=FLIGHT_DISTANCE;
@@ -85,22 +85,22 @@ function moves(seat=turn,dice=roll){
  return pawns[seat].map((p,index)=>({seat,index,from:p,to:advance(seat,p,dice)})).filter(m=>m.to!==null);
 }
 function opponentsAt(seat,progress){
- if(progress<0||progress>=52)return [];
+ if(progress<0||progress>=50)return [];
  const slot=absolute(seat,progress);
  if(safe(slot))return [];
- const result=[];pawns[1-seat].forEach((p,index)=>{if(p>=0&&p<52&&absolute(1-seat,p)===slot)result.push(index);});
+ const result=[];pawns[1-seat].forEach((p,index)=>{if(p>=0&&p<50&&absolute(1-seat,p)===slot)result.push(index);});
  return result;
 }
 function profile(level=difficulty){return level==="easy"?{risk:false,score:false}:level==="normal"?{risk:false,score:true}:{risk:true,score:true};}
 function rankMove(m){
- let value=(m.to-m.from)+(m.to===57?95:0)+opponentsAt(m.seat,m.to).length*28;
- if(profile().risk&&m.to<52){
+ let value=(m.to-m.from)+(m.to===55?95:0)+opponentsAt(m.seat,m.to).length*28;
+ if(profile().risk&&m.to<50){
   const landing=absolute(m.seat,m.to);
   if(!safe(landing)){
    let threatened=0;
-   for(const p of pawns[1-m.seat])if(p>=0&&p<52)for(let die=1;die<=6;die++){
+   for(const p of pawns[1-m.seat])if(p>=0&&p<50)for(let die=1;die<=6;die++){
     const next=advance(1-m.seat,p,die);
-    if(next!=null&&next<52&&absolute(1-m.seat,next)===landing)threatened++;
+    if(next!=null&&next<50&&absolute(1-m.seat,next)===landing)threatened++;
    }
    value-=threatened*8;
   }else value+=8;
@@ -119,7 +119,7 @@ function turnLabel(){
  if(isRolling&&diceFace.dataset.phase==="spin")return side+" · 掷骰中";
  return roll===null?side+"回合":side+" · "+roll+"点";
 }
-function report(msg){status.textContent=msg;turnText.textContent=turnLabel();GameBridge.report(msg,{score:pawns[0].filter(p=>p===57).length,turn});}
+function report(msg){status.textContent=msg;turnText.textContent=turnLabel();GameBridge.report(msg,{score:pawns[0].filter(p=>p===55).length,turn});}
 function svgNode(tag,attrs){const ns="http:"+"//www.w3.org/2000/svg",e=document.createElementNS(ns,tag);for(const [key,val] of Object.entries(attrs))e.setAttribute(key,String(val));return e;}
 // Animate visual faces and colorways while the logical die result stays fixed.
 const diceInk=["#447c9c","#d96754","#378b6b","#9771be","#d6a044","#407bb5"];
@@ -248,7 +248,7 @@ function routeFor(index){
  if(from<0)steps.push({progress:0,number:1});
  else for(let i=1;i<=roll;i++)steps.push({progress:from+i,number:i});
  let destination=from<0?0:from+roll;
- if(from>=0&&destination>0&&destination<52){
+ if(from>=0&&destination>0&&destination<49){
   if(destination===FLIGHT_GATE_PROGRESS){
    shortcuts.push({kind:"flight",from:destination,to:destination+FLIGHT_DISTANCE});
    destination+=FLIGHT_DISTANCE;
@@ -302,7 +302,7 @@ function drawClassicBoard(){
   const attrs={cx,cy,r:11,fill:"none",stroke:"none",class:"flight-track-meta",
    "data-track":index,"data-track-color":trackColors[index],"data-hole-track":index,
    "data-track-source-x":rawTrack[index][0],"data-track-source-y":rawTrack[index][1]};
-  if(index===0||index===26)attrs["data-launch"]=index===0?"red":"blue";
+  if(index===3||index===29)attrs["data-launch"]=index===3?"red":"blue";
   if(trackColors[index]==="red"&&index!==0&&index!==20)attrs["data-jump-seat"]="red";
   if(trackColors[index]==="blue"&&index!==26&&index!==46)attrs["data-jump-seat"]="blue";
   meta.append(svgNode("circle",attrs));
@@ -342,7 +342,7 @@ function drawClassicBoard(){
   const [cx,cy]=scalePoint([x,y]);
   meta.append(svgNode("circle",{cx,cy,r:17,fill:"none",stroke:"none","data-center-seat":name}));
  }
- for(const index of [0,13,26,39]){
+ for(const index of [3,16,29,42]){
   const [x,y]=track[index],[nx,ny]=track[(index+1)%52];
   meta.append(svgNode("path",{d:"M "+x+" "+y+" L "+nx+" "+ny,
    fill:"none",stroke:"none",class:"flight-route-arrow",
@@ -411,7 +411,7 @@ function draw(){
     "data-preview-to":preview.final,"aria-label":"点击确认将飞机移动到目标位置"});
   goal.append(svgNode("circle",{cx:tx,cy:ty,r:24,class:"flight-target-ring"}));
   const end=svgNode("text",{x:tx,y:ty+6,"text-anchor":"middle",class:"flight-target-label"});
-  end.textContent=preview.final===57?"终":"落";goal.append(end);
+  end.textContent=preview.final===55?"终":"落";goal.append(end);
   goal.addEventListener("click",()=>play(selectedPlane));
   goal.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();play(selectedPlane);}});
   previewMarkers.push(goal);
@@ -503,8 +503,8 @@ function draw(){
  boardScene.append(...Array.from(el.childNodes));el.append(boardScene);
  el.dataset.turn=String(turn);el.dataset.dice=roll===null?"":String(roll);
  layoutRoot.dataset.turnSide=turn===0?"red":"blue";
- document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===57).length);
- document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===57).length);
+ document.getElementById("redArrived").textContent=String(pawns[0].filter(p=>p===55).length);
+ document.getElementById("blueArrived").textContent=String(pawns[1].filter(p=>p===55).length);
  rollButton.disabled=paused||over||isRolling||isMoving||roll!==null||turn===1&&mode==="ai";
  document.getElementById("flightDiceCaption").textContent=isRolling?"掷骰中…":roll===null?(hasRolled?"上次 "+lastDie+" 点":"等待掷骰"):"点数 "+roll;
  renderChoices();
@@ -547,9 +547,9 @@ function play(index){
  pawns[turn][index]=m.to;
  for(const enemy of opponentsAt(turn,m.to))pawns[1-turn][enemy]=-1;
  const die=roll;window.GameTurnClock?.record(turn===0?"红方":"蓝方",turn===0?"红方":"蓝方","飞机移动");draw();
- if(pawns[turn].every(p=>p===57)){
+ if(pawns[turn].every(p=>p===55)){
   over=true;paused=true;clearTimeout(aiTimer);const msg=turn===0?"红方获胜":"蓝方获胜";
-  report(msg);GameBridge.send("GAME_OVER",{message:msg,win:turn===0,score:pawns[0].filter(p=>p===57).length});draw();return true;
+  report(msg);GameBridge.send("GAME_OVER",{message:msg,win:turn===0,score:pawns[0].filter(p=>p===55).length});draw();return true;
  }
  newTurn(die);
  if(useMotion)animateTravel(seat,index,prior,route,m.to);
@@ -599,7 +599,7 @@ function resign(){
  over=true;paused=true;selectedPlane=null;expandedStackKey=null;roll=null;turn=winner;
  const label=s=>s===0?"红方":"蓝方";
  draw();const message=label(loser)+"认输 · "+label(winner)+"获胜";
- report(message);GameBridge.send("GAME_OVER",{message,winner:label(winner),score:pawns[0].filter(p=>p===57).length,
+ report(message);GameBridge.send("GAME_OVER",{message,winner:label(winner),score:pawns[0].filter(p=>p===55).length,
   win:mode==="ai"?false:winner===0});
  return true;
 }
