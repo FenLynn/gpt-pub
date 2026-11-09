@@ -508,10 +508,11 @@ const names=[
   assert.ok(Math.abs(clockSizes.date-clockSizes.time)<=1,"Home clock must be as prominent as the date: "+JSON.stringify(clockSizes));
   assert.equal(await page.locator("#homeRecentList .recent-game").count(),9,"Recent tab must show exactly nine real played games");
   const recent=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.game,name:n.querySelector(".recent-copy strong").textContent.trim(),x:n.getBoundingClientRect().x,
-    icon:!!n.querySelector(".game-vector-icon"),hasTankSvg:!!n.querySelector(".game-tank-icon")})));
+    icon:!!n.querySelector(".game-vector-icon"),iconGame:n.querySelector(".game-vector-icon")?.dataset.game,iconStyle:n.querySelector(".game-vector-icon")?.dataset.iconStyle,hasTankSvg:!!n.querySelector(".game-tank-icon")})));
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋"],"Recent games must show the nine newest games in order");
   assert.ok(recent.every((x,i)=>i%3===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.icon&&(x.id==="tank"?x.hasTankSvg:!x.hasTankSvg)),"All recent games must use local SVG artwork, with the sourced tank vector retained");
+  assert.ok(recent.every(x=>x.iconGame===x.id&&x.iconStyle==="soft-cute"),"Recent games must reuse the same soft-cute SVG artwork as the game library");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
   assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent tab labels must remain fully visible inside the list: "+JSON.stringify(recentFit));
@@ -541,6 +542,8 @@ const names=[
   const homePreviewGameId=await homePreviewButton.getAttribute("data-game");
   await homePreviewButton.click();
   assert.equal(await page.locator("#homeGamePoster").getAttribute("data-game"),homePreviewGameId,"Single click on a recent game must only update the poster preview");
+  const posterIcon=await page.locator("#homePosterArt .game-vector-icon").evaluate(svg=>({game:svg.dataset.game,style:svg.dataset.iconStyle}));
+  assert.deepEqual(posterIcon,{game:homePreviewGameId,style:"soft-cute"},"Featured poster must reuse the same bundled soft-cute game SVG");
   await page.locator("#homeRecentList .recent-game").nth(1).dblclick();
   await page.locator("#workspaceView:not(.hidden)").waitFor({state:"visible"});
   assert.equal(await page.locator("#libraryView").evaluate(el=>el.classList.contains("hidden")),true,"Double-clicking a recent game must launch it directly, not open its category");
