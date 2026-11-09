@@ -648,6 +648,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    return document.getElementById("diceFace").getBoundingClientRect().width;
   });
   assert.ok(diceVisible>=60,"3D animation fixture must render a visible die");
+  // Exercise the die under the OS reduced-motion preference as well: the
+  // requested physical cube roll must remain visible and deterministic.
+  await flight.emulateMedia({reducedMotion:"reduce"});
   const diceRun=await flight.evaluate(async()=>{
    const api=window.__p111FlightTest;
    api.setPawns([[0,-1,-1,-1],[-1,-1,-1,-1]]);
@@ -659,7 +662,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
     const cube=el.querySelector(".flight-dice-cube");
     log.push({ms:performance.now()-started,phase:el.dataset.phase,
      face:Number(el.dataset.displayFace),caption:caption.textContent,
-     transform:getComputedStyle(cube).transform});
+     transform:getComputedStyle(cube).transform,
+     animations:cube.getAnimations().map(animation=>animation.effect?.getTiming().duration)});
     await new Promise(resolve=>setTimeout(resolve,40));
    }
    return{outcome,log,faces:el.querySelectorAll(".flight-dice-side").length,
@@ -679,6 +683,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   const spinFrames=diceRun.log.filter(x=>x.phase==="spin");
   assert.ok(new Set(spinFrames.map(x=>x.transform)).size>=5,
    "Cube must visibly rotate throughout its uninterrupted spin");
+  assert.ok(spinFrames.some(x=>x.animations.includes(500)),
+   "The 500 ms Web Animation must drive the cube even with reduced-motion CSS enabled");
   assert.ok(spinFrames.every(x=>x.caption==="掷骰中…"),
    "Actual die result must not be announced during spin");
   assert.ok(diceRun.log.filter(x=>x.phase==="settle").every(x=>
@@ -689,6 +695,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    "Die must remain motionless throughout the final hold");
   assert.equal(Number(diceRun.final),diceRun.outcome,"Displayed face must match actual random roll");
   assert.equal(diceRun.state.isRolling,false,"A round ends after the 500+500 ms sequence");
+  await flight.emulateMedia({reducedMotion:"no-preference"});
   await flight.evaluate(()=>window.__p111FlightTest.setPawns([[-1,-1,-1,-1],[-1,-1,-1,-1]]));
   assert.equal(await flight.locator(".flight-center").count(),0,"Flight Chess must have no second inner board");
   assert.equal(await flight.locator(".reversi-record-rail").count(),1,"Flight Chess must have a left move history");
