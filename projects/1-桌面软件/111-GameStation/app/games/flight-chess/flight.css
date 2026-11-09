@@ -308,3 +308,58 @@
 
 /* Reference runway color fills are purely decorative, never hit targets. */
 #game.flight-chess-layout .flight-route-ribbon{pointer-events:none!important}
+
+/* R59 — restore the physical six-sided die. The previous JavaScript already
+   rotated a cube container, but the old stylesheet only animated each SVG
+   face in 2D and never positioned the six faces in 3D space. */
+#game.flight-chess-layout .flight-dice{
+  --flight-dice-size:clamp(56px,7.2vh,72px);
+  width:var(--flight-dice-size)!important;
+  height:var(--flight-dice-size)!important;
+  max-width:var(--flight-dice-size)!important;
+  flex:0 0 var(--flight-dice-size);
+  position:relative;
+  overflow:visible;
+  perspective:280px;
+  perspective-origin:50% 45%;
+}
+#game.flight-chess-layout>.game-tools>.flight-play-controls .flight-dice{
+  width:var(--flight-dice-size)!important;
+  height:var(--flight-dice-size)!important;
+  max-width:var(--flight-dice-size)!important;
+}
+#game.flight-chess-layout .flight-dice-cube{
+  position:relative;
+  width:100%;
+  height:100%;
+  transform-style:preserve-3d;
+  transform-origin:50% 50%;
+  will-change:transform;
+}
+#game.flight-chess-layout .flight-dice-side{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  width:100%;
+  height:100%;
+  border:1px solid var(--dice-ink);
+  border-radius:12px;
+  background:var(--dice-paper);
+  box-shadow:inset 0 1px 2px #ffffffb8,0 2px 4px #263c5026;
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
+#game.flight-chess-layout .flight-dice-side[data-face="1"]{transform:translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="2"]{transform:rotateX(90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="3"]{transform:rotateY(90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="4"]{transform:rotateY(-90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="5"]{transform:rotateX(-90deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-side[data-face="6"]{transform:rotateY(180deg) translateZ(calc(var(--flight-dice-size)/2))}
+#game.flight-chess-layout .flight-dice-svg{display:block;width:100%;height:100%;overflow:visible;filter:none}
+#game.flight-chess-layout .flight-dice-body{fill:var(--dice-paper)!important;stroke:var(--dice-ink)!important;stroke-width:4}
+#game.flight-chess-layout .flight-dice-pip{fill:var(--dice-ink)!important}
+#game.flight-chess-layout .flight-dice.rolling .flight-dice-svg{animation:none!important}
+@media(prefers-reduced-motion:reduce){
+  #game.flight-chess-layout .flight-dice-cube{transition:none!important;will-change:auto}
+}
