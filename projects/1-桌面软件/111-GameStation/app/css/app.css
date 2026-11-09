@@ -1320,6 +1320,7 @@ body{font-size:15px}
  #homeView .ranking-title{display:flex;align-items:center;gap:7px;min-width:0}
  #homeView .ranking-trophy{display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:19px;line-height:1}
  #homeView .ranking-title h2{white-space:nowrap}
+#homeView .ranking-trophy svg{display:block;width:1em;height:1em;overflow:visible}
  #homeView .ranking-row:nth-child(-n+3) .ranking-rank{color:inherit}
  #homeView .ranking-rank.ranking-medal{font-size:17px;line-height:1}
 }
