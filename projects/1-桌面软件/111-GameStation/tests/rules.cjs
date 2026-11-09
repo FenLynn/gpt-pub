@@ -620,7 +620,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    const cube=el.querySelector(".flight-dice-cube"),faces=[...cube.querySelectorAll(".flight-dice-side")];
    const before={transform:cube.style.transform,transition:cube.style.transition};
    cube.style.transition="none";
-   const targets=[[0,0],[90,0],[0,-90],[0,90],[-90,0],[0,180]];
+   const targets=[1,2,3,4,5,6].map(value=>window.__p111FlightTest.diceOrientation[value]);
    const normals=targets.map(([x,y],i)=>{
     cube.style.transform="rotateX("+x+"deg) rotateY("+y+"deg)";
     const parent=new DOMMatrix(getComputedStyle(cube).transform);
