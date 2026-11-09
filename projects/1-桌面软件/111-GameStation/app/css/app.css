@@ -1123,14 +1123,14 @@ body{font-size:15px}
  #homeView .recent-copy strong{font-size:9px}
  #homeView .recent-empty{font-size:11px}
 }
-/* P111 R30 · deterministic, bundled SVG pictograms; no OS emoji-font dependency. */
-.game-vector-icon{display:block;width:100%;height:100%;max-width:100%;max-height:100%;overflow:visible;flex:none}
+/* P111 R35 · local source-backed SVG icon assets; no OS emoji-font or network dependency. */
+.game-vector-icon{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;overflow:visible;flex:none}
 .game-card-icon{padding:0;font-family:inherit!important;font-variant-emoji:normal!important}
-.game-card-icon .game-vector-icon{width:32px;height:32px;flex:none}
+.game-card-icon .game-vector-icon{width:32px;height:32px;flex:none;object-fit:contain}
 #homeView .recent-icon{font-size:0!important}
 #homeView .recent-icon .game-vector-icon{width:100%;height:100%;object-fit:contain}
-.game-tank-icon{fill:#447e56}
-@media(max-width:700px){#homeView .recent-icon .game-vector-icon{width:100%;height:100%}}
+.game-tank-icon{object-fit:contain}
+@media(max-width:700px){#homeView .recent-icon .game-vector-icon{width:100%;height:100%;object-fit:contain}}
 /* P111 R21.4 · center the session clock and float status notices over the game surface. */
 @media(min-width:1101px){
  .main-area:has(#workspaceView:not(.hidden)) .topbar{
@@ -1377,38 +1377,17 @@ body{font-size:15px}
 .game-fullscreen-exit:hover{background:#e4f2fb;border-color:#98c4db}
 .game-fullscreen-exit[hidden]{display:none!important}
 
-/* P111 R33 · cohesive soft-cute vector artwork: rounded contours, gentle depth and consistent highlights. */
-.game-vector-icon{
-  shape-rendering:geometricPrecision;
-  filter:drop-shadow(0 1.2px 1.2px rgba(39,61,79,.19));
-}
-.game-card-icon .game-vector-icon{
-  transform:translateY(0);
-  transition:transform .18s ease,filter .18s ease;
-}
-.game-card:hover .game-card-icon .game-vector-icon{
-  transform:translateY(-1px) scale(1.035);
-  filter:drop-shadow(0 2px 2px rgba(39,61,79,.23));
-}
-#homeView .recent-icon .game-vector-icon{
-  filter:drop-shadow(0 1.4px 1.4px rgba(39,61,79,.2));
-}
-@media(prefers-reduced-motion:reduce){
-  .game-card-icon .game-vector-icon{transition:none!important}
-}
-
-/* P111 R34 · remove the redundant uniform tile and let each game pictogram read at full size. */
-.game-card-icon{
-  width:48px!important;height:48px!important;flex:0 0 48px!important;
-  border-radius:0!important;background:transparent!important;
-  box-shadow:none!important;padding:0!important;
-}
-.game-card-icon .game-vector-icon{
-  width:46px!important;height:46px!important;max-width:none;max-height:none;
-}
+/* P111 R35 · familiar, playful game symbols without a repeated outer tile template. */
+.game-vector-icon{filter:drop-shadow(0 1px 1px rgba(39,61,79,.12))}
+.game-card-icon .game-vector-icon{transform:translateY(0);transition:transform .18s ease,filter .18s ease}
+.game-card:hover .game-card-icon .game-vector-icon{transform:translateY(-1px) scale(1.035);filter:drop-shadow(0 2px 2px rgba(39,61,79,.16))}
+#homeView .recent-icon .game-vector-icon{filter:drop-shadow(0 1px 1px rgba(39,61,79,.12))}
+.game-card-icon{width:48px!important;height:48px!important;flex:0 0 48px!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
+.game-card-icon .game-vector-icon{width:46px!important;height:46px!important;max-width:none;max-height:none}
 #gameGrid .game-card-icon{flex-basis:48px!important}
 @media(max-width:620px){
-  .game-card-icon{width:42px!important;height:42px!important;flex-basis:42px!important}
-  .game-card-icon .game-vector-icon{width:40px!important;height:40px!important}
-  #gameGrid .game-card-icon{flex-basis:42px!important}
+ .game-card-icon{width:42px!important;height:42px!important;flex-basis:42px!important}
+ .game-card-icon .game-vector-icon{width:40px!important;height:40px!important}
+ #gameGrid .game-card-icon{flex-basis:42px!important}
 }
+@media(prefers-reduced-motion:reduce){.game-card-icon .game-vector-icon{transition:none!important}}

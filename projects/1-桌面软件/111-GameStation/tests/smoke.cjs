@@ -512,7 +512,7 @@ const names=[
   assert.deepEqual(recent.map(x=>x.name),["俄罗斯方块","90 坦克","扫雷","中国象棋","黑白棋","四子棋","海战棋","中国跳棋","飞行棋"],"Recent games must show the nine newest games in order");
   assert.ok(recent.every((x,i)=>i%3===0||x.x>recent[i-1].x),"Recent games must run left-to-right within each row");
   assert.ok(recent.every(x=>x.icon&&(x.id==="tank"?x.hasTankSvg:!x.hasTankSvg)),"All recent games must use local SVG artwork, with the sourced tank vector retained");
-  assert.ok(recent.every(x=>x.iconGame===x.id&&x.iconStyle==="soft-cute"),"Recent games must reuse the same soft-cute SVG artwork as the game library");
+  assert.ok(recent.every(x=>x.iconGame===x.id&&x.iconStyle==="familiar-cute"),"Recent games must reuse the same familiar-cute SVG artwork as the game library");
   assert.equal(await page.locator('#homeRecentList .recent-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use the sourced top-view tank vector");
   const recentFit=await page.locator("#homeRecentList .recent-game").evaluateAll(nodes=>nodes.map(n=>({name:n.querySelector(".recent-copy strong").textContent.trim(),textBottom:n.querySelector(".recent-copy").getBoundingClientRect().bottom,listBottom:n.parentElement.getBoundingClientRect().bottom})));
   assert.ok(recentFit.every(x=>x.textBottom<=x.listBottom+1),"Recent tab labels must remain fully visible inside the list: "+JSON.stringify(recentFit));
@@ -543,7 +543,7 @@ const names=[
   await homePreviewButton.click();
   assert.equal(await page.locator("#homeGamePoster").getAttribute("data-game"),homePreviewGameId,"Single click on a recent game must only update the poster preview");
   const posterIcon=await page.locator("#homePosterArt .game-vector-icon").evaluate(svg=>({game:svg.dataset.game,style:svg.dataset.iconStyle}));
-  assert.deepEqual(posterIcon,{game:homePreviewGameId,style:"soft-cute"},"Featured poster must reuse the same bundled soft-cute game SVG");
+  assert.deepEqual(posterIcon,{game:homePreviewGameId,style:"familiar-cute"},"Featured poster must reuse the same bundled familiar-cute game SVG");
   await page.locator("#homeRecentList .recent-game").nth(1).dblclick();
   await page.locator("#workspaceView:not(.hidden)").waitFor({state:"visible"});
   assert.equal(await page.locator("#libraryView").evaluate(el=>el.classList.contains("hidden")),true,"Double-clicking a recent game must launch it directly, not open its category");
@@ -770,39 +770,35 @@ const names=[
   }));
   assert.ok(catalogIconLayout.background==="rgba(0, 0, 0, 0)"||catalogIconLayout.background==="transparent","Catalog icons must not sit inside a redundant uniform background tile");
   assert.ok(catalogIconLayout.svgWidth>=45,"Desktop catalog SVG artwork must render at full 46px size, not the old 32px thumbnail");
-  const iconAudit=await page.locator(".game-card-icon").evaluateAll(nodes=>nodes.map(node=>{
-    const svg=node.querySelector(".game-vector-icon");
-    return{id:node.dataset.game,svgGame:svg?.dataset.game,style:svg?.dataset.iconStyle,viewBox:svg?.getAttribute("viewBox"),
-      shapeCount:svg?.querySelectorAll("path,rect,circle,ellipse,polygon,line,polyline").length||0,
-      ids:[...(svg?.querySelectorAll("[id]")||[])].map(el=>el.id),
-      unresolved:svg?.outerHTML.includes("__ID__")||false,
-      pieces:[...(svg?.querySelectorAll("[data-piece]")||[])].map(el=>el.getAttribute("data-piece"))};
-  }));
-  assert.equal(new Set(iconAudit.map(icon=>icon.id)).size,24,"Every game must retain its own distinct icon identity");
-  assert.ok(iconAudit.every(icon=>icon.svgGame===icon.id&&icon.style==="soft-cute"&&icon.shapeCount>=2&&!icon.unresolved),"All 24 icons must render as complete soft-cute SVG artwork");
-  const iconIds=iconAudit.flatMap(icon=>icon.ids);
-  assert.ok(iconIds.length>=300&&new Set(iconIds).size===iconIds.length,"SVG gradient IDs must be unique across every rendered icon instance");
-  assert.equal(iconAudit.filter(icon=>icon.viewBox==="0 0 64 64").length,23,"All standard icons must use a consistent 64×64 viewBox");
-  assert.equal(iconAudit.find(icon=>icon.id==="tank").viewBox,"0 0 512 512","The attributed tank source must retain its original viewBox");
-  assert.ok(iconAudit.find(icon=>icon.id==="gomoku").pieces.includes("black")&&iconAudit.find(icon=>icon.id==="gomoku").pieces.includes("white"),"Gomoku must visibly distinguish its black and white stones");
-  assert.ok(iconAudit.find(icon=>icon.id==="checkers").pieces.includes("red")&&iconAudit.find(icon=>icon.id==="checkers").pieces.includes("dark"),"Western Checkers must visibly distinguish its red and dark pieces");
-  assert.equal(await page.locator(".game-card .game-icon-glyph").count(),0,"Game icons must not depend on OS emoji fonts");
-  assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
-  const tankVector=await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').evaluate(svg=>({
-    ns:svg.namespaceURI,viewBox:svg.getAttribute("viewBox"),path:!!svg.querySelector("path"),
-    pathLength:svg.querySelector("path")?.getAttribute("d")?.length||0,
-    width:svg.getBoundingClientRect().width,height:svg.getBoundingClientRect().height
-  }));
-  assert.equal(tankVector.ns,"http://www.w3.org/2000/svg","The sourced 90 Tank icon must be crisp native SVG");
-  assert.equal(tankVector.viewBox,"0 0 512 512");
-  assert.ok(tankVector.path&&tankVector.pathLength>900&&tankVector.width>24&&tankVector.height>24,"90 Tank must render the detailed armored tank vehicle, not a tank-top clothing icon");
-  assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-vector-icon').count(),1,"Minesweeper must use a bundled bomb SVG");
-  assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use its sourced tank SVG");
-  assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-vector-icon').count(),1,"Mahjong must use a bundled tile SVG");
-  const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
-  assert.deepEqual(iconCategories,["board","arcade"],"Bundled SVG icons must retain their board/arcade category metadata");
-  assert.equal(await page.locator('.game-card .game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"The 90 tank library icon must show the non-rasterized vector");
-  const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
+  await page.locator(".game-card .game-vector-icon").evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
+   const iconAudit=await page.locator(".game-card-icon").evaluateAll(nodes=>nodes.map(node=>{
+     const icon=node.querySelector(".game-vector-icon");
+     return{id:node.dataset.game,game:icon?.dataset.game,style:icon?.dataset.iconStyle,source:icon?.dataset.iconSource,
+       tag:icon?.tagName,src:icon?.getAttribute("src"),complete:icon?.complete,naturalWidth:icon?.naturalWidth,
+       naturalHeight:icon?.naturalHeight,alt:icon?.getAttribute("alt")};
+   }));
+   assert.equal(new Set(iconAudit.map(icon=>icon.id)).size,24,"Every game must retain its own distinct icon identity");
+   assert.ok(iconAudit.every(icon=>icon.game===icon.id&&icon.style==="familiar-cute"&&icon.tag==="IMG"&&icon.src.startsWith("./assets/icons/")&&icon.complete&&icon.naturalWidth>0&&icon.naturalHeight>0&&icon.alt===""),"All 24 local SVG assets must load, match their game identity and have no OS-font dependency");
+   assert.equal(new Set(iconAudit.map(icon=>icon.src)).size,24,"Every game must use its own icon asset");
+   assert.equal(iconAudit.filter(icon=>icon.source==="twemoji").length,12,"Twelve familiar symbols must come from bundled Twemoji artwork");
+   assert.equal(iconAudit.filter(icon=>icon.source==="custom-game-object").length,10,"Ten board/puzzle icons must depict their actual game objects");
+   assert.equal(iconAudit.filter(icon=>icon.source==="game-icons.net").length,2,"Chess and tank must use the attributed Game-icons.net vectors");
+   const iconDir=path.join(root,"assets/icons");
+   assert.equal(fs.readdirSync(iconDir).filter(file=>file.endsWith(".svg")).length,24,"The offline icon directory must contain exactly 24 SVG assets");
+   const gomokuSvg=fs.readFileSync(path.join(iconDir,"gomoku.svg"),"utf8");
+   const checkersSvg=fs.readFileSync(path.join(iconDir,"checkers.svg"),"utf8");
+   assert.ok(gomokuSvg.includes('data-piece="black"')&&gomokuSvg.includes('data-piece="white"'),"Gomoku must show wooden board and both black/white stones");
+   assert.ok(checkersSvg.includes('data-piece="red"')&&checkersSvg.includes('data-piece="dark"'),"Western Checkers must show a checkerboard and distinct red/dark pieces");
+   const tankSvg=fs.readFileSync(path.join(iconDir,"tank.svg"),"utf8");
+   const tankPath=tankSvg.match(/<path[^>]*d="([^"]+)"/);
+   assert.match(tankSvg,/viewBox="0 0 512 512"/);
+   assert.ok(tankPath&&tankPath[1].length>900,"90 Tank must retain the detailed sourced armored-vehicle silhouette");
+   assert.equal(await page.locator('.game-card-icon[data-game="tank"] .game-tank-icon').count(),1,"90 Tank must use its sourced local tank SVG");
+   assert.equal(await page.locator('.game-card-icon[data-game="minesweeper"] .game-vector-icon').count(),1,"Minesweeper must use its local bomb SVG");
+   assert.equal(await page.locator('.game-card-icon[data-game="mahjong"] .game-vector-icon').count(),1,"Mahjong must use its local mahjong-tile SVG");
+   const iconCategories=await page.locator('.game-card-icon[data-game="gomoku"],.game-card-icon[data-game="tank"]').evaluateAll(nodes=>nodes.map(n=>n.dataset.category));
+   assert.deepEqual(iconCategories,["board","arcade"],"Local SVG icons must retain their board/arcade category metadata");
+   const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});
   for(const size of [{width:1440,height:1000},{width:1366,height:768}]){
