@@ -1,4 +1,4 @@
-/* P111 Minesweeper R28 — classic blue glass board, reliable rules and records.
+/* P111 Minesweeper R29 — classic blue glass board, reliable rules and records.
    No network or external assets; all gameplay remains local to this iframe. */
 (function(){
 "use strict";
@@ -335,7 +335,7 @@ boardEl.addEventListener("mouseup",event=>{
  const i=cellFromEvent(event);
  if(event.button===1&&middleTarget>=0){
   const target=middleTarget;middleTarget=-1;
-  if(i===target)chord(target);
+  if(i===target)previewChord(target);
  }
  if(dualTarget>=0&&event.buttons!==3){
   const target=dualTarget;dualTarget=-1;
