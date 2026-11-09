@@ -24,7 +24,7 @@ const levelNames={easy:"初级",normal:"中级",hard:"高级"};
 const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 27V5" fill="none" stroke="#53677e" stroke-width="2.5" stroke-linecap="round"/><path d="M11 6h17l-5 7 5 7H11z" fill="#df4949" stroke="#a42e35" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 28h13" stroke="#4b6278" stroke-width="3" stroke-linecap="round"/></svg>';
 const bombSVG='<svg class="mine-symbol mine-bomb-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2v5M16 25v5M2 16h5M25 16h5M6.2 6.2l3.5 3.5M22.3 22.3l3.5 3.5M25.8 6.2l-3.5 3.5M9.7 22.3l-3.5 3.5" stroke="#344c5f" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="9.2" fill="#24313d" stroke="#131e2b" stroke-width="1.5"/><circle cx="12.9" cy="12.6" r="2.7" fill="#a8b9c4"/></svg>';
 let cells=[],nodes=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,triggerMine=-1;
-let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null;
+let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null,flashTimer=null,middleTarget=-1,dualTarget=-1;
 function emptyRecord(){return{played:0,won:0,best:null,streak:0};}
 function readRecords(){
  try{
@@ -68,15 +68,14 @@ function report(message){
 function fitBoard(){
  const rect=gameArea.getBoundingClientRect(),areaStyle=getComputedStyle(gameArea);
  const classic=document.querySelector(".mine-classic"),footer=document.querySelector(".mine-bottom-panel");
- const caption=document.querySelector(".mine-status-strip");
  const classicStyle=getComputedStyle(classic),gridStyle=getComputedStyle(boardEl);
  const px=value=>Number.parseFloat(value)||0;
  const overheadX=px(classicStyle.paddingLeft)+px(classicStyle.paddingRight)+
   px(classicStyle.borderLeftWidth)+px(classicStyle.borderRightWidth)+
   px(gridStyle.paddingLeft)+px(gridStyle.paddingRight)+px(gridStyle.borderLeftWidth)+
   px(gridStyle.borderRightWidth)+Math.max(0,W-1)*px(gridStyle.columnGap);
- const overheadY=footer.getBoundingClientRect().height+caption.getBoundingClientRect().height+
-  px(classicStyle.rowGap)*2+px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+
+ const overheadY=footer.getBoundingClientRect().height+
+  px(classicStyle.rowGap)+px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+
   px(classicStyle.borderTopWidth)+px(classicStyle.borderBottomWidth)+
   px(gridStyle.paddingTop)+px(gridStyle.paddingBottom)+px(gridStyle.borderTopWidth)+
   px(gridStyle.borderBottomWidth)+Math.max(0,H-1)*px(gridStyle.rowGap);
@@ -182,6 +181,9 @@ function render(){
 }
 function makeBoard(){
  stopTimer();
+ if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}
+ middleTarget=-1;dualTarget=-1;
+ nodes.forEach(node=>node.classList.remove("chord-flash"));
  cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));
  let placed=0;
  while(placed<MINES){
@@ -254,7 +256,7 @@ function evaluateWin(){if(opened===W*H-MINES)conclude(true);}
 function reveal(index){
  if(paused||over||index<0||index>=cells.length)return;
  const cell=cells[index];
- if(cell.open){if(cell.n>0)chord(index);return;}
+ if(cell.open)return;
  if(cell.flag)return;
  if(!started){
   protectFirstClick(index);
@@ -290,12 +292,63 @@ function cellFromEvent(event){
  const b=event.target instanceof Element?event.target.closest(".mine-cell"):null;
  return b&&boardEl.contains(b)?Number(b.dataset.index):-1;
 }
+function flashNeighbors(index){
+ const cell=cells[index];
+ if(paused||over||!cell?.open||cell.n===0)return false;
+ nodes.forEach(node=>node.classList.remove("chord-flash"));
+ const targets=neighbors(index).filter(i=>!cells[i].open);
+ targets.forEach(i=>nodes[i]?.classList.add("chord-flash"));
+ if(flashTimer!==null)clearTimeout(flashTimer);
+ flashTimer=setTimeout(()=>{
+  targets.forEach(i=>nodes[i]?.classList.remove("chord-flash"));
+  flashTimer=null;
+ },380);
+ return true;
+}
+function previewChord(index){
+ const cell=cells[index];
+ if(!flashNeighbors(index))return;
+ const board=cells,expected=cell.n;
+ const flagged=neighbors(index).filter(i=>cells[i].flag).length;
+ // The covered neighbours flash first, just like classic Minesweeper.
+ // Reveal only when the number of flags matches the number on the centre tile.
+ if(flagged!==expected)return;
+ setTimeout(()=>{
+  if(cells!==board||paused||over||!cells[index]?.open)return;
+  if(neighbors(index).filter(i=>cells[i].flag).length===expected)chord(index);
+ },230);
+}
 boardEl.addEventListener("click",event=>{const i=cellFromEvent(event);if(i>=0)reveal(i);});
 boardEl.addEventListener("contextmenu",event=>{event.preventDefault();const i=cellFromEvent(event);if(i>=0)toggleFlag(i);});
-boardEl.addEventListener("mousedown",event=>{if(event.button===1)event.preventDefault();});
+boardEl.addEventListener("mousedown",event=>{
+ const i=cellFromEvent(event);
+ if(event.button===1){
+  event.preventDefault();
+  if(i>=0&&cells[i]?.open&&cells[i].n>0){middleTarget=i;flashNeighbors(i);}
+ }
+ // Traditional Windows chord: press left and right together on a number.
+ if(event.buttons===3&&i>=0&&cells[i]?.open&&cells[i].n>0){
+  dualTarget=i;flashNeighbors(i);
+ }
+});
+boardEl.addEventListener("mouseup",event=>{
+ const i=cellFromEvent(event);
+ if(event.button===1&&middleTarget>=0){
+  const target=middleTarget;middleTarget=-1;
+  if(i===target)chord(target);
+ }
+ if(dualTarget>=0&&event.buttons!==3){
+  const target=dualTarget;dualTarget=-1;
+  if(i===target)chord(target);
+ }
+});
 boardEl.addEventListener("auxclick",event=>{
- if(event.button!==1)return;
- event.preventDefault();const i=cellFromEvent(event);if(i>=0)chord(i);
+ if(event.button===1)event.preventDefault();
+});
+boardEl.addEventListener("dblclick",event=>{
+ const i=cellFromEvent(event);
+ if(i<0||!cells[i]?.open||cells[i].n===0)return;
+ event.preventDefault();previewChord(i);
 });
 boardEl.addEventListener("pointerdown",event=>{
  if(event.button===0&&!over&&!paused&&started)face.textContent="😮";
@@ -347,6 +400,8 @@ if(isFixture){
   reveal(index){reveal(index);return fixtureState();},
   toggleFlag(index){toggleFlag(index);return fixtureState();},
   chord(index){chord(index);return fixtureState();},
+  previewChord(index){previewChord(index);return fixtureState();},
+  flashNeighbors(index){flashNeighbors(index);return fixtureState();},
   stopTimer,
   forceFlag(index){if(cells[index]){cells[index].flag=true;render();}return fixtureState();},
   forceMine(index){
