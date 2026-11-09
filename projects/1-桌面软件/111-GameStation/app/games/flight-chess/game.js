@@ -14,8 +14,8 @@ const fitHistoryHeight=()=>{
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
 window.addEventListener("resize",fitHistoryHeight);
 fitHistoryHeight();requestAnimationFrame(fitHistoryHeight);
-// Exact mapping to the supplied 1100×1100 SVG board. The playable ring is
-// clockwise from red: 48 outer holes + four colored launch squares.
+// Exact mapping to the supplied 1100×1100 SVG board. Route index 0 is the
+// red home-lane entrance; the four START markers are at indices 3,16,29,42.
 const scalePoint=([x,y])=>[x*BOARD_SCALE,y*BOARD_SCALE];
 const rawTrack=[
  [1024,550],[1022,628],[1022,708],[1018,782],[944,786],[864,786],
