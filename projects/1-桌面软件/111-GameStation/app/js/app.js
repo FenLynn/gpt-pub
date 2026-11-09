@@ -232,7 +232,7 @@ function renderRanking(){
   const li=document.createElement("li");li.className="ranking-row";
   const value=rankingType==="time"?fmtDuration(x.stat.totalMs):rankingType==="plays"?x.stat.plays+" 次":x.stat.bestScore.toLocaleString("zh-CN");
   const button=document.createElement("button");button.type="button";button.className="ranking-open";button.setAttribute("aria-label","打开"+x.game.name);
-  const rank=i<3?'<span class="ranking-rank ranking-medal" aria-label="第'+(i+1)+'名">'+["🥇","🥈","🥉"][i]+'</span>':'<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span>';
+  const rank=i<3?'<span class="ranking-rank ranking-medal" aria-label="第'+(i+1)+'名"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 6 2-6h4l-3 9h-6z" fill="'+["#d9a52f","#9caab4","#b77b4c"][i]+'"/><circle cx="12" cy="16" r="5.5" fill="'+["#f3cf69","#d5dce1","#d5a078"][i]+'" stroke="'+["#b7831d","#7d8a95","#98603c"][i]+'" stroke-width="1.2"/><path d="M9 20l-1 3 4-1 4 1-1-3" fill="'+["#d9a52f","#9caab4","#b77b4c"][i]+'"/></svg></span>':'<span class="ranking-rank">'+String(i+1).padStart(2,"0")+'</span>';
   button.innerHTML=rank+'<span class="ranking-name" title="'+escapeHtml(x.game.name)+'">'+escapeHtml(x.game.name)+'</span><span class="ranking-value">'+value+'</span>';
   button.addEventListener("click",()=>openGame(x.game.id));li.appendChild(button);list.appendChild(li);
  });
