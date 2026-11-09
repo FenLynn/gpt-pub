@@ -2,10 +2,9 @@
 const el=document.getElementById("board"),status=document.getElementById("status"),rollButton=document.getElementById("rollButton"),diceFace=document.getElementById("diceFace"),turnText=document.getElementById("turnText");
 const layoutRoot=document.getElementById("game");
 const BOARD_SCALE=900/1100;
-// Align both side rails with the visible 867-unit source-board frame,
-// scaled from the supplied 1100-unit SVG board.
+// Preserve the established 90%-height side-rail alignment around the board.
 const fitHistoryHeight=()=>{
- const rect=el.getBoundingClientRect(),h=rect.height*(1060*BOARD_SCALE)/900;
+ const rect=el.getBoundingClientRect(),h=rect.height*810/900;
  if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
   layoutRoot.style.setProperty("--reversi-board-height",h+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
