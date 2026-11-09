@@ -8,7 +8,7 @@ const fitHistoryHeight=()=>{
  if(h>0&&layoutRoot.classList.contains("gs-tools-open")){
   layoutRoot.style.setProperty("--reversi-board-height",h+"px");
   // Release the first paint only after workspace CSS, HUD and sizing are set.
-  if(document.getElementById("gs-turn-clock")&&el.childElementCount>0)layoutRoot.dataset.boardMeasured="true";
+  if(document.getElementById("gs-turn-clock")&&el.querySelector(".flight-board-art")?.dataset.loaded==="true")layoutRoot.dataset.boardMeasured="true";
  }
 };
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitHistoryHeight).observe(el);
@@ -293,7 +293,7 @@ function drawClassicBoard(){
  const artwork=svgNode("image",{x:0,y:0,width:900,height:900,
   href:"./board.svg?v=flight-board-r60",preserveAspectRatio:"xMidYMid meet",
   class:"flight-board-art","aria-hidden":"true"});
- artwork.addEventListener("load",()=>{artwork.dataset.loaded="true";});
+ artwork.addEventListener("load",()=>{artwork.dataset.loaded="true";fitHistoryHeight();});
  artwork.addEventListener("error",()=>{artwork.dataset.error="true";});
  el.append(artwork);
  const meta=svgNode("g",{class:"flight-rule-map","aria-hidden":"true"});
@@ -356,9 +356,10 @@ function drawClassicBoard(){
  el.append(meta);
 }
 function draw(){
+ const artwork=el.querySelector(".flight-board-art"),ruleMap=el.querySelector(".flight-rule-map");
  el.replaceChildren();
+ if(artwork&&ruleMap)el.append(artwork,ruleMap);else drawClassicBoard();
  const pos=(x,y)=>[x,y];
- drawClassicBoard();
  // Numbered stepping stones belong to the chosen airplane only, never to a
  // decorative second board. A separate green end marker commits the move.
  const preview=selectedPlane===null||paused||over?null:routeFor(selectedPlane);
