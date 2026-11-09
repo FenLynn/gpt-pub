@@ -758,6 +758,7 @@ const names=[
   await library();
   assert.equal(await page.locator(".game-card").count(),24);
   assert.equal(await page.locator("#homeView .ranking-trophy svg").count(),1,"Leaderboard trophy must be a bundled SVG, not an OS emoji");
+  assert.equal(await page.locator("#homeView .ranking-rank.ranking-medal svg").count(),3,"Top-three medals must be bundled SVGs, not OS emoji");
   assert.equal(await page.locator(".game-card .game-vector-icon").count(),24,"All 24 game icons must use bundled vector artwork");
   assert.equal(await page.locator(".game-card .game-icon-glyph").count(),0,"Game icons must not depend on OS emoji fonts");
   assert.equal(await page.locator(".game-card .game-icon-svg").count(),0,"The old unsourced game logo SVGs must not be used");
