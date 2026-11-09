@@ -360,6 +360,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
    await mine.evaluate(()=>window.__p111MineTest.toggleFlag(1));
    await mine.locator(".mine-cell").nth(0).click({button:"middle"});
+   assert.ok(await mine.locator(".mine-cell.chord-flash").count()>0,"Middle-clicking an open number must flash covered neighbours");
+   await mine.waitForTimeout(300);
    mineState=await mine.evaluate(()=>window.__p111MineTest.state());
    assert.equal(mineState.cells[4].open,true,"Middle-clicking an open numbered cell must chord correctly");
 
