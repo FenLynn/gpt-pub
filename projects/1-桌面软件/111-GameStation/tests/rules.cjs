@@ -295,7 +295,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    await mine.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href+"?p111Test=1");
    await mine.waitForFunction(()=>!!window.__p111MineTest);
    await mine.evaluate(()=>window.postMessage({channel:"gamestation",protocolVersion:1,gameId:"minesweeper",type:"INIT",payload:{name:"扫雷",difficulty:"normal",hasDifficulty:true}},"*"));
-   await mine.waitForSelector("#gs-hud");
+   await mine.waitForFunction(()=>!!document.querySelector("#gs-hud"));
    assert.equal(await mine.locator("#gs-mode").count(),0,"Single-player Minesweeper must not show an empty battle-mode selector");
    assert.equal(await mine.locator("#gs-difficulty").count(),1,"Minesweeper should retain its difficulty selector");
    assert.equal(await mine.locator(".mine-status-strip").count(),0,"The top status strip must be removed");
