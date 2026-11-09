@@ -558,9 +558,10 @@ const names=[
   await page.locator('[data-recent-tab="recent"]').click();
   assert.equal(await page.locator(".hero-kicker,.home-art,.quick-start,.featured-section,.hero-description,#recentSubtitle").count(),0,"No banner/recent annotation, decorative kicker or duplicate game library");
   assert.equal(await page.locator(".ranking-mark").innerText(),"前十名");
-  assert.equal(await page.locator(".ranking-trophy").innerText(),"🏆","Leaderboard must show a trophy mark");
+  assert.equal(await page.locator(".ranking-trophy svg").count(),1,"Leaderboard must show a bundled SVG trophy");
   assert.equal(await page.locator(".ranking-heading p").count(),0,"Remove the redundant local-record subtitle");
-  assert.deepEqual(await page.locator("#rankingList .ranking-medal").allInnerTexts(),["🥇","🥈","🥉"],"Top three ranks must use gold, silver and bronze medals");
+  const medalFills=await page.locator("#rankingList .ranking-medal svg circle").evaluateAll(nodes=>nodes.map(node=>node.getAttribute("fill")));
+  assert.deepEqual(medalFills,["#f3cf69","#d5dce1","#d5a078"],"Top three ranks must use gold, silver and bronze SVG medals");
   assert.equal(await page.locator("#activityRange").innerText(),"近 12 个月");
   assert.ok(!(await page.locator("#activitySummary").innerText()).includes("近 12 个月"),"The activity period must not be duplicated");
   assert.deepEqual(await page.locator(".heatmap-weekdays span").allInnerTexts(),["周一","周三","周五"],"Weekday labels must be explicit");
