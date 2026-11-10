@@ -1521,7 +1521,7 @@ const names=[
   await cannonPage.close();
   // The breadcrumb is an actual navigation path: Game -> category -> current game.
   await library();await open("五子棋");
-  assert.equal((await page.locator("#topbar .breadcrumbs").innerText()).replace(/\\s+/g,""),"Game›棋类›五子棋");
+  assert.equal((await page.locator("#topbar .breadcrumbs").innerText()).replace(/\s+/g,""),"Game›棋类›五子棋");
   await page.locator("#breadcrumbCategory").click();
   await page.locator("#libraryView").waitFor({state:"visible"});
   assert.equal(await page.locator("#libraryTitle").innerText(),"棋类","Category breadcrumb must open the corresponding game menu");
