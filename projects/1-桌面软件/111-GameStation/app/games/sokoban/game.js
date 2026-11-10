@@ -25,5 +25,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   undo(){undo();return fixtureState();}
  };
 }
-GameBridge.register({init:parse,newGame:parse,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续闯关");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
+GameBridge.register({init:parse,newGame:parse,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续闯关");},snapshot(){return{level,player,boxes:[...boxes],goals:[...goals],walls:[...walls],moves,history:history.map(h=>({player:h.player,boxes:h.boxes.slice(),moves:h.moves}))};},restore(s){if(!s||!Number.isInteger(s.level)||!Array.isArray(s.boxes)||!Array.isArray(s.goals)||!Array.isArray(s.walls))throw new Error("推箱子存档数据无效");level=Math.max(0,Math.min(levels.length-1,s.level));player=Number(s.player)||0;boxes=new Set(s.boxes.map(Number));goals=new Set(s.goals.map(Number));walls=new Set(s.walls.map(Number));moves=Math.max(0,Number(s.moves)||0);history=Array.isArray(s.history)?s.history.map(h=>({player:Number(h.player)||0,boxes:Array.isArray(h.boxes)?h.boxes.map(Number):[],moves:Math.max(0,Number(h.moves)||0)})):[];paused=true;render();report("已恢复上次进度");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();
