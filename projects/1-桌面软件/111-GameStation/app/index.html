@@ -53,6 +53,7 @@
             <button class="top-action" id="pauseButton" title="暂停" aria-label="暂停" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
             <button class="top-action next-action" id="newGameButton" title="下一局" aria-label="下一局" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg></button>
           </div>
+          <button class="top-action progress-action hidden" id="progressButton" type="button" title="保存或恢复本局进度" aria-label="保存进度" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2zM7 3v6h10V3M7 21v-7h10v7M9 17h6"/></svg><span id="progressButtonLabel">保存进度</span></button>
           <button class="help-action hidden" id="helpButton" title="游戏帮助" aria-label="帮助">帮助</button>
           <button class="icon-action" id="fullscreenButton" title="游戏全屏（隐藏导航与顶栏）" aria-label="游戏全屏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg></button>
         </div>
@@ -146,6 +147,13 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
               <span>继续</span>
             </button>
+          </div>
+        </div>
+        <div class="restore-countdown-overlay" id="restoreCountdownOverlay" hidden aria-hidden="true">
+          <div class="restore-countdown-card">
+            <span>已恢复上次进度</span>
+            <strong id="restoreCountdownNumber">3</strong>
+            <span>准备好，马上继续</span>
           </div>
         </div>
         <section class="game-result-overlay" id="gameResultOverlay" hidden aria-hidden="true" aria-label="本局结算">
