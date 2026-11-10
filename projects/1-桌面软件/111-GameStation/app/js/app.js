@@ -97,10 +97,11 @@ function showGameNotice(message,timeout=2400,persistent=false){
 function clearGameNotice(){clearTimeout(centerNoticeTimer);permanentGameStatus="";setGameNoticeText("");}
 function toast(message){const el=$("toast");if(active){el.classList.remove("show");showGameNotice(message);return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[]))),firstStartedAt=Math.max(0,Number(read("firstStartedAt",0))||0);
-let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="";
+let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="",savedProgress=null,restoredThisSession=false,snapshotRequestId=null,restorePending=null,restoreCountdownTimer=null;
 
 const scoringGames=new Set(["2048","memory","tetris","snake","pong","contra","mario","tank","doudizhu","mahjong","sanguosha"]);
 const nativeResultGames=new Set(["gomoku","xiangqi"]);
+const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","snake","pong","contra","mario","tank"]);
 function hideGameResult(){const el=$("gameResultOverlay");el.hidden=true;el.setAttribute("aria-hidden","true");}
 function showGameResult(payload={},manual=false){
  if(!active)return;
@@ -347,6 +348,98 @@ function setGameState(){
  overlay.hidden=!visible;overlay.setAttribute("aria-hidden",String(!visible));
  $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
  if(active&&ready)send("HUD_STATE",{ready,started,paused,finished,elapsed:session?fmtClock(session.elapsedMs):"00:00",modeIndex,difficulty});
+ renderProgressButton();
+}
+function readProgress(id){
+ const all=read("progress",{});
+ const item=all&&typeof all==="object"&&!Array.isArray(all)?all[id]:null;
+ if(!item||item.schemaVersion!==1||item.gameId!==id||!item.state||typeof item.state!=="object"||Array.isArray(item.state))return null;
+ return item;
+}
+function writeProgress(id,item){
+ const all=read("progress",{});
+ const next=all&&typeof all==="object"&&!Array.isArray(all)?{...all}:{};
+ next[id]=item;
+ return write("progress",next);
+}
+function clearProgress(id){
+ const all=read("progress",{});
+ if(!all||typeof all!=="object"||Array.isArray(all))return;
+ const next={...all};delete next[id];
+ write("progress",next);
+ if(active?.id===id)savedProgress=null;
+ renderProgressButton();
+}
+function renderProgressButton(){
+ const button=$("progressButton"),label=$("progressButtonLabel");
+ if(!button||!label)return;
+ const visible=!!active&&!workspaceView.classList.contains("hidden");
+ button.classList.toggle("hidden",!visible);
+ if(!visible)return;
+ const canRestore=!!savedProgress&&!restoredThisSession;
+ label.textContent=canRestore?"恢复进度":"保存进度";
+ button.setAttribute("aria-label",canRestore?"恢复上次保存的进度":"保存当前游戏进度");
+ button.title=canRestore?"恢复上次保存的游戏进度":"保存当前游戏进度；再次保存将覆盖旧进度";
+ button.disabled=!ready||!session||!!session.finished||!!snapshotRequestId||!!restorePending||restoreCountdownTimer!==null;
+}
+function saveProgress(){
+ if(!active||!ready||!session||session.finished||snapshotRequestId||restorePending)return;
+ snapshotRequestId="save-"+Date.now()+"-"+Math.random().toString(16).slice(2);
+ renderProgressButton();
+ send("SNAPSHOT_REQUEST",{requestId:snapshotRequestId});
+}
+function activateRestoredGame(){
+ if(!active||!ready||!session||session.finished)return;
+ if(!roundCounted)countRound();
+ $("restoreCountdownOverlay").hidden=true;
+ $("restoreCountdownOverlay").setAttribute("aria-hidden","true");
+ send("RESUME");startClock();focusGameFrame();renderProgressButton();
+}
+function startRestoreCountdown(){
+ const overlay=$("restoreCountdownOverlay"),number=$("restoreCountdownNumber");
+ if(!overlay||!number){activateRestoredGame();return;}
+ let remaining=3;number.textContent="3";
+ overlay.hidden=false;overlay.setAttribute("aria-hidden","false");
+ renderProgressButton();
+ restoreCountdownTimer=setInterval(()=>{
+  remaining--;
+  if(remaining>0){number.textContent=String(remaining);return;}
+  clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;
+  overlay.hidden=true;overlay.setAttribute("aria-hidden","true");
+  activateRestoredGame();
+ },1000);
+}
+function restoreProgress(){
+ if(!active||!ready||!savedProgress||restoredThisSession||restorePending||snapshotRequestId)return;
+ if(savedProgress.schemaVersion!==1||savedProgress.gameId!==active.id){toast("存档版本不兼容，无法恢复");return;}
+ restorePending={requestId:"restore-"+Date.now()+"-"+Math.random().toString(16).slice(2),item:savedProgress};
+ renderProgressButton();
+ send("RESTORE_STATE",{requestId:restorePending.requestId,snapshot:savedProgress.state});
+}
+function handleProgressSnapshot(payload){
+ if(!snapshotRequestId||payload?.requestId!==snapshotRequestId)return;
+ snapshotRequestId=null;
+ if(payload?.error||!payload?.snapshot||typeof payload.snapshot!=="object"){
+  toast(payload?.error||"保存进度失败");renderProgressButton();return;
+ }
+ const elapsedMs=Math.max(0,Number(session?.elapsedMs)||0)+(session?.running?Math.max(0,Date.now()-session.lastTick):0);
+ const item={schemaVersion:1,gameId:active.id,savedAt:Date.now(),modeIndex,difficulty,
+  elapsedMs,score:Number(session?.score??currentScore)||0,roundCounted:!!roundCounted,state:payload.snapshot};
+ if(!writeProgress(active.id,item)){toast("本地存储空间不足，未能保存进度");renderProgressButton();return;}
+ savedProgress=item;restoredThisSession=true;renderProgressButton();toast("游戏进度已保存");
+}
+function handleProgressRestored(payload){
+ if(!restorePending||payload?.requestId!==restorePending.requestId)return;
+ const item=restorePending.item;restorePending=null;
+ if(!payload?.ok){
+  toast(payload?.error||"恢复进度失败");renderProgressButton();return;
+ }
+ session.elapsedMs=Math.max(0,Number(item.elapsedMs)||0);
+ session.score=Math.max(0,Number(item.score)||0);session.running=false;session.finished=false;session.needsInit=false;
+ currentScore=session.score;roundCounted=!!item.roundCounted;started=true;paused=true;restoredThisSession=true;
+ setGameState();renderProgressButton();
+ if(countdownRestoreGames.has(active.id))startRestoreCountdown();
+ else activateRestoredGame();
 }
 function persistSessionTime(){if(!session||!session.running)return;const now=Date.now(),delta=Math.max(0,now-session.lastTick);session.lastTick=now;session.elapsedMs+=delta;const s=statFor(session.id),key=dateKey(new Date(now));s.totalMs+=delta;s.days[key]=(Number(s.days[key])||0)+delta;}
 function startClock(){if(!session||session.running)return;session.running=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
@@ -354,7 +447,7 @@ function stopClock(){if(session&&session.running){persistSessionTime();session.r
 function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(active&&ready)send("HUD_STATE",{ready,started,paused,finished:!!session?.finished,elapsed:fmtClock(session.elapsedMs),modeIndex,difficulty});if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
 function countRound(){if(!session||roundCounted)return;const now=Date.now(),s=statFor(session.id);if(!firstStartedAt){firstStartedAt=inferFirstStartedAt()||now;write("firstStartedAt",firstStartedAt);}s.plays++;s.lastPlayed=dateKey(new Date(now));s.lastPlayedAt=now;roundCounted=true;persistStats();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();}
 function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");startClock();focusGameFrame();toast("开始游戏");}
-function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;persistStats();setGameState();showGameNotice("已结束",0,true);showGameResult({},true);}
+function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;clearProgress(session.id);persistStats();setGameState();showGameNotice("已结束",0,true);showGameResult({},true);}
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
 function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");startClock();focusGameFrame();toast("继续游戏");}
 function togglePause(){if(paused)resumeGame();else pauseGame();}
@@ -366,12 +459,13 @@ function focusGameFrame(){
 }
 function newRound(){
  if(!ready||!session)return;
+ clearProgress(session.id);restoredThisSession=false;
  hideGameResult();clearGameNotice();
  stopClock();session.elapsedMs=0;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;
  currentScore=0;started=false;roundCounted=false;paused=true;
  send("NEW_GAME");send("RESUME");countRound();startClock();focusGameFrame();setGameState();renderGameControls();
 }
-function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;
+function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;clearProgress(session.id);
  const score=Number(payload.score??session.score);if(scoringGames.has(session.id)&&Number.isFinite(score))session.score=score;
  const s=statFor(session.id);if(Number.isFinite(Number(payload.score)))s.bestScore=Math.max(s.bestScore,Number(payload.score));
  const msg=String(payload.message||"");if((typeof payload.win==="boolean"?payload.win:!payload.draw&&/获胜|胜利|通关|完成|挑战成功|你赢/.test(msg)))s.wins++;
@@ -380,16 +474,30 @@ function finishGame(payload={}){if(!session||session.finished)return;stopClock()
 }
 function openGame(id){
  const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;
+ savedProgress=readProgress(g.id);restoredThisSession=false;snapshotRequestId=null;restorePending=null;
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
- ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;helpSource={lines:[],note:""};hideGameResult();
+ ready=false;paused=true;started=false;roundCounted=false;
+ modeIndex=savedProgress?Math.max(0,Math.min((g.modes?.length||1)-1,Number(savedProgress.modeIndex)||0)):0;
+ difficulty=savedProgress&&["easy","normal","hard"].includes(savedProgress.difficulty)?savedProgress.difficulty:"normal";
+ currentScore=0;helpSource={lines:[],note:""};hideGameResult();
  session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
  setBreadcrumb();$("gameActions").classList.remove("hidden");$("helpButton").classList.remove("hidden");
- renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
+ renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;renderProgressButton();
  $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("gameNotice").classList.remove("hidden");clearGameNotice();$("helpTitle").textContent=g.name+" · 玩法";
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
 }
-function closeGame(){hideGameResult();if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}active=null;session=null;ready=false;paused=true;started=false;if(gameFullscreenRequested){gameFullscreenRequested=false;syncGameFullscreen();}$("gamePauseOverlay").hidden=true;$("gamePauseOverlay").setAttribute("aria-hidden","true");$("hostGameTimer").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("helpButton").classList.add("hidden");clearGameNotice();$("gameNotice").classList.add("hidden");}
+function closeGame(){
+ if(restoreCountdownTimer!==null){clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;}
+ $("restoreCountdownOverlay").hidden=true;$("restoreCountdownOverlay").setAttribute("aria-hidden","true");
+ snapshotRequestId=null;restorePending=null;
+ hideGameResult();if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}
+ active=null;session=null;savedProgress=null;restoredThisSession=false;ready=false;paused=true;started=false;
+ if(gameFullscreenRequested){gameFullscreenRequested=false;syncGameFullscreen();}
+ $("gamePauseOverlay").hidden=true;$("gamePauseOverlay").setAttribute("aria-hidden","true");
+ $("hostGameTimer").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("progressButton").classList.add("hidden");$("helpButton").classList.add("hidden");
+ clearGameNotice();$("gameNotice").classList.add("hidden");
+}
 window.addEventListener("message",event=>{
  if(!active||event.source!==frame.contentWindow)return;
  const m=event.data;
@@ -402,9 +510,12 @@ window.addEventListener("message",event=>{
   setGameState();
   $("stageLoading").classList.add("done");
   send("SET_RAIL",{collapsed:false});
+  renderProgressButton();
   return;
  }
  if(m.sessionId!==sessionId)return;
+ if(m.type==="SNAPSHOT"){handleProgressSnapshot(m.payload||{});return;}
+ if(m.type==="RESTORED"){handleProgressRestored(m.payload||{});return;}
  if(m.type==="HOTKEY"){if(started&&!session?.finished&&["toggle","pause","start"].includes(m.payload?.action))togglePause();return;}
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
@@ -451,7 +562,7 @@ function openSettings(){$("settingsBackdrop").classList.remove("hidden");applySe
 function closeSettings(){$("settingsBackdrop").classList.add("hidden");}
 function exportData(){const payload={app:"GameStation",schemaVersion:2,appVersion:"1.1",exportedAt:new Date().toISOString(),firstStartedAt:firstStartedAt||inferFirstStartedAt(),stats:normalizeStats(stats),favorites:normalizeFavorites([...favorites]),settings:normalizeSettings(settings)};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="gamestation-backup-"+dateKey(new Date())+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast("本地 JSON 备份已生成");}
 function importData(file){const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(String(reader.result));if(!data||data.app!=="GameStation"||![1,2].includes(Number(data.schemaVersion))||!data.stats||typeof data.stats!=="object"||Array.isArray(data.stats))throw new Error("格式不正确");if(!confirm("导入备份将替换本机现有的游戏记录、收藏和界面设置。建议先导出当前数据。继续吗？"))return;const nextStats=normalizeStats(data.stats),nextFavorites=normalizeFavorites(data.favorites),nextSettings=normalizeSettings(data.settings);if(!write("stats",nextStats)||!write("favorites",nextFavorites)||!write("settings",nextSettings))throw new Error("本地存储写入失败");stats=nextStats;firstStartedAt=Math.max(0,Number(data.firstStartedAt)||0)||inferFirstStartedAt();if(firstStartedAt)write("firstStartedAt",firstStartedAt);else try{localStorage.removeItem(storePrefix+"firstStartedAt");}catch(e){}favorites=new Set(nextFavorites);settings=nextSettings;applySettings();renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();toast("备份已恢复到当前浏览器");}catch(e){toast("备份文件无效、损坏或版本不兼容");}};reader.onerror=()=>toast("无法读取备份文件");reader.readAsText(file);}
-function clearData(){if(!confirm("确定清空本机的游戏时间、成绩、次数和收藏吗？此操作不可撤销。"))return;stats={};firstStartedAt=0;try{localStorage.removeItem(storePrefix+"firstStartedAt");}catch(e){}favorites.clear();write("stats",stats);write("favorites",[]);renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();toast("本机记录已清空");}
+function clearData(){if(!confirm("确定清空本机的游戏时间、成绩、次数、收藏和已保存进度吗？此操作不可撤销。"))return;stats={};firstStartedAt=0;try{localStorage.removeItem(storePrefix+"firstStartedAt");localStorage.removeItem(storePrefix+"progress");}catch(e){}favorites.clear();savedProgress=null;restoredThisSession=false;write("stats",stats);write("favorites",[]);renderProgressButton();renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();toast("本机记录已清空");}
 $("mobileMenu").addEventListener("click",()=>shell.classList.toggle("menu-open"));
 document.querySelectorAll("[data-view='home']").forEach(b=>b.addEventListener("click",showHome));
 document.querySelectorAll(".nav-item[data-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.category)));
@@ -461,6 +572,7 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  $("startButton").addEventListener("click",()=>{if(started)endGame();else startGame();});$("pauseButton").addEventListener("click",togglePause);$("newGameButton").addEventListener("click",newRound);$("gamePauseResume").addEventListener("click",resumeGame);
  $("gameResultReplay").addEventListener("click",newRound);
  $("gameResultLeave").addEventListener("click",()=>{if(active)showLibrary(active.category);});
+$("progressButton").addEventListener("click",()=>{if(savedProgress&&!restoredThisSession)restoreProgress();else saveProgress();});
  document.querySelectorAll("[data-recent-tab]").forEach(b=>b.addEventListener("click",()=>{
   homeRecentTab=b.dataset.recentTab==="popular"?"popular":"recent";renderHomeRecent();
  }));
