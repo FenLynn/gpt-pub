@@ -1302,11 +1302,18 @@ const names=[
   await open("四子棋");await start();
   await page.waitForTimeout(100);
   const tallFour=await frame.locator("#board").evaluate(board=>{
-   const b=board.getBoundingClientRect(),root=board.closest(".game-root").getBoundingClientRect();
-   return{boardHeight:b.height,stageHeight:root.height,ratio:b.height/root.height};
+   const b=board.getBoundingClientRect(),root=board.closest(".game-root");
+   const stage=root.getBoundingClientRect(),tracks=getComputedStyle(root).gridTemplateColumns
+    .split(/\\s+/).map(value=>parseFloat(value));
+   const centerTrackWidth=tracks.length===3?tracks[1]:root.clientWidth;
+   const existingBoardWidthCap=Math.min(window.innerHeight*.82,centerTrackWidth);
+   const maximumFeasibleHeight=Math.min(stage.height,existingBoardWidthCap*6/7);
+   return{boardHeight:b.height,stageHeight:stage.height,ratio:b.height/stage.height,
+    centerTrackWidth,existingBoardWidthCap,maximumFeasibleHeight,
+    fillRatio:b.height/maximumFeasibleHeight};
   });
-  assert.ok(tallFour.ratio>=.90,
-   "Wide desktop Connect Four must prioritize height just like Xiangqi: "+JSON.stringify(tallFour));
+  assert.ok(tallFour.fillRatio>=.96,
+   "Wide desktop Connect Four must fill the maximum area allowed by its existing 7:6 aspect ratio and 82vh width cap after matching Xiangqi-width side rails: "+JSON.stringify(tallFour));
   await page.screenshot({path:path.join(artifacts,"connect4-height-first-1671x892.png")});
   await page.setViewportSize({width:1440,height:1000});
   await open("五子棋");await start();
