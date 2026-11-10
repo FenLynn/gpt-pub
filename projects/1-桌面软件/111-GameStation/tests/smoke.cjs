@@ -399,13 +399,14 @@ const names=[
   assert.ok(header.visible&&header.iconCount===3,name+" all three SVG game buttons must be in the parent topbar");
   assert.ok(header.crumb.right<=header.notice.x+2,name+" LED notice must sit after the game breadcrumb");
   if(width>=901){
-   const title=await page.locator("#breadcrumbCategory").evaluate(el=>{
-    const text=el.getBoundingClientRect(),notice=document.querySelector("#gameNotice").getBoundingClientRect();
+   const title=await page.locator("#breadcrumbGame").evaluate(el=>{
+    const text=el.getBoundingClientRect(),crumb=el.closest(".breadcrumbs"),notice=document.querySelector("#gameNotice").getBoundingClientRect();
     return{label:el.textContent,available:el.clientWidth,required:el.scrollWidth,
+     crumbAvailable:crumb.clientWidth,crumbRequired:crumb.scrollWidth,
      actualRight:text.right,noticeLeft:notice.left,tooltip:el.title};
    });
    assert.equal(title.tooltip,name,name+" game title must provide a full-name fallback");
-   assert.ok(title.required<=title.available+2&&title.actualRight<=title.noticeLeft+2,
+   assert.ok(title.required<=title.available+2&&title.crumbRequired<=title.crumbAvailable+2&&title.actualRight<=title.noticeLeft+2,
     name+" game title must fit the left header without truncation or overlapping LED: "+JSON.stringify(title));
   }
   const stop=await page.locator("#startButton.end-action svg rect").evaluate(el=>({
