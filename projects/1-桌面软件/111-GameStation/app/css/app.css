@@ -1395,3 +1395,24 @@ body{font-size:15px}
  #gameGrid .game-card-icon{flex-basis:42px!important}
 }
 @media(prefers-reduced-motion:reduce){.game-card-icon .game-vector-icon{transition:none!important}}
+
+
+/* R36.2 · retain the complete host action row at the 1366px desktop baseline.
+   Keep save/restore text visible while reducing only horizontal chrome. */
+@media(min-width:1121px) and (max-width:1400px){
+ .topbar{gap:6px;padding-left:12px;padding-right:12px}
+ .topbar-left{min-width:0;flex:0 1 150px}
+ .game-controls{min-width:0;flex:0 1 auto;gap:4px}
+ .segment-control{padding:2px;gap:2px}
+ .segment-control button{min-width:52px;padding:0 8px;font-size:12px}
+ .elapsed-label{min-width:50px}
+ .topbar-actions{gap:4px}
+ .round-actions{gap:4px;padding-right:6px}
+ .topbar .round-actions .top-action{min-width:60px;padding:0 8px;font-size:12px}
+ .topbar .round-actions #newGameButton{min-width:68px}
+ .topbar #progressButton{width:78px;min-width:78px;height:32px;padding:0 6px!important;gap:4px;font-size:11px!important}
+ .topbar #progressButton svg{width:14px;height:14px}
+ .topbar #progressButtonLabel{font-size:11px;line-height:1;white-space:nowrap}
+ .topbar #helpButton{padding:0 9px;font-size:12px}
+ .topbar #fullscreenButton{width:32px;height:32px}
+}

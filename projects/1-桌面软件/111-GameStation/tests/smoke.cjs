@@ -985,7 +985,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
       const modes=[...document.querySelectorAll("#modeControl button")],levels=[...document.querySelectorAll("#difficultyControl button")];
       const selectors=[...modes,...levels];
       const inside=b=>{const r=b.getBoundingClientRect(),s=getComputedStyle(b);return r.width>=28&&r.height>=24&&r.left>=bar.left-1&&r.right<=bar.right+1&&r.top>=bar.top-1&&r.bottom<=bar.bottom+1&&s.visibility==="visible"&&s.display!=="none";};
-      const actions=[...document.querySelectorAll("#startButton,#pauseButton,#newGameButton,#helpButton")];
+      const actions=[...document.querySelectorAll("#startButton,#pauseButton,#newGameButton,#progressButton,#helpButton")];
       return{modes:modes.length,levels:levels.length,selectedModes:modes.filter(b=>b.getAttribute("aria-pressed")==="true").length,
        selectedLevels:levels.filter(b=>b.getAttribute("aria-pressed")==="true").length,
        selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside)};
