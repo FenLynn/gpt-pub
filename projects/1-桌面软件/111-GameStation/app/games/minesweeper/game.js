@@ -21,8 +21,8 @@ const recordWin=document.getElementById("mineRecordWin");
 const isFixture=new URLSearchParams(location.search).has("p111Test");
 const RECORD_KEY="p111-minesweeper-records-v1";
 const levelNames={easy:"初级",normal:"中级",hard:"高级"};
-const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 27V5" fill="none" stroke="#53677e" stroke-width="2.5" stroke-linecap="round"/><path d="M11 6h17l-5 7 5 7H11z" fill="#df4949" stroke="#a42e35" stroke-width="1.3" stroke-linejoin="round"/><path d="M5 28h13" stroke="#4b6278" stroke-width="3" stroke-linecap="round"/></svg>';
-const bombSVG='<svg class="mine-symbol mine-bomb-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2v5M16 25v5M2 16h5M25 16h5M6.2 6.2l3.5 3.5M22.3 22.3l3.5 3.5M25.8 6.2l-3.5 3.5M9.7 22.3l-3.5 3.5" stroke="#344c5f" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="16" r="9.2" fill="#24313d" stroke="#131e2b" stroke-width="1.5"/><circle cx="12.9" cy="12.6" r="2.7" fill="#a8b9c4"/></svg>';
+const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 28h19" stroke="#58616a" stroke-width="2.4" stroke-linecap="round"/><path d="M11.5 27V4.5" stroke="#303a43" stroke-width="2.7" stroke-linecap="round"/><path d="M13 5.5l14 3.2-7.2 5.8 7.2 4.2-14 3.2z" fill="#e52e2e" stroke="#7d171b" stroke-width="1.25" stroke-linejoin="round"/><path d="M13.8 6.8l10 2.3-5.3 4.1-4.7-1.1z" fill="#ff8b82"/><path d="M8 29h16" stroke="#353f47" stroke-width="2.7" stroke-linecap="round"/></svg>';
+const bombSVG='<svg class="mine-symbol mine-bomb-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1.5v5M16 25.5v5M1.5 16h5M25.5 16h5M5.7 5.7l3.7 3.7M22.6 22.6l3.7 3.7M26.3 5.7l-3.7 3.7M9.4 22.6l-3.7 3.7" stroke="#202a32" stroke-width="2.3" stroke-linecap="round"/><path d="M13 7.4l3-2.2 3.1 2.3" fill="none" stroke="#222c34" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="17" r="9.4" fill="#171d22" stroke="#090e12" stroke-width="1.4"/><ellipse cx="12.4" cy="13.2" rx="3.1" ry="2.2" fill="#aebbc3"/><circle cx="21.4" cy="20.7" r="1.1" fill="#05090d"/></svg>';
 const faceSVG={
  normal:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><path d="M10.5 12.5h.2M21.3 12.5h.2" stroke="#493b2a" stroke-width="2.8" stroke-linecap="round"/><path d="M9.5 18.2q6.5 8 13 0" fill="none" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/></svg>',
  pressed:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><circle cx="10.8" cy="12.2" r="1.8" fill="#493b2a"/><circle cx="21.2" cy="12.2" r="1.8" fill="#493b2a"/><ellipse cx="16" cy="20" rx="3.1" ry="4" fill="#493b2a"/></svg>',
@@ -35,7 +35,7 @@ function setFace(state="normal"){
  face.dataset.face=key;face.innerHTML=faceSVG[key];face.setAttribute("aria-label",faceLabels[key]);
 }
 let cells=[],nodes=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,triggerMine=-1;
-let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null,flashTimer=null,middleTarget=-1,dualTarget=-1;
+let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null,flashTimer=null,resultTimer=null,middleTarget=-1,dualTarget=-1;
 function emptyRecord(){return{played:0,won:0,best:null,streak:0};}
 function readRecords(){
  try{
@@ -174,10 +174,11 @@ function paint(index){
  if(cell.flag){
   button.innerHTML=flagSVG+(over&&!cell.mine?'<span class="mine-false-mark" aria-hidden="true">×</span>':"");
  }else if(cell.open&&cell.mine){
-  button.innerHTML=bombSVG;
+  button.innerHTML=bombSVG+(index===triggerMine?'<span class="mine-explosion-burst" aria-hidden="true"></span>':"");
  }else if(cell.open&&cell.n){
   button.textContent=String(cell.n);
  }else button.textContent="";
+ if(over&&triggerMine>=0&&cell.mine){const distance=Math.abs(index%W-triggerMine%W)+Math.abs(Math.floor(index/W)-Math.floor(triggerMine/W));button.style.setProperty("--mine-blast-delay",Math.min(720,distance*42)+"ms");}else button.style.removeProperty("--mine-blast-delay");
  const name=cell.flag?(over&&!cell.mine?"错误旗帜":"已插旗"):
   cell.open?(cell.mine?(index===triggerMine?"踩中的地雷":"地雷"):cell.n?"数字 "+cell.n:"空白"):
   "未翻开";
@@ -187,12 +188,15 @@ function paint(index){
 }
 function render(){
  if(nodes.length!==cells.length)buildBoard();
+ boardEl.classList.toggle("mine-blast-sequence",over&&triggerMine>=0);
  for(let i=0;i<cells.length;i++)paint(i);
  updateCounters();
 }
 function makeBoard(){
  stopTimer();
  if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}
+ if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}
+ boardEl.classList.remove("mine-blast-sequence");
  middleTarget=-1;dualTarget=-1;
  nodes.forEach(node=>node.classList.remove("chord-flash"));
  cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));
@@ -259,9 +263,14 @@ function conclude(won,exploded=-1){
  }
  persistRecords();
  render();renderRecords();
- report(won?"扫雷成功 · 用时 "+formatTime(seconds):"踩到地雷 · 再试一次");
- GameBridge.send("GAME_OVER",{message:won?"扫雷成功 · "+levelNames[difficulty]+" "+formatTime(seconds):"踩到地雷",
-  score:opened,win:won,difficulty,seconds});
+ const message=won?"扫雷成功 · "+levelNames[difficulty]+" "+formatTime(seconds):"踩到地雷";
+ report(won?message:"踩到地雷 · 爆炸中…");
+ const settle=()=>GameBridge.send("GAME_OVER",{message,score:opened,win:won,difficulty,seconds});
+ if(won)settle();
+ else{
+  boardEl.classList.add("mine-blast-sequence");
+  resultTimer=setTimeout(()=>{resultTimer=null;settle();},2000);
+ }
 }
 function evaluateWin(){if(opened===W*H-MINES)conclude(true);}
 function reveal(index){
@@ -307,7 +316,7 @@ function flashNeighbors(index){
  const cell=cells[index];
  if(paused||over||!cell?.open||cell.n===0)return false;
  nodes.forEach(node=>node.classList.remove("chord-flash"));
- const targets=neighbors(index).filter(i=>!cells[i].open);
+ const targets=neighbors(index).filter(i=>!cells[i].open&&!cells[i].flag);
  targets.forEach(i=>nodes[i]?.classList.add("chord-flash"));
  if(flashTimer!==null)clearTimeout(flashTimer);
  flashTimer=setTimeout(()=>{
@@ -318,16 +327,10 @@ function flashNeighbors(index){
 }
 function previewChord(index){
  const cell=cells[index];
- if(!flashNeighbors(index))return;
- const board=cells,expected=cell.n;
+ if(paused||over||!cell?.open||cell.n===0)return;
  const flagged=neighbors(index).filter(i=>cells[i].flag).length;
- // The covered neighbours flash first, just like classic Minesweeper.
- // Reveal only when the number of flags matches the number on the centre tile.
- if(flagged!==expected)return;
- setTimeout(()=>{
-  if(cells!==board||paused||over||!cells[index]?.open)return;
-  if(neighbors(index).filter(i=>cells[i].flag).length===expected)chord(index);
- },230);
+ if(flagged===cell.n){chord(index);return;}
+ flashNeighbors(index);
 }
 boardEl.addEventListener("click",event=>{const i=cellFromEvent(event);if(i>=0)reveal(i);});
 boardEl.addEventListener("contextmenu",event=>{event.preventDefault();const i=cellFromEvent(event);if(i>=0)toggleFlag(i);});
@@ -335,11 +338,11 @@ boardEl.addEventListener("mousedown",event=>{
  const i=cellFromEvent(event);
  if(event.button===1){
   event.preventDefault();
-  if(i>=0&&cells[i]?.open&&cells[i].n>0){middleTarget=i;flashNeighbors(i);}
+  if(i>=0&&cells[i]?.open&&cells[i].n>0)middleTarget=i;
  }
  // Traditional Windows chord: press left and right together on a number.
  if(event.buttons===3&&i>=0&&cells[i]?.open&&cells[i].n>0){
-  dualTarget=i;flashNeighbors(i);
+  dualTarget=i;
  }
 });
 boardEl.addEventListener("mouseup",event=>{
@@ -438,8 +441,18 @@ GameBridge.register({
  pause(){paused=true;freezeTimer();report("已暂停");},
  resume(){paused=false;if(started&&!over)startTimer();if(!over)report(started?"游戏进行中":"点击任意方格开始");},
  setDifficulty(value){configure(value);},
+ snapshot(){return{width:W,height:H,mines:MINES,difficulty,started,flags,opened,seconds,elapsedMs:activeMs(),cells:cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Number(c.n)||0}))};},
+ restore(s){
+  if(!s||!Number.isInteger(s.width)||!Number.isInteger(s.height)||!Array.isArray(s.cells)||s.cells.length!==s.width*s.height)throw new Error("扫雷存档数据无效");
+  stopTimer();if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}
+  W=s.width;H=s.height;MINES=Math.max(0,Number(s.mines)||0);difficulty=Object.hasOwn(levelNames,s.difficulty)?s.difficulty:"normal";
+  boardEl.style.setProperty("--cols",W);boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);levelEl.textContent=levelNames[difficulty]||"自定义";
+  cells=s.cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Math.max(0,Number(c.n)||0)}));
+  started=!!s.started;over=false;paused=true;flags=Math.max(0,Number(s.flags)||cells.filter(c=>c.flag).length);opened=Math.max(0,Number(s.opened)||cells.filter(c=>c.open&&!c.mine).length);
+  elapsedMs=Math.max(0,Number(s.elapsedMs)||Math.max(0,Number(s.seconds)||0)*1000);runningSince=null;seconds=Math.min(999,Math.floor(elapsedMs/1000));triggerMine=-1;middleTarget=-1;dualTarget=-1;setFace("normal");nodes=[];render();renderRecords();fitBoard();report("已恢复上次进度");
+ },
  dispose(){
-  paused=true;stopTimer();resizeObserver?.disconnect();
+  paused=true;stopTimer();if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}resizeObserver?.disconnect();
   window.removeEventListener("resize",fitBoard);
  }
 });
