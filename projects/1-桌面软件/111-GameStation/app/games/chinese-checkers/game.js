@@ -189,6 +189,19 @@ GameBridge.register({
  newGame,pause(){paused=true;clearTimeout(aiTimer);document.getElementById("undoButton").disabled=true;report("已暂停");},
  resume(){paused=false;draw();report("对局继续");scheduleAI();},
  setMode:v=>{mode=v==="two"?"two":"ai";draw();scheduleAI();},setDifficulty:v=>{difficulty=v||"normal";},
+ snapshot(){return{playerCount,pieces:[...pieces.entries()],turn,mode,difficulty,selected,history:history.map(h=>({pieces:[...h.pieces.entries()],turn:h.turn})),turnClock:window.GameTurnClock?.snapshot?.()||null};},
+ restore(s){
+  if(!s||![2,3,4,6].includes(Number(s.playerCount))||!Array.isArray(s.pieces))throw new Error("中国跳棋存档数据无效");
+  clearTimeout(aiTimer);playerCount=Number(s.playerCount);
+  const validEntries=entries=>Array.isArray(entries)&&entries.every(e=>Array.isArray(e)&&e.length===2&&nodes.has(String(e[0]))&&Number.isInteger(Number(e[1]))&&Number(e[1])>=0&&Number(e[1])<playerCount);
+  if(!validEntries(s.pieces))throw new Error("中国跳棋棋子数据无效");
+  pieces=new Map(s.pieces.map(([k,v])=>[String(k),Number(v)]));turn=Number.isInteger(Number(s.turn))?Math.max(0,Math.min(playerCount-1,Number(s.turn))):0;
+  mode=s.mode==="two"?"two":"ai";difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";
+  history=Array.isArray(s.history)?s.history.filter(h=>validEntries(h.pieces)).map(h=>({pieces:new Map(h.pieces.map(([k,v])=>[String(k),Number(v)])),turn:Number.isInteger(Number(h.turn))?Math.max(0,Math.min(playerCount-1,Number(h.turn))):0})):[];over=false;paused=true;
+  selected=typeof s.selected==="string"&&pieces.get(s.selected)===turn?s.selected:null;targets=selected?options(selected):new Map();
+  document.querySelectorAll("#starPlayerOptions button").forEach(btn=>btn.setAttribute("aria-pressed",String(Number(btn.dataset.players)===playerCount)));
+  window.GameTurnClock?.restore?.(s.turnClock);draw();report("已恢复上次进度 · "+names[turn]+"回合");
+ },
  dispose(){paused=true;clearTimeout(aiTimer);}
 });
 })();

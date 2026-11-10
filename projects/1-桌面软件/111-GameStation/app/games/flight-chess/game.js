@@ -636,6 +636,23 @@ GameBridge.register({
  resume:resumeGame,
  setMode:v=>{mode=v==="two"?"two":"ai";draw();},
  setDifficulty:v=>{difficulty=v||"normal";},
+ snapshot(){return{
+  pawns:pawns.map(row=>row.slice()),turn,mode,difficulty,roll,lastDie,hasRolled,pendingNoMove,
+  history:history.map(h=>({pawns:h.pawns.map(row=>row.slice()),turn:h.turn,roll:h.roll})),
+  turnClock:window.GameTurnClock?.snapshot?.()||null
+ };},
+ restore(s){
+  if(!s||!Array.isArray(s.pawns)||s.pawns.length!==2||s.pawns.some(row=>!Array.isArray(row)||row.length!==4||row.some(v=>!Number.isInteger(v)||v< -1||v>55)))throw new Error("飞行棋存档数据无效");
+  if(s.roll!==null&&s.roll!==undefined&&(!Number.isInteger(Number(s.roll))||Number(s.roll)<1||Number(s.roll)>6))throw new Error("飞行棋骰子存档无效");
+  clearTimeout(aiTimer);cancelTravel();stopDiceAnimation();
+  pawns=s.pawns.map(row=>row.map(Number));turn=Number(s.turn)===1?1:0;mode=s.mode==="two"?"two":"ai";
+  difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";
+  roll=s.roll===null||s.roll===undefined?null:Number(s.roll);lastDie=Number.isInteger(Number(s.lastDie))&&Number(s.lastDie)>=1&&Number(s.lastDie)<=6?Number(s.lastDie):1;
+  hasRolled=!!s.hasRolled;pendingNoMove=!!s.pendingNoMove;
+  history=Array.isArray(s.history)?s.history.filter(h=>Array.isArray(h.pawns)&&h.pawns.length===2&&h.pawns.every(row=>Array.isArray(row)&&row.length===4)).map(h=>({pawns:h.pawns.map(row=>row.map(Number)),turn:Number(h.turn)===1?1:0,roll:h.roll===null?null:Number(h.roll)})):[];
+  selectedPlane=null;expandedStackKey=null;isMoving=false;isRolling=false;over=false;paused=true;
+  window.GameTurnClock?.restore?.(s.turnClock);draw();report("已恢复上次进度 · "+(turn===0?"红方":"蓝方")+"回合");
+ },
  dispose(){paused=true;clearTimeout(aiTimer);cancelTravel();stopDiceAnimation();}
 });
 })();

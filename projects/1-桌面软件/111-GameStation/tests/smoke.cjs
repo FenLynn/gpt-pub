@@ -11,6 +11,8 @@ const names=[
 "俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克",
 "经典纸牌","斗地主","麻将","三国杀"
 ];
+const gameIds=["gomoku","xiangqi","chess","reversi","connect4","battleship","checkers","chinese-checkers","flight-chess","minesweeper","2048","memory","sudoku","sokoban","tetris","snake","pong","contra","mario","tank","solitaire","doudizhu","mahjong","sanguosha"];
+const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","snake","pong","contra","mario","tank"]);
 (async()=>{
  const root=path.resolve(__dirname,"../app");
  const artifacts=path.resolve(__dirname,"../p111-smoke-artifacts");
@@ -41,6 +43,33 @@ const names=[
   await page.waitForFunction(()=>document.querySelector("#startButton").getAttribute("aria-label")==="结束");
   assert.equal(await page.locator("#startButton svg").count(),1,"Start SVG icon must be visible");
   assert.equal(await page.locator("#pauseButton svg").count(),1,"Pause SVG icon must be visible");
+ }
+ async function progressRoundTrip(name,id){
+  await page.locator("#pauseButton").click();
+  await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
+  await page.locator("#progressButton").waitFor({state:"visible"});
+  assert.equal(await page.locator("#progressButtonLabel").innerText(),"保存进度",name+" must expose save progress while paused");
+  await page.locator("#progressButton").click();
+  await page.waitForFunction(id=>{
+   try{const all=JSON.parse(localStorage.getItem("gamestation.progress")||"{}"),item=all[id];return item?.schemaVersion===1&&item.gameId===id&&item.state&&typeof item.state==="object"&&!Array.isArray(item.state);}
+   catch{return false;}
+  },id,{timeout:7000});
+  const saved=await page.evaluate(id=>JSON.parse(localStorage.getItem("gamestation.progress")||"{}")[id],id);
+  assert.ok(Object.keys(saved.state).length>0,name+" snapshot must contain a real game state");
+  await page.locator("#breadcrumbCategory").click();
+  await page.locator("#libraryView").waitFor({state:"visible"});
+  await open(name);
+  await page.waitForFunction(()=>document.querySelector("#progressButtonLabel")?.textContent==="恢复进度",{timeout:5000});
+  await page.locator("#progressButton").click();
+  if(countdownRestoreGames.has(id)){
+   await page.locator("#restoreCountdownOverlay").waitFor({state:"visible",timeout:3000});
+   assert.equal(await page.locator("#restoreCountdownNumber").innerText(),"3",name+" must show the full three-second restore countdown");
+   await page.locator("#restoreCountdownOverlay").waitFor({state:"hidden",timeout:5000});
+  }else{
+   assert.equal(await page.locator("#restoreCountdownOverlay").isVisible(),false,name+" is turn-based and must restore without a countdown");
+  }
+  await page.waitForFunction(()=>document.querySelector("#progressButtonLabel")?.textContent==="保存进度",{timeout:7000});
+  await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="暂停",{timeout:7000});
  }
  async function pauseResume(){
   assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,"Pause icon must not cover an active game");
@@ -893,8 +922,9 @@ const names=[
   for(const size of [{width:1440,height:1000},{width:1366,height:768}]){
    await page.setViewportSize(size);
    await library();
-   for(const name of names){
+   for(const [gameIndex,name] of names.entries()){
     await open(name);await start();await pauseResume();
+    if(size.width===1440)await progressRoundTrip(name,gameIds[gameIndex]);
     if(resignGames.has(name)){
      await frame.locator("#resignButton:enabled").waitFor({state:"visible",timeout:3500});
      const action=await frame.locator("#resignButton").evaluate(el=>({
@@ -1055,6 +1085,18 @@ const names=[
   assert.equal(await page.locator("#modeControl").isVisible(),false,"Minesweeper must not show an empty battle-mode label");
   assert.equal(await page.locator("#difficultyControl").isVisible(),true,"Minesweeper must retain its difficulty selector");
   await start();
+  assert.equal(await frame.locator(".mine-menu-bar").count(),1,"Minesweeper must use a compact Windows-style menu strip");
+  assert.equal(await frame.locator(".game-guide,.game-tools").count(),0,"Minesweeper must not waste board area on side panels");
+  assert.equal(await frame.locator("#mineMenuGame").innerText(),"游戏(G)");
+  await frame.locator("#mineMenuGame").click();
+  assert.equal(await frame.locator("#mineGameMenu").isVisible(),true,"Game menu must open");
+  assert.equal(await frame.locator("#mineGameMenu [data-mine-difficulty]").count(),3,"Game menu must expose all three classic board sizes");
+  await frame.locator("#mineMenuGame").click();
+  await frame.locator("#mineMenuHelp").click();
+  assert.equal(await frame.locator("#mineHelpMenu").isVisible(),true,"Help menu must open");
+  await frame.locator("#mineMenuHelp").click();
+  const mineTimerBox=await frame.locator("#timer").boundingBox(),mineCountBox=await frame.locator("#counter").boundingBox();
+  assert.ok(mineTimerBox.x<mineCountBox.x,"Classic timer belongs on the left and mine counter on the right");
   const mine=frame.locator(".mine-classic");
   async function fitMine(){
    const f=await mine.evaluate(el=>{
@@ -1079,7 +1121,7 @@ const names=[
   assert.equal(await mineFixture.locator("#reset svg").count(),1,"Minesweeper reset face must be a local SVG");
   assert.equal(await mineFixture.locator("#reset").getAttribute("data-face"),"normal","Minesweeper reset face must initialize deterministically");
   assert.equal(await mineFixture.locator("#reset").textContent(),"","Minesweeper must not render an OS emoji glyph");
-  assert.equal(await mineFixture.locator(".mine-flag-medallion svg").count(),1,"Minesweeper flag medallion must be SVG");
+  assert.equal(await mineFixture.locator(".mine-bomb-medallion svg").count(),1,"Minesweeper mine medallion must be SVG");
   assert.equal(await mineFixture.locator(".mine-time-medallion svg").count(),1,"Minesweeper clock medallion must be SVG");
   await mineFixture.evaluate(()=>{window.__p111MineTest.forceFlag(0);window.__p111MineTest.forceMine(1);window.__p111MineTest.forceNumber(2,8);});
   const symbols=await mineFixture.locator(".mine-cell").evaluateAll(cells=>cells.slice(0,3).map(cell=>{
@@ -1612,7 +1654,7 @@ const names=[
   assert.equal(await page.locator("#libraryTitle").innerText(),"全部游戏","Game breadcrumb must open the all-games menu");
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
-  console.log("P111 R19 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), left timer, central notices, SVG controls, Tetris preview/score, chess and arcade lifecycle.");
+  console.log("P111 R33 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), 24 save/restore round trips, Windows 7 Minesweeper UI/menu/chord flow and shared game lifecycles.");
  }finally{await browser.close();}
 })().then(()=>{
  console.log("Running deterministic game-rule regression fixtures...");

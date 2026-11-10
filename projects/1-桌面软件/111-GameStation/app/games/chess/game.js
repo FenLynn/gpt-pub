@@ -23,7 +23,7 @@ function cloneBoard(b){return b.map(row=>row.map(p=>p?{c:p.c,t:p.t}:null));}
 function cloneCastle(c){return{wK:!!c.wK,wQ:!!c.wQ,bK:!!c.bK,bQ:!!c.bQ};}
 function snapshot(){return{board:cloneBoard(board),turn,castle:cloneCastle(castle),ep:ep?{x:ep.x,y:ep.y}:null,moveNo:moveNo,captured:{w:captured.w.slice(),b:captured.b.slice()},moveLog:moveLog.slice(),lastMove:lastMove?{...lastMove}:null,halfMoves,positions:positions.slice()};}
 let moveNo=1;
-function restore(s){board=cloneBoard(s.board);turn=s.turn;castle=cloneCastle(s.castle);ep=s.ep?{...s.ep}:null;moveNo=s.moveNo;captured={w:s.captured.w.slice(),b:s.captured.b.slice()};moveLog=s.moveLog.slice();lastMove=s.lastMove?{...s.lastMove}:null;halfMoves=s.halfMoves||0;positions=s.positions?s.positions.slice():[];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];}
+function restorePosition(s){board=cloneBoard(s.board);turn=s.turn;castle=cloneCastle(s.castle);ep=s.ep?{...s.ep}:null;moveNo=s.moveNo;captured={w:s.captured.w.slice(),b:s.captured.b.slice()};moveLog=s.moveLog.slice();lastMove=s.lastMove?{...s.lastMove}:null;halfMoves=s.halfMoves||0;positions=s.positions?s.positions.slice():[];promotionChoices=null;document.getElementById("promotionChooser")?.remove();selected=null;legal=[];}
 function squareName(x,y){return files[x]+String(8-y);}
 function attacked(b,x,y,by){
  for(let sy=0;sy<8;sy++)for(let sx=0;sx<8;sx++){
@@ -215,7 +215,7 @@ function clickSquare(x,y){
 function undo(){
  if(!history.length||paused)return;clearTimeout(aiTimer);
  let n=mode==="ai"&&turn==="w"?2:1,removed=Math.min(n,history.length);
- while(n--&&history.length)restore(history.pop());window.GameTurnClock?.rewind(removed,turn==="w"?"白方":"黑方");
+ while(n--&&history.length)restorePosition(history.pop());window.GameTurnClock?.rewind(removed,turn==="w"?"白方":"黑方");
  over=false;render();reportTurn();
 }
 function newGame(){
@@ -289,6 +289,16 @@ GameBridge.register({
  newGame,pause,resume,
  setMode(v){mode=v==="two"?"two":"ai";},
  setDifficulty(v){difficulty=v||"normal";},
+ snapshot(){return{position:snapshot(),history:history.map(h=>({...h,board:cloneBoard(h.board),castle:cloneCastle(h.castle),ep:h.ep?{...h.ep}:null,captured:{w:h.captured.w.slice(),b:h.captured.b.slice()},moveLog:h.moveLog.slice(),lastMove:h.lastMove?{...h.lastMove}:null,positions:h.positions.slice()})),mode,difficulty,flip,selected:selected?{...selected}:null,promotionChoices:promotionChoices?promotionChoices.map(m=>({...m})):null,turnClock:window.GameTurnClock?.snapshot?.()||null};},
+ restore(s){
+  const p=s?.position,validBoard=b=>Array.isArray(b)&&b.length===8&&b.every(r=>Array.isArray(r)&&r.length===8);
+  if(!p||!validBoard(p.board)||!p.castle||!p.captured||!Array.isArray(p.captured.w)||!Array.isArray(p.captured.b))throw new Error("国际象棋存档数据无效");
+  clearTimeout(aiTimer);restorePosition(p);history=Array.isArray(s.history)?s.history.filter(h=>validBoard(h.board)&&h.castle&&h.captured).map(h=>({...h,board:cloneBoard(h.board),castle:cloneCastle(h.castle),ep:h.ep?{...h.ep}:null,captured:{w:h.captured.w.slice(),b:h.captured.b.slice()},moveLog:Array.isArray(h.moveLog)?h.moveLog.slice():[],lastMove:h.lastMove?{...h.lastMove}:null,positions:Array.isArray(h.positions)?h.positions.slice():[]})):[];
+  mode=s.mode==="two"?"two":"ai";difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";flip=!!s.flip;
+  selected=s.selected&&inside(Number(s.selected.x),Number(s.selected.y))?{x:Number(s.selected.x),y:Number(s.selected.y)}:null;legal=selected?legalMoves(board,turn,castle,ep).filter(m=>m.fx===selected.x&&m.fy===selected.y):[];
+  promotionChoices=Array.isArray(s.promotionChoices)?s.promotionChoices.map(m=>({...m})):null;document.getElementById("promotionChooser")?.remove();over=false;paused=true;
+  window.GameTurnClock?.restore?.(s.turnClock);render();if(promotionChoices?.length)choosePromotion(promotionChoices);reportTurn();
+ },
  dispose(){clearTimeout(aiTimer);document.removeEventListener("keydown",onKey);}
 });
 })();

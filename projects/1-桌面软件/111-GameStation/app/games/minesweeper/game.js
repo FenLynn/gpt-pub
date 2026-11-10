@@ -12,6 +12,10 @@ const levelEl=document.getElementById("level");
 const openedEl=document.getElementById("openedCount");
 const remainingEl=document.getElementById("remaining");
 const face=document.getElementById("reset");
+const menuGameButton=document.getElementById("mineMenuGame");
+const menuHelpButton=document.getElementById("mineMenuHelp");
+const gameMenu=document.getElementById("mineGameMenu");
+const helpMenu=document.getElementById("mineHelpMenu");
 const gameArea=document.querySelector(".game-main-board");
 const headline=document.getElementById("mineHeadline");
 const bestInline=document.getElementById("mineBestInline");
@@ -385,6 +389,37 @@ boardEl.addEventListener("keydown",event=>{
 });
 function newGame(){makeBoard();}
 face.addEventListener("click",()=>GameBridge.send("REQUEST_NEW_GAME"));
+function closeMineMenus(){
+ for(const [button,popup] of [[menuGameButton,gameMenu],[menuHelpButton,helpMenu]]){
+  if(button&&popup){popup.hidden=true;button.setAttribute("aria-expanded","false");}
+ }
+}
+function toggleMineMenu(button,popup){
+ if(!button||!popup)return;
+ const opening=popup.hidden;closeMineMenus();popup.hidden=!opening;
+ button.setAttribute("aria-expanded",String(opening));
+}
+menuGameButton?.addEventListener("click",()=>toggleMineMenu(menuGameButton,gameMenu));
+menuHelpButton?.addEventListener("click",()=>toggleMineMenu(menuHelpButton,helpMenu));
+gameMenu?.addEventListener("click",event=>{
+ const action=event.target.closest("[data-mine-action]");
+ const difficultyButton=event.target.closest("[data-mine-difficulty]");
+ closeMineMenus();
+ if(action?.dataset.mineAction==="new")GameBridge.send("REQUEST_NEW_GAME");
+ if(action?.dataset.mineAction==="help")GameBridge.send("CONTROL",{action:"help"});
+ if(difficultyButton)GameBridge.send("CONTROL",{action:"difficulty",value:difficultyButton.dataset.mineDifficulty});
+});
+helpMenu?.addEventListener("click",event=>{
+ if(event.target.closest('[data-mine-action="help"]')){closeMineMenus();GameBridge.send("CONTROL",{action:"help"});}
+});
+document.addEventListener("pointerdown",event=>{
+ if(!event.target.closest(".mine-menu-root"))closeMineMenus();
+});
+window.addEventListener("keydown",event=>{
+ if(event.key==="Escape"){closeMineMenus();return;}
+ if(event.key==="F1"&&!event.repeat){event.preventDefault();closeMineMenus();GameBridge.send("CONTROL",{action:"help"});return;}
+ if(event.key==="F2"&&!event.repeat){event.preventDefault();closeMineMenus();GameBridge.send("REQUEST_NEW_GAME");}
+});
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){
  resizeObserver=new ResizeObserver(fitBoard);

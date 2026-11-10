@@ -132,5 +132,21 @@ if(new URLSearchParams(location.search).has("p111Test")){
    claimQueue:this.queue(),humanClaims,paused,over,selfHuAllowed,rules:{...rules}};}
  };
 }
-GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");render();},resume(){paused=false;render();if(pendingKong)resolveKongClaims();else scheduleAI();},setDifficulty(v){difficulty=v||"normal";},setOptions(v){rules={...rules,...v};},dispose(){paused=true;clearTimeout(timer);}});
+GameBridge.register({init(p){difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);report("已暂停");render();},resume(){paused=false;render();if(pendingKong)resolveKongClaims();else if(phase==="claim")resolveClaims();else scheduleAI();},setDifficulty(v){difficulty=v||"normal";},setOptions(v){rules={...rules,...v};},
+ snapshot(){const tiles=a=>a.map(t=>({...t}));return{wall:tiles(wall),hands:hands.map(tiles),discards:discards.map(tiles),melds:melds.map(ms=>ms.map(m=>({kind:m.kind,tiles:m.tiles.slice()}))),current,phase,pending:pending?{seat:pending.seat,tile:{...pending.tile}}:null,pendingKong:pendingKong?{seat:pendingKong.seat,tile:{...pendingKong.tile},meldIndex:pendingKong.meldIndex}:null,claimQueue:claimQueue.map(q=>({seat:q.seat,priority:q.priority,opts:{...q.opts,chi:(q.opts.chi||[]).map(seq=>seq.slice())}})),humanClaims:humanClaims?{...humanClaims,chi:(humanClaims.chi||[]).map(seq=>seq.slice())}:null,selfHuAllowed,difficulty,rules:{...rules}};},
+ restore(s){
+  const validTiles=a=>Array.isArray(a)&&a.every(t=>t&&Number.isInteger(Number(t.id))&&Number.isInteger(Number(t.type))&&Number(t.type)>=0&&Number(t.type)<34);
+  if(!s||!validTiles(s.wall)||!Array.isArray(s.hands)||s.hands.length!==4||!s.hands.every(validTiles)||!Array.isArray(s.discards)||s.discards.length!==4||!s.discards.every(validTiles)||!Array.isArray(s.melds)||s.melds.length!==4)throw new Error("麻将存档数据无效");
+  clearTimeout(timer);const tiles=a=>a.map(t=>({id:Number(t.id),type:Number(t.type)}));
+  wall=tiles(s.wall);hands=s.hands.map(tiles);discards=s.discards.map(tiles);
+  melds=s.melds.map(ms=>ms.map(m=>({kind:String(m.kind||"pong"),tiles:Array.isArray(m.tiles)?m.tiles.map(Number):[]})));
+  current=Number.isInteger(Number(s.current))?Math.max(0,Math.min(3,Number(s.current))):0;phase=["draw","discard","claim"].includes(s.phase)?s.phase:"discard";
+  pending=s.pending&&s.pending.tile?{seat:Number(s.pending.seat),tile:{id:Number(s.pending.tile.id),type:Number(s.pending.tile.type)}}:null;
+  pendingKong=s.pendingKong&&s.pendingKong.tile?{seat:Number(s.pendingKong.seat),tile:{id:Number(s.pendingKong.tile.id),type:Number(s.pendingKong.tile.type)},meldIndex:Number(s.pendingKong.meldIndex)}:null;
+  claimQueue=Array.isArray(s.claimQueue)?s.claimQueue.map(q=>({seat:Number(q.seat),priority:q.priority,opts:{...(q.opts||{}),chi:(q.opts?.chi||[]).map(seq=>seq.map(Number))}})):[];humanClaims=s.humanClaims?{...s.humanClaims,chi:(s.humanClaims.chi||[]).map(seq=>seq.map(Number))}:null;
+  selfHuAllowed=s.selfHuAllowed!==false;difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";rules={chi:s.rules?.chi!==false,sevenPairs:s.rules?.sevenPairs!==false,kong:s.rules?.kong!==false};
+  over=false;paused=true;document.getElementById("ruleChi").checked=rules.chi;document.getElementById("ruleSevenPairs").checked=rules.sevenPairs;document.getElementById("ruleKong").checked=rules.kong;
+  render();report("已恢复上次进度 · "+(current===0?"你的回合":"AI "+current+" 回合"));
+ },
+ dispose(){paused=true;clearTimeout(timer);}});
 })();

@@ -138,5 +138,15 @@ if(new URLSearchParams(location.search).has("p111Test")){
   stepDown(){const moved=stepDown();draw();return{moved,...fixtureState()};}
  };
 }
-GameBridge.register({init(payload){configure(payload.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},dispose(){paused=true;stop();window.removeEventListener("keydown",onKeyDown);canvas.removeEventListener("pointerdown",focusCanvas);}});
+GameBridge.register({init(payload){configure(payload.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},
+ snapshot(){const copy=p=>p?{...p,shape:p.shape.map(row=>row.slice())}:null;return{grid:grid.map(row=>row.slice()),piece:copy(piece),nextPiece:copy(nextPiece),score,lines,speed,baseSpeed,difficulty,dropAccumulator,roundSerial};},
+ restore(s){
+  const validPiece=p=>p&&Number.isInteger(p.kind)&&p.kind>=0&&p.kind<SHAPES.length&&Array.isArray(p.shape)&&p.shape.length>0&&p.shape.every(row=>Array.isArray(row)&&row.every(v=>v===0||v===1))&&Number.isFinite(Number(p.x))&&Number.isFinite(Number(p.y));
+  if(!s||!Array.isArray(s.grid)||s.grid.length!==ROWS||s.grid.some(row=>!Array.isArray(row)||row.length!==COLS)||!validPiece(s.piece)||!validPiece(s.nextPiece))throw new Error("俄罗斯方块存档数据无效");
+  stop();grid=s.grid.map(row=>row.slice());piece={...s.piece,shape:s.piece.shape.map(row=>row.slice())};nextPiece={...s.nextPiece,shape:s.nextPiece.shape.map(row=>row.slice())};
+  score=Math.max(0,Number(s.score)||0);lines=Math.max(0,Number(s.lines)||0);configure(s.difficulty||difficulty);baseSpeed=Math.max(90,Number(s.baseSpeed)||baseSpeed);speed=Math.max(90,Number(s.speed)||baseSpeed);
+  difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";dropAccumulator=Math.max(0,Number(s.dropAccumulator)||0);roundSerial=Math.max(0,Number(s.roundSerial)||roundSerial);
+  over=false;paused=true;lastFrame=0;canvas.dataset.roundSerial=String(roundSerial);updateScore();drawNext();draw();setStatus("已恢复上次进度");
+ },
+ dispose(){paused=true;stop();window.removeEventListener("keydown",onKeyDown);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();

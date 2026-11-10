@@ -83,5 +83,17 @@ function resign(){
  return true;
 }
 window.addEventListener("gamestation:resign",resign);
-GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;render();if(turn===2&&mode==="ai")scheduleAI(!!continuing);else report(turn===1?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},dispose(){paused=true;clearTimeout(timer);}});
+GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(timer);document.getElementById("undoButton").disabled=true;report("已暂停");},resume(){paused=false;render();if(turn===2&&mode==="ai")scheduleAI(!!continuing);else report(turn===1?"红方回合":"黑方回合");},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},
+ snapshot(){return{board:clone(b),turn,selected:selected?{...selected}:null,continuing:continuing?{...continuing}:null,mode,difficulty,lastHop:lastHop?{...lastHop}:null,history:history.map(h=>({board:clone(h.board),turn:h.turn})),turnClock:window.GameTurnClock?.snapshot?.()||null};},
+ restore(s){
+  const valid=a=>Array.isArray(a)&&a.length===8&&a.every(r=>Array.isArray(r)&&r.length===8&&r.every(v=>[0,1,2,3,4].includes(v)));
+  if(!s||!valid(s.board))throw new Error("西洋跳棋存档数据无效");
+  clearTimeout(timer);b=clone(s.board);turn=Number(s.turn)===2?2:1;mode=s.mode==="two"?"two":"ai";difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:"normal";
+  history=Array.isArray(s.history)?s.history.filter(h=>valid(h.board)).map(h=>({board:clone(h.board),turn:Number(h.turn)===2?2:1})):[];continuing=s.continuing&&Number.isInteger(s.continuing.x)&&Number.isInteger(s.continuing.y)?{x:s.continuing.x,y:s.continuing.y}:null;
+  selected=continuing?{...continuing}:s.selected&&Number.isInteger(s.selected.x)&&Number.isInteger(s.selected.y)?{x:s.selected.x,y:s.selected.y}:null;
+  lastHop=s.lastHop&&Number.isInteger(s.lastHop.x)&&Number.isInteger(s.lastHop.y)?{x:s.lastHop.x,y:s.lastHop.y}:null;
+  legal=continuing?pieceMoves(b,continuing.x,continuing.y).filter(m=>m.capture):selected?moves(b,turn).filter(m=>m.x===selected.x&&m.y===selected.y):[];
+  over=false;paused=true;window.GameTurnClock?.restore?.(s.turnClock);render();report("已恢复上次进度 · "+(turn===1?"红方":"黑方")+"回合");
+ },
+ dispose(){paused=true;clearTimeout(timer);}});
 })();

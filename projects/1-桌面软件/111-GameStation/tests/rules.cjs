@@ -298,9 +298,13 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    await mine.waitForFunction(()=>!!document.querySelector("#gs-hud"));
    assert.equal(await mine.locator("#gs-mode").count(),0,"Single-player Minesweeper must not show an empty battle-mode selector");
    assert.equal(await mine.locator("#gs-difficulty").count(),1,"Minesweeper should retain its difficulty selector");
-   assert.equal(await mine.locator(".mine-status-strip").count(),0,"The top status strip must be removed");
-   assert.equal(await mine.locator("#mineHeadline").evaluate(el=>!!el.closest(".mine-bottom-panel")),true,"Game status must live in the bottom control strip");
-   assert.equal(await mine.locator("#mineBestInline").evaluate(el=>!!el.closest(".mine-bottom-panel")),true,"Personal best must live in the bottom control strip");
+   assert.equal(await mine.locator(".mine-status-strip").count(),0,"The old status strip must remain removed");
+   assert.equal(await mine.locator(".mine-menu-bar").count(),1,"Minesweeper must have the Windows-style menu row");
+   assert.equal(await mine.locator(".game-guide,.game-tools").count(),0,"Minesweeper must devote the available area to the board");
+   assert.equal(await mine.locator("#mineHeadline").evaluate(el=>!!el.closest(".mine-accessibility-data")),true,"Status text must remain available to the game logic without occupying board space");
+   assert.equal(await mine.locator("#mineBestInline").evaluate(el=>!!el.closest(".mine-accessibility-data")),true,"Record metadata must not occupy the board area");
+   assert.equal(await mine.locator("#timer").evaluate(el=>!!el.closest(".mine-bottom-left")),true,"Timer must be displayed on the left");
+   assert.equal(await mine.locator("#counter").evaluate(el=>!!el.closest(".mine-bottom-right")),true,"Remaining mine count must be displayed on the right");
    let mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[0]}));
    mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));
    assert.equal(mineState.started,true);assert.equal(mineState.cells[0].open,true);assert.equal(mineState.cells[0].mine,false,"Minesweeper first click must never detonate");
@@ -339,31 +343,36 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(mineState.cells[0].mine,false,"Even crowded boards must guarantee a safe first click");
    assert.equal(mineState.cells.filter(c=>c.mine).length,3);
 
-   // Number-cell double click flashes covered neighbours, then performs a
-   // chord only when the adjacent flag count matches. DOM nodes remain stable.
+   // Correctly flagged double-click and middle-click chords reveal immediately.
+   // No flagged tile is animated or highlighted as part of the chord.
    mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:4,height:4,mines:[1,15]}));
    await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
    const firstMineNode=await mine.evaluate(()=>{window.__mineNodeProbe=window.__p111MineTest.nodeIdentity(0);return !!window.__mineNodeProbe;});
    assert.equal(firstMineNode,true);
    await mine.locator(".mine-cell").nth(1).click({button:"right"});
    await mine.locator(".mine-cell").nth(0).dblclick();
-   assert.ok(await mine.locator(".mine-cell.chord-flash").count()>0,"Double-clicking an open number must briefly flash covered neighbours");
-   await mine.waitForTimeout(300);
+   assert.equal(await mine.locator(".mine-cell.chord-flash").count(),0,"A correctly flagged double-click chord must not flash any neighbours");
+   assert.ok((await mine.locator(".mine-cell").nth(1).getAttribute("class")).includes("flag"),"The flagged mine must remain marked and must not flash");
    const nodeStable=await mine.evaluate(()=>window.__p111MineTest.nodeIdentity(0)===window.__mineNodeProbe);
    assert.equal(nodeStable,true,"Cell DOM must stay mounted across reveals and flag changes");
    mineState=await mine.evaluate(()=>window.__p111MineTest.state());
-   assert.equal(mineState.cells[4].open,true,"Double-clicking an open numbered cell must chord correctly");
+   assert.equal(mineState.cells[4].open,true,"Double-clicking an open numbered cell with enough flags must immediately chord");
+   // Too few flags produce a short warning only on covered, unflagged neighbours.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:4,height:4,mines:[1,15]}));
+   await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
+   await mine.locator(".mine-cell").nth(0).dblclick();
+   assert.ok(await mine.locator(".mine-cell.chord-flash").count()>0,"An incorrect flag count may briefly warn on covered neighbours");
+   assert.equal((await mine.locator(".mine-cell").nth(0).getAttribute("class")).includes("chord-flash"),false,"The revealed number itself must never flash");
    assert.ok(mineState.records.normal.played>=0,"Per-difficulty local records must be exposed");
 
-   // A single middle click on a revealed number performs the same chord.
+   // A single middle click with the exact flag count also chords immediately.
    mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[1]}));
    await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
    await mine.evaluate(()=>window.__p111MineTest.toggleFlag(1));
    await mine.locator(".mine-cell").nth(0).click({button:"middle"});
-   assert.ok(await mine.locator(".mine-cell.chord-flash").count()>0,"Middle-clicking an open number must flash covered neighbours");
-   await mine.waitForTimeout(300);
+   assert.equal(await mine.locator(".mine-cell.chord-flash").count(),0,"A correctly flagged middle-click chord must not flash neighbours");
    mineState=await mine.evaluate(()=>window.__p111MineTest.state());
-   assert.equal(mineState.cells[4].open,true,"Middle-clicking an open numbered cell must chord correctly");
+   assert.equal(mineState.cells[4].open,true,"Middle-clicking an open numbered cell with enough flags must chord immediately");
 
    await mine.close();
 
