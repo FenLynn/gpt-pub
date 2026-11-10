@@ -1408,8 +1408,9 @@ body{font-size:15px}
  .elapsed-label{min-width:50px}
  .topbar-actions{gap:4px}
  .round-actions{gap:4px;padding-right:6px}
- .topbar .round-actions .top-action{min-width:60px;padding:0 8px;font-size:12px}
- .topbar .round-actions #newGameButton{min-width:68px}
+ .topbar .round-actions .top-action{min-width:60px;height:32px;padding:0 8px!important;font-size:12px!important;gap:5px}
+ .topbar .round-actions .action-label{font-size:12px!important}
+ .topbar .round-actions #newGameButton{min-width:68px!important}
  .topbar #progressButton{width:78px;min-width:78px;height:32px;padding:0 6px!important;gap:4px;font-size:11px!important}
  .topbar #progressButton svg{width:14px;height:14px}
  .topbar #progressButtonLabel{font-size:11px;line-height:1;white-space:nowrap}
