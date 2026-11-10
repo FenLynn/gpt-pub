@@ -139,6 +139,26 @@ window.addEventListener("message",event=>{
   suspendTimers();safeCall("setOptions",m.payload||{});safePause();
  }else if(m.type==="LOAD_STATE"){
   suspendTimers();safeCall("loadState",m.payload||{});safePause();
+ }else if(m.type==="SNAPSHOT_REQUEST"){
+  try{
+   if(typeof handlers.snapshot!=="function")throw new Error("该游戏暂不支持进度保存");
+   const snapshot=handlers.snapshot();
+   if(snapshot===undefined)throw new Error("游戏没有返回可保存的进度");
+   send("SNAPSHOT",{requestId:m.payload?.requestId||null,snapshot});
+  }catch(error){
+   send("SNAPSHOT",{requestId:m.payload?.requestId||null,error:String(error?.message||error)});
+  }
+ }else if(m.type==="RESTORE_STATE"){
+  activityPending=false;pendingKey=null;suspendTimers();
+  try{
+   if(typeof handlers.restore!=="function")throw new Error("该游戏暂不支持进度恢复");
+   safeCall("restore",m.payload?.snapshot);
+   safePause();
+   send("RESTORED",{requestId:m.payload?.requestId||null,ok:true});
+  }catch(error){
+   try{safePause();}catch{}
+   send("RESTORED",{requestId:m.payload?.requestId||null,ok:false,error:String(error?.message||error)});
+  }
  }else if(m.type==="SET_RAIL"){
   const root=document.querySelector(".game-root");
   root?.classList.toggle("rail-collapsed",!!m.payload?.collapsed);
