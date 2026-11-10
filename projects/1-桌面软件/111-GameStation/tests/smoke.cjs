@@ -451,13 +451,22 @@ const names=[
    }
   }else assert.ok(header.notice.width>=(width<=1390?195:214)&&header.notice.width<=285,name+" all game headers must share the Gomoku LED dimensions: "+JSON.stringify(header));
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
-  const crumb=await page.evaluate(()=>({name:document.querySelector("#breadcrumbCategory").textContent.trim(),
+  const crumb=await page.evaluate(()=>({root:document.querySelector("#breadcrumbRoot").textContent.trim(),
+   category:document.querySelector("#breadcrumbCategory").textContent.trim(),
+   game:document.querySelector("#breadcrumbGame").textContent.trim(),
+   categorySeparator:!document.querySelector("#crumbCategorySep").classList.contains("hidden"),
    gameSeparator:!document.querySelector("#crumbGameSep").classList.contains("hidden"),
-   gameName:!document.querySelector("#breadcrumbGame").classList.contains("hidden")}));
-  assert.equal(crumb.name,name,name+" titlebar breadcrumb must identify the active game");
-  assert.equal(crumb.gameSeparator,false,name+" titlebar must not show an empty second breadcrumb separator");
-  assert.equal(crumb.gameName,false,name+" active game name must not be squeezed out by duplicate breadcrumb text");
-  assert.equal(await page.locator("#railToggleButton").count(),0,name+" obsolete fold button must be removed");
+   gameName:!document.querySelector("#breadcrumbGame").classList.contains("hidden"),
+   clusterMarginLeft:getComputedStyle(document.querySelector(".game-topbar-cluster")).marginLeft}));
+  assert.equal(crumb.root,"Game",name+" breadcrumb root must be Game");
+  assert.ok(["棋类","益智","街机","卡牌"].includes(crumb.category),name+" breadcrumb must show its category: "+JSON.stringify(crumb));
+  assert.equal(crumb.game,name,name+" breadcrumb must show the active game as the final segment");
+  assert.equal(crumb.categorySeparator,true,name+" breadcrumb must retain Game > category");
+  assert.equal(crumb.gameSeparator,true,name+" breadcrumb must retain category > game");
+  assert.equal(crumb.gameName,true,name+" active game breadcrumb must be visible");
+  assert.equal(crumb.clusterMarginLeft,"0px",name+" titlebar cluster must not carry a hidden auto-spacer");
+  assert.equal(await page.locator("#railToggleButton").count(),0,name+" obsolete host fold button must be absent");
+  assert.equal(await frame.locator("#gs-tools").count(),0,name+" obsolete hidden iframe fold button must be absent");
   assert.ok(Math.max(...header.actions.map(x=>x.centerY))-Math.min(...header.actions.map(x=>x.centerY))<=2,name+" SVG controls vertically aligned");
   const availableHeight=name==="中国象棋"
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
@@ -819,6 +828,30 @@ const names=[
      }));
      assert.ok((action.hasUndo?action.afterUndo:action.beforeScores)&&action.text==="认输"&&action.icon&&!action.disabled,
       name+" resignation must appear immediately after undo, enabled in active play: "+JSON.stringify(action));
+     if(name==="五子棋"){
+      const alignment=await frame.locator("#resignButton").evaluate(el=>{
+       const icon=el.querySelector("svg").getBoundingClientRect();
+       const node=[...el.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
+       const range=document.createRange();range.selectNode(node);const label=range.getBoundingClientRect();
+       const style=getComputedStyle(el);
+       return{display:style.display,alignItems:style.alignItems,iconCenter:icon.top+icon.height/2,
+        labelCenter:label.top+label.height/2,iconRight:icon.right,labelLeft:label.left,buttonHeight:el.getBoundingClientRect().height};
+      });
+      assert.equal(alignment.display,"flex","Gomoku resign must use a horizontal flex row: "+JSON.stringify(alignment));
+      assert.equal(alignment.alignItems,"center","Gomoku resign icon and label must share vertical centering: "+JSON.stringify(alignment));
+      assert.ok(Math.abs(alignment.iconCenter-alignment.labelCenter)<=2&&alignment.iconRight<=alignment.labelLeft+2&&alignment.buttonHeight>=52,
+       "Gomoku resign icon and text must be aligned side by side: "+JSON.stringify(alignment));
+     }
+    }
+    if(name==="海战棋"){
+     const preload=await frame.locator("#game").evaluate(root=>{
+      const link=document.querySelector("head #gameWorkspaceStyles");
+      return{head:!!link,parent:link?.parentElement?.tagName,href:link?.getAttribute("href"),loaded:!!link?.sheet,
+       copies:document.querySelectorAll('link[href*="shared/workspace.css"]').length,
+       guide:getComputedStyle(root.querySelector(".game-guide")).display};
+     });
+     assert.ok(preload.head&&preload.parent==="HEAD"&&preload.href==="../shared/workspace.css"&&preload.loaded&&preload.copies===1&&preload.guide==="none",
+      "Battleship must preload exactly one shared workspace stylesheet before first paint: "+JSON.stringify(preload));
     }
     if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
      const preload=await frame.locator("#game").evaluate(root=>({
@@ -1486,6 +1519,15 @@ const names=[
   await cannonLoad([...cannonBase,[0,7,"red","炮"],[0,5,"red","兵"],[0,2,"red","车"]]);
   assert.equal((await cannonMoves()).some(m=>m.fx===0&&m.fy===7&&m.tx===0&&m.ty===2),false,"cannon cannot capture a friendly piece");
   await cannonPage.close();
+  // The breadcrumb is an actual navigation path: Game -> category -> current game.
+  await library();await open("五子棋");
+  assert.equal((await page.locator("#topbar .breadcrumbs").innerText()).replace(/\\s+/g,""),"Game›棋类›五子棋");
+  await page.locator("#breadcrumbCategory").click();
+  await page.locator("#libraryView").waitFor({state:"visible"});
+  assert.equal(await page.locator("#libraryTitle").innerText(),"棋类","Category breadcrumb must open the corresponding game menu");
+  await page.locator("#breadcrumbRoot").click();
+  await page.locator("#libraryView").waitFor({state:"visible"});
+  assert.equal(await page.locator("#libraryTitle").innerText(),"全部游戏","Game breadcrumb must open the all-games menu");
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
   console.log("P111 R19 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), left timer, central notices, SVG controls, Tetris preview/score, chess and arcade lifecycle.");

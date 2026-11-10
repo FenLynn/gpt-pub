@@ -97,7 +97,7 @@ function showGameNotice(message,timeout=2400,persistent=false){
 function clearGameNotice(){clearTimeout(centerNoticeTimer);permanentGameStatus="";setGameNoticeText("");}
 function toast(message){const el=$("toast");if(active){el.classList.remove("show");showGameNotice(message);return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[]))),firstStartedAt=Math.max(0,Number(read("firstStartedAt",0))||0);
-let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",railCollapsed=false,heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="";
+let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="";
 
 const scoringGames=new Set(["2048","memory","tetris","snake","pong","contra","mario","tank","doudizhu","mahjong","sanguosha"]);
 const nativeResultGames=new Set(["gomoku","xiangqi"]);
@@ -303,15 +303,20 @@ function rotateHomePoster(){
 }
 
 function updateCounts(){for(const cat of Object.keys(categoryNames))$("count-"+cat).textContent=games.filter(g=>cat==="all"||g.category===cat).length;if($("totalGameCount"))$("totalGameCount").textContent=String(games.length);["board","puzzle","arcade","card"].forEach(cat=>{const el=$("homeCount-"+cat);if(el)el.textContent=games.filter(g=>g.category===cat).length+" 款";});}
-function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent="首页";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("helpButton").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();}
-function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
+function showHome(){closeGame();homeView.classList.remove("hidden");libraryView.classList.add("hidden");workspaceView.classList.add("hidden");$("breadcrumbRoot").textContent="Game";$("breadcrumbCategory").textContent="首页";$("breadcrumbCategory").dataset.category="home";$("crumbCategorySep").classList.remove("hidden");$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("helpButton").classList.add("hidden");document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.view==="home"));shell.classList.remove("menu-open");updateHomeClock();renderHeatmap();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();}
+function showLibrary(category){closeGame();currentCategory=category||"all";homeView.classList.add("hidden");libraryView.classList.remove("hidden");workspaceView.classList.add("hidden");$("breadcrumbRoot").textContent="Game";$("breadcrumbCategory").textContent=categoryNames[currentCategory]||"全部游戏";$("breadcrumbCategory").dataset.category=currentCategory;$("crumbCategorySep").classList.remove("hidden");$("crumbGameSep").classList.add("hidden");$("breadcrumbGame").classList.add("hidden");$("gameControls").classList.add("hidden");$("gameActions").classList.add("hidden");$("libraryTitle").textContent=categoryNames[currentCategory]||"全部游戏";document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.category===currentCategory));renderLibrary();shell.classList.remove("menu-open");}
 function renderLibrary(){const grid=$("gameGrid");grid.innerHTML="";const rows=games.filter(g=>(currentCategory==="all"||g.category===currentCategory)&&(!search||(g.name+" "+g.description).toLowerCase().includes(search)));$("libraryCount").textContent=rows.length+" 款";$("emptyState").classList.toggle("hidden",rows.length>0);rows.forEach(g=>{const b=document.createElement("button");b.className="game-card";b.type="button";b.innerHTML='<span class="game-card-icon" data-category="'+g.category+'" data-game="'+g.id+'" aria-hidden="true">'+gameIconMarkup(g)+'</span><span class="game-card-copy"><strong class="game-card-title">'+escapeHtml(g.name)+'</strong><span class="game-card-meta"><i class="game-card-status '+(g.status==="prototype"?"prototype":"")+'"></i>'+(g.status==="prototype"?"持续完善":"可直接游玩")+'</span></span><span class="game-card-arrow">›</span>';b.addEventListener("click",()=>openGame(g.id));grid.appendChild(b);});}
 function send(type,payload={}){if(!active||!frame.contentWindow)return;frame.contentWindow.postMessage({channel:"gamestation",protocolVersion:1,gameId:active.id,sessionId,type,payload},"*");}
 function setBreadcrumb(){
- $("breadcrumbCategory").textContent=active.name;
- $("breadcrumbCategory").title=active.name;
- $("crumbGameSep").classList.add("hidden");
- $("breadcrumbGame").classList.add("hidden");
+ $("breadcrumbRoot").textContent="Game";
+ $("breadcrumbCategory").textContent=active.categoryName||categoryNames[active.category]||"游戏";
+ $("breadcrumbCategory").dataset.category=active.category;
+ $("breadcrumbCategory").title=(active.categoryName||categoryNames[active.category]||"游戏")+" · 返回分类";
+ $("crumbCategorySep").classList.remove("hidden");
+ $("crumbGameSep").classList.remove("hidden");
+ $("breadcrumbGame").textContent=active.name;
+ $("breadcrumbGame").title=active.name;
+ $("breadcrumbGame").classList.remove("hidden");
 }
 function renderGameControls(){
  const modeEl=$("modeControl"),difficultyEl=$("difficultyControl"),hasModes=Array.isArray(active?.modes)&&active.modes.length>1;
@@ -376,7 +381,7 @@ function finishGame(payload={}){if(!session||session.finished)return;stopClock()
 function openGame(id){
  const g=games.find(x=>x.id===id);if(!g)return;closeGame();active=g;
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
- ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;railCollapsed=false;helpSource={lines:[],note:""};hideGameResult();
+ ready=false;paused=true;started=false;roundCounted=false;modeIndex=0;difficulty="normal";currentScore=0;helpSource={lines:[],note:""};hideGameResult();
  session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
  setBreadcrumb();$("gameActions").classList.remove("hidden");$("helpButton").classList.remove("hidden");
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;
@@ -396,7 +401,7 @@ window.addEventListener("message",event=>{
   paused=true;
   setGameState();
   $("stageLoading").classList.add("done");
-  send("SET_RAIL",{collapsed:railCollapsed});
+  send("SET_RAIL",{collapsed:false});
   return;
  }
  if(m.sessionId!==sessionId)return;
@@ -404,10 +409,8 @@ window.addEventListener("message",event=>{
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="leave")showLibrary(active.category);else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}
- if(m.type==="TOOLS_STATE"){railCollapsed=!m.payload?.expanded;return;}
  if(m.type==="TOOLS_META"){
-  const hasActions=!!m.payload?.hasActions;railCollapsed=!hasActions;
-  send("SET_RAIL",{collapsed:!hasActions});return;
+  send("SET_RAIL",{collapsed:!m.payload?.hasActions});return;
  }
   if(m.type==="HELP_SOURCE"){helpSource={lines:m.payload?.lines||[],note:m.payload?.note||""};if(!$("helpPanel").classList.contains("hidden"))renderHelp();return;}
  if(m.type==="REQUEST_NEW_GAME"){newRound();return;}
@@ -452,7 +455,8 @@ function clearData(){if(!confirm("确定清空本机的游戏时间、成绩、�
 $("mobileMenu").addEventListener("click",()=>shell.classList.toggle("menu-open"));
 document.querySelectorAll("[data-view='home']").forEach(b=>b.addEventListener("click",showHome));
 document.querySelectorAll(".nav-item[data-category]").forEach(b=>b.addEventListener("click",()=>showLibrary(b.dataset.category)));
-$("breadcrumbCategory").addEventListener("click",()=>active?showLibrary(active.category):showHome());
+$("breadcrumbRoot").addEventListener("click",()=>showLibrary("all"));
+$("breadcrumbCategory").addEventListener("click",()=>{if(active)showLibrary(active.category);else if(!homeView.classList.contains("hidden"))showHome();else showLibrary(currentCategory);});
 $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowerCase();renderLibrary();});
  $("startButton").addEventListener("click",()=>{if(started)endGame();else startGame();});$("pauseButton").addEventListener("click",togglePause);$("newGameButton").addEventListener("click",newRound);$("gamePauseResume").addEventListener("click",resumeGame);
  $("gameResultReplay").addEventListener("click",newRound);

@@ -10,13 +10,12 @@ if(!document.getElementById("gameWorkspaceStyles")){
 }
 root.classList.remove("rail-collapsed");
 root.dataset.workspace="r17";
-let hud=null,menu=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null;
+let hud=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false;
 function send(action,detail={}){window.GameBridge?.send("CONTROL",{action,...detail});}
 function setExpanded(open){
  const side=root.querySelector(".game-tools");
- if(!side||menu?.hidden)return;
+ if(!side?.querySelector("button,select,input,summary"))return;
  root.classList.toggle("gs-tools-open",!!open);
- menu.setAttribute("aria-expanded",String(!!open));
 }
 function hideNotice(){
  if(!notice)return;
@@ -148,13 +147,9 @@ function setup(){
   '<button type="button" class="gs-hud-button" data-action="start" id="gs-start">开始</button>'+
   '<button type="button" class="gs-hud-button" data-action="pause" id="gs-pause" disabled>暂停</button>'+
   '<button type="button" class="gs-hud-button" data-action="new" id="gs-next" disabled>新局</button>'+
-  '<button type="button" class="gs-hud-button" data-action="tools" id="gs-tools" aria-expanded="false">工具</button>'+
   '<button type="button" class="gs-hud-button" data-action="help" id="gs-help">帮助</button>'+
   '</div></div>';
  root.prepend(hud);
- menu=hud.querySelector("#gs-tools");
- const side=root.querySelector(".game-tools");
- menu.hidden=!side?.querySelector("button,select,input,summary");
  const main=root.querySelector(".game-main-board")||root;
  notice=document.createElement("div");
  notice.className="gs-notice";
@@ -182,7 +177,6 @@ function setup(){
   const button=event.target.closest("button[data-action]");
   if(!button)return;
   const action=button.dataset.action;
-  if(action==="tools"){autoToolsOpen=false;setExpanded(!root.classList.contains("gs-tools-open"));return;}
   if(action==="help")send("help");
   else if(action==="pause")send("toggle");
   else send(action);
@@ -277,13 +271,5 @@ window.addEventListener("message",event=>{
  if(message.type==="HUD_NOTICE"&&message.payload?.message)showNotice(message.payload.message,false);
 });
 window.addEventListener("resize",()=>{if(notice&&!notice.hidden)positionNotice();});
-let lastToolsExpanded=null;
-new MutationObserver(()=>{
- const expanded=root.classList.contains("gs-tools-open");
- if(expanded!==lastToolsExpanded){
-  lastToolsExpanded=expanded;
-  window.GameBridge?.send("TOOLS_STATE",{expanded});
- }
-}).observe(root,{attributes:true,attributeFilter:["class"]});
 setup();
 })();

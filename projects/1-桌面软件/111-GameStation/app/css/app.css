@@ -36,6 +36,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .breadcrumbs{display:flex;align-items:center;gap:9px;min-width:0;white-space:nowrap;color:#8297a8;font-size:13px}
 .breadcrumbs i{font-style:normal;color:#b6c5d0}
 .breadcrumbs strong{overflow:hidden;color:#294861;font-weight:680;text-overflow:ellipsis}
+.breadcrumbs .breadcrumb-link{display:inline-flex;align-items:center;border:0;padding:0;background:transparent;color:#8297a8;font:inherit;font-weight:650;line-height:inherit;white-space:nowrap;cursor:pointer}
+.breadcrumbs #breadcrumbCategory{color:#294861;font-weight:680}
+.breadcrumbs .breadcrumb-link:hover{color:#2378ab;text-decoration:underline}
+.breadcrumbs .breadcrumb-link:focus-visible{outline:2px solid #8abbd8;outline-offset:3px;border-radius:2px}
 .mobile-menu{display:none;width:32px;height:32px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#58758c}
 .game-controls{display:flex;align-items:center;justify-content:center;gap:9px;min-width:0;flex:1}
 .cycle-control{height:30px;display:flex;align-items:center;gap:4px;padding:0 3px;border:1px solid #dce7ef;border-radius:8px;background:#fbfdfe;color:#4e6c83;white-space:nowrap}

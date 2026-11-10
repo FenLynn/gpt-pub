@@ -520,10 +520,10 @@
 
 /* R37: keep game titles legible and make notification arrival visible. */
 @media(min-width:901px){
- .main-area:has(#workspaceView:not(.hidden)) .breadcrumbs>span:first-child,
- .main-area:has(#workspaceView:not(.hidden)) #crumbCategorySep{display:none!important}
+ .main-area:has(#workspaceView:not(.hidden)) #breadcrumbRoot,
+ .main-area:has(#workspaceView:not(.hidden)) #crumbCategorySep{display:inline-flex!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .breadcrumbs{
-  gap:0!important;max-width:100%!important;overflow:visible!important
+  gap:5px!important;max-width:100%!important;overflow:visible!important
  }
  .main-area:has(#workspaceView:not(.hidden)) #breadcrumbCategory{
   display:block!important;white-space:nowrap!important;overflow:visible!important;
