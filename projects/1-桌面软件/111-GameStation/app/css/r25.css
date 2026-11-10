@@ -621,3 +621,47 @@
  height:0!important;min-height:0!important;
  padding:0!important;border:0!important;
 }
+
+/* P111 progress save/restore controls and three-second resume gate. */
+.main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action{
+ display:inline-flex!important;align-items:center;justify-content:center;gap:6px;
+ min-width:94px;height:32px;padding:0 10px!important;
+ border:1px solid #c8dce8!important;border-radius:8px!important;
+ background:#edf6fb!important;color:#276889!important;
+ font-size:12px!important;font-weight:720!important;white-space:nowrap;
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action svg{
+ display:block;width:15px;height:15px;flex:none;fill:none;stroke:currentColor;
+ stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;
+}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action:hover:not(:disabled){
+ background:#e2f1f9!important;border-color:#a9cddd!important;
+}
+#gameStage>.restore-countdown-overlay{
+ position:absolute;inset:0;z-index:6;display:grid;place-items:center;
+ pointer-events:auto;background:rgba(18,43,62,.24);backdrop-filter:blur(2px);
+}
+#gameStage>.restore-countdown-overlay[hidden]{display:none!important}
+#gameStage .restore-countdown-card{
+ width:min(280px,calc(100% - 32px));min-height:205px;padding:22px;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+ border:1px solid #c6dce8;border-radius:17px;
+ background:linear-gradient(145deg,rgba(255,255,255,.96),rgba(235,246,252,.94));
+ box-shadow:0 18px 48px rgba(24,53,73,.28),inset 0 1px #fff;
+ color:#42677e;text-align:center;
+}
+#gameStage .restore-countdown-card span{font-size:13px;font-weight:650;letter-spacing:.04em}
+#gameStage .restore-countdown-card strong{
+ display:block;color:#216b98;font:800 64px/1 ui-monospace,Consolas,monospace;
+ font-variant-numeric:tabular-nums;
+}
+@media(max-width:620px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action{
+  min-width:31px;width:31px;height:31px;padding:0!important;font-size:0!important;gap:0;
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action svg{width:16px;height:16px}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action span{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+ #gameStage .restore-countdown-card{animation:none!important}
+}
