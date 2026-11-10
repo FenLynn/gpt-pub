@@ -365,19 +365,25 @@
   #game.flight-chess-layout .flight-dice-cube{transition:none!important;will-change:transform}
 }
 
-/* R61 — the history rail follows the actual wooden frame not the SVG's 20-unit viewBox margin. Widen only the left rail; preserve the right rail. */
+/* R61 — the history rail follows the actual wooden frame, not the SVG's
+   20-unit viewBox margin. Match Xiangqi's two virtual side tracks; keep the
+   actual right-side dice/control content at its existing narrower width. */
 @media(min-width:701px){
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed){
   --gs-history-width:clamp(280px,24vw,340px)!important;
-  --gs-board-track:min(calc(100dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
-  grid-template-columns:var(--gs-history-width) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
+  --gs-board-track:min(calc(100dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
+  grid-template-columns:var(--gs-history-width) minmax(0,var(--gs-board-track)) var(--gs-history-width)!important;
  }
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board{
-  transform:translateX(calc((var(--gs-board-side) - var(--gs-history-width))/2))!important
+  transform:none!important
  }
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.reversi-record-rail{
   width:100%!important;position:static!important;left:auto!important;
   height:var(--flight-record-height,100%)!important;max-height:100%!important;align-self:center!important
+ }
+ #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.game-tools{
+  width:var(--gs-board-side)!important;max-width:100%!important;
+  justify-self:start!important;align-self:center!important
  }
  #game.flight-chess-layout .flight-dice.rolling{animation:none!important}
 }
