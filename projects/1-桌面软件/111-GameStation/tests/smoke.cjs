@@ -308,7 +308,10 @@ const names=[
       primaryCenter:kind==="海战棋"?box(root.querySelector(".fleet-boards")).left+box(root.querySelector(".fleet-boards")).width/2:b.left+b.width/2,
       ownBoardInStage:kind==="海战棋"?root.querySelector(".fleet-boards").contains(root.querySelector("#own")):null,
       ownCenter:kind==="海战棋"?box(root.querySelector("#own")).left+box(root.querySelector("#own")).width/2:null,
-      rightHeight:r.height,
+      rightHeight:r.height,rightRect:{top:r.top,bottom:r.bottom},
+      rightContent:(()=>{const children=[...right.children].filter(el=>getComputedStyle(el).display!=="none");
+       return{top:Math.min(...children.map(el=>box(el).top)),bottom:Math.max(...children.map(el=>box(el).bottom)),
+        overflow:getComputedStyle(right).overflow};})(),
       stageTexture:getComputedStyle(root.querySelector(".game-main-board")).backgroundImage,
       left:{width:left.width,height:left.height,top:left.top,bottom:left.bottom,gap:b.left-left.right},
       center:box(root).left+box(root).width/2,
@@ -336,7 +339,11 @@ const names=[
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
     assert.ok(detail.left.width>=280&&Math.abs(detail.left.height-detail.physicalHeight)<=3,
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
-    assert.ok(Math.abs(detail.rightHeight-detail.physicalHeight)<=3,
+    if(name==="海战棋"){
+     assert.ok(detail.rightHeight>=detail.physicalHeight-3&&detail.rightContent.top>=detail.rightRect.top-1&&
+      detail.rightContent.bottom<=detail.rightRect.bottom+1&&detail.rightContent.overflow==="visible",
+      "Battleship right tools may grow beyond the compact sea height, but must never clip their content: "+JSON.stringify(detail));
+    }else assert.ok(Math.abs(detail.rightHeight-detail.physicalHeight)<=3,
      name+" right tools must match physical board height: "+JSON.stringify(detail));
     assert.ok(["海战棋","中国跳棋","西洋跳棋（8×8）"].includes(name)?detail.stageTexture==="none":detail.stageTexture.includes("radial-gradient")&&!detail.stageTexture.includes("repeating-"),
      name+" stage must not contain an unnecessary central colored frame: "+JSON.stringify(detail));
