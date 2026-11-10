@@ -109,11 +109,19 @@ const names=[
     const x=root.querySelector(".chess-axis-x"),y=root.querySelector(".chess-axis-y"),main=box(root.querySelector(".game-main-board"));
     return{xLabels:[...x.querySelectorAll("span")].map(el=>el.textContent.trim()),
      yLabels:[...y.querySelectorAll("span")].map(el=>el.textContent.trim()),
+     xFontSize:getComputedStyle(x.querySelector("span")).fontSize,
+     yFontSize:getComputedStyle(y.querySelector("span")).fontSize,
+     xFontWeight:getComputedStyle(x.querySelector("span")).fontWeight,
+     yFontWeight:getComputedStyle(y.querySelector("span")).fontWeight,
      x:box(x),y:box(y),main,wrapOverflow:getComputedStyle(root.querySelector(".board-wrap")).overflow};
    });
    assert.deepEqual(coordinates.xLabels,["a","b","c","d","e","f","g","h"],"Chess file coordinates must show all eight letters");
    assert.deepEqual(coordinates.yLabels,["8","7","6","5","4","3","2","1"],"Chess rank coordinates must show all eight numbers");
    assert.equal(coordinates.wrapOverflow,"visible","Chess board wrapper must not clip the external coordinate labels");
+   assert.equal(coordinates.xFontSize,"13px","Chess file coordinates must be enlarged for readability");
+   assert.equal(coordinates.yFontSize,"13px","Chess rank coordinates must be enlarged for readability");
+   assert.equal(coordinates.xFontWeight,"700","Chess file coordinates must use a readable weight");
+   assert.equal(coordinates.yFontWeight,"700","Chess rank coordinates must use a readable weight");
    const inside=rect=>rect.left>=coordinates.main.left-1&&rect.right<=coordinates.main.right+1&&
     rect.top>=coordinates.main.top-1&&rect.bottom<=coordinates.main.bottom+1;
    assert.ok(inside(coordinates.x)&&inside(coordinates.y),
