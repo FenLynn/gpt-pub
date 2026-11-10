@@ -383,7 +383,8 @@
  }
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.game-tools{
   width:var(--gs-board-side)!important;max-width:100%!important;
-  justify-self:start!important;align-self:center!important
+  justify-self:start!important;align-self:center!important;
+  transform:translateX(calc((var(--gs-board-side) - var(--gs-history-width))/2 - var(--gs-board-gap)))!important
  }
  #game.flight-chess-layout .flight-dice.rolling{animation:none!important}
 }
