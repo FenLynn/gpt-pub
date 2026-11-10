@@ -34,5 +34,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   undo(){document.getElementById("undo").click();return this.state();}
  };
 }
-GameBridge.register({init:newGame,newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续游戏");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
+GameBridge.register({init:newGame,newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续游戏");},snapshot(){return{grid:grid.map(r=>r.slice()),score,best,previous:previous?{grid:previous.grid.map(r=>r.slice()),score:previous.score,won:previous.won,over:previous.over}:null,won,over};},restore(s){if(!s||!Array.isArray(s.grid)||s.grid.length!==4||s.grid.some(r=>!Array.isArray(r)||r.length!==4))throw new Error("2048 存档数据无效");grid=s.grid.map(r=>r.slice());score=Math.max(0,Number(s.score)||0);best=Math.max(0,Number(s.best)||best);previous=s.previous?{grid:s.previous.grid.map(r=>r.slice()),score:Number(s.previous.score)||0,won:!!s.previous.won,over:!!s.previous.over}:null;won=!!s.won;over=!!s.over;paused=true;render();report("已恢复上次进度");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();
