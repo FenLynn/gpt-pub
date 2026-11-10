@@ -150,6 +150,7 @@ function setup(){
   '<button type="button" class="gs-hud-button" data-action="help" id="gs-help">帮助</button>'+
   '</div></div>';
  root.prepend(hud);
+ const side=root.querySelector(".game-tools");
  const main=root.querySelector(".game-main-board")||root;
  notice=document.createElement("div");
  notice.className="gs-notice";
