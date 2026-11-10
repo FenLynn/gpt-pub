@@ -79,7 +79,7 @@ function newGame(){
  paused=false;over=false;food=placeFood();scoreEl.textContent="0";setStatus("游戏进行中");draw();canvas.focus();run();
 }
 function pause(){if(paused)return;paused=true;setStatus("已暂停");draw();}
-function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();stop();run();draw();}
+function resume(){if(over)return;paused=false;setStatus("游戏进行中");canvas.focus();if(rafId!==null)cancelAnimationFrame(rafId);rafId=null;lastFrame=0;run();draw();}
 function keydown(event){
  const key=event.key.length===1?event.key.toLowerCase():event.key;
  const map={ArrowUp:{x:0,y:-1},ArrowDown:{x:0,y:1},ArrowLeft:{x:-1,y:0},ArrowRight:{x:1,y:0},w:{x:0,y:-1},s:{x:0,y:1},a:{x:-1,y:0},d:{x:1,y:0}};
@@ -101,5 +101,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   queueDirection(x,y){queueDirection({x,y});return fixtureState();}
  };
 }
-GameBridge.register({init(p){configure(p.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},dispose(){paused=true;stop();window.removeEventListener("keydown",keydown);canvas.removeEventListener("pointerdown",focusCanvas);}});
+GameBridge.register({init(p){configure(p.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},snapshot(){return{snake:snake.map(p=>({...p})),food:food?{...food}:null,dir:{...dir},queue:queue.map(p=>({...p})),score,difficulty,speed,accumulator};},restore(s){if(!s||!Array.isArray(s.snake)||!s.snake.length||!s.dir)throw new Error("贪吃蛇存档数据无效");if(rafId!==null)cancelAnimationFrame(rafId);rafId=null;snake=s.snake.map(p=>({x:Number(p.x),y:Number(p.y)}));food=s.food?{x:Number(s.food.x),y:Number(s.food.y)}:null;dir={x:Number(s.dir.x),y:Number(s.dir.y)};queue=Array.isArray(s.queue)?s.queue.map(p=>({x:Number(p.x),y:Number(p.y)})):[];score=Math.max(0,Number(s.score)||0);configure(s.difficulty||difficulty);speed=Math.max(1,Number(s.speed)||speed);accumulator=Math.max(0,Number(s.accumulator)||0);paused=true;over=false;lastFrame=0;scoreEl.textContent=String(score);setStatus("已恢复上次进度");draw();},dispose(){paused=true;stop();window.removeEventListener("keydown",keydown);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();
