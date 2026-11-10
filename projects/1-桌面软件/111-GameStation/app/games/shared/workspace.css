@@ -2048,12 +2048,13 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   grid-column:3!important;grid-row:1!important;display:flex!important;
   flex-direction:column!important;align-items:stretch!important;
   width:var(--gs-actions-width)!important;max-width:100%!important;min-width:0!important;
-  height:auto!important;max-height:100%!important;min-height:0!important;
-  justify-self:start!important;align-self:center!important;
-  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+  height:var(--reversi-board-height,100%)!important;max-height:100%!important;min-height:0!important;
+  justify-self:start!important;align-self:center!important;justify-content:center!important;
+  gap:15px!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
   background:transparent!important;box-shadow:none!important;overflow-x:hidden!important
  }
  .game-root.game-layout:not(.rail-collapsed).battleship-layout>.game-tools{
+  height:auto!important;min-height:var(--reversi-board-height,0px)!important;
   transform:translateY(var(--battleship-rail-offset,0px))!important;overflow:visible!important
  }
  .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
