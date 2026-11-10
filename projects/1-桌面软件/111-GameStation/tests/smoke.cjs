@@ -500,6 +500,7 @@ const names=[
    ?Math.min(v.main.height,Math.max(0,(v.main.width-14)*9/8))
    :name==="黑白棋"?Math.min(v.main.height,Math.max(0,v.main.width-18))
    :name==="四子棋"?Math.min(v.main.height,Math.max(0,(v.main.width-18)*6/7))
+   :name==="国际象棋"?Math.min(v.main.height-52,Math.max(0,v.main.width-48))
    :v.battleship?Math.min(v.main.height-58,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
   assert.ok(v.surface.height>=(v.battleship?Math.min(v.main.height*.45,availableHeight)*.90:Math.min(v.main.height*.70,availableHeight)-1),
