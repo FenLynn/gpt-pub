@@ -107,8 +107,13 @@ const names=[
    assert.ok(Math.abs(v.history.width-v.expectedHistoryWidth)<=2,
     name+" history rail must match Xiangqi's responsive notation width: "+JSON.stringify({history:v.history,expected:v.expectedHistoryWidth,viewport:{width,height}}));
    assert.equal(v.gridColumns.length,3,name+" history layout must have three symmetric grid tracks: "+JSON.stringify(v));
-   assert.ok(Math.abs(v.gridColumns[0]-v.expectedHistoryWidth)<=2&&Math.abs(v.gridColumns[2]-v.expectedHistoryWidth)<=2,
-    name+" left and right virtual tracks must both match Xiangqi's width: "+JSON.stringify(v));
+   assert.ok(Math.abs(v.gridColumns[0]-v.expectedHistoryWidth)<=2&&
+    (name==="飞行棋"||Math.abs(v.gridColumns[2]-v.expectedHistoryWidth)<=2),
+    name+" history rail must match Xiangqi's width; Flight Chess retains its original narrower right control track: "+JSON.stringify(v));
+   if(name==="飞行棋"){
+    assert.ok(v.gridColumns[2]>=160&&v.gridColumns[2]<=220&&Math.abs(v.tools.width-v.gridColumns[2])<=2,
+     "Flight Chess right dice/control track must retain its original compact width: "+JSON.stringify(v));
+   }
    assert.equal(v.historyGridColumn,"1",name+" history must occupy the left track: "+JSON.stringify(v));
    assert.equal(v.mainGridColumn,"2",name+" board must occupy the centered middle track: "+JSON.stringify(v));
    assert.equal(v.toolsGridColumn,"3",name+" tools must occupy the right track: "+JSON.stringify(v));
