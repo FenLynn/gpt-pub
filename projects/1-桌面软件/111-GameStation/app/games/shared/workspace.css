@@ -1930,3 +1930,65 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   transition:none!important;will-change:auto!important
  }
 }
+
+/* R51 · Match every board-game history rail to Xiangqi's responsive notation width.
+   Keep the board centered with equal virtual side tracks; preserve each game's
+   existing right-control width and board-specific aspect ratio. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout){
+  --gs-history-width:clamp(280px,24vw,340px)!important;
+  --gs-board-gap:clamp(8px,.8vw,12px)!important;
+  --gs-board-track:min(calc(100dvh - 14px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
+  grid-template-columns:var(--gs-history-width) minmax(0,var(--gs-board-track)) var(--gs-history-width)!important;
+  column-gap:var(--gs-board-gap)!important;
+  justify-content:center!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout{
+  --gs-board-track:min(calc(116.6667dvh - 17px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+  --gs-board-track:min(calc(111.1111dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout)>.game-main-board{
+  grid-column:2!important;grid-row:1!important;min-width:0!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout)>.reversi-record-rail,
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chess-layout>.chess-notation-rail{
+  grid-column:1!important;grid-row:1!important;width:100%!important;
+  min-width:0!important;justify-self:stretch!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).reversi-layout{
+  --gs-actions-width:clamp(154px,12vw,186px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout{
+  --gs-actions-width:clamp(154px,12vw,186px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout{
+  --gs-actions-width:clamp(150px,12vw,188px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).checkers-layout{
+  --gs-actions-width:clamp(156px,calc(50% - 50dvh - 7px),235px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+  --gs-actions-width:clamp(168px,13vw,205px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).flight-chess-layout{
+  --gs-actions-width:clamp(166px,13vw,210px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chess-layout{
+  --gs-actions-width:clamp(170px,13vw,215px)!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout)>.game-tools{
+  grid-column:3!important;grid-row:1!important;
+  width:var(--gs-actions-width)!important;max-width:100%!important;min-width:0!important;
+  justify-self:start!important;align-self:center!important
+ }
+ .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
+ .game-root.game-layout.chess-layout>.game-main-board>.board-wrap{overflow:visible!important}
+}
+@media(min-width:701px) and (max-width:900px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout){
+  --gs-history-width:240px!important;
+  --gs-board-gap:6px!important
+ }
+}
