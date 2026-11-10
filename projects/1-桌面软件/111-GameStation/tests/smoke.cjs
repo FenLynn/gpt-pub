@@ -1304,7 +1304,7 @@ const names=[
   const tallFour=await frame.locator("#board").evaluate(board=>{
    const b=board.getBoundingClientRect(),root=board.closest(".game-root");
    const stage=root.getBoundingClientRect(),tracks=getComputedStyle(root).gridTemplateColumns
-    .split(/\\s+/).map(value=>parseFloat(value));
+    .split(/\s+/).map(value=>parseFloat(value));
    const centerTrackWidth=tracks.length===3?tracks[1]:root.clientWidth;
    const existingBoardWidthCap=Math.min(window.innerHeight*.82,centerTrackWidth);
    const maximumFeasibleHeight=Math.min(stage.height,existingBoardWidthCap*6/7);
