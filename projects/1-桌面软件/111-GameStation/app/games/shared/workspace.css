@@ -1985,6 +1985,9 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  }
  .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
  .game-root.game-layout.chess-layout>.game-main-board>.board-wrap{overflow:visible!important}
+ .game-root.game-layout.chess-layout :is(.chess-axis-x,.chess-axis-y) span{
+  color:#59432f!important;font-size:13px!important;font-weight:700!important;line-height:1!important
+ }
 }
 @media(min-width:701px) and (max-width:900px){
  .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout){
