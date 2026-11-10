@@ -113,7 +113,16 @@ function sync(payload){
  advance();running=next;refresh();
 }
 function snapshot(){advance();return{side,turnMs,actionMs,records:records.map(r=>({...r})),running};}
-window.GameTurnClock=Object.freeze({reset,record,handover,rewind,snapshot});
+function restore(value){
+ const p=value&&typeof value==="object"?value:{};
+ running=false;mark=performance.now();
+ side=String(p.side||"—");
+ turnMs=Math.max(0,Number(p.turnMs)||0);
+ actionMs=Math.max(0,Number(p.actionMs)||0);
+ records=Array.isArray(p.records)?p.records.slice(-1000).map(r=>({side:String(r?.side||"—"),label:String(r?.label||"走棋"),ms:Math.max(0,Number(r?.ms)||0)})):[];
+ refresh();
+}
+window.GameTurnClock=Object.freeze({reset,record,handover,rewind,snapshot,restore});
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
  const m=event.data;
