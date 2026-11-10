@@ -85,7 +85,7 @@ const names=[
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
    const history=el.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
-   const gridColumns=getComputedStyle(el).gridTemplateColumns.split(/\\s+/).map(value=>parseFloat(value));
+   const gridColumns=getComputedStyle(el).gridTemplateColumns.split(/\s+/).map(value=>parseFloat(value));
    return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),history:history?box(history):null,
     gridColumns,historyGridColumn:history?getComputedStyle(history).gridColumnStart:null,
     mainGridColumn:main?getComputedStyle(main).gridColumnStart:null,
