@@ -49,11 +49,22 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
   await page.locator("#progressButton").waitFor({state:"visible"});
   assert.equal(await page.locator("#progressButtonLabel").innerText(),"保存进度",name+" must expose save progress while paused");
+  assert.equal(await page.locator("#progressButton").isEnabled(),true,name+" save button must be enabled while paused");
   await page.locator("#progressButton").click();
-  await page.waitForFunction(id=>{
-   try{const all=JSON.parse(localStorage.getItem("gamestation.progress")||"{}"),item=all[id];return item?.schemaVersion===1&&item.gameId===id&&item.state&&typeof item.state==="object"&&!Array.isArray(item.state);}
-   catch{return false;}
-  },id,{timeout:7000});
+  try{
+   await page.waitForFunction(id=>{
+    try{const all=JSON.parse(localStorage.getItem("gamestation.progress")||"{}"),item=all[id];return item?.schemaVersion===1&&item.gameId===id&&item.state&&typeof item.state==="object"&&!Array.isArray(item.state);}
+    catch{return false;}
+   },id,{timeout:5000});
+  }catch(error){
+   const diagnostic=await page.evaluate(()=>({
+    label:document.querySelector("#progressButtonLabel")?.textContent,
+    disabled:document.querySelector("#progressButton")?.disabled,
+    notice:document.querySelector("#gameNotice")?.innerText,
+    progressKeys:Object.keys(JSON.parse(localStorage.getItem("gamestation.progress")||"{}"))
+   }));
+   throw new Error(name+" progress save did not persist: "+JSON.stringify(diagnostic));
+  }
   const saved=await page.evaluate(id=>JSON.parse(localStorage.getItem("gamestation.progress")||"{}")[id],id);
   assert.ok(Object.keys(saved.state).length>0,name+" snapshot must contain a real game state");
   await page.locator("#breadcrumbCategory").click();
