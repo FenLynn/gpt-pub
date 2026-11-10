@@ -98,7 +98,13 @@ const names=[
     battleship:el.classList.contains("battleship-layout"),overflow:document.documentElement.scrollWidth,viewport:innerWidth};
   });
   const centerOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.root.x+v.root.width/2));
-  assert.ok(centerOffset<=2.5,name+" primary playing window must center horizontally in the lower game area: "+JSON.stringify({centerOffset,view:{width,height},geometry:v}));
+  if(name==="飞行棋"){
+   const centerTrackOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.main.x+v.main.width/2));
+   assert.ok(centerTrackOffset<=2.5,"Flight Chess board must center in the actual space between its wider history rail and compact right controls: "+JSON.stringify({centerTrackOffset,geometry:v}));
+   assert.ok(v.history.right<=v.primary.x+2,"Flight Chess history rail must not overlap the physical board: "+JSON.stringify(v));
+  }else{
+   assert.ok(centerOffset<=2.5,name+" primary playing window must center horizontally in the lower game area: "+JSON.stringify({centerOffset,view:{width,height},geometry:v}));
+  }
   assert.equal(v.guide,"none",name+" guide should not consume playfield space");
   assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
