@@ -2067,3 +2067,17 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   --gs-board-gap:6px!important
  }
 }
+
+/* R52.1 · Battleship's action rail can exceed the square sea height.
+   Give the compact two-sea game an intrinsic-height tool rail. The history and
+   tool columns remain symmetric, but the right-side controls must never be
+   clipped to the 10×10 sea's height. */
+@media(min-width:701px){
+ #game.battleship-layout>.game-tools{
+  width:clamp(150px,12vw,188px)!important;
+  height:max-content!important;min-height:var(--reversi-board-height,0px)!important;
+  max-height:none!important;align-self:center!important;justify-self:start!important;
+  overflow:visible!important;overflow-x:visible!important;overflow-y:visible!important;
+  transform:translateY(var(--battleship-rail-offset,0px))!important
+ }
+}
