@@ -52,5 +52,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   step(t=16.67){last=0;tick(t);cancelAnimationFrame(raf);raf=0;return fixtureState();}
  };
 }
-GameBridge.register({init(){pause();},newGame:start,pause,resume,setDifficulty(v){difficulty=v||"normal";},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);canvas.removeEventListener("pointerdown",focusCanvas);}});
+GameBridge.register({init(){pause();},newGame:start,pause,resume,setDifficulty(v){difficulty=v||"normal";},snapshot(){return{playerY,aiY,ball:ball?{...ball}:null,ps,as,difficulty};},restore(s){if(!s?.ball)throw new Error("Pong 存档数据无效");cancelAnimationFrame(raf);playerY=Math.max(0,Math.min(290,Number(s.playerY)||145));aiY=Math.max(0,Math.min(290,Number(s.aiY)||145));ball={x:Number(s.ball.x),y:Number(s.ball.y),vx:Number(s.ball.vx),vy:Number(s.ball.vy)};ps=Math.max(0,Number(s.ps)||0);as=Math.max(0,Number(s.as)||0);difficulty=s.difficulty||difficulty;paused=true;over=false;raf=0;last=0;keys={};document.getElementById("playerScore").textContent=String(ps);document.getElementById("aiScore").textContent=String(as);report("已恢复上次进度");draw();},dispose(){pause();window.removeEventListener("keydown",keydown);window.removeEventListener("keyup",keyup);canvas.removeEventListener("pointerdown",focusCanvas);}});
 })();
