@@ -85,7 +85,11 @@ const names=[
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
    const history=el.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
+   const gridColumns=getComputedStyle(el).gridTemplateColumns.split(/\\s+/).map(value=>parseFloat(value));
    return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),history:history?box(history):null,
+    gridColumns,historyGridColumn:history?getComputedStyle(history).gridColumnStart:null,
+    mainGridColumn:main?getComputedStyle(main).gridColumnStart:null,
+    toolsGridColumn:tools?getComputedStyle(tools).gridColumnStart:null,
     expectedHistoryWidth:innerWidth<=900?240:Math.min(340,Math.max(280,innerWidth*.24)),
     tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
     guide:el.querySelector(".game-guide")?getComputedStyle(el.querySelector(".game-guide")).display:"none",
@@ -102,6 +106,12 @@ const names=[
   if(v.history){
    assert.ok(Math.abs(v.history.width-v.expectedHistoryWidth)<=2,
     name+" history rail must match Xiangqi's responsive notation width: "+JSON.stringify({history:v.history,expected:v.expectedHistoryWidth,viewport:{width,height}}));
+   assert.equal(v.gridColumns.length,3,name+" history layout must have three symmetric grid tracks: "+JSON.stringify(v));
+   assert.ok(Math.abs(v.gridColumns[0]-v.expectedHistoryWidth)<=2&&Math.abs(v.gridColumns[2]-v.expectedHistoryWidth)<=2,
+    name+" left and right virtual tracks must both match Xiangqi's width: "+JSON.stringify(v));
+   assert.equal(v.historyGridColumn,"1",name+" history must occupy the left track: "+JSON.stringify(v));
+   assert.equal(v.mainGridColumn,"2",name+" board must occupy the centered middle track: "+JSON.stringify(v));
+   assert.equal(v.toolsGridColumn,"3",name+" tools must occupy the right track: "+JSON.stringify(v));
   }
   if(name==="国际象棋"){
    const coordinates=await frame.locator("#game").evaluate(root=>{
