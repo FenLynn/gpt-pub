@@ -334,7 +334,7 @@ const names=[
       ownSquare:kind==="海战棋"?box(root.querySelector("#own")).width:null};
     },name);
     const wantedRatio=name==="四子棋"?7/6:1;
-    const contentWidth=detail.mainWidth-(name==="中国跳棋"?0:8);
+    const contentWidth=detail.mainWidth-(name==="中国跳棋"?10:8);
     const contentHeight=detail.main-(name==="中国跳棋"?0:8);
     const expectedPhysicalHeight=name==="海战棋"
      ?Math.min(contentWidth/2-16,contentHeight-53)
@@ -534,7 +534,8 @@ const names=[
    :name==="四子棋"?Math.min(v.main.height,Math.max(0,(v.main.width-18)*6/7))
    :name==="国际象棋"?Math.min(v.main.height-52,Math.max(0,v.main.width-48))
    :name==="西洋跳棋（8×8）"?Math.min(v.main.height-8,Math.max(0,v.main.width-8))
-   :name==="中国跳棋"||name==="飞行棋"?Math.min(v.main.height,Math.max(0,v.main.width))
+   :name==="中国跳棋"?Math.min(v.main.height,Math.max(0,v.main.width-10))
+   :name==="飞行棋"?Math.min(v.main.height,Math.max(0,v.main.width))
    :v.battleship?Math.min(v.main.height-58,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
   assert.ok(v.surface.height>=(v.battleship?Math.min(v.main.height*.45,availableHeight)*.90:Math.min(v.main.height*.70,availableHeight)-1),
