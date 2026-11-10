@@ -1943,10 +1943,10 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   column-gap:var(--gs-board-gap)!important;
   justify-content:center!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed).connect4-layout{
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout).connect4-layout{
   --gs-board-track:min(calc(116.6667dvh - 17px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed).chinese-checkers-layout{
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout).chinese-checkers-layout{
   --gs-board-track:min(calc(111.1111dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-history-width) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important
  }
  .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):is(.reversi-layout,.connect4-layout,.battleship-layout,.checkers-layout,.chinese-checkers-layout,.flight-chess-layout,.chess-layout)>.game-main-board{
