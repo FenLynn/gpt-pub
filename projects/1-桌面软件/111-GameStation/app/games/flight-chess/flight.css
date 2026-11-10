@@ -365,18 +365,12 @@
   #game.flight-chess-layout .flight-dice-cube{transition:none!important;will-change:transform}
 }
 
-/* R61 — the history rail follows the actual wooden frame, not the SVG's
-   20-unit viewBox margin. Widen only the left rail; preserve the right rail. */
+/* R61 — the history rail follows the actual wooden frame not the SVG's 20-unit viewBox margin. Widen only the left rail; preserve the right rail. */
 @media(min-width:701px){
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed){
   --gs-history-width:clamp(280px,24vw,340px)!important;
   --gs-board-track:min(calc(100dvh - 16px),calc(100% - var(--gs-history-width) - var(--gs-board-side) - var(--gs-board-gap) - var(--gs-board-gap) - 12px))!important;
   grid-template-columns:var(--gs-history-width) minmax(0,var(--gs-board-track)) var(--gs-board-side)!important;
- }
-}
-@media(min-width:701px) and (max-width:900px){
- #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed){
-  --gs-history-width:240px!important
  }
  #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board{
   transform:translateX(calc((var(--gs-board-side) - var(--gs-history-width))/2))!important
@@ -386,6 +380,11 @@
   height:var(--flight-record-height,100%)!important;max-height:100%!important;align-self:center!important
  }
  #game.flight-chess-layout .flight-dice.rolling{animation:none!important}
+}
+@media(min-width:701px) and (max-width:900px){
+ #game.flight-chess-layout.gs-tools-open:not(.rail-collapsed){
+  --gs-history-width:240px!important
+ }
 }
 
 /* R60 — the user's supplied SVG is the single source of board artwork.
