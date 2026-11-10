@@ -293,6 +293,7 @@ const names=[
       top=box(timer),bottom=box(hint);
      return{board:{width:b.width,height:b.height,center:b.left+b.width/2},
       main:box(root.querySelector(".game-main-board")).height,
+      mainWidth:box(root.querySelector(".game-main-board")).width,
       physicalHeight:kind==="中国跳棋"?b.height*812/900:b.height,
       physicalTop:kind==="中国跳棋"?b.top+(b.height-b.height*812/900)/2:b.top,
       physicalBottom:kind==="中国跳棋"?b.bottom-(b.height-b.height*812/900)/2:b.bottom,
@@ -312,11 +313,17 @@ const names=[
       ownSquare:kind==="海战棋"?box(root.querySelector("#own")).width:null};
     },name);
     const wantedRatio=name==="四子棋"?7/6:1;
-    const minHeightShare=name==="海战棋"?.35:name==="四子棋"?.74:name==="中国跳棋"?.72:.80;
+    const contentWidth=detail.mainWidth-(name==="中国跳棋"?0:8);
+    const contentHeight=detail.main-(name==="中国跳棋"?0:8);
+    const expectedPhysicalHeight=name==="海战棋"
+     ?Math.min(contentWidth/2-16,contentHeight-53)
+     :name==="四子棋"?Math.min(contentHeight,contentWidth*6/7)
+     :name==="中国跳棋"?Math.min(contentHeight,contentWidth)*812/900
+     :Math.min(contentHeight,contentWidth);
     assert.ok(Math.abs(detail.board.width/detail.board.height-wantedRatio)<.03,
      name+" must retain actual board aspect ratio: "+JSON.stringify(detail));
-    assert.ok(detail.board.height>=detail.main*minHeightShare,
-     name+" must prioritize the available height instead of a shallow board: "+JSON.stringify(detail));
+    assert.ok(detail.physicalHeight>=expectedPhysicalHeight*.96,
+     name+" board must use the maximum physical area available after matching Xiangqi-width history rails: "+JSON.stringify({expectedPhysicalHeight,detail}));
     assert.ok(Math.abs(detail.primaryCenter-detail.center)<=2.5,
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
     assert.ok(detail.left.width>=280&&Math.abs(detail.left.height-detail.physicalHeight)<=3,
