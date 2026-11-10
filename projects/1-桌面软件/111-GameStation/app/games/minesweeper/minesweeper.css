@@ -79,7 +79,7 @@ body[data-game="minesweeper"]{background:#c7d7e5}
  width:var(--mine-cell-size)!important;height:var(--mine-cell-size)!important;
  min-width:0;min-height:0;aspect-ratio:1!important;padding:0;
  border:1px solid #285d9e;border-radius:0;
- background:linear-gradient(142deg,#e9f7ff 0%,#c5e3f7 25%,#86b9e6 58%,#4c8bd0 100%);
+ background:linear-gradient(142deg,#e7f5ff 0%,#b5d9fa 24%,#6fa7ee 58%,#3974c8 100%);
  color:#172f4b;font-family:"Segoe UI",Arial,sans-serif;
  font-size:clamp(12px,calc(var(--mine-cell-size)*.73),34px);
  font-weight:800;line-height:1;user-select:none;text-shadow:0 1px 0 #fff9;
@@ -88,7 +88,7 @@ body[data-game="minesweeper"]{background:#c7d7e5}
  transition:filter .08s ease,background .08s ease;
 }
 #game.minesweeper-layout .mine-cell::before{
- content:"";position:absolute;inset:2px 2px auto auto;width:42%;height:34%;
+ content:"";position:absolute;inset:2px auto auto 2px;width:42%;height:34%;
  background:linear-gradient(135deg,#fff8,transparent 82%);
  pointer-events:none;
 }

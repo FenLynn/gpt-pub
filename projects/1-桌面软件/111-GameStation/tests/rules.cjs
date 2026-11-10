@@ -305,6 +305,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(await mine.locator("#mineBestInline").evaluate(el=>!!el.closest(".mine-accessibility-data")),true,"Record metadata must not occupy the board area");
    assert.equal(await mine.locator("#timer").evaluate(el=>!!el.closest(".mine-bottom-left")),true,"Timer must be displayed on the left");
    assert.equal(await mine.locator("#counter").evaluate(el=>!!el.closest(".mine-bottom-right")),true,"Remaining mine count must be displayed on the right");
+   assert.equal(await mine.locator("#timer").innerText(),"0","Classic timer must not show leading zeroes");
+   assert.equal(await mine.locator("#counter").innerText(),"40","Classic remaining-mine counter must not show leading zeroes");
    let mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[0]}));
    mineState=await mine.evaluate(()=>window.__p111MineTest.reveal(0));
    assert.equal(mineState.started,true);assert.equal(mineState.cells[0].open,true);assert.equal(mineState.cells[0].mine,false,"Minesweeper first click must never detonate");

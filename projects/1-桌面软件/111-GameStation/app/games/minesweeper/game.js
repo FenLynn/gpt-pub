@@ -63,8 +63,8 @@ function persistRecords(){
 }
 function formatCounter(value){
  const n=Math.trunc(Number(value)||0);
- if(n<0)return "-"+String(Math.min(99,Math.abs(n))).padStart(2,"0");
- return String(Math.min(999,n)).padStart(3,"0");
+ if(n<0)return "-"+String(Math.min(99,Math.abs(n)));
+ return String(Math.min(999,n));
 }
 function formatTime(value){return value===null?"—":Math.floor(value/60)+":"+String(value%60).padStart(2,"0");}
 function renderRecords(){
