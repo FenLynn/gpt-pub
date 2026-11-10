@@ -10,7 +10,7 @@ if(!document.getElementById("gameWorkspaceStyles")){
 }
 root.classList.remove("rail-collapsed");
 root.dataset.workspace="r17";
-let hud=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false;
+let hud=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null;
 function send(action,detail={}){window.GameBridge?.send("CONTROL",{action,...detail});}
 function setExpanded(open){
  const side=root.querySelector(".game-tools");
