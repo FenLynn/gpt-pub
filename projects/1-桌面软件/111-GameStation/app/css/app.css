@@ -1417,3 +1417,31 @@ body{font-size:15px}
  .topbar #helpButton{padding:0 9px;font-size:12px}
  .topbar #fullscreenButton{width:32px;height:32px}
 }
+
+
+/* Workspace grid has five fixed semantic columns. Compress those columns
+   explicitly at 1366px; flex sizing alone cannot shrink its max-content tracks. */
+@media(min-width:1261px) and (max-width:1400px){
+ .main-area:has(#workspaceView:not(.hidden)) .topbar{
+  grid-template-columns:minmax(64px,100px) max-content minmax(0,1fr) max-content max-content!important;
+  gap:3px!important;
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{
+  min-width:44px!important;padding:0 6px!important;font-size:11px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions:not(.hidden){gap:3px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions .top-action{
+  min-width:58px!important;height:32px!important;padding:0 6px!important;font-size:11px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions .action-label{font-size:11px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions #newGameButton{min-width:64px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .elapsed-label{min-width:44px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{gap:3px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #progressButton{
+  width:64px!important;min-width:64px!important;height:30px!important;padding:0 4px!important;gap:3px!important;font-size:9px!important
+ }
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #progressButton svg{width:12px!important;height:12px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #progressButtonLabel{font-size:9px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #helpButton{min-width:44px!important;padding:0 5px!important;font-size:11px!important}
+ .main-area:has(#workspaceView:not(.hidden)) .topbar #fullscreenButton{width:30px!important;min-width:30px!important;height:30px!important}
+}

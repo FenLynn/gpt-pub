@@ -986,9 +986,11 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
       const selectors=[...modes,...levels];
       const inside=b=>{const r=b.getBoundingClientRect(),s=getComputedStyle(b);return r.width>=28&&r.height>=24&&r.left>=bar.left-1&&r.right<=bar.right+1&&r.top>=bar.top-1&&r.bottom<=bar.bottom+1&&s.visibility==="visible"&&s.display!=="none";};
       const actions=[...document.querySelectorAll("#startButton,#pauseButton,#newGameButton,#progressButton,#helpButton")];
-      return{modes:modes.length,levels:levels.length,selectedModes:modes.filter(b=>b.getAttribute("aria-pressed")==="true").length,
+      const rect=b=>{const r=b.getBoundingClientRect(),st=getComputedStyle(b);return{id:b.id,text:b.innerText,disabled:b.disabled,left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width),top:Math.round(r.top),bottom:Math.round(r.bottom),display:st.display,visibility:st.visibility};};
+      return{bar:{left:Math.round(bar.left),right:Math.round(bar.right),width:Math.round(bar.width)},
+       modes:modes.length,levels:levels.length,selectedModes:modes.filter(b=>b.getAttribute("aria-pressed")==="true").length,
        selectedLevels:levels.filter(b=>b.getAttribute("aria-pressed")==="true").length,
-       selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside)};
+       selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside),actionRects:actions.map(rect)};
      });
      const dualModes=new Set(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","西洋跳棋（8×8）","中国跳棋","飞行棋"]);
      assert.equal(controls.modes,dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
