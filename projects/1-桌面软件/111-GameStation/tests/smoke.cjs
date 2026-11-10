@@ -84,7 +84,10 @@ const names=[
      (el.classList.contains("battleship-layout")?el.querySelector("#enemy"):null)||el.querySelector(".fleet-board .game-grid")||
     el.querySelector(".mine-classic")||el.querySelector(".solitaire-table")||el.querySelector(".card-table-main")||el.querySelector("#board");
    const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
-   return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
+   const history=el.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
+   return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),history:history?box(history):null,
+    expectedHistoryWidth:innerWidth<=900?240:Math.min(340,Math.max(280,innerWidth*.24)),
+    tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
     guide:el.querySelector(".game-guide")?getComputedStyle(el.querySelector(".game-guide")).display:"none",
     hudVisible:!!el.querySelector("#gs-hud")&&getComputedStyle(el.querySelector("#gs-hud")).display!=="none",
     noticeVisible:!!el.querySelector("#gs-notice")&&getComputedStyle(el.querySelector("#gs-notice")).display!=="none",
@@ -96,6 +99,26 @@ const names=[
   assert.equal(v.hudVisible,false,name+" secondary iframe titlebar must be hidden");
   assert.equal(v.noticeVisible,false,name+" iframe notices must not appear on board");
   assert.ok(v.main.height>=v.root.height*.96,name+" game stage should use full iframe height: "+JSON.stringify(v));
+  if(v.history){
+   assert.ok(Math.abs(v.history.width-v.expectedHistoryWidth)<=2,
+    name+" history rail must match Xiangqi's responsive notation width: "+JSON.stringify({history:v.history,expected:v.expectedHistoryWidth,viewport:{width,height}}));
+  }
+  if(name==="国际象棋"){
+   const coordinates=await frame.locator("#game").evaluate(root=>{
+    const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
+    const x=root.querySelector(".chess-axis-x"),y=root.querySelector(".chess-axis-y"),main=box(root.querySelector(".game-main-board"));
+    return{xLabels:[...x.querySelectorAll("span")].map(el=>el.textContent.trim()),
+     yLabels:[...y.querySelectorAll("span")].map(el=>el.textContent.trim()),
+     x:box(x),y:box(y),main,wrapOverflow:getComputedStyle(root.querySelector(".board-wrap")).overflow};
+   });
+   assert.deepEqual(coordinates.xLabels,["a","b","c","d","e","f","g","h"],"Chess file coordinates must show all eight letters");
+   assert.deepEqual(coordinates.yLabels,["8","7","6","5","4","3","2","1"],"Chess rank coordinates must show all eight numbers");
+   assert.equal(coordinates.wrapOverflow,"visible","Chess board wrapper must not clip the external coordinate labels");
+   const inside=rect=>rect.left>=coordinates.main.left-1&&rect.right<=coordinates.main.right+1&&
+    rect.top>=coordinates.main.top-1&&rect.bottom<=coordinates.main.bottom+1;
+   assert.ok(inside(coordinates.x)&&inside(coordinates.y),
+    "All chess coordinates must remain visible inside the main board area: "+JSON.stringify(coordinates));
+  }
   if(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋"].includes(name)){
    const timing=await frame.locator("#gs-turn-clock").evaluate(el=>{
     const r=el.getBoundingClientRect();
@@ -240,7 +263,7 @@ const names=[
       hintLast:hint.top>score.bottom,rowGap:rows[1].top-rows[0].bottom,
       turn:root.dataset.turnSide,rows};
     });
-    assert.ok(detail.leftWidth>=(name==="黑白棋"?250:150)&&Math.abs(detail.leftHeight-detail.boardHeight)<=2.5,
+    assert.ok(detail.leftWidth>=280&&Math.abs(detail.leftHeight-detail.boardHeight)<=2.5,
      "Reversi history must be wide and exactly board-height: "+JSON.stringify(detail));
     assert.ok(detail.gap>=-2&&detail.gap<=48&&detail.hasColumns,
      "Reversi history must be adjacent to the centered board with column headings: "+JSON.stringify(detail));
@@ -296,7 +319,7 @@ const names=[
      name+" must prioritize the available height instead of a shallow board: "+JSON.stringify(detail));
     assert.ok(Math.abs(detail.primaryCenter-detail.center)<=2.5,
      name+" physical playing board must remain centered horizontally: "+JSON.stringify(detail));
-    assert.ok(detail.left.width>=150&&Math.abs(detail.left.height-detail.physicalHeight)<=3,
+    assert.ok(detail.left.width>=280&&Math.abs(detail.left.height-detail.physicalHeight)<=3,
      name+" full-height left history must align with actual board: "+JSON.stringify(detail));
     assert.ok(Math.abs(detail.rightHeight-detail.physicalHeight)<=3,
      name+" right tools must match physical board height: "+JSON.stringify(detail));
@@ -328,7 +351,7 @@ const names=[
       left:root.querySelector(".chess-notation-rail #moveList")!==null,
       right:root.querySelector(".game-tools #moveList")!==null};
     });
-    assert.ok(info.left&&!info.right,"Chess notation belongs only on the left");
+    assert.ok(info.left&&!info.right&&info.history.width>=280,"Chess notation must stay on the left at Xiangqi width: "+JSON.stringify(info));
     assert.ok(Math.abs(info.history.height-info.board.height)<=3&&Math.abs(info.tools.height-info.board.height)<=3,
      "Chess history and right controls equal actual board height: "+JSON.stringify(info));
     assert.ok(info.history.right<=info.board.left+2&&info.board.right<=info.tools.left+2,
@@ -379,9 +402,13 @@ const names=[
     assert.ok(!geometry.background.includes("repeating-linear-gradient"),
      "Xiangqi wood board must not contain horizontal stripe gradients");
    }else {
-    const feasible=(name==="黑白棋"||name==="四子棋")
-    ?Math.min(v.root.height-30,v.root.width-2*(await frame.locator(".reversi-record-rail").evaluate(el=>el.getBoundingClientRect().width))-38)
-    :Math.min(v.root.height-30,v.root.width-400);
+    const historyWidth=await frame.locator("#game").evaluate(root=>{
+     const rail=root.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
+     return rail?rail.getBoundingClientRect().width:null;
+    });
+    const feasible=historyWidth!==null
+     ?Math.min(v.root.height-30,v.root.width-historyWidth-historyWidth-38)
+     :Math.min(v.root.height-30,v.root.width-400);
     assert.ok(v.main.width>=feasible*.96&&v.main.width<=v.root.width,
      name+" board must retain maximum usable playfield width inside centered symmetric side tracks: "+JSON.stringify({feasible,geometry:v}));
    }
