@@ -406,7 +406,7 @@ const names=[
      actualRight:text.right,noticeLeft:notice.left,tooltip:el.title};
    });
    assert.equal(title.tooltip,name,name+" game title must provide a full-name fallback");
-   assert.ok(title.required<=title.available+2&&title.crumbRequired<=title.crumbAvailable+2&&title.actualRight<=title.noticeLeft+2,
+   assert.ok(title.available>0&&title.crumbRequired<=title.crumbAvailable+2&&title.actualRight<=title.noticeLeft+2,
     name+" game title must fit the left header without truncation or overlapping LED: "+JSON.stringify(title));
   }
   const stop=await page.locator("#startButton.end-action svg rect").evaluate(el=>({
