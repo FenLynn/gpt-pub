@@ -351,7 +351,7 @@ const names=[
       left:root.querySelector(".chess-notation-rail #moveList")!==null,
       right:root.querySelector(".game-tools #moveList")!==null};
     });
-    assert.ok(info.left&&!info.right&&info.history.width>=280,"Chess notation must stay on the left at Xiangqi width: "+JSON.stringify(info));
+    assert.ok(info.left&&!info.right&&info.history.right-info.history.left>=280,"Chess notation must stay on the left at Xiangqi width: "+JSON.stringify(info));
     assert.ok(Math.abs(info.history.height-info.board.height)<=3&&Math.abs(info.tools.height-info.board.height)<=3,
      "Chess history and right controls equal actual board height: "+JSON.stringify(info));
     assert.ok(info.history.right<=info.board.left+2&&info.board.right<=info.tools.left+2,
