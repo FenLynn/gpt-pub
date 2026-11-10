@@ -1983,6 +1983,11 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   width:var(--gs-actions-width)!important;max-width:100%!important;min-width:0!important;
   justify-self:start!important;align-self:center!important
  }
+
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed).battleship-layout>.game-tools{
+  height:auto!important;min-height:var(--reversi-board-height,0px)!important;
+  max-height:100%!important;overflow:visible!important
+ }
  .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
  .game-root.game-layout.chess-layout>.game-main-board>.board-wrap{overflow:visible!important}
  .game-root.game-layout.chess-layout :is(.chess-axis-x,.chess-axis-y) span{
