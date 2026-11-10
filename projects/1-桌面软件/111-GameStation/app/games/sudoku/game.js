@@ -36,5 +36,5 @@ if(new URLSearchParams(location.search).has("p111Test")){
   check(){check();return fixtureState();}
  };
 }
-GameBridge.register({init(p){level=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续解题");},setDifficulty(v){level=v||"normal";},dispose(){paused=true;window.removeEventListener("keydown",key);}});
+GameBridge.register({init(p){level=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续解题");},setDifficulty(v){level=v||"normal";},snapshot(){return{puzzle:puzzle.map(r=>r.slice()),solution:solution.map(r=>r.slice()),given:given.map(r=>r.slice()),selected,level,over};},restore(s){const valid=g=>Array.isArray(g)&&g.length===9&&g.every(r=>Array.isArray(r)&&r.length===9&&r.every(v=>Number.isInteger(v)&&v>=0&&v<=9));if(!s||!valid(s.puzzle)||!valid(s.solution)||!valid(s.given))throw new Error("数独存档数据无效");puzzle=s.puzzle.map(r=>r.slice());solution=s.solution.map(r=>r.slice());given=s.given.map(r=>r.map(Boolean));selected=Number.isInteger(s.selected)?s.selected:-1;level=s.level||level;over=!!s.over;paused=true;document.getElementById("level").textContent=level==="easy"?"简单":level==="hard"?"困难":"标准";render();report("已恢复上次进度");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
 })();
