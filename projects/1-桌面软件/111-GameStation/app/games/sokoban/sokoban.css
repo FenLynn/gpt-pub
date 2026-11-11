@@ -59,11 +59,22 @@
 }
 .sokoban-layout .soko-legend>div>span:first-child{font-size:15px;font-weight:800}
 .sokoban-layout .legend-player{color:#3988a8}.sokoban-layout .legend-box{color:#bb844b}.sokoban-layout .legend-goal{color:#d2a849}
-.sokoban-layout .game-tools>.game-btn{min-height:36px!important;height:37px!important;padding:6px 10px!important;border-radius:9px!important;font-size:13px!important}
+.sokoban-layout .game-tools>.game-btn{
+ width:100%!important;min-width:75px!important;min-height:44px!important;height:44px!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;
+ padding:0 11px!important;border-radius:10px!important;font-size:13px!important;font-weight:680!important;
+}
+.sokoban-layout .game-tools>.game-btn svg{
+ width:17px;height:17px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;
+ stroke-linecap:round;stroke-linejoin:round
+}
+.sokoban-layout .game-tools>.game-btn span{line-height:1}
+.sokoban-layout .game-tools>.game-btn:disabled{cursor:not-allowed}
+
 .sokoban-layout .game-tools>.game-btn.primary:not(:disabled){border-color:#b6d8c4!important;background:linear-gradient(145deg,#f4fbf6,#e3f3e8)!important;color:#28764e!important}
 @media(max-width:700px){
  .sokoban-layout .game-tools{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}
  .sokoban-layout .game-tools-heading,.sokoban-layout .sokoban-status,.sokoban-layout .soko-stats,.sokoban-layout .soko-progress,.sokoban-layout .soko-dpad,.sokoban-layout .soko-key-hint,.sokoban-layout .soko-legend{grid-column:1/-1}
- .sokoban-layout .game-tools>.game-btn{min-height:34px!important;height:34px!important}
+ .sokoban-layout .game-tools>.game-btn{min-height:42px!important;height:42px!important}
 }
 @media(prefers-reduced-motion:reduce){.sokoban-layout .soko-progress span{transition:none}}
