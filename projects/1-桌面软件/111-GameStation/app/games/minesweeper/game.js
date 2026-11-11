@@ -112,6 +112,9 @@ function fitBoard(){
  boardEl.style.setProperty("--mine-cell-size",rounded+"px");
  boardEl.dataset.cellSize=String(rounded);
 }
+function scheduleFitBoard(){
+ requestAnimationFrame(()=>requestAnimationFrame(fitBoard));
+}
 function configure(value){
  difficulty=Object.hasOwn(levelNames,value)?value:"normal";
  if(difficulty==="easy"){W=9;H=9;MINES=10;}
@@ -254,7 +257,7 @@ function makeBoard(){
  started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
  elapsedMs=0;runningSince=null;hostElapsedMs=null;triggerMine=-1;
  setFace("normal");
- render();renderRecords();fitBoard();report("点击任意方格开始");
+ render();renderRecords();fitBoard();scheduleFitBoard();report("点击任意方格开始");
 }
 function protectFirstClick(index){
  const region=[index,...neighbors(index)];
@@ -450,9 +453,9 @@ window.addEventListener("keydown",event=>{
  if(event.key==="F1"&&!event.repeat){event.preventDefault();GameBridge.send("CONTROL",{action:"help"});return;}
  if(event.key==="F2"&&!event.repeat){event.preventDefault();GameBridge.send("REQUEST_NEW_GAME");}
 });
-window.addEventListener("resize",fitBoard);
+window.addEventListener("resize",scheduleFitBoard);
 if(typeof ResizeObserver!=="undefined"){
- resizeObserver=new ResizeObserver(fitBoard);
+ resizeObserver=new ResizeObserver(scheduleFitBoard);
  resizeObserver.observe(gameArea);
 }
 if(isFixture){
@@ -505,7 +508,7 @@ GameBridge.register({
  init(payload){configure(payload.difficulty);newGame();},
  newGame,
  pause(){paused=true;freezeTimer();report("已暂停");},
- resume(){paused=false;if(started&&!over)startTimer();if(!over)report(started?"游戏进行中":"点击任意方格开始");},
+ resume(){paused=false;if(started&&!over)startTimer();if(!over)report(started?"游戏进行中":"点击任意方格开始");scheduleFitBoard();},
  setDifficulty(value){configure(value);},
  snapshot(){return{width:W,height:H,mines:MINES,difficulty,started,flags,opened,seconds,elapsedMs:hostElapsedMs===null?activeMs():hostElapsedMs,cells:cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Number(c.n)||0}))};},
  restore(s){
@@ -515,11 +518,11 @@ GameBridge.register({
   boardEl.style.setProperty("--cols",W);boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);levelEl.textContent=levelNames[difficulty]||"自定义";
   cells=s.cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Math.max(0,Number(c.n)||0)}));
   started=!!s.started;over=false;paused=true;flags=Math.max(0,Number(s.flags)||cells.filter(c=>c.flag).length);opened=Math.max(0,Number(s.opened)||cells.filter(c=>c.open&&!c.mine).length);
-  elapsedMs=Math.max(0,Number(s.elapsedMs)||Math.max(0,Number(s.seconds)||0)*1000);hostElapsedMs=elapsedMs;runningSince=null;seconds=Math.min(999,Math.floor(elapsedMs/1000));triggerMine=-1;middleTarget=-1;dualTarget=-1;setFace("normal");nodes=[];render();renderRecords();fitBoard();report("已恢复上次进度");
+  elapsedMs=Math.max(0,Number(s.elapsedMs)||Math.max(0,Number(s.seconds)||0)*1000);hostElapsedMs=elapsedMs;runningSince=null;seconds=Math.min(999,Math.floor(elapsedMs/1000));triggerMine=-1;middleTarget=-1;dualTarget=-1;setFace("normal");nodes=[];render();renderRecords();fitBoard();scheduleFitBoard();report("已恢复上次进度");
  },
  dispose(){
   paused=true;stopTimer();if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}resizeObserver?.disconnect();
-  window.removeEventListener("resize",fitBoard);
+  window.removeEventListener("resize",scheduleFitBoard);
  }
 });
 })();
