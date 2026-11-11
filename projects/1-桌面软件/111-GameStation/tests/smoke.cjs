@@ -1280,14 +1280,31 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await flagPaths.nth(3).getAttribute("d"),"M7.5 28.5h18","Minesweeper flag base must be one clean horizontal line");
   const flagShape=await flagPaths.nth(1).getAttribute("d");
   assert.equal(flagShape,"M12.8 4.5L30 8.8L12.8 22Z","Minesweeper flag must be enlarged while retaining a single pointed triangular pennant");
-  const tintStyles=await mineFixture.evaluate(()=>{
-   const a=document.querySelector(".mine-cell.tint-0"),b=document.querySelector(".mine-cell.tint-3");
-   return {top:a&&getComputedStyle(a).backgroundImage,bottom:b&&getComputedStyle(b).backgroundImage,highlight:a&&getComputedStyle(a,"::before").content};
+  const tilePerfStyle=await mineFixture.evaluate(()=>{
+   const tile=document.querySelector(".mine-cell.tint-0"),style=getComputedStyle(tile);
+   return {background:style.backgroundImage,filter:style.filter,transition:style.transitionProperty,shadow:style.boxShadow,isolation:style.isolation,pseudo:getComputedStyle(tile,"::before").display};
   });
-  assert.ok(tintStyles.top.includes("radial-gradient")&&tintStyles.top.includes("linear-gradient")&&tintStyles.bottom.includes("linear-gradient")&&tintStyles.highlight!=="none","Covered tiles must use Win7 blue-glass gradients and soft top highlights");
+  assert.ok(tilePerfStyle.background.includes("linear-gradient")&&!tilePerfStyle.background.includes("radial-gradient"),"Covered tiles must retain a single Win7 blue gradient");
+  assert.equal(tilePerfStyle.filter,"none","Covered tiles must not use per-cell brightness filters");
+  assert.equal(tilePerfStyle.transition,"none","Covered tiles must not animate background/filter transitions");
+  assert.equal(tilePerfStyle.shadow,"none","Covered tiles must not allocate per-cell box shadows");
+  assert.equal(tilePerfStyle.isolation,"auto","Covered tiles must not create an isolated stacking context per cell");
+  assert.equal(tilePerfStyle.pseudo,"none","Covered tiles must not allocate a separate highlight pseudo-element");
+  const floodPerf=await mineFixture.evaluate(async()=>{
+   window.__p111MineTest.loadBoard({width:30,height:16,mines:[]});
+   const start=performance.now(),state=window.__p111MineTest.reveal(0),syncMs=performance.now()-start;
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const frameMs=performance.now()-start;
+   window.__p111MineTest.stopTimer();
+   return {syncMs,frameMs,opened:state.opened,cellCount:document.querySelectorAll(".mine-cell").length};
+  });
+  console.log("[P111 Minesweeper full-board reveal]",JSON.stringify(floodPerf));
+  assert.equal(floodPerf.opened,480,"Minesweeper full-board reveal benchmark must open all 480 safe cells");
+  assert.ok(floodPerf.syncMs<200,"Minesweeper 480-cell flood/repaint must complete synchronously under 200ms: "+JSON.stringify(floodPerf));
+  assert.ok(floodPerf.frameMs<350,"Minesweeper 480-cell flood/repaint must settle within 350ms: "+JSON.stringify(floodPerf));
   await mineFixture.evaluate(()=>{window.__p111MineTest.loadBoard({width:3,height:3,mines:[]});window.__p111MineTest.forceNumber(4,8);});
-  const mineRecessStyle=await mineFixture.locator(".mine-cell").nth(4).evaluate(el=>({top:el.classList.contains("shadow-top"),left:el.classList.contains("shadow-left"),bg:getComputedStyle(el).backgroundImage,shadow:getComputedStyle(el).boxShadow}));
-  assert.ok(mineRecessStyle.top&&mineRecessStyle.left&&mineRecessStyle.bg.includes("linear-gradient")&&mineRecessStyle.shadow.includes("inset"),"Opened tiles must use cool-gray recessed texture with upper/left shadows");
+  const mineRecessStyle=await mineFixture.locator(".mine-cell").nth(4).evaluate(el=>({top:el.classList.contains("shadow-top"),left:el.classList.contains("shadow-left"),bg:getComputedStyle(el).backgroundColor,topWidth:getComputedStyle(el).borderTopWidth,leftWidth:getComputedStyle(el).borderLeftWidth,shadow:getComputedStyle(el).boxShadow}));
+  assert.ok(mineRecessStyle.top&&mineRecessStyle.left&&mineRecessStyle.bg!=="rgba(0, 0, 0, 0)"&&mineRecessStyle.topWidth==="2px"&&mineRecessStyle.leftWidth==="2px"&&mineRecessStyle.shadow==="none","Opened tiles must retain a recessed upper/left edge without expensive inset shadows");
   await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
   await open("记忆翻牌");await start();

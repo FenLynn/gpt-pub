@@ -33,10 +33,9 @@ const numberGlyphs={
  7:{top:"#22252a",bottom:"#0b0d10",path:"M9.5 6.2h14v3l-7.7 17.6h-4l7.7-17.6h-10z"},
  8:{top:"#4e5c6a",bottom:"#263038",path:"M16 5.2c-3.2 0-5.5 2-5.5 4.6 0 2.2 1.5 4 3.5 4.8-2.5.9-4.5 3.2-4.5 6.2 0 3.7 2.7 6.2 6.5 6.2s6.5-2.5 6.5-6.2c0-3-2-5.3-4.5-6.2 2-.8 3.5-2.6 3.5-4.8 0-2.6-2.3-4.6-5.5-4.6zm0 2.6c1.8 0 2.8 1.2 2.8 2.6s-1 2.6-2.8 2.6-2.8-1.2-2.8-2.6 1-2.6 2.8-2.6zm0 7.6c2.2 0 3.6 1.8 3.6 4.4s-1.4 4.6-3.6 4.6-3.6-2-3.6-4.6 1.4-4.4 3.6-4.4z"}
 };
-function numberSVG(value,index){
+function numberSVG(value){
  const glyph=numberGlyphs[value];if(!glyph)return "";
- const id="mine-number-"+index;
- return '<svg class="mine-number-svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+glyph.top+'"/><stop offset="100%" stop-color="'+glyph.bottom+'"/></linearGradient></defs><path d="'+glyph.path+'" fill="url(#'+id+')"/></svg>';
+ return '<svg class="mine-number-svg" viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="'+glyph.path+'" fill="'+glyph.top+'"/></svg>';
 }
 const faceSVG={
  normal:'<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><circle cx="16" cy="16" r="13" fill="#ffd45b" stroke="#9e742b" stroke-width="1.6"/><path d="M10.5 12.5h.2M21.3 12.5h.2" stroke="#493b2a" stroke-width="2.8" stroke-linecap="round"/><path d="M9.5 18.2q6.5 8 13 0" fill="none" stroke="#493b2a" stroke-width="2" stroke-linecap="round"/></svg>',
@@ -129,7 +128,8 @@ function activeMs(){return elapsedMs+(runningSince===null?0:Math.max(0,now()-run
 function updateTimer(){
  const elapsed=hostElapsedMs===null?activeMs():hostElapsedMs;
  seconds=Math.min(999,Math.floor(elapsed/1000));
- timerEl.textContent=formatCounter(seconds);
+ const display=formatCounter(seconds);
+ if(timerEl.textContent!==display)timerEl.textContent=display;
 }
 window.addEventListener("message",event=>{
  if(event.source!==window.parent)return;
@@ -142,7 +142,7 @@ window.addEventListener("message",event=>{
 });
 function startTimer(){
  if(runningSince===null)runningSince=now();
- if(timerId===null)timerId=setInterval(updateTimer,200);
+ if(timerId===null)timerId=setInterval(updateTimer,1000);
 }
 function freezeTimer(){
  if(runningSince!==null){elapsedMs+=Math.max(0,now()-runningSince);runningSince=null;}
@@ -153,10 +153,10 @@ function stopTimer(){
  if(timerId!==null){clearInterval(timerId);timerId=null;}
 }
 function updateCounters(){
- const left=MINES-flags;
- counter.textContent=formatCounter(left);
- remainingEl.textContent=formatCounter(left);
- openedEl.textContent=String(opened);
+ const left=formatCounter(MINES-flags),openedText=String(opened);
+ if(counter.textContent!==left)counter.textContent=left;
+ if(remainingEl.textContent!==left)remainingEl.textContent=left;
+ if(openedEl.textContent!==openedText)openedEl.textContent=openedText;
  updateTimer();
 }
 function neighbors(index){
@@ -209,7 +209,7 @@ function paint(index){
  }else if(cell.open&&cell.mine){
   button.innerHTML=bombSVG+(index===triggerMine?'<span class="mine-explosion-burst" aria-hidden="true"></span>':"");
  }else if(cell.open&&cell.n){
-  button.innerHTML=numberSVG(cell.n,index);
+  button.innerHTML=numberSVG(cell.n);
  }else button.textContent="";
  if(over&&triggerMine>=0&&cell.mine){const distance=Math.abs(index%W-triggerMine%W)+Math.abs(Math.floor(index/W)-Math.floor(triggerMine/W));button.style.setProperty("--mine-blast-delay",Math.min(720,distance*42)+"ms");}else button.style.removeProperty("--mine-blast-delay");
  if(victoryFlag)button.style.setProperty("--mine-victory-delay",Math.round(index/Math.max(1,cells.length-1)*780)+"ms");else button.style.removeProperty("--mine-victory-delay");
@@ -220,11 +220,20 @@ function paint(index){
  button.setAttribute("title",name);
  button.setAttribute("aria-pressed",cell.flag?"true":"false");
 }
-function render(){
+function render(changed){
  if(nodes.length!==cells.length)buildBoard();
  boardEl.classList.toggle("mine-blast-sequence",over&&triggerMine>=0);
  boardEl.classList.toggle("mine-victory-sequence",over&&triggerMine<0);
- for(let i=0;i<cells.length;i++)paint(i);
+ if(Array.isArray(changed)){
+  const dirty=new Set(changed);
+  for(const index of changed){
+   if(index+W<cells.length&&cells[index+W].open)dirty.add(index+W);
+   if(index%W<W-1&&cells[index+1].open)dirty.add(index+1);
+  }
+  dirty.forEach(paint);
+ }else{
+  for(let i=0;i<cells.length;i++)paint(i);
+ }
  updateCounters();
  boardEl.classList.add("mine-ready");
 }
@@ -251,6 +260,7 @@ function protectFirstClick(index){
  const region=[index,...neighbors(index)];
  const regionSet=new Set(region);
  const blocked=region.filter(i=>cells[i].mine);
+ if(!blocked.length)return;
  let choices=[];
  for(let i=0;i<cells.length;i++)if(!regionSet.has(i)&&!cells[i].mine)choices.push(i);
  // If the full 3x3 region cannot be cleared, the chosen square itself
@@ -261,26 +271,36 @@ function protectFirstClick(index){
   choices=[];for(let i=0;i<cells.length;i++)if(i!==index&&!cells[i].mine)choices.push(i);
   if(!choices.length)throw new Error("扫雷棋盘没有安全格");
  }
- for(let i=choices.length-1;i>0;i--){
-  const j=Math.floor(Math.random()*(i+1));
+ const moving=moveFull?blocked:[index];
+ for(let i=0;i<moving.length;i++){
+  const j=i+Math.floor(Math.random()*(choices.length-i));
   [choices[i],choices[j]]=[choices[j],choices[i]];
  }
- const moving=moveFull?blocked:[index];
  for(let i=0;i<moving.length;i++){
   cells[moving[i]].mine=false;
   cells[choices[i]].mine=true;
  }
  recount();
 }
-function flood(index){
- const queue=[index],seen=new Set();
- while(queue.length){
-  const current=queue.pop();
-  if(seen.has(current))continue;seen.add(current);
-  const cell=cells[current];
+function flood(index,changed=[],visited=new Uint8Array(cells.length)){
+ const queue=[index];
+ visited[index]=1;
+ for(let head=0;head<queue.length;head++){
+  const current=queue[head],cell=cells[current];
   if(!cell||cell.open||cell.flag||cell.mine)continue;
-  cell.open=true;opened++;
-  if(cell.n===0)queue.push(...neighbors(current));
+  cell.open=true;opened++;changed.push(current);
+  if(cell.n!==0)continue;
+  const x=current%W,y=Math.floor(current/W);
+  const minX=Math.max(0,x-1),maxX=Math.min(W-1,x+1);
+  const minY=Math.max(0,y-1),maxY=Math.min(H-1,y+1);
+  for(let ny=minY;ny<=maxY;ny++){
+   const row=ny*W;
+   for(let nx=minX;nx<=maxX;nx++){
+    if(nx===x&&ny===y)continue;
+    const next=row+nx;
+    if(!visited[next]){visited[next]=1;queue.push(next);}
+   }
+  }
  }
 }
 function conclude(won,exploded=-1){
@@ -324,7 +344,7 @@ function reveal(index){
   startTimer();GameBridge.send("CLOCK_START");renderRecords();
  }
  if(cells[index].mine){conclude(false,index);return;}
- flood(index);render();
+ const changed=[];flood(index,changed);render(changed);
  if(opened===W*H-MINES){conclude(true);return;}
  report("游戏进行中");
 }
@@ -332,7 +352,7 @@ function toggleFlag(index){
  if(paused||over||index<0||index>=cells.length||cells[index].open)return;
  cells[index].flag=!cells[index].flag;
  flags+=cells[index].flag?1:-1;
- render();
+ render([index]);
 }
 function chord(index){
  const cell=cells[index];
@@ -343,7 +363,9 @@ function chord(index){
  if(!covered.length)return;
  const dangerous=covered.find(i=>cells[i].mine);
  if(dangerous!==undefined){conclude(false,dangerous);return;}
- covered.forEach(flood);render();
+ const changed=[],visited=new Uint8Array(cells.length);
+ for(const target of covered)flood(target,changed,visited);
+ render(changed);
  if(opened===W*H-MINES){conclude(true);return;}
  report("游戏进行中");
 }
