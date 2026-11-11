@@ -1184,12 +1184,17 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   async function fitMine(){
    const f=await mine.evaluate(el=>{
     const rect=node=>{const r=node.getBoundingClientRect();return{left:r.left,top:r.top,bottom:r.bottom,width:r.width,right:r.right,height:r.height};};
-    return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(el.querySelector(".mine-bottom-panel")),area:rect(el.closest(".game-main-board")),horizontal:el.classList.contains("mine-hard-layout")&&matchMedia("(min-width:900px)").matches};
+    const footer=el.querySelector(".mine-bottom-panel");
+    return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(footer),area:rect(el.closest(".game-main-board")),
+     horizontal:el.classList.contains("mine-hard-layout")&&matchMedia("(min-width:900px)").matches,
+     direction:getComputedStyle(el).flexDirection,display:getComputedStyle(el).display,
+     footerDirection:getComputedStyle(footer).flexDirection,footerWidth:getComputedStyle(footer).width,
+     cssViewport:innerWidth,media900:matchMedia("(min-width:900px)").matches};
    });
    assert.ok(f.footer.bottom<=f.area.bottom+1&&f.footer.top>=f.area.top-1,"Minesweeper timer/counter must remain visible");
    assert.ok(f.board.width<=f.area.width+1,"Minesweeper must fit available width");
    if(f.horizontal){
-    assert.ok(f.footer.left>=f.grid.right-1,"Advanced Minesweeper status must sit to the RIGHT of the minefield");
+    assert.ok(f.footer.left>=f.grid.right-1,"Advanced Minesweeper status must sit to the RIGHT of the minefield: "+JSON.stringify(f));
     assert.ok(Math.abs((f.footer.top+f.footer.bottom)/2-(f.grid.top+f.grid.bottom)/2)<=4,"Advanced status must be vertically centered beside the board");
     assert.ok(Math.abs((f.board.left-f.area.left)-(f.area.right-f.board.right))<=3,"Advanced board and status group must leave balanced outer margins");
    }else{
@@ -1199,7 +1204,9 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForTimeout(130);await fitMine();
   assert.equal(await frame.locator(".mine-cell").count(),256);
   await page.locator('#difficultyControl button[data-difficulty="hard"]').click();
-  await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);await fitMine();
+  await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);
+  await page.screenshot({path:path.join(artifacts,"minesweeper-hard-layout-debug.png")});
+  await fitMine();
   assert.equal(await frame.locator(".mine-classic.mine-hard-layout").count(),1,"Advanced Minesweeper must activate horizontal board/status composition");
   await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),81);await fitMine();
