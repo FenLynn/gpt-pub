@@ -242,17 +242,22 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.ok(memoryBoardSize.width>0&&memoryBoardSize.height>0,"Memory board must size itself to the available play area");
   await memory.close();
 
-  // Sokoban: push onto goal, win state, undo, normal movement and wall blocking.
+  // Sokoban: seven handcrafted levels must all be solvable; test pushes, deadlocks, undo, next and restore.
   const sokoban=await browser.newPage({viewport:{width:900,height:700}});
   sokoban.on("pageerror",e=>errors.push("Sokoban: "+e.message));
   await sokoban.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sokoban/index.html")).href+"?p111Test=1");
   await sokoban.waitForFunction(()=>!!window.__p111SokobanTest);
   let boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
   assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.deepEqual(boxState.goals,[22]);
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(0,-1));
-  assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[22]);assert.equal(boxState.complete,true);assert.equal(boxState.moves,1);
+  assert.equal(boxState.level,0);assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
+  assert.equal(await sokoban.locator("#next").isDisabled(),true,"Next level must stay locked until all boxes reach goals");
+  await sokoban.locator('#sokoDpad [data-move="0,-1"]').click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[22]);assert.equal(boxState.complete,true);
+  assert.equal(boxState.moves,1);assert.equal(boxState.pushes,1);
+  assert.equal(await sokoban.locator("#next").isDisabled(),false,"Completing a level must unlock the next-level button");
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
-  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.equal(boxState.complete,false);assert.equal(boxState.moves,0);
+  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.equal(boxState.complete,false);
   for(let i=0;i<3;i++)boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
   assert.equal(boxState.player,37);assert.equal(boxState.moves,3);
   const beforeWall={player:boxState.player,moves:boxState.moves};
@@ -260,9 +265,39 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(boxState.player,beforeWall.player,"Sokoban must not move through a wall");assert.equal(boxState.moves,beforeWall.moves);
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
   assert.equal(boxState.player,38);assert.equal(boxState.moves,2);
+  assert.equal(await sokoban.evaluate(()=>window.__p111SokobanTest.isCornerDeadlock(10)),true,"A non-goal corner must be recognized as a box deadlock");
+  const sokoSolutions=[
+   ["U",1,1],["LUURR",5,2],["DLUURULL",8,4],["LULUDDRRRURU",12,2],
+   ["LLUULURDDDRRRRUURUL",19,4],["UUDDRRUUDDRRUU",14,3],["DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",34,12]
+  ];
+  for(let i=0;i<sokoSolutions.length;i++){
+   boxState=await sokoban.evaluate(index=>window.__p111SokobanTest.loadLevel(index),i);
+   const [path,expectedMoves,expectedPushes]=sokoSolutions[i];
+   for(const step of path){
+    const delta=step==="U"?[0,-1]:step==="D"?[0,1]:step==="L"?[-1,0]:[1,0];
+    boxState=await sokoban.evaluate(([dx,dy])=>window.__p111SokobanTest.move(dx,dy),delta);
+   }
+   assert.equal(boxState.complete,true,"Sokoban level "+(i+1)+" must have a verified solution");
+   assert.equal(boxState.moves,expectedMoves,"Sokoban level "+(i+1)+" solution step count must match");
+   assert.equal(boxState.pushes,expectedPushes,"Sokoban level "+(i+1)+" solution push count must match");
+   if(i<sokoSolutions.length-1){
+    boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.nextLevel());
+    assert.equal(boxState.level,i+1,"A completed level must advance to the next level");
+    assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
+   }
+  }
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(4));
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
+  const sokoSnapshot=await sokoban.evaluate(()=>window.__p111SokobanTest.snapshot());
+  const sokoBeforeRestore=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  await sokoban.evaluate(snapshot=>window.__p111SokobanTest.restore(snapshot),sokoSnapshot);
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.paused,true,"Restored Sokoban must wait for the host countdown/continue action");
+  assert.equal(boxState.moves,sokoBeforeRestore.moves);assert.deepEqual(boxState.boxes,sokoBeforeRestore.boxes);
+  assert.equal(boxState.pushes,sokoBeforeRestore.pushes);
   await sokoban.close();
 
-  // Sudoku: given-cell protection, error detection and exact-solution completion.
+  // Sudoku: protected clues, non-destructive hint, conflicts, undo and exact-solution completion.
   const sudoku=await browser.newPage({viewport:{width:900,height:900}});
   sudoku.on("pageerror",e=>errors.push("Sudoku: "+e.message));
   await sudoku.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sudoku/index.html")).href+"?p111Test=1");

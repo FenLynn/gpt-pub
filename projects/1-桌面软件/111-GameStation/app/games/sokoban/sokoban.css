@@ -1,0 +1,69 @@
+/* Sokoban R48 · clear pieces, tactile tiles and an always-visible control guide. */
+.sokoban-layout .game-main-board{overflow:hidden!important}
+.sokoban-layout #board{
+ display:grid!important;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(7,minmax(0,1fr));
+ width:min(100cqw,calc(100cqh * 9 / 7))!important;height:auto!important;max-width:100%!important;max-height:100%!important;
+ aspect-ratio:9/7!important;gap:4px!important;padding:10px!important;overflow:hidden;
+ border:3px solid #7b968b;border-radius:12px;background:#dce8df;box-shadow:0 12px 28px rgba(39,73,61,.16),inset 0 1px #fff;
+}
+.sokoban-layout #board .soko-cell{
+ position:relative;display:grid;place-items:center;min-width:0;min-height:0;width:auto!important;height:auto!important;
+ aspect-ratio:auto!important;border:1px solid #d1ddcf;border-radius:4px;background:#edf3e8;box-shadow:inset 0 1px rgba(255,255,255,.88)
+}
+.sokoban-layout #board .soko-cell.wall{
+ border:1px solid #3f5e64;border-radius:3px;
+ background:repeating-linear-gradient(180deg,#6d898c 0 8px,#5e7b7f 8px 12px,#4d696e 12px 15px);
+ box-shadow:inset 1px 1px #a5b9b8,inset -1px -1px #29484e,0 1px 2px #284a4a25
+}
+.sokoban-layout #board .soko-cell.goal::before{
+ content:"";position:absolute;width:34%;height:34%;border:3px solid #dfb75e;border-radius:50%;
+ box-shadow:0 0 0 4px rgba(223,183,94,.15),inset 0 1px rgba(255,255,255,.75)
+}
+.sokoban-layout #board .soko-cell .soko-piece{position:relative;z-index:1;display:grid;place-items:center;line-height:1;user-select:none;pointer-events:none}
+.sokoban-layout #board .soko-cell.box .soko-piece{
+ width:68%;height:68%;border:3px solid #a8753e;border-radius:4px;background:linear-gradient(145deg,#f1ce91,#c68c4e);
+ color:#fff8e9;font-size:clamp(19px,3.1cqh,34px);font-weight:800;text-shadow:0 1px 1px #84552c;
+ box-shadow:inset 1px 1px #fff8,inset -2px -2px #986333,0 2px 3px #73512c35
+}
+.sokoban-layout #board .soko-cell.box-on-goal .soko-piece{border-color:#548b72;background:linear-gradient(145deg,#9bc7a6,#5d9c7a);color:#fff;text-shadow:0 1px 2px #38664c;box-shadow:inset 1px 1px #ffffff88,0 2px 4px #38664c35}
+.sokoban-layout #board .soko-cell.player .soko-piece{
+ width:72%;height:72%;border:3px solid #347e9e;border-radius:50%;
+ background:radial-gradient(circle at 34% 26%,#a5d9e9,#4d9ebc 58%,#317c9e);
+ color:#fff;font-size:clamp(15px,2.4cqh,26px);text-shadow:0 1px 2px #28627d;box-shadow:inset 0 2px 3px #ffffff66,0 3px 5px #315b6c40
+}
+.sokoban-layout #board .soko-cell.deadlocked .soko-piece{border-color:#b64d43;background:linear-gradient(145deg,#e4a49a,#c9685c);box-shadow:0 0 0 3px rgba(190,72,61,.22),inset 0 1px #ffffff88}
+.sokoban-layout .game-tools{gap:8px!important}
+.sokoban-layout .game-tools-heading{display:block!important;margin:2px 0 0;color:#8297a6;font-size:11px;font-weight:780;letter-spacing:.06em}
+.sokoban-layout .sokoban-status{min-height:54px;padding:9px 10px;font-size:12px;line-height:1.5}
+.sokoban-layout .soko-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.sokoban-layout .soko-stats>div{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0;padding:7px 8px;border:1px solid #e0e9e3;border-radius:8px;background:rgba(255,255,255,.78)}
+.sokoban-layout .soko-stats span{color:#879a91;font-size:10px}.sokoban-layout .soko-stats strong{color:#426b59;font-size:14px;font-weight:760;font-variant-numeric:tabular-nums}
+.sokoban-layout .soko-progress{height:5px;overflow:hidden;border-radius:99px;background:#e2eae3}
+.sokoban-layout .soko-progress span{display:block;width:0;height:100%;border-radius:99px;background:linear-gradient(90deg,#9bc7a6,#4e9a75);transition:width .18s ease}
+.sokoban-layout .soko-dpad{display:grid;grid-template-columns:repeat(3,34px);grid-template-rows:repeat(3,31px);justify-content:center;align-items:center;gap:4px}
+.sokoban-layout .soko-dir{
+ width:34px;height:31px;padding:0;border:1px solid #cbdde3;border-radius:8px;background:linear-gradient(145deg,#fff,#eaf3f6);
+ color:#416c82;font-size:18px;font-weight:800;line-height:1;cursor:pointer;box-shadow:inset 0 1px #fff,0 2px 5px #315d7210
+}
+.sokoban-layout .soko-dir:hover:not(:disabled){border-color:#8fb9cb;background:#eaf6fb}
+.sokoban-layout .soko-dir:active:not(:disabled){transform:translateY(1px)}
+.sokoban-layout .soko-dir:disabled{opacity:.38;cursor:not-allowed}
+.sokoban-layout .soko-dir.up{grid-column:2;grid-row:1}.sokoban-layout .soko-dir.left{grid-column:1;grid-row:2}
+.sokoban-layout .soko-dir.right{grid-column:3;grid-row:2}.sokoban-layout .soko-dir.down{grid-column:2;grid-row:3}
+.sokoban-layout .soko-dpad-center{grid-column:2;grid-row:2;display:grid;place-items:center;color:#91a39b;font-size:9px;font-weight:700}
+.sokoban-layout .soko-key-hint{color:#8a9a91;font-size:9px;line-height:1.4;text-align:center}
+.sokoban-layout .soko-legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.sokoban-layout .soko-legend>div{
+ display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;padding:5px 3px;
+ border:1px solid #e2eae4;border-radius:7px;background:rgba(255,255,255,.7);color:#6f887c;font-size:10px;white-space:nowrap
+}
+.sokoban-layout .soko-legend>div>span:first-child{font-size:15px;font-weight:800}
+.sokoban-layout .legend-player{color:#3988a8}.sokoban-layout .legend-box{color:#bb844b}.sokoban-layout .legend-goal{color:#d2a849}
+.sokoban-layout .game-tools>.game-btn{min-height:36px!important;height:37px!important;padding:6px 10px!important;border-radius:9px!important;font-size:13px!important}
+.sokoban-layout .game-tools>.game-btn.primary:not(:disabled){border-color:#b6d8c4!important;background:linear-gradient(145deg,#f4fbf6,#e3f3e8)!important;color:#28764e!important}
+@media(max-width:700px){
+ .sokoban-layout .game-tools{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}
+ .sokoban-layout .game-tools-heading,.sokoban-layout .sokoban-status,.sokoban-layout .soko-stats,.sokoban-layout .soko-progress,.sokoban-layout .soko-dpad,.sokoban-layout .soko-key-hint,.sokoban-layout .soko-legend{grid-column:1/-1}
+ .sokoban-layout .game-tools>.game-btn{min-height:34px!important;height:34px!important}
+}
+@media(prefers-reduced-motion:reduce){.sokoban-layout .soko-progress span{transition:none}}

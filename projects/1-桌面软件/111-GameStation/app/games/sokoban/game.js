@@ -2,28 +2,167 @@
 "use strict";
 const levels=[
 ["#########","#       #","#   .   #","#   $   #","#   @   #","#       #","#########"],
-["#########","#       #","# .   . #","# $   $ #","#   @   #","#       #","#########"],
-["#########","#       #","# .   . #","# $ $   #","#   @   #","#       #","#########"],
-["#########","#  . .  #","#  $ $  #","#   @   #","#  $ $  #","#  . .  #","#########"]
+["#########","#       #","#  $ .  #","#  #    #","#  @    #","#       #","#########"],
+["#########","# .     #","# #     #","#   $@  #","#       #","#       #","#########"],
+["#########","# .   . #","# $ # $ #","#   #   #","#   @   #","#       #","#########"],
+["#########","#  . .  #","# $   $ #","#  # #  #","#   @   #","#       #","#########"],
+["#########","# . . . #","# $ $ $ #","#  # #  #","#   @   #","#       #","#########"],
+["#########","# . . . #","# $   $ #","# #   # #","#  $@   #","#       #","#########"]
 ];
-const el=document.getElementById("board"),status=document.getElementById("status");let level=0,player,boxes,goals,walls,moves=0,history=[],paused=false;
-function parse(){walls=new Set();boxes=new Set();goals=new Set();player=0;levels[level].forEach((row,y)=>[...row].forEach((c,x)=>{const k=y*9+x;if(c==="#")walls.add(k);if(c==="$")boxes.add(k);if(c==="@")player=k;if(c===".")goals.add(k);}));moves=0;history=[];render();report("推动箱子到目标点");}
-function report(t){status.textContent=t;GameBridge.report(t,{score:moves});}
-function save(){history.push({player,boxes:[...boxes],moves});if(history.length>100)history.shift();}
-function render(){el.innerHTML="";for(let y=0;y<7;y++)for(let x=0;x<9;x++){const k=y*9+x,q=document.createElement("div");q.className="game-cell";q.style.width="clamp(30px,5.5vw,48px)";q.style.height="clamp(30px,5.5vw,48px)";q.style.borderRadius="3px";if(walls.has(k)){q.classList.add("wall");}else if(boxes.has(k)){q.classList.add("box");q.textContent=goals.has(k)?"✓":"▣";}else if(player===k){q.classList.add("player");q.textContent="●";}else if(goals.has(k)){q.classList.add("goal");q.textContent="◎";}else q.style.background="#f5f7fa";el.appendChild(q);}document.getElementById("level").textContent=(level+1)+" / "+levels.length;document.getElementById("moves").textContent=moves;}
-function move(dx,dy){if(paused)return;const x=player%9,y=Math.floor(player/9),nx=x+dx,ny=y+dy;if(nx<0||nx>=9||ny<0||ny>=7)return;const target=ny*9+nx;if(walls.has(target))return;let dest=target;if(boxes.has(target)){const bx=nx+dx,by=ny+dy;dest=by*9+bx;if(bx<0||bx>=9||by<0||by>=7||walls.has(dest)||boxes.has(dest))return;}save();if(boxes.has(target)){boxes.delete(target);boxes.add(dest);}player=target;moves++;render();if([...goals].every(g=>boxes.has(g))){report("关卡完成！");GameBridge.send("GAME_OVER",{message:"第 "+(level+1)+" 关完成"});}else report("继续推箱子");}
-function undo(){const s=history.pop();if(!s)return;player=s.player;boxes=new Set(s.boxes);moves=s.moves;render();report("已撤销一步");}
-function key(e){const map={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};if(map[e.key]){e.preventDefault();move(...map[e.key]);}if(e.key.toLowerCase()==="z")undo();if(e.key.toLowerCase()==="r")parse();}
-document.getElementById("undo").onclick=undo;document.getElementById("reset").onclick=parse;document.getElementById("next").onclick=()=>{level=(level+1)%levels.length;parse();};window.addEventListener("keydown",key);
-// Test-only deterministic fixture API. It is not exposed in normal gameplay.
+const board=document.getElementById("board"),status=document.getElementById("sokobanStatus"),
+ levelEl=document.getElementById("level"),movesEl=document.getElementById("moves"),
+ pushesEl=document.getElementById("pushes"),goalProgressEl=document.getElementById("goalProgress"),
+ goalBar=document.getElementById("goalBar"),undoButton=document.getElementById("undo"),
+ resetButton=document.getElementById("reset"),nextButton=document.getElementById("next"),
+ dpad=document.getElementById("sokoDpad");
+let level=0,width=9,height=7,player=0,boxes=new Set(),goals=new Set(),walls=new Set(),
+ moves=0,pushes=0,history=[],paused=true,complete=false;
+function setStatus(message,notify){status.textContent=message;if(notify)GameBridge.report(message,{score:moves});}
+function isInside(x,y){return x>=0&&x<width&&y>=0&&y<height;}
+function isBlocked(x,y){return !isInside(x,y)||walls.has(y*width+x);}
+function completedGoals(){let count=0;for(const goal of goals)if(boxes.has(goal))count++;return count;}
+function isComplete(){return goals.size===boxes.size&&completedGoals()===goals.size;}
+function isCornerDeadlock(index){
+ if(goals.has(index))return false;
+ const x=index%width,y=Math.floor(index/width);
+ const up=isBlocked(x,y-1),down=isBlocked(x,y+1),left=isBlocked(x-1,y),right=isBlocked(x+1,y);
+ return(up&&left)||(up&&right)||(down&&left)||(down&&right);
+}
+function updateControls(){
+ undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;
+ nextButton.disabled=paused||!complete||level>=levels.length-1;
+ nextButton.textContent=level>=levels.length-1?"全部通关":"下一关";
+ dpad.querySelectorAll("button[data-move]").forEach(button=>button.disabled=paused||complete);
+}
+function updateStats(){
+ const done=completedGoals(),total=goals.size;
+ levelEl.textContent=(level+1)+" / "+levels.length;movesEl.textContent=String(moves);pushesEl.textContent=String(pushes);
+ goalProgressEl.textContent=done+" / "+total;goalBar.style.width=(total?Math.round(done/total*100):0)+"%";updateControls();
+}
+function render(){
+ const fragment=document.createDocumentFragment(),deadlocked=new Set();
+ for(const box of boxes)if(isCornerDeadlock(box))deadlocked.add(box);
+ board.style.gridTemplateColumns="repeat("+width+",minmax(0,1fr))";
+ board.style.gridTemplateRows="repeat("+height+",minmax(0,1fr))";board.style.aspectRatio=width+" / "+height;
+ board.setAttribute("aria-rowcount",String(height));board.setAttribute("aria-colcount",String(width));
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const index=y*width+x,cell=document.createElement("div");cell.className="soko-cell";cell.setAttribute("role","gridcell");
+  if(walls.has(index)){cell.classList.add("wall");cell.setAttribute("aria-label","墙");}
+  else{
+   cell.classList.add("floor");if(goals.has(index))cell.classList.add("goal");
+   if(boxes.has(index)){
+    cell.classList.add("box");if(goals.has(index))cell.classList.add("box-on-goal");
+    if(deadlocked.has(index))cell.classList.add("deadlocked");
+    cell.setAttribute("aria-label",goals.has(index)?"箱子已到达目标点":"木箱");
+    const piece=document.createElement("span");piece.className="soko-piece";piece.setAttribute("aria-hidden","true");piece.textContent=goals.has(index)?"✓":"▣";cell.appendChild(piece);
+   }else if(player===index){
+    cell.classList.add("player");if(goals.has(index))cell.classList.add("player-on-goal");
+    cell.setAttribute("aria-label",goals.has(index)?"玩家，站在目标点上":"玩家");
+    const piece=document.createElement("span");piece.className="soko-piece";piece.setAttribute("aria-hidden","true");piece.textContent="●";cell.appendChild(piece);
+   }else cell.setAttribute("aria-label",goals.has(index)?"目标点":"空地");
+  }
+  fragment.appendChild(cell);
+ }
+ board.replaceChildren(fragment);updateStats();
+}
+function parseLevel(index){
+ level=Math.max(0,Math.min(levels.length-1,Math.floor(Number(index)||0)));
+ const rows=levels[level];width=rows[0].length;height=rows.length;
+ walls=new Set();boxes=new Set();goals=new Set();player=-1;
+ rows.forEach((row,y)=>[...row].forEach((symbol,x)=>{
+  const index=y*width+x;
+  if(symbol==="#")walls.add(index);else if(symbol==="$")boxes.add(index);else if(symbol==="@")player=index;
+  else if(symbol===".")goals.add(index);else if(symbol==="*"){boxes.add(index);goals.add(index);}else if(symbol==="+"){player=index;goals.add(index);}
+ }));
+ if(player<0||boxes.size!==goals.size)throw new Error("推箱子关卡数据无效");
+ moves=0;pushes=0;history=[];complete=isComplete();render();
+ setStatus("把所有木箱推到圆形目标点上。先站到箱子反方向，再朝目标推动。");
+}
+function save(){history.push({player,boxes:[...boxes],moves,pushes});if(history.length>200)history.shift();}
+function move(dx,dy){
+ if(paused||complete||Math.abs(dx)+Math.abs(dy)!==1)return false;
+ const x=player%width,y=Math.floor(player/width),nx=x+dx,ny=y+dy;
+ if(isBlocked(nx,ny)){setStatus("前方是墙，不能通过。");return false;}
+ const target=ny*width+nx;let pushed=false,destination=-1;
+ if(boxes.has(target)){
+  const bx=nx+dx,by=ny+dy;
+  if(isBlocked(bx,by)||boxes.has(by*width+bx)){setStatus("箱子前方被挡住，无法推动。");return false;}
+  destination=by*width+bx;pushed=true;
+ }
+ save();if(pushed){boxes.delete(target);boxes.add(destination);pushes++;}
+ player=target;moves++;complete=isComplete();render();
+ if(complete){
+  if(level===levels.length-1){setStatus("全部 "+levels.length+" 关通关！",true);GameBridge.send("GAME_OVER",{message:"推箱子全部通关",score:moves,win:true});}
+  else setStatus("本关完成！点击右侧「下一关」继续。",true);
+ }else if(pushed&&isCornerDeadlock(destination))setStatus("注意：箱子被推入角落，已经无法移动。按 Z 或点击撤销一步。");
+ else if(pushed)setStatus("推动成功 · "+completedGoals()+" / "+goals.size+" 个箱子已到位。");
+ else setStatus("移动 "+moves+" 步 · 已推动 "+pushes+" 次。");
+ return true;
+}
+function undo(){
+ if(paused||!history.length)return false;
+ const previous=history.pop();player=previous.player;boxes=new Set(previous.boxes);
+ moves=previous.moves;pushes=previous.pushes;complete=isComplete();render();
+ setStatus("已撤销一步 · 可以重新规划推动方向。");return true;
+}
+function resetLevel(){if(paused)return;parseLevel(level);setStatus("本关已重置，从头规划路线。");}
+function nextLevel(){
+ if(paused||!complete||level>=levels.length-1)return false;
+ parseLevel(level+1);setStatus("第 "+(level+1)+" 关 · 观察箱子和目标点的位置，再规划路线。");return true;
+}
+function newGame(){paused=false;parseLevel(0);}
+function key(event){
+ const target=event.target instanceof Element?event.target:null;
+ if(target&&(target.matches("input,textarea,select")||target.isContentEditable))return;
+ const key=event.key.toLowerCase(),directions={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
+ if(directions[event.key]||directions[key]){event.preventDefault();move(...(directions[event.key]||directions[key]));return;}
+ if(key==="z"){event.preventDefault();undo();return;}if(key==="r"){event.preventDefault();resetLevel();}
+}
+function dpadClick(event){const button=event.target.closest("button[data-move]");if(!button)return;const parts=button.dataset.move.split(",").map(Number);move(parts[0],parts[1]);}
+function snapshot(){
+ return{layoutVersion:2,level,width,height,player,boxes:[...boxes],goals:[...goals],walls:[...walls],
+  moves,pushes,complete,history:history.map(item=>({player:item.player,boxes:item.boxes.slice(),moves:item.moves,pushes:item.pushes}))};
+}
+function restore(saved){
+ const validIndex=(value,max)=>Number.isInteger(value)&&value>=0&&value<max;
+ if(!saved||!Number.isInteger(saved.level)||!Array.isArray(saved.boxes)||!Array.isArray(saved.goals)||!Array.isArray(saved.walls))throw new Error("推箱子存档数据无效");
+ const nextWidth=Number.isInteger(saved.width)?saved.width:9,nextHeight=Number.isInteger(saved.height)?saved.height:7,total=nextWidth*nextHeight;
+ if(nextWidth<5||nextWidth>20||nextHeight<5||nextHeight>20||!validIndex(saved.player,total))throw new Error("推箱子存档位置无效");
+ const toSet=values=>{
+  if(!Array.isArray(values))throw new Error("推箱子存档地图无效");
+  const result=new Set(values.map(Number));
+  if(result.size!==values.length||[...result].some(index=>!validIndex(index,total)))throw new Error("推箱子存档地图越界");
+  return result;
+ };
+ const nextWalls=toSet(saved.walls),nextGoals=toSet(saved.goals),nextBoxes=toSet(saved.boxes);
+ if(!nextGoals.size||nextBoxes.size!==nextGoals.size||nextWalls.has(saved.player)||nextBoxes.has(saved.player)||
+  [...nextGoals].some(index=>nextWalls.has(index))||[...nextBoxes].some(index=>nextWalls.has(index)))throw new Error("推箱子存档状态不一致");
+ const nextHistory=Array.isArray(saved.history)?saved.history.filter(item=>item&&validIndex(item.player,total)&&Array.isArray(item.boxes)).slice(-200).map(item=>({
+  player:item.player,boxes:item.boxes.map(Number),moves:Math.max(0,Number(item.moves)||0),pushes:Math.max(0,Number(item.pushes)||0)
+ })): [];
+ if(nextHistory.some(item=>!validIndex(item.player,total)||new Set(item.boxes).size!==item.boxes.length||item.boxes.some(index=>!validIndex(index,total)||nextWalls.has(index))))throw new Error("推箱子撤销记录无效");
+ level=Math.max(0,Math.min(levels.length-1,saved.level));width=nextWidth;height=nextHeight;
+ walls=nextWalls;goals=nextGoals;boxes=nextBoxes;player=saved.player;
+ moves=Math.max(0,Number(saved.moves)||0);pushes=Math.max(0,Number(saved.pushes)||0);
+ history=nextHistory;complete=isComplete();paused=true;render();setStatus("进度已恢复 · 点击顶部「继续」后接着推箱子。");
+}
+function fixtureState(){
+ return{level,width,height,player,boxes:[...boxes].sort((a,b)=>a-b),goals:[...goals].sort((a,b)=>a-b),
+  walls:[...walls].sort((a,b)=>a-b),moves,pushes,paused,complete,status:status.textContent,history:history.length};
+}
+dpad.addEventListener("click",dpadClick);window.addEventListener("keydown",key);
 if(new URLSearchParams(location.search).has("p111Test")){
- const fixtureState=()=>({level,player,boxes:[...boxes].sort((a,b)=>a-b),goals:[...goals].sort((a,b)=>a-b),walls:[...walls].sort((a,b)=>a-b),moves,paused,complete:[...goals].every(g=>boxes.has(g))});
  window.__p111SokobanTest={
-  loadLevel(index=0){level=Math.max(0,Math.min(levels.length-1,Math.floor(Number(index)||0)));paused=false;parse();return fixtureState();},
-  state:fixtureState,
-  move(dx,dy){move(dx,dy);return fixtureState();},
-  undo(){undo();return fixtureState();}
+  loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
+  move(dx,dy){move(dx,dy);return fixtureState();},undo(){undo();return fixtureState();},
+  nextLevel(){nextLevel();return fixtureState();},resetLevel(){resetLevel();return fixtureState();},
+  snapshot,restore,isCornerDeadlock,levelCount:levels.length,levelRows:index=>levels[index]?.slice()||[]
  };
 }
-GameBridge.register({init:parse,newGame:parse,pause(){paused=true;report("已暂停");},resume(){paused=false;report("继续闯关");},snapshot(){return{level,player,boxes:[...boxes],goals:[...goals],walls:[...walls],moves,history:history.map(h=>({player:h.player,boxes:h.boxes.slice(),moves:h.moves}))};},restore(s){if(!s||!Number.isInteger(s.level)||!Array.isArray(s.boxes)||!Array.isArray(s.goals)||!Array.isArray(s.walls))throw new Error("推箱子存档数据无效");level=Math.max(0,Math.min(levels.length-1,s.level));player=Number(s.player)||0;boxes=new Set(s.boxes.map(Number));goals=new Set(s.goals.map(Number));walls=new Set(s.walls.map(Number));moves=Math.max(0,Number(s.moves)||0);history=Array.isArray(s.history)?s.history.map(h=>({player:Number(h.player)||0,boxes:Array.isArray(h.boxes)?h.boxes.map(Number):[],moves:Math.max(0,Number(h.moves)||0)})):[];paused=true;render();report("已恢复上次进度");},dispose(){paused=true;window.removeEventListener("keydown",key);}});
+GameBridge.register({
+ init(){paused=false;parseLevel(0);pause();},newGame,
+ pause(){paused=true;updateControls();setStatus("已暂停 · 当前关卡和步数均已保留。");},
+ resume(){paused=false;updateControls();setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
+ snapshot,restore,dispose(){paused=true;window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);}
+});
 })();

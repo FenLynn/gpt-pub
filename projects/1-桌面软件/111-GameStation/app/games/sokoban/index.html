@@ -1,1 +1,34 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推箱子</title><link rel="stylesheet" href="../shared/game.css"></head><body data-game="sokoban"><main class="game-root game-layout sokoban-layout" id="game"><aside class="game-guide"><div class="game-guide-kicker">SOKOBAN</div><h2>移动提示</h2><p>方向键移动，只能推动箱子，不能拉动。把所有箱子推到目标点即可通关。</p><div class="guide-note">不要把箱子推入无法离开的角落。Z 撤销一步，R 重置关卡。</div></aside><section class="game-main-board"><div class="game-panel"><div id="board" class="game-grid" style="grid-template-columns:repeat(9,minmax(0,1fr));width:min(84vh,100%);aspect-ratio:9/7;margin:auto"></div></div></section><aside class="game-tools"><div class="game-tools-heading">关卡状态</div><div class="game-status" id="status">准备开始</div><div class="side-score"><div><span>关卡</span><strong id="level">1 / 4</strong></div><div><span>步数</span><strong id="moves">0</strong></div></div><div class="game-tools-heading">关卡操作</div><button class="game-btn" id="undo">撤销一步</button><button class="game-btn" id="reset">重置关卡</button><button class="game-btn primary" id="next">下一关</button></aside></main><script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js"></script></body></html>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推箱子</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./sokoban.css?v=sokoban-r48"></head><body data-game="sokoban"><main class="game-root game-layout sokoban-layout" id="game">
+<aside class="game-guide"><div class="game-guide-kicker">SOKOBAN</div><h2>推箱子规则</h2>
+<p class="key-instruction">你是蓝色圆点，木箱是棕色方块，金色圆环是目标点。</p>
+<p class="key-instruction">走到箱子背后，再朝目标方向移动；每次只能推一个箱子，不能拉箱子，也不能穿过墙。</p>
+<p class="key-instruction">所有箱子都压在目标点上才算过关。推入非目标角落的箱子无法自行取出。</p>
+<p class="key-instruction">方向键或 WASD 移动；Z 撤销一步；R 重开本关。也可以点击右侧方向按钮。</p>
+<div class="game-tool-note">先观察箱子到目标的路线，再决定从哪一侧靠近。不要急着推；如果箱子卡住，立即撤销一步重新规划。</div></aside>
+<section class="game-main-board"><div class="game-panel"><div id="board" class="game-grid" role="grid" aria-label="推箱子棋盘"></div></div></section>
+<aside class="game-tools">
+ <div class="game-tools-heading">本关状态</div>
+ <div class="game-status sokoban-status" id="sokobanStatus" aria-live="polite">把所有木箱推到圆形目标点上。</div>
+ <div class="soko-stats">
+  <div><span>关卡</span><strong id="level">1 / 7</strong></div><div><span>移动</span><strong id="moves">0</strong></div>
+  <div><span>推动</span><strong id="pushes">0</strong></div><div><span>到位</span><strong id="goalProgress">0 / 1</strong></div>
+ </div>
+ <div class="soko-progress" aria-label="目标完成进度"><span id="goalBar"></span></div>
+ <div class="game-tools-heading">方向控制</div>
+ <div class="soko-dpad" id="sokoDpad" role="group" aria-label="方向控制">
+  <button type="button" class="soko-dir up" data-move="0,-1" aria-label="向上移动">↑</button>
+  <button type="button" class="soko-dir left" data-move="-1,0" aria-label="向左移动">←</button>
+  <span class="soko-dpad-center" aria-hidden="true">移动</span>
+  <button type="button" class="soko-dir right" data-move="1,0" aria-label="向右移动">→</button>
+  <button type="button" class="soko-dir down" data-move="0,1" aria-label="向下移动">↓</button>
+ </div>
+ <div class="soko-key-hint">键盘：方向键 / WASD　·　Z 撤销　·　R 重开</div>
+ <div class="game-tools-heading">棋盘图例</div>
+ <div class="soko-legend">
+  <div><span class="legend-player">●</span><span>你</span></div><div><span class="legend-box">▣</span><span>木箱</span></div><div><span class="legend-goal">◎</span><span>目标点</span></div>
+ </div>
+ <div class="game-tools-heading">关卡操作</div>
+ <button class="game-btn" id="undo">撤销一步</button><button class="game-btn" id="reset">重开本关</button>
+ <button class="game-btn primary" id="next" disabled>下一关</button>
+</aside></main>
+<script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js?v=sokoban-r48"></script></body></html>
