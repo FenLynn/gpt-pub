@@ -1188,6 +1188,12 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("score")?.textContent==="0");
   assert.equal(await frame.locator("#score").innerText(),"0","Next after scoring must reset the real in-game score");
   await open("扫雷");
+  const mineLoading=await page.locator("#stageLoading").evaluate(el=>({display:getComputedStyle(el).display,scoped:el.parentElement.classList.contains("is-minesweeper")}));
+  assert.equal(mineLoading.scoped,true,"Minesweeper must scope the loading-layer exception to its own game stage");
+  assert.equal(mineLoading.display,"none","Minesweeper must not flash the generic centered loading strip");
+  const mineCssSource=fs.readFileSync(path.join(root,"games/minesweeper/minesweeper.css"),"utf8");
+  assert.ok(!mineCssSource.includes("mine-hard-layout"),"Minesweeper must not retain the superseded hard-only layout CSS");
+  assert.ok(!mineCssSource.includes(".mine-bottom-left")&&!mineCssSource.includes(".mine-bottom-right"),"Minesweeper must not retain unused bottom alignment selectors");
   assert.equal(await page.locator("#modeControl").isVisible(),false,"Minesweeper must not show an empty battle-mode label");
   assert.equal(await page.locator("#difficultyControl").isVisible(),true,"Minesweeper must retain its difficulty selector");
   await start();
@@ -1249,6 +1255,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }));
   assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
   assert.ok(symbols[2].number&&symbols[2].width>=.65&&symbols[2].height>=.65&&symbols[2].text==="","Minesweeper numbers must use large self-contained vector glyphs");
+  const flagPoleStroke=await mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path").nth(1).getAttribute("stroke");
+  assert.equal(flagPoleStroke,"#ffffff","Minesweeper flag pole must be white");
   const flagShape=await mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path").nth(2).getAttribute("d");
   assert.equal(flagShape,"M13 5.5L26 9.2L13 17Z","Minesweeper flag must be a single pointed triangular pennant");
   const tintStyles=await mineFixture.evaluate(()=>{
