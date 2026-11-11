@@ -484,11 +484,13 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     assert.equal(rail.toolsColumn,"3","2048 controls must occupy the right-hand track");
     assert.ok(rail.tools.left>=rail.main.right-1&&rail.undo.left>=rail.tools.left-1&&rail.undo.right<=rail.tools.right+1,
      "2048 undo action must sit inside the right rail without covering the board: "+JSON.stringify(rail));
-    assert.ok(rail.tools.width>=160&&rail.tools.width<=230&&rail.direction==="column",
+    assert.ok(rail.tools.width>=140&&rail.tools.width<=160&&rail.direction==="column",
      "2048 right rail must match the chess-style vertical action column: "+JSON.stringify(rail));
     assert.equal(rail.border,"0px","2048 controls must not be wrapped in a second outer card");
     assert.equal(rail.background,"rgba(0, 0, 0, 0)","2048 right rail must use the transparent chess-style container");
     assert.ok(rail.undo.height>=42&&rail.undoIcon,"2048 undo button must keep the shared large icon-button treatment");
+    const rootRight=await frame.locator("#game").evaluate(el=>el.getBoundingClientRect().right);
+    assert.ok(rootRight-rail.tools.right>=28,"2048 controls must leave a comfortable margin at the viewport right edge: "+JSON.stringify({margin:rootRight-rail.tools.right,rail}));
     assert.ok(rail.preloaded&&rail.workspaceLinks===1&&rail.initialRail&&rail.guideHidden&&rail.statusHidden,
      "2048 must preload exactly one workspace layout and never flash legacy guide/duplicate status: "+JSON.stringify(rail));
     const boardGap=rail.tools.left-rail.board.right;
