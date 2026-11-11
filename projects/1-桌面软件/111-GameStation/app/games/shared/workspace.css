@@ -2092,7 +2092,6 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout){
   --gs-side-gutter:clamp(170px,13vw,215px)!important;
   grid-template-columns:var(--gs-side-gutter) minmax(0,1fr) var(--gs-side-gutter)!important;
-  column-gap:clamp(8px,.8vw,12px)!important;
   justify-content:center!important
  }
  .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout)>.game-main-board{
