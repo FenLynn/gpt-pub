@@ -1233,7 +1233,13 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await page.locator("#gameElapsed").innerText(),"00:00","Minesweeper host clock must wait for the first reveal");
   assert.equal(await frame.locator("#timer").innerText(),"0","Minesweeper in-game clock must wait for the first reveal");
   await frame.locator(".mine-cell").first().click();
-  await page.waitForTimeout(1250);
+  // The host's one-second HUD tick is phase-aligned to app startup, not this click.
+  // Wait for the first displayed second instead of assuming it arrives within 1.25s.
+  await page.waitForFunction(()=>{
+   const host=document.querySelector("#gameElapsed")?.textContent;
+   const game=document.querySelector("#gameFrame")?.contentDocument?.getElementById("timer")?.textContent;
+   return host==="00:01"&&game==="1";
+  },null,{timeout:3500});
   const mineClockSync={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#timer").innerText()};
   assert.equal(mineClockSync.host,"00:01","Minesweeper host clock must start on first reveal: "+JSON.stringify(mineClockSync));
   assert.equal(Number(mineClockSync.game),1,"Minesweeper in-game clock must match host elapsed time: "+JSON.stringify(mineClockSync));
