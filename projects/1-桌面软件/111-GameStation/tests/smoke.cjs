@@ -1255,10 +1255,15 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }));
   assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
   assert.ok(symbols[2].number&&symbols[2].width>=.65&&symbols[2].height>=.65&&symbols[2].text==="","Minesweeper numbers must use large self-contained vector glyphs");
-  const flagPoleStroke=await mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path").nth(1).getAttribute("stroke");
+  const flagPaths=mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path");
+  const flagTopBase=await flagPaths.nth(0).getAttribute("stroke");
+  const flagPoleStroke=await flagPaths.nth(1).getAttribute("stroke");
+  const flagFootStroke=await flagPaths.nth(4).getAttribute("stroke");
+  assert.equal(flagTopBase,"#ffffff","Minesweeper flag upper base must be white");
   assert.equal(flagPoleStroke,"#ffffff","Minesweeper flag pole must be white");
-  const flagShape=await mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path").nth(2).getAttribute("d");
-  assert.equal(flagShape,"M13 5.5L26 9.2L13 17Z","Minesweeper flag must be a single pointed triangular pennant");
+  assert.equal(flagFootStroke,"#ffffff","Minesweeper flag lower base must be white");
+  const flagShape=await flagPaths.nth(2).getAttribute("d");
+  assert.equal(flagShape,"M12.8 4.5L30 8.8L12.8 22Z","Minesweeper flag must be enlarged while retaining a single pointed triangular pennant");
   const tintStyles=await mineFixture.evaluate(()=>{
    const a=document.querySelector(".mine-cell.tint-0"),b=document.querySelector(".mine-cell.tint-3");
    return {top:a&&getComputedStyle(a).backgroundImage,bottom:b&&getComputedStyle(b).backgroundImage,highlight:a&&getComputedStyle(a,"::before").content};
