@@ -1,0 +1,47 @@
+/* Sudoku R48 · a calm, readable 9×9 board with clear conflict and selection states. */
+.sudoku-layout .game-main-board{overflow:hidden!important}
+.sudoku-layout #board{
+ display:grid!important;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));
+ width:min(100cqw,100cqh)!important;height:auto!important;max-width:100%!important;max-height:100%!important;
+ aspect-ratio:1!important;gap:0!important;padding:0!important;overflow:hidden;
+ border:3px solid #647f93;border-radius:9px;background:#fff;
+ box-shadow:0 12px 28px rgba(37,69,91,.14),inset 0 1px #fff;
+}
+.sudoku-layout #board .sudoku-cell{
+ appearance:none;position:relative;display:grid;place-items:center;width:auto!important;height:auto!important;
+ min-width:0;min-height:0;aspect-ratio:auto!important;padding:0;border:0;border-right:1px solid #dce5eb;
+ border-bottom:1px solid #dce5eb;border-radius:0!important;background:#fff;color:#4b6c88;
+ font:600 clamp(15px,2.15cqh,25px)/1 "Segoe UI","Microsoft YaHei",sans-serif;
+ font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;transition:background .12s,color .12s,box-shadow .12s;
+}
+.sudoku-layout #board .sudoku-cell.box-right{border-right:2px solid #91a9ba}
+.sudoku-layout #board .sudoku-cell.box-bottom{border-bottom:2px solid #91a9ba}
+.sudoku-layout #board .sudoku-cell.related{background:#f0f5f8}
+.sudoku-layout #board .sudoku-cell.same-number{background:#dcecf5;color:#245e82}
+.sudoku-layout #board .sudoku-cell.given{color:#315873;font-weight:800}
+.sudoku-layout #board .sudoku-cell.conflict{background:#fff0ec;color:#b24b41}
+.sudoku-layout #board .sudoku-cell.wrong{background:#fbded8;color:#a8322b;text-decoration:underline;text-decoration-color:#d16b5f;text-decoration-thickness:2px}
+.sudoku-layout #board .sudoku-cell.hinted{box-shadow:inset 0 0 0 3px #dfb45d}
+.sudoku-layout #board .sudoku-cell.selected{z-index:2;background:#d6eaf6!important;color:#1f5f88!important;box-shadow:inset 0 0 0 2px #4c91b7!important}
+.sudoku-layout #board .sudoku-cell:focus-visible{z-index:3;outline:2px solid #287fac;outline-offset:-3px}
+.sudoku-layout .game-tools{gap:9px!important}
+.sudoku-layout .game-tools-heading{display:block!important;margin:1px 0 0;color:#8297a6;font-size:11px;font-weight:780;letter-spacing:.06em}
+.sudoku-layout .sudoku-status{min-height:58px;display:flex;align-items:center;padding:10px 11px;font-size:12px;line-height:1.55}
+.sudoku-layout .sudoku-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.sudoku-layout .sudoku-metrics>div{min-width:0;display:flex;flex-direction:column;gap:3px;padding:8px 9px;border:1px solid #e1e9ee;border-radius:9px;background:rgba(255,255,255,.82)}
+.sudoku-layout .sudoku-metrics span{color:#8799a6;font-size:10px}
+.sudoku-layout .sudoku-metrics strong{color:#3e6078;font-size:15px;font-weight:760;font-variant-numeric:tabular-nums}
+.sudoku-layout .number-pad{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px!important}
+.sudoku-layout .number-pad button{width:100%!important;height:34px!important;min-width:0;padding:0;border:1px solid #d5e2ea;border-radius:8px;background:#fff;color:#456b87;font-size:15px;font-weight:760;cursor:pointer}
+.sudoku-layout .number-pad button:hover:not(:disabled){border-color:#9fc4d8;background:#edf6fb}
+.sudoku-layout .number-pad button[data-number="0"]{background:#f4f7f9;color:#748a99}
+.sudoku-layout .number-pad button:disabled{opacity:.42;cursor:not-allowed}
+.sudoku-layout .game-tools>.game-btn{min-height:36px!important;height:37px!important;padding:6px 10px!important;border-radius:9px!important;font-size:13px!important}
+.sudoku-layout .sudoku-footnote{padding:8px 9px;border:1px solid #e4ebef;border-radius:8px;background:rgba(255,255,255,.55);color:#8293a0;font-size:10px;line-height:1.55}
+@media(max-width:700px){
+ .sudoku-layout .game-tools{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important}
+ .sudoku-layout .game-tools-heading,.sudoku-layout .sudoku-status,.sudoku-layout .sudoku-metrics,.sudoku-layout .number-pad,.sudoku-layout .sudoku-footnote{grid-column:1/-1}
+ .sudoku-layout .game-tools>.game-btn{min-height:34px!important;height:34px!important}
+ .sudoku-layout .number-pad button{height:32px!important}
+}
+@media(prefers-reduced-motion:reduce){.sudoku-layout #board .sudoku-cell{transition:none}}
