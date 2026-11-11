@@ -78,3 +78,11 @@
  .sokoban-layout .game-tools>.game-btn{min-height:42px!important;height:42px!important}
 }
 @media(prefers-reduced-motion:reduce){.sokoban-layout .soko-progress span{transition:none}}
+
+/* R50 · Highlight the solver's recommended next move without executing it. */
+.sokoban-layout .soko-dir.suggested{
+ border-color:#c99d4d;background:linear-gradient(145deg,#fff9e9,#f9e8bd);color:#8b6828;
+ box-shadow:0 0 0 3px rgba(201,157,77,.17),inset 0 1px #fff;
+}
+.sokoban-layout .game-tools>#hint:not(:disabled){border-color:#c8dce8;background:linear-gradient(145deg,#fff,#eef6fa);color:#376a87}
+.sokoban-layout .game-tools>#hint svg{color:#b58a3f}

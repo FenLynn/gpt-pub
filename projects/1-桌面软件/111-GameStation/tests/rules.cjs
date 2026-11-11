@@ -251,13 +251,30 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.deepEqual(boxState.goals,[22]);
   assert.equal(boxState.level,0);assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
   assert.equal(await sokoban.locator("#next").isDisabled(),true,"Next level must stay locked until all boxes reach goals");
+  await sokoban.locator("#hint").click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.moves,0,"Sokoban hint must never move the player automatically");
+  assert.equal(boxState.hintCount,1,"Sokoban hint use must be recorded");
+  assert.match(boxState.status,/向上/,"The first-level hint must explain the next direction");
   await sokoban.locator('#sokoDpad [data-move="0,-1"]').click();
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
   assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[22]);assert.equal(boxState.complete,true);
   assert.equal(boxState.moves,1);assert.equal(boxState.pushes,1);
   assert.equal(await sokoban.locator("#next").isDisabled(),false,"Completing a level must unlock the next-level button");
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
+  await sokoban.locator("#undo").click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
   assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.equal(boxState.complete,false);
+  await sokoban.locator("#next").click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.level,1,"The right-side next button must open the next level");
+  await sokoban.locator('#sokoDpad [data-move="1,0"]').click();
+  await sokoban.locator("#undo").click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.player,39);assert.equal(boxState.moves,0,"The right-side undo button must reverse one move");
+  await sokoban.locator('#sokoDpad [data-move="1,0"]').click();
+  await sokoban.locator("#reset").click();
+  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.player,39);assert.equal(boxState.moves,0,"The right-side reset button must restart the current level");
   for(let i=0;i<3;i++)boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
   assert.equal(boxState.player,37);assert.equal(boxState.moves,3);
   const beforeWall={player:boxState.player,moves:boxState.moves};
@@ -272,6 +289,11 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   ];
   for(let i=0;i<sokoSolutions.length;i++){
    boxState=await sokoban.evaluate(index=>window.__p111SokobanTest.loadLevel(index),i);
+   if(i===6){
+    await sokoban.locator("#hint").click();
+    boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+    assert.equal(boxState.moves,0);assert.match(boxState.status,/向下/,"The three-box level hint must find a valid first move");
+   }
    const [path,expectedMoves,expectedPushes]=sokoSolutions[i];
    for(const step of path){
     const delta=step==="U"?[0,-1]:step==="D"?[0,1]:step==="L"?[-1,0]:[1,0];

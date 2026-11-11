@@ -14,9 +14,13 @@ const board=document.getElementById("board"),status=document.getElementById("sok
  pushesEl=document.getElementById("pushes"),goalProgressEl=document.getElementById("goalProgress"),
  goalBar=document.getElementById("goalBar"),undoButton=document.getElementById("undo"),
  resetButton=document.getElementById("reset"),nextButton=document.getElementById("next"),
- dpad=document.getElementById("sokoDpad");
+ hintButton=document.getElementById("hint"),dpad=document.getElementById("sokoDpad");
 let level=0,width=9,height=7,player=0,boxes=new Set(),goals=new Set(),walls=new Set(),
- moves=0,pushes=0,history=[],paused=true,complete=false;
+ moves=0,pushes=0,history=[],paused=true,complete=false,hintCount=0,hintTimer=null;
+const solverDirections=[
+ {dx:0,dy:-1,code:"U",label:"向上"},{dx:0,dy:1,code:"D",label:"向下"},
+ {dx:-1,dy:0,code:"L",label:"向左"},{dx:1,dy:0,code:"R",label:"向右"}
+];
 function setStatus(message,notify){status.textContent=message;if(notify)GameBridge.report(message,{score:moves});}
 function isInside(x,y){return x>=0&&x<width&&y>=0&&y<height;}
 function isBlocked(x,y){return !isInside(x,y)||walls.has(y*width+x);}
@@ -28,8 +32,55 @@ function isCornerDeadlock(index){
  const up=isBlocked(x,y-1),down=isBlocked(x,y+1),left=isBlocked(x-1,y),right=isBlocked(x+1,y);
  return(up&&left)||(up&&right)||(down&&left)||(down&&right);
 }
+function clearHintHighlight(){
+ if(hintTimer!==null){clearTimeout(hintTimer);hintTimer=null;}
+ dpad.querySelectorAll(".soko-dir.suggested").forEach(button=>button.classList.remove("suggested"));
+}
+function findSolutionPath(maxStates=220000){
+ const startBoxes=[...boxes].sort((a,b)=>a-b),startKey=player+"|"+startBoxes.join(",");
+ const parents=new Map([[startKey,null]]),queue=[{player,boxes:startBoxes,key:startKey}];
+ let finishKey=null;
+ for(let cursor=0;cursor<queue.length;cursor++){
+  const state=queue[cursor];
+  if(state.boxes.length===goals.size&&state.boxes.every(index=>goals.has(index))){finishKey=state.key;break;}
+  const occupied=new Set(state.boxes),px=state.player%width,py=Math.floor(state.player/width);
+  for(const direction of solverDirections){
+   const nx=px+direction.dx,ny=py+direction.dy;
+   if(isBlocked(nx,ny))continue;
+   const target=ny*width+nx;let nextBoxes=state.boxes;
+   if(occupied.has(target)){
+    const bx=nx+direction.dx,by=ny+direction.dy,destination=by*width+bx;
+    if(isBlocked(bx,by)||occupied.has(destination)||isCornerDeadlock(destination))continue;
+    nextBoxes=state.boxes.filter(index=>index!==target).concat(destination).sort((a,b)=>a-b);
+   }
+   const nextPlayer=target,nextKey=nextPlayer+"|"+nextBoxes.join(",");
+   if(parents.has(nextKey))continue;
+   parents.set(nextKey,{previous:state.key,code:direction.code});
+   queue.push({player:nextPlayer,boxes:nextBoxes,key:nextKey});
+   if(queue.length>=maxStates)return null;
+  }
+ }
+ if(!finishKey)return null;
+ const path=[];
+ while(finishKey!==startKey){const step=parents.get(finishKey);if(!step)return null;path.push(step.code);finishKey=step.previous;}
+ return path.reverse();
+}
+function hint(){
+ if(paused||complete)return;
+ clearHintHighlight();
+ const path=findSolutionPath();
+ if(!path){setStatus("暂时没有找到可行路线。检查是否有箱子被卡住，可撤销或重开本关。");return;}
+ if(!path.length){setStatus("所有箱子已经到位，本关完成。");return;}
+ const direction=solverDirections.find(item=>item.code===path[0]);
+ const target=(Math.floor(player/width)+direction.dy)*width+(player%width)+direction.dx;
+ const pushing=boxes.has(target),button=dpad.querySelector('[data-move="'+direction.dx+","+direction.dy+'"]');
+ if(button){button.classList.add("suggested");hintTimer=setTimeout(()=>{button.classList.remove("suggested");hintTimer=null;},1800);}
+ hintCount++;
+ setStatus("建议下一步："+direction.label+(pushing?"推动前方木箱":"移动一步")+
+  "。这是当前局面的最短路线第一步；提示不会自动移动。");
+}
 function updateControls(){
- undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;
+ undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;hintButton.disabled=paused||complete;
  nextButton.disabled=paused||!complete||level>=levels.length-1;
  nextButton.querySelector("span").textContent=level>=levels.length-1?"全部通关":"下一关";
  dpad.querySelectorAll("button[data-move]").forEach(button=>button.disabled=paused||complete);
@@ -66,6 +117,7 @@ function render(){
  board.replaceChildren(fragment);updateStats();
 }
 function parseLevel(index){
+ clearHintHighlight();hintCount=0;
  level=Math.max(0,Math.min(levels.length-1,Math.floor(Number(index)||0)));
  const rows=levels[level];width=rows[0].length;height=rows.length;
  walls=new Set();boxes=new Set();goals=new Set();player=-1;
@@ -81,6 +133,7 @@ function parseLevel(index){
 function save(){history.push({player,boxes:[...boxes],moves,pushes});if(history.length>200)history.shift();}
 function move(dx,dy){
  if(paused||complete||Math.abs(dx)+Math.abs(dy)!==1)return false;
+ clearHintHighlight();
  const x=player%width,y=Math.floor(player/width),nx=x+dx,ny=y+dy;
  if(isBlocked(nx,ny)){setStatus("前方是墙，不能通过。");return false;}
  const target=ny*width+nx;let pushed=false,destination=-1;
@@ -101,6 +154,7 @@ function move(dx,dy){
 }
 function undo(){
  if(paused||!history.length)return false;
+ clearHintHighlight();
  const previous=history.pop();player=previous.player;boxes=new Set(previous.boxes);
  moves=previous.moves;pushes=previous.pushes;complete=isComplete();render();
  setStatus("已撤销一步 · 可以重新规划推动方向。");return true;
@@ -121,9 +175,10 @@ function key(event){
 function dpadClick(event){const button=event.target.closest("button[data-move]");if(!button)return;const parts=button.dataset.move.split(",").map(Number);move(parts[0],parts[1]);}
 function snapshot(){
  return{layoutVersion:2,level,width,height,player,boxes:[...boxes],goals:[...goals],walls:[...walls],
-  moves,pushes,complete,history:history.map(item=>({player:item.player,boxes:item.boxes.slice(),moves:item.moves,pushes:item.pushes}))};
+  moves,pushes,complete,hintCount,history:history.map(item=>({player:item.player,boxes:item.boxes.slice(),moves:item.moves,pushes:item.pushes}))};
 }
 function restore(saved){
+ clearHintHighlight();
  const validIndex=(value,max)=>Number.isInteger(value)&&value>=0&&value<max;
  if(!saved||!Number.isInteger(saved.level)||!Array.isArray(saved.boxes)||!Array.isArray(saved.goals)||!Array.isArray(saved.walls))throw new Error("推箱子存档数据无效");
  const nextWidth=Number.isInteger(saved.width)?saved.width:9,nextHeight=Number.isInteger(saved.height)?saved.height:7,total=nextWidth*nextHeight;
@@ -144,13 +199,17 @@ function restore(saved){
  level=Math.max(0,Math.min(levels.length-1,saved.level));width=nextWidth;height=nextHeight;
  walls=nextWalls;goals=nextGoals;boxes=nextBoxes;player=saved.player;
  moves=Math.max(0,Number(saved.moves)||0);pushes=Math.max(0,Number(saved.pushes)||0);
+ hintCount=Math.max(0,Number(saved.hintCount)||0);
  history=nextHistory;complete=isComplete();paused=true;render();setStatus("进度已恢复 · 点击顶部「继续」后接着推箱子。");
 }
 function fixtureState(){
  return{level,width,height,player,boxes:[...boxes].sort((a,b)=>a-b),goals:[...goals].sort((a,b)=>a-b),
-  walls:[...walls].sort((a,b)=>a-b),moves,pushes,paused,complete,status:status.textContent,history:history.length};
+  walls:[...walls].sort((a,b)=>a-b),moves,pushes,hintCount,paused,complete,status:status.textContent,history:history.length};
 }
-dpad.addEventListener("click",dpadClick);window.addEventListener("keydown",key);
+dpad.addEventListener("click",dpadClick);
+undoButton.addEventListener("click",undo);resetButton.addEventListener("click",resetLevel);
+nextButton.addEventListener("click",nextLevel);hintButton.addEventListener("click",hint);
+window.addEventListener("keydown",key);
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111SokobanTest={
   loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
@@ -163,6 +222,10 @@ GameBridge.register({
  init(){paused=false;parseLevel(0);pause();},newGame,
  pause(){paused=true;updateControls();setStatus("已暂停 · 当前关卡和步数均已保留。");},
  resume(){paused=false;updateControls();setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
- snapshot,restore,dispose(){paused=true;window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);}
+ snapshot,restore,dispose(){
+   paused=true;clearHintHighlight();window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);
+   undoButton.removeEventListener("click",undo);resetButton.removeEventListener("click",resetLevel);
+   nextButton.removeEventListener("click",nextLevel);hintButton.removeEventListener("click",hint);
+  },
 });
 })();
