@@ -418,25 +418,36 @@ function leaveAfterSave(){
  hideSaveProgressDialog();
  showLibrary(category);
 }
+function clearRestoreCountdown(){
+ if(restoreCountdownTimer!==null){clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;}
+ const overlay=$("restoreCountdownOverlay");
+ if(overlay){overlay.hidden=true;overlay.setAttribute("aria-hidden","true");}
+}
+function cancelRestoreCountdown(showMessage=true){
+ if(restoreCountdownTimer===null)return;
+ clearRestoreCountdown();
+ if(session?.running)freezeClock();
+ else{paused=true;setGameState();}
+ renderProgressButton();
+ if(showMessage)toast("已取消自动开始，游戏保持暂停");
+}
 function activateRestoredGame(){
  if(!active||!ready||!session||session.finished)return;
+ clearRestoreCountdown();
  if(!roundCounted)countRound();
- $("restoreCountdownOverlay").hidden=true;
- $("restoreCountdownOverlay").setAttribute("aria-hidden","true");
  send("RESUME");if(deferredClockGames.has(active.id)&&!session.clockStarted){paused=false;setGameState();}else startClock();focusGameFrame();renderProgressButton();
 }
 function startRestoreCountdown(){
  const overlay=$("restoreCountdownOverlay"),number=$("restoreCountdownNumber");
  if(!overlay||!number){activateRestoredGame();return;}
+ clearRestoreCountdown();
  let remaining=3;number.textContent="3";
  overlay.hidden=false;overlay.setAttribute("aria-hidden","false");
  renderProgressButton();
  restoreCountdownTimer=setInterval(()=>{
   remaining--;
   if(remaining>0){number.textContent=String(remaining);return;}
-  clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;
-  overlay.hidden=true;overlay.setAttribute("aria-hidden","true");
-  activateRestoredGame();
+  clearRestoreCountdown();activateRestoredGame();
  },1000);
 }
 function restoreProgress(){
@@ -505,6 +516,7 @@ function focusGameFrame(){
 }
 function newRound(){
  if(!ready||!session)return;
+ if(restoreCountdownTimer!==null)cancelRestoreCountdown(false);
  clearProgress(session.id);restoredThisSession=false;
  hideGameResult();clearGameNotice();
  stopClock();session.elapsedMs=0;session.clockStarted=false;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;
@@ -626,6 +638,7 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
 $("progressButton").addEventListener("click",()=>{if(savedProgress&&!restoredThisSession)restoreProgress();else saveProgress();});
 $("saveProgressContinue").addEventListener("click",continueAfterSave);
 $("saveProgressNewGame").addEventListener("click",newGameAfterSave);
+$("restoreCountdownCancel").addEventListener("click",()=>cancelRestoreCountdown(true));
 $("saveProgressLeave").addEventListener("click",leaveAfterSave);
  document.querySelectorAll("[data-recent-tab]").forEach(b=>b.addEventListener("click",()=>{
   homeRecentTab=b.dataset.recentTab==="popular"?"popular":"recent";renderHomeRecent();

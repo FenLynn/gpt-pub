@@ -713,3 +713,15 @@
  #gameStage .save-progress-actions button{height:40px;padding:0 5px;font-size:12px}
 }
 @media(prefers-reduced-motion:reduce){#gameStage .save-progress-card{animation:none!important}}
+
+/* R48 · Dismiss the restore countdown without resuming the restored game. */
+#gameStage .restore-countdown-card{position:relative}
+#gameStage .restore-countdown-close{
+ position:absolute;top:9px;right:9px;width:32px;height:32px;display:grid;place-items:center;
+ border:1px solid #d6e3eb;border-radius:9px;background:rgba(255,255,255,.82);
+ color:#668195;font:500 23px/1 "Segoe UI",Arial,sans-serif;cursor:pointer;
+ transition:background .15s,border-color .15s,color .15s,transform .15s;
+}
+#gameStage .restore-countdown-close:hover{border-color:#a9cddd;background:#edf7fc;color:#286d91;transform:scale(1.04)}
+#gameStage .restore-countdown-close:focus-visible{outline:2px solid #368ab4;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){#gameStage .restore-countdown-close{transition:none}}

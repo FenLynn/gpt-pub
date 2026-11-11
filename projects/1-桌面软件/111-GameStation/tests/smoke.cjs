@@ -87,7 +87,17 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   if(countdownRestoreGames.has(id)){
    await page.locator("#restoreCountdownOverlay").waitFor({state:"visible",timeout:3000});
    assert.equal(await page.locator("#restoreCountdownNumber").innerText(),"3",name+" must show the full three-second restore countdown");
-   await page.locator("#restoreCountdownOverlay").waitFor({state:"hidden",timeout:5000});
+   assert.equal(await page.locator("#restoreCountdownCancel").isVisible(),true,name+" restore countdown must expose a close X");
+   if(id==="minesweeper"){
+    await page.locator("#restoreCountdownCancel").click();
+    await page.locator("#restoreCountdownOverlay").waitFor({state:"hidden",timeout:2000});
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"),"继续","Closing the countdown must leave the restored game paused");
+    await page.waitForTimeout(1100);
+    assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"),"继续","The canceled countdown must not auto-resume later");
+    await page.locator("#pauseButton").click();
+   }else{
+    await page.locator("#restoreCountdownOverlay").waitFor({state:"hidden",timeout:5000});
+   }
   }else{
    assert.equal(await page.locator("#restoreCountdownOverlay").isVisible(),false,name+" is turn-based and must restore without a countdown");
   }
