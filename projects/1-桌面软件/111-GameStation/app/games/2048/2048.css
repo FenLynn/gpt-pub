@@ -81,7 +81,7 @@ body[data-game="2048"] #game.game2048-layout>.game-tools>.game-status{
   justify-content:center!important;align-self:center!important;justify-self:start!important;
   box-sizing:border-box!important;width:min(175px,calc(100% - 12px))!important;
   height:max-content!important;min-height:0!important;max-height:calc(100% - 16px)!important;
-  margin:0 0 0 12px!important;padding:0!important;gap:13px!important;
+  margin:0!important;padding:0!important;gap:13px!important;
   background:transparent!important;border:0!important;border-radius:0!important;
   box-shadow:none!important;overflow-x:hidden!important;overflow-y:auto!important
  }
