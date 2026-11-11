@@ -167,7 +167,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   if(name==="国际象棋"){
    const coordinates=await frame.locator("#game").evaluate(root=>{
     const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
-    const center=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};
+    const centerX=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};
+    const centerY=el=>{const r=el.getBoundingClientRect();return r.top+r.height/2;};
     const x=root.querySelector(".chess-axis-x"),y=root.querySelector(".chess-axis-y"),
      frame=box(root.querySelector(".chess-frame")),main=box(root.querySelector(".game-main-board")),
      squares=[...root.querySelectorAll(".chess-square")],xLabels=[...x.querySelectorAll("span")],
@@ -177,8 +178,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      xFontSize:getComputedStyle(xLabels[0]).fontSize,yFontSize:getComputedStyle(yLabels[0]).fontSize,
      xFontWeight:getComputedStyle(xLabels[0]).fontWeight,yFontWeight:getComputedStyle(yLabels[0]).fontWeight,
      x:box(x),y:box(y),frame,main,
-     xAlignment:Math.max(...xLabels.map((el,i)=>Math.abs(center(el)-center(bottomRow[i])))),
-     yAlignment:Math.max(...yLabels.map((el,i)=>Math.abs(center(el)-center(leftColumn[i])))),
+     xAlignment:Math.max(...xLabels.map((el,i)=>Math.abs(centerX(el)-centerX(bottomRow[i])))),
+     yAlignment:Math.max(...yLabels.map((el,i)=>Math.abs(centerY(el)-centerY(leftColumn[i])))),
      wrapOverflow:getComputedStyle(root.querySelector(".board-wrap")).overflow};
    });
    assert.deepEqual(coordinates.xLabels,["a","b","c","d","e","f","g","h"],"Chess file coordinates must show all eight letters");
