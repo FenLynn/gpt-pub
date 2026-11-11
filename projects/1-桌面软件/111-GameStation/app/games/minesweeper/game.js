@@ -167,13 +167,15 @@ function buildBoard(){
 }
 function paint(index){
  const cell=cells[index],button=nodes[index];if(!button)return;
- const key=[cell.open,cell.flag,cell.mine,cell.n,over,triggerMine===index].join(":");
+ const victoryFlag=over&&triggerMine<0&&cell.mine&&cell.flag;
+ const key=[cell.open,cell.flag,cell.mine,cell.n,over,triggerMine===index,victoryFlag].join(":");
  if(button.dataset.render===key)return;
  button.dataset.render=key;
  button.className="mine-cell"+(cell.open?" open":"")+(cell.flag?" flag":"")+
   (cell.open&&cell.mine?" mine":"")+
   (over&&cell.flag&&!cell.mine?" wrong-flag":"")+
-  (cell.open&&cell.mine&&index===triggerMine?" exploded":"");
+  (cell.open&&cell.mine&&index===triggerMine?" exploded":"")+
+  (victoryFlag?" victory-flag":"");
  button.dataset.n=String(cell.n);
  if(cell.flag){
   button.innerHTML=flagSVG+(over&&!cell.mine?'<span class="mine-false-mark" aria-hidden="true">×</span>':"");
@@ -183,6 +185,7 @@ function paint(index){
   button.textContent=String(cell.n);
  }else button.textContent="";
  if(over&&triggerMine>=0&&cell.mine){const distance=Math.abs(index%W-triggerMine%W)+Math.abs(Math.floor(index/W)-Math.floor(triggerMine/W));button.style.setProperty("--mine-blast-delay",Math.min(720,distance*42)+"ms");}else button.style.removeProperty("--mine-blast-delay");
+ if(victoryFlag)button.style.setProperty("--mine-victory-delay",Math.round(index/Math.max(1,cells.length-1)*780)+"ms");else button.style.removeProperty("--mine-victory-delay");
  const name=cell.flag?(over&&!cell.mine?"错误旗帜":"已插旗"):
   cell.open?(cell.mine?(index===triggerMine?"踩中的地雷":"地雷"):cell.n?"数字 "+cell.n:"空白"):
   "未翻开";
@@ -193,6 +196,7 @@ function paint(index){
 function render(){
  if(nodes.length!==cells.length)buildBoard();
  boardEl.classList.toggle("mine-blast-sequence",over&&triggerMine>=0);
+ boardEl.classList.toggle("mine-victory-sequence",over&&triggerMine<0);
  for(let i=0;i<cells.length;i++)paint(i);
  updateCounters();
 }
@@ -268,10 +272,12 @@ function conclude(won,exploded=-1){
  persistRecords();
  render();renderRecords();
  const message=won?"扫雷成功 · "+levelNames[difficulty]+" "+formatTime(seconds):"踩到地雷";
- report(won?message:"踩到地雷 · 爆炸中…");
+ report(won?message+" · 庆祝中":"踩到地雷 · 爆炸中…");
  const settle=()=>GameBridge.send("GAME_OVER",{message,score:opened,win:won,difficulty,seconds});
- if(won)settle();
- else{
+ if(won){
+  boardEl.classList.add("mine-victory-sequence");
+  resultTimer=setTimeout(()=>{resultTimer=null;boardEl.classList.remove("mine-victory-sequence");settle();},1800);
+ }else{
   boardEl.classList.add("mine-blast-sequence");
   resultTimer=setTimeout(()=>{resultTimer=null;settle();},2000);
  }
@@ -427,12 +433,13 @@ if(typeof ResizeObserver!=="undefined"){
 }
 if(isFixture){
  configure("normal");newGame();
- const fixtureState=()=>({width:W,height:H,mines:MINES,started,over,paused,flags,opened,seconds,
+ const fixtureState=()=>({width:W,height:H,mines:MINES,started,over,paused,flags,opened,seconds,resultPending:resultTimer!==null,
   phase:root.dataset.phase,cells:cells.map(c=>({mine:c.mine,open:c.open,flag:c.flag,n:c.n})),
   records:JSON.parse(JSON.stringify(records))});
  window.__p111MineTest={
   loadBoard({width=3,height=3,mines=[]}={}){
-   stopTimer();W=Math.max(2,Math.floor(width));H=Math.max(2,Math.floor(height));MINES=mines.length;
+   stopTimer();if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}
+   W=Math.max(2,Math.floor(width));H=Math.max(2,Math.floor(height));MINES=mines.length;
    boardEl.style.setProperty("--cols",W);
    boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);
    cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));

@@ -165,6 +165,10 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.deepEqual(p2048State.grid[0].slice(0,2),[4,2],"2048 must merge a tile only once per move");
    assert.equal(p2048State.score,4,"2048 score must increase by the merged tile value");
    assert.equal(p2048State.grid.flat().filter(Boolean).length,3,"A successful move must spawn exactly one new tile");
+   assert.equal(p2048State.lastMerged.length,1,"2048 must identify the merged destination for animation");
+   assert.equal(p2048State.lastSpawn.length,1,"2048 must identify the newly spawned tile for animation");
+   assert.equal(await p2048.locator("#board .is-merged").evaluate(el=>getComputedStyle(el).animationName),"p2048-tile-merge");
+   assert.equal(await p2048.locator("#board .is-new").evaluate(el=>getComputedStyle(el).animationName),"p2048-tile-appear");
    p2048State=await p2048.evaluate(()=>window.__p1112048Test.undo());
    assert.deepEqual(p2048State.grid,mergeGrid,"2048 undo must restore the previous grid");assert.equal(p2048State.score,0);
    const noMoveGrid=empty2048();noMoveGrid[0][0]=2;
@@ -209,6 +213,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   await memory.waitForFunction(()=>!!window.__p111MemoryTest);
   let memoryState=await memory.evaluate(()=>window.__p111MemoryTest.loadDeck(["A","B"]));
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));
+  assert.equal(await memory.locator(".memory-card.is-flipping").evaluate(el=>getComputedStyle(el).animationName),"memory-card-flip-in");
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(1));
   assert.equal(memoryState.locked,true);assert.equal(memoryState.moves,1);assert.deepEqual(memoryState.opened,[0,1]);
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(2));
@@ -217,8 +222,14 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(memoryState.locked,false);assert.deepEqual(memoryState.opened,[]);assert.equal(memoryState.cards[0].open,false);assert.equal(memoryState.cards[1].open,false);
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(2));
   assert.equal(memoryState.matched,1);assert.equal(memoryState.cards[0].matched,true);assert.equal(memoryState.cards[2].matched,true);
+  assert.equal(await memory.locator(".memory-card.is-matched-pop").evaluate(el=>getComputedStyle(el).animationName),"memory-match-pop");
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(1));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(3));
   assert.equal(memoryState.matched,2);assert.equal(memoryState.moves,3);assert.ok(memoryState.cards.every(card=>card.matched),"All Memory pairs must finish the game");
+  assert.equal(memoryState.over,true);assert.equal(memoryState.resultPending,true,"Memory victory must hold the result until the card wave completes");
+  assert.equal(await memory.locator("#board.memory-complete").count(),1);
+  assert.equal(await memory.locator("#board .memory-card.matched").first().evaluate(el=>getComputedStyle(el).animationName),"memory-victory-wave");
+  const memoryBoardSize=await memory.locator("#board").evaluate(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));
+  assert.ok(memoryBoardSize.width>0&&memoryBoardSize.height>0,"Memory board must size itself to the available play area");
   await memory.close();
 
   // Sokoban: push onto goal, win state, undo, normal movement and wall blocking.
@@ -330,6 +341,37 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    assert.equal(await mine.locator(".mine-cell.wrong-flag").count(),1,"Incorrect flags must be crossed out");
    const wrongFlag=await mine.locator(".mine-cell.wrong-flag").innerHTML();
    assert.ok(wrongFlag.includes("mine-false-mark"),"Wrong flag must display a visible correction marker");
+
+   // Endgame: a triggered mine starts the primary flash and a delayed chain
+   // reaction; the host result remains pending until the two-second sequence ends.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:3,height:3,mines:[1,8]}));
+   await mine.evaluate(()=>window.__p111MineTest.forceNumber(0,1));
+   await mine.evaluate(()=>window.__p111MineTest.toggleFlag(3));
+   mineState=await mine.evaluate(()=>window.__p111MineTest.chord(0));
+   assert.equal(mineState.over,true);assert.equal(mineState.resultPending,true,"Mine-hit result must wait for the explosion sequence");
+   assert.equal(await mine.locator("#board.mine-blast-sequence").count(),1,"Mine-hit must activate the blast sequence");
+   const blastFx=await mine.locator(".mine-cell.exploded").evaluate(el=>({primary:getComputedStyle(el,"::after").animationName,burst:getComputedStyle(el.querySelector(".mine-explosion-burst")).animationName}));
+   assert.equal(blastFx.primary,"mine-primary-flash");assert.equal(blastFx.burst,"mine-shockwave");
+   const chainFx=await mine.locator(".mine-cell.mine:not(.exploded):not(.flag)").first().evaluate(el=>getComputedStyle(el).animationName);
+   assert.equal(chainFx,"mine-chain-explosion","Other mines must visibly erupt in a staggered chain");
+   await mine.waitForTimeout(2050);
+   mineState=await mine.evaluate(()=>window.__p111MineTest.state());
+   assert.equal(mineState.resultPending,false,"Mine-hit result must be released after the two-second blast");
+
+   // Victory: every mine becomes a flag, flags wave in sequence and the
+   // result overlay is held until the celebration finishes.
+   mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:2,height:2,mines:[0]}));
+   await mine.evaluate(()=>{window.__p111MineTest.reveal(1);window.__p111MineTest.reveal(2);return window.__p111MineTest.reveal(3);});
+   mineState=await mine.evaluate(()=>window.__p111MineTest.state());
+   assert.equal(mineState.over,true);assert.equal(mineState.phase,"won");assert.equal(mineState.resultPending,true);
+   assert.equal(await mine.locator("#board.mine-victory-sequence").count(),1,"Victory must activate its own animation sequence");
+   assert.equal(await mine.locator(".mine-cell.victory-flag").count(),1,"Winning mine must be marked as a celebratory flag");
+   const victoryFx=await mine.locator(".mine-cell.victory-flag").evaluate(el=>({tile:getComputedStyle(el).animationName,flag:getComputedStyle(el.querySelector(".mine-flag-svg")).animationName}));
+   assert.equal(victoryFx.tile,"mine-victory-flag-pop");assert.equal(victoryFx.flag,"mine-victory-flag-wave");
+   assert.equal(await mine.locator("#board").evaluate(el=>getComputedStyle(el,"::after").animationName),"mine-victory-sparkle");
+   await mine.waitForTimeout(1850);
+   mineState=await mine.evaluate(()=>window.__p111MineTest.state());
+   assert.equal(mineState.resultPending,false,"Victory result must wait for the celebration sequence");
 
    // First click protects its complete adjacent 3x3 region when possible.
    mineState=await mine.evaluate(()=>window.__p111MineTest.loadBoard({width:9,height:9,mines:[0,1,9,10,40]}));

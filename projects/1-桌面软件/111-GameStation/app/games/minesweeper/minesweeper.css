@@ -211,7 +211,49 @@ body[data-game="minesweeper"]{background:#c7d7e5}
 }
 @media(prefers-reduced-motion:reduce){
  #game.minesweeper-layout .mine-cell{transition:none}
- #game.minesweeper-layout .mine-grid.mine-blast-sequence .mine-cell.mine,
+ /* Keep end-of-round feedback visible even when the OS asks for less motion. */
+ #game.minesweeper-layout .mine-grid.mine-blast-sequence .mine-cell.mine:not(.exploded):not(.flag),
  #game.minesweeper-layout .mine-cell.exploded::after,
- #game.minesweeper-layout .mine-cell.exploded .mine-explosion-burst{animation:none!important}
+ #game.minesweeper-layout .mine-cell.exploded .mine-explosion-burst,
+ #game.minesweeper-layout .mine-grid.mine-victory-sequence .mine-cell.victory-flag,
+ #game.minesweeper-layout .mine-grid.mine-victory-sequence .mine-cell.victory-flag .mine-flag-svg,
+ #game.minesweeper-layout .mine-grid.mine-victory-sequence::after{
+  animation-duration:420ms!important;animation-delay:0ms!important;
+ }
+}
+
+/* R38 — visible end-of-round feedback: cascading blast and a victory flag wave. */
+#game.minesweeper-layout .mine-grid{position:relative}
+#game.minesweeper-layout .mine-grid.mine-victory-sequence .mine-cell.victory-flag{
+ z-index:2;animation:mine-victory-flag-pop 620ms cubic-bezier(.18,.78,.24,1) var(--mine-victory-delay,0ms) both;
+}
+#game.minesweeper-layout .mine-grid.mine-victory-sequence .mine-cell.victory-flag .mine-flag-svg{
+ transform-origin:50% 92%;animation:mine-victory-flag-wave 620ms ease-in-out var(--mine-victory-delay,0ms) both;
+}
+#game.minesweeper-layout .mine-grid.mine-victory-sequence::after{
+ content:"";position:absolute;z-index:8;inset:0;pointer-events:none;
+ background:
+  radial-gradient(circle at 9% 15%,#fff 0 1.5px,transparent 3px),
+  radial-gradient(circle at 24% 67%,#ffe59a 0 2px,transparent 4px),
+  radial-gradient(circle at 43% 22%,#fff 0 1.5px,transparent 3px),
+  radial-gradient(circle at 61% 76%,#ffe59a 0 2px,transparent 4px),
+  radial-gradient(circle at 79% 28%,#fff 0 1.5px,transparent 3px),
+  radial-gradient(circle at 92% 62%,#ffe59a 0 2px,transparent 4px);
+ animation:mine-victory-sparkle 1650ms ease-out both;
+}
+@keyframes mine-victory-flag-pop{
+ 0%{opacity:.35;transform:translateY(5px) scale(.78);filter:brightness(.9)}
+ 58%{opacity:1;transform:translateY(-2px) scale(1.17);filter:brightness(1.35)}
+ 100%{opacity:1;transform:translateY(0) scale(1);filter:brightness(1)}
+}
+@keyframes mine-victory-flag-wave{
+ 0%,100%{transform:rotate(0)}
+ 32%{transform:rotate(-13deg)}
+ 68%{transform:rotate(9deg)}
+}
+@keyframes mine-victory-sparkle{
+ 0%{opacity:0;transform:scale(.88)}
+ 28%{opacity:.9;transform:scale(1.02)}
+ 72%{opacity:.65;transform:scale(1)}
+ 100%{opacity:0;transform:scale(1.04)}
 }
