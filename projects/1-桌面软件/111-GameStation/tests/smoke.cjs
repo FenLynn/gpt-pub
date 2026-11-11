@@ -1240,9 +1240,23 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.locator("#pauseButton").click();
   assert.equal(await page.locator("#gameElapsed").innerText(),"00:01","Minesweeper host clock must freeze on pause");
   assert.equal(Number(await frame.locator("#timer").innerText()),1,"Minesweeper in-game clock must freeze at the same value");
+  const mineCold=await browser.newPage({viewport:{width:1000,height:800}});
+  await mineCold.addInitScript(()=>{
+   let bridge;
+   Object.defineProperty(window,"GameBridge",{configurable:true,get(){return bridge;},set(value){
+    bridge=value;
+    if(value&&typeof value.register==="function")value.register=()=>{window.__p111RegisterIntercepted=true;};
+   }});
+  });
+  await mineCold.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href);
+  await mineCold.waitForFunction(()=>window.__p111RegisterIntercepted===true);
+  const coldBoard=await mineCold.locator("#board").evaluate(el=>({visibility:getComputedStyle(el).visibility,children:el.children.length,ready:el.classList.contains("mine-ready")}));
+  assert.deepEqual(coldBoard,{visibility:"hidden",children:0,ready:false},"Empty Minesweeper grid must stay hidden before the first complete board render; no transient horizontal border lines");
+  await mineCold.close();
   const mineFixture=await browser.newPage({viewport:{width:1000,height:800}});
   await mineFixture.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href+"?p111Test=1");
   await mineFixture.waitForFunction(()=>!!window.__p111MineTest);
+  assert.equal(await mineFixture.locator("#board").evaluate(el=>el.classList.contains("mine-ready")),true,"Minesweeper board must become visible only after a complete render");
   assert.equal(await mineFixture.locator("#reset svg").count(),1,"Minesweeper reset face must be a local SVG");
   assert.equal(await mineFixture.locator("#reset").getAttribute("data-face"),"normal","Minesweeper reset face must initialize deterministically");
   assert.equal(await mineFixture.locator("#reset").textContent(),"","Minesweeper must not render an OS emoji glyph");
@@ -1256,13 +1270,15 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
   assert.ok(symbols[2].number&&symbols[2].width>=.65&&symbols[2].height>=.65&&symbols[2].text==="","Minesweeper numbers must use large self-contained vector glyphs");
   const flagPaths=mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path");
-  const flagTopBase=await flagPaths.nth(0).getAttribute("stroke");
-  const flagPoleStroke=await flagPaths.nth(1).getAttribute("stroke");
-  const flagFootStroke=await flagPaths.nth(4).getAttribute("stroke");
-  assert.equal(flagTopBase,"#ffffff","Minesweeper flag upper base must be white");
+  assert.equal(await flagPaths.count(),4,"Minesweeper flag must contain only one horizontal base line");
+  const flagPoleStroke=await flagPaths.nth(0).getAttribute("stroke");
+  const flagBaseStroke=await flagPaths.nth(3).getAttribute("stroke");
+  const flagBaseWidth=await flagPaths.nth(3).getAttribute("stroke-width");
   assert.equal(flagPoleStroke,"#ffffff","Minesweeper flag pole must be white");
-  assert.equal(flagFootStroke,"#ffffff","Minesweeper flag lower base must be white");
-  const flagShape=await flagPaths.nth(2).getAttribute("d");
+  assert.equal(flagBaseStroke,"#ffffff","Minesweeper flag base must be white");
+  assert.equal(flagBaseWidth,"1.8","Minesweeper flag base must be a single slender line");
+  assert.equal(await flagPaths.nth(3).getAttribute("d"),"M7.5 28.5h18","Minesweeper flag base must be one clean horizontal line");
+  const flagShape=await flagPaths.nth(1).getAttribute("d");
   assert.equal(flagShape,"M12.8 4.5L30 8.8L12.8 22Z","Minesweeper flag must be enlarged while retaining a single pointed triangular pennant");
   const tintStyles=await mineFixture.evaluate(()=>{
    const a=document.querySelector(".mine-cell.tint-0"),b=document.querySelector(".mine-cell.tint-3");

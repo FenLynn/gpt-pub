@@ -22,6 +22,7 @@ body[data-game="minesweeper"]{background:#c7d7e5}
  padding:clamp(20px,7.6vh,42px) 14px 7px;border:0;border-radius:0;background:transparent;
  box-shadow:none;overflow:visible;
 }
+#game.minesweeper-layout .mine-grid:not(.mine-ready){visibility:hidden}
 #game.minesweeper-layout .mine-grid{
  order:1;display:grid;grid-template-columns:repeat(var(--cols,16),var(--mine-cell-size,25px));
  gap:1px;width:max-content;max-width:100%;max-height:none;
