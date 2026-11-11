@@ -31,7 +31,7 @@ function isCornerDeadlock(index){
 function updateControls(){
  undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;
  nextButton.disabled=paused||!complete||level>=levels.length-1;
- nextButton.textContent=level>=levels.length-1?"全部通关":"下一关";
+ nextButton.querySelector("span").textContent=level>=levels.length-1?"全部通关":"下一关";
  dpad.querySelectorAll("button[data-move]").forEach(button=>button.disabled=paused||complete);
 }
 function updateStats(){
