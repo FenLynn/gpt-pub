@@ -222,7 +222,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(memoryState.locked,false);assert.deepEqual(memoryState.opened,[]);assert.equal(memoryState.cards[0].open,false);assert.equal(memoryState.cards[1].open,false);
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(2));
   assert.equal(memoryState.matched,1);assert.equal(memoryState.cards[0].matched,true);assert.equal(memoryState.cards[2].matched,true);
-  assert.equal(await memory.locator(".memory-card.is-matched-pop").evaluate(el=>getComputedStyle(el).animationName),"memory-match-pop");
+  assert.equal(await memory.locator(".memory-card.is-matched-pop").first().evaluate(el=>getComputedStyle(el).animationName),"memory-match-pop");
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(1));memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(3));
   assert.equal(memoryState.matched,2);assert.equal(memoryState.moves,3);assert.ok(memoryState.cards.every(card=>card.matched),"All Memory pairs must finish the game");
   assert.equal(memoryState.over,true);assert.equal(memoryState.resultPending,true,"Memory victory must hold the result until the card wave completes");
