@@ -211,6 +211,16 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   memory.on("pageerror",e=>errors.push("Memory: "+e.message));
   await memory.goto(pathToFileURL(path.resolve(__dirname,"../app/games/memory/index.html")).href+"?p111Test=1");
   await memory.waitForFunction(()=>!!window.__p111MemoryTest);
+  const mascotCount=await memory.evaluate(()=>window.GameMemoryArt?.icons.length||0);
+  assert.equal(mascotCount,12,"Memory must bundle twelve original offline animal mascots");
+  await memory.evaluate(()=>window.__p111MemoryTest.loadDeck(["🐱","🐶"]));
+  await memory.evaluate(()=>window.__p111MemoryTest.flip(0));
+  const mascot=await memory.locator(".memory-card.revealed").evaluate(el=>({
+   svg:!!el.querySelector(".memory-mascot-svg"),name:el.querySelector(".memory-character-name")?.textContent,
+   label:el.getAttribute("aria-label"),externalImages:el.querySelectorAll("image").length
+  }));
+  assert.ok(mascot.svg&&mascot.name==="小猫"&&mascot.label.includes("小猫")&&mascot.externalImages===0,
+   "Memory face cards must show recognizable named SVG mascots, not generic emoji or remote assets: "+JSON.stringify(mascot));
   let memoryState=await memory.evaluate(()=>window.__p111MemoryTest.loadDeck(["A","B"]));
   memoryState=await memory.evaluate(()=>window.__p111MemoryTest.flip(0));
   assert.equal(await memory.locator(".memory-card.is-flipping").evaluate(el=>getComputedStyle(el).animationName),"memory-card-flip-in");

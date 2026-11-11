@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const allIcons=["🍀","🌙","🎈","🍉","🚀","🎧","🐳","🌻","🧩","⭐","🍄","🪁"];
+const allIcons=window.GameMemoryArt?.icons||["🐱","🐶","🐰","🐻","🐼","🦊","🐸","🐥","🐷","🐨","🐧","🐹"];
 const boardEl=document.getElementById("board"),status=document.getElementById("status");
 let cards=[],opened=[],matched=0,moves=0,locked=false,paused=false,over=false;
 let tick=null,flipTimer=null,resultTimer=null,animationTimer=null,resizeObserver=null,seconds=0,pairCount=8,difficulty="normal";
@@ -42,9 +42,15 @@ function render(){
   if(closingAnimationIndices.has(i))card.classList.add("is-closing");
   card.dataset.index=String(i);card.style.setProperty("--memory-index",String(i));
   card.style.setProperty("--memory-win-delay",Math.min(850,i*28)+"ms");
-  card.textContent=c.open||c.matched?c.icon:"";
+  const face=(c.open||c.matched)?window.GameMemoryArt?.face(c.icon):null;
+  const palette=window.GameMemoryArt?.colors(c.icon);
+  if(palette){card.style.setProperty("--memory-card-tint",palette.tint);card.style.setProperty("--memory-card-accent",palette.accent);}
+  if(face)card.innerHTML=face;
+  else if(c.open||c.matched)card.textContent=c.icon;
+  else card.innerHTML=window.GameMemoryArt?.back||"";
   card.disabled=c.matched||c.open||paused||over;
-  card.setAttribute("aria-label",c.matched?"已匹配 "+c.icon:c.open?"已翻开 "+c.icon:"未翻开");
+  const label=window.GameMemoryArt?.named(c.icon)||c.icon;
+  card.setAttribute("aria-label",c.matched?"已匹配 "+label:c.open?"已翻开 "+label:"未翻开");
   card.addEventListener("click",()=>flip(i));boardEl.appendChild(card);
  });
  document.getElementById("moves").textContent=moves;

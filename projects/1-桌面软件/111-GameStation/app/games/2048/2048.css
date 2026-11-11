@@ -55,3 +55,34 @@ body[data-game="2048"] #board.is-over{filter:saturate(.75)}
  body[data-game="2048"] #board .tile.is-new,
  body[data-game="2048"] #board .tile.is-merged{animation-duration:100ms!important}
 }
+
+/* R54 · No right-overlay flash: shared workspace CSS is preloaded in HEAD and
+   gs-tools-open is in HTML. Keep the square board centered between symmetric
+   virtual gutters and place the controls immediately alongside its real edge. */
+body[data-game="2048"] #game.game2048-layout>.game-tools>.game-status{
+ display:none!important;
+}
+@media(min-width:701px){
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed){
+  --p2048-guard:clamp(136px,14vw,185px);
+  grid-template-columns:minmax(0,1fr) minmax(0,min(88dvh,860px,calc(100% - 2 * var(--p2048-guard)))) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;column-gap:0!important;justify-content:center!important
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board{
+  grid-column:2!important;grid-row:1!important;
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed) #board{
+  width:min(88cqh,100cqw,860px)!important;max-width:100%!important;max-height:100%!important;
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed)>.game-tools{
+  position:relative!important;grid-column:3!important;grid-row:1!important;
+  top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  justify-content:center!important;align-self:center!important;justify-self:start!important;
+  box-sizing:border-box!important;width:min(175px,calc(100% - 12px))!important;
+  height:max-content!important;min-height:0!important;max-height:calc(100% - 16px)!important;
+  margin:0 0 0 12px!important;padding:0!important;gap:13px!important;
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;overflow-x:hidden!important;overflow-y:auto!important
+ }
+}

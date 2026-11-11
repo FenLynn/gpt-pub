@@ -82,3 +82,85 @@ body[data-game="memory"] #board.memory-complete .memory-card.matched{
  body[data-game="memory"] #board .memory-card.is-matched-pop,
  body[data-game="memory"] #board.memory-complete .memory-card.matched{animation-duration:100ms!important}
 }
+
+/* R54 · Hand-drawn animal friends: tactile pastel cards, gentle paw backs,
+   accessible named faces and compact artwork that survives all difficulties. */
+body[data-game="memory"] #game.memory-layout{
+ background:radial-gradient(ellipse at 55% 45%,#fffaf1 0%,#f0f7f7 64%,#e7f0f4 100%)!important;
+}
+body[data-game="memory"] #board.memory-complete{filter:none}
+body[data-game="memory"] #board .memory-card{
+ padding:7px!important;border-radius:20px!important;
+ border:2px solid #fffdfc!important;overflow:hidden!important;
+ box-shadow:0 6px 13px #52748b24,inset 0 2px #fff9!important;
+}
+body[data-game="memory"] #board .memory-card.face-down{
+ background:radial-gradient(circle at 24% 18%,#b6f1ea 0%,transparent 36%),
+ linear-gradient(145deg,#72caca 0%,#5ba5bd 54%,#557fba 100%)!important;
+ border-color:#b9e8e7!important;box-shadow:0 7px 14px #467e9733,inset 0 1px 2px #fff8!important;
+}
+body[data-game="memory"] #board .memory-card.face-down::before{
+ content:"";position:absolute;inset:7px;border:2px dashed #e6fff7bb;border-radius:13px;
+ background:radial-gradient(circle at 20% 20%,#ffffff38 0 3px,transparent 4px),
+ radial-gradient(circle at 83% 77%,#ffffff42 0 4px,transparent 5px);
+ opacity:.85
+}
+body[data-game="memory"] #board .memory-card.face-down::after{content:none!important}
+body[data-game="memory"] #board .memory-back-emblem{
+ position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+ width:100%;height:100%;gap:3px;
+ filter:drop-shadow(0 3px 4px #38758e40)
+}
+body[data-game="memory"] #board .memory-paw-svg{
+ display:block;width:min(65%,112px);height:min(65%,112px);
+ animation:memory-paw-idle 3.8s ease-in-out infinite
+}
+body[data-game="memory"] #board .memory-back-stars{
+ font-size:clamp(11px,1.9cqh,20px);font-weight:800;letter-spacing:.2em;color:#fff9e3;
+ text-shadow:0 2px 5px #42758b66
+}
+body[data-game="memory"] #board .memory-card.revealed{
+ background:linear-gradient(155deg,#fff 4%,var(--memory-card-tint,#fff6f3) 92%)!important;
+ border-color:var(--memory-card-accent,#efc7bc)!important;
+ box-shadow:0 8px 16px #6075872d,inset 0 1px #fff!important
+}
+body[data-game="memory"] #board .memory-card.matched{
+ background:linear-gradient(155deg,#ffffff 0%,#e9fff1 100%)!important;
+ border-color:#a1d5b5!important;
+ box-shadow:0 5px 14px #6fa98a30,inset 0 0 0 2px #fff!important
+}
+body[data-game="memory"] #board .memory-card.matched::after{
+ content:"♥";position:absolute;top:7px;right:8px;font:900 clamp(11px,1.7cqh,18px)/1 sans-serif;
+ color:#6dbb88;text-shadow:0 1px #fff
+}
+body[data-game="memory"] #board .memory-portrait{
+ position:relative;z-index:1;display:flex;flex-direction:column;
+ align-items:center;justify-content:center;width:100%;height:100%;
+ gap:2px;min-width:0;min-height:0
+}
+body[data-game="memory"] #board .memory-mascot-svg{
+ display:block;flex:1 1 auto;min-height:0;min-width:0;
+ width:min(95%,148px);height:min(75%,148px);max-height:calc(100% - 22px);
+ filter:drop-shadow(0 3px 3px #6d849025)
+}
+body[data-game="memory"] #board .memory-character-name{
+ display:block;flex:0 0 auto;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+ color:#607387;font:800 clamp(10px,1.45cqh,15px)/1.1 "Segoe UI","Noto Sans CJK SC",sans-serif;
+ letter-spacing:.07em;white-space:nowrap;text-shadow:0 1px #fff
+}
+body[data-game="memory"] #board .memory-card.face-down:hover:not(:disabled){
+ transform:translateY(-4px) rotate(-.7deg);filter:brightness(1.06);
+ box-shadow:0 10px 19px #427a9240,inset 0 1px 2px #fff9!important
+}
+@keyframes memory-paw-idle{
+ 0%,100%{transform:translateY(1px) rotate(-3deg)}
+ 50%{transform:translateY(-3px) rotate(3deg)}
+}
+@media(max-width:700px){
+ body[data-game="memory"] #board .memory-card{border-radius:12px!important;padding:3px!important}
+ body[data-game="memory"] #board .memory-card.face-down::before{inset:4px;border-radius:8px}
+ body[data-game="memory"] #board .memory-character-name{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-game="memory"] #board .memory-paw-svg{animation:none!important}
+}

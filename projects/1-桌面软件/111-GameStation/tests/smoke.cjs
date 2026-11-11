@@ -471,10 +471,14 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     const rail=await frame.locator("#game").evaluate(root=>{
      const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
      const tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board"),
-      undo=tools.querySelector("#undo"),style=getComputedStyle(tools);
+      undo=tools.querySelector("#undo"),board=root.querySelector("#board"),style=getComputedStyle(tools);
      return{mainColumn:getComputedStyle(main).gridColumnStart,toolsColumn:getComputedStyle(tools).gridColumnStart,
-      main:box(main),tools:box(tools),undo:box(undo),undoIcon:!!undo.querySelector("svg"),
-      direction:style.flexDirection,border:style.borderWidth,background:style.backgroundColor};
+      main:box(main),tools:box(tools),board:box(board),undo:box(undo),undoIcon:!!undo.querySelector("svg"),
+      direction:style.flexDirection,border:style.borderWidth,background:style.backgroundColor,
+      preloaded:!!document.querySelector("#gameWorkspaceStyles")?.sheet,
+      workspaceLinks:document.querySelectorAll('link[href*="shared/workspace.css"]').length,
+      initialRail:root.classList.contains("gs-tools-open"),guideHidden:getComputedStyle(root.querySelector(".game-guide")).display==="none",
+      statusHidden:getComputedStyle(tools.querySelector("#status")).display==="none"};
     });
     assert.equal(rail.mainColumn,"2","2048 playfield must occupy the centered middle track");
     assert.equal(rail.toolsColumn,"3","2048 controls must occupy the right-hand track");
@@ -485,6 +489,25 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     assert.equal(rail.border,"0px","2048 controls must not be wrapped in a second outer card");
     assert.equal(rail.background,"rgba(0, 0, 0, 0)","2048 right rail must use the transparent chess-style container");
     assert.ok(rail.undo.height>=42&&rail.undoIcon,"2048 undo button must keep the shared large icon-button treatment");
+    assert.ok(rail.preloaded&&rail.workspaceLinks===1&&rail.initialRail&&rail.guideHidden&&rail.statusHidden,
+     "2048 must preload exactly one workspace layout and never flash legacy guide/duplicate status: "+JSON.stringify(rail));
+    const boardGap=rail.tools.left-rail.board.right;
+    assert.ok(boardGap>=7&&boardGap<=22,
+     "2048 controls must dock 8–20 px after the actual board edge, not at the viewport edge: "+JSON.stringify({boardGap,rail}));
+    assert.ok(Math.abs((rail.board.left+rail.board.right)-(rail.main.left+rail.main.right))<=3,
+     "2048 square board must stay centered inside its fixed middle column: "+JSON.stringify(rail));
+   }
+   if(name==="记忆翻牌"){
+    const art=await frame.locator("#game").evaluate(root=>({
+     preloaded:!!document.querySelector("#gameWorkspaceStyles")?.sheet,
+     workspaceLinks:document.querySelectorAll('link[href*="shared/workspace.css"]').length,
+     backs:root.querySelectorAll("#board .memory-card.face-down .memory-paw-svg").length,
+     total:root.querySelectorAll("#board .memory-card").length,
+     svgResourceURLs:[...document.querySelectorAll("svg image")].map(el=>el.getAttribute("href")||el.getAttribute("xlink:href"))
+    }));
+    assert.ok(art.preloaded&&art.workspaceLinks===1,"Memory must preload the layout in HEAD: "+JSON.stringify(art));
+    assert.ok(art.total>=12&&art.backs===art.total,"Every hidden memory card needs the illustrated paw motif: "+JSON.stringify(art));
+    assert.equal(art.svgResourceURLs.length,0,"Memory illustrated artwork must remain self-contained and offline");
    }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));
