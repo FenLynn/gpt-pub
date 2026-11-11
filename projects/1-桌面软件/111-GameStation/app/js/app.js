@@ -97,9 +97,10 @@ function showGameNotice(message,timeout=2400,persistent=false){
 function clearGameNotice(){clearTimeout(centerNoticeTimer);permanentGameStatus="";setGameNoticeText("");}
 function toast(message){const el=$("toast");if(active){el.classList.remove("show");showGameNotice(message);return;}el.textContent=message;el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),1900);}
 let stats=normalizeStats(read("stats",{})),settings=normalizeSettings(read("settings",{scale:"1"})),favorites=new Set(normalizeFavorites(read("favorites",[]))),firstStartedAt=Math.max(0,Number(read("firstStartedAt",0))||0);
-let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="",savedProgress=null,restoredThisSession=false,snapshotRequestId=null,restorePending=null,restoreCountdownTimer=null;
+let active=null,sessionId=null,ready=false,paused=true,started=false,roundCounted=false,modeIndex=0,difficulty="normal",currentScore=0,session=null,currentCategory="all",search="",rankingType="score",lastHomeDay="",heatmapObserver=null,helpSource={lines:[],note:""},homeRecentTab="recent",posterIndex=0,selectedPosterId="",savedProgress=null,restoredThisSession=false,snapshotRequestId=null,restorePending=null,restoreCountdownTimer=null,savingProgress=false;
 
 const scoringGames=new Set(["2048","memory","tetris","snake","pong","contra","mario","tank","doudizhu","mahjong","sanguosha"]);
+const deferredClockGames=new Set(["minesweeper","memory"]);
 const nativeResultGames=new Set(["gomoku","xiangqi"]);
 const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","snake","pong","contra","mario","tank"]);
 function hideGameResult(){const el=$("gameResultOverlay");el.hidden=true;el.setAttribute("aria-hidden","true");}
@@ -344,7 +345,7 @@ function setGameState(){
  $("startButton").classList.toggle("end-action",started);$("startButton").disabled=!ready||finished||(!started&&!paused);
  $("pauseButton").innerHTML=started&&!finished&&paused?icons.resume:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;$("pauseButton").classList.toggle("continue-action",started&&!finished&&paused);
  $("pauseButton").disabled=!ready||!started||finished;
- const overlay=$("gamePauseOverlay"),visible=!!active&&ready&&started&&paused&&!finished;
+ const overlay=$("gamePauseOverlay"),visible=!!active&&ready&&started&&paused&&!finished&&!savingProgress;
  overlay.hidden=!visible;overlay.setAttribute("aria-hidden",String(!visible));
  $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
  if(active&&ready)send("HUD_STATE",{ready,started,paused,finished,elapsed:session?fmtClock(session.elapsedMs):"00:00",modeIndex,difficulty});
@@ -384,7 +385,8 @@ function renderProgressButton(){
 }
 function saveProgress(){
  if(!active||!ready||!session||session.finished||snapshotRequestId||restorePending)return;
- if(!paused){send("PAUSE");stopClock();}
+ savingProgress=true;
+ if(!paused){send("PAUSE");stopClock();}else setGameState();
  snapshotRequestId="save-"+Date.now()+"-"+Math.random().toString(16).slice(2);
  renderProgressButton();
  send("SNAPSHOT_REQUEST",{requestId:snapshotRequestId});
@@ -396,6 +398,7 @@ function showSaveProgressDialog(){
  requestAnimationFrame(()=>$("saveProgressContinue")?.focus({preventScroll:true}));
 }
 function hideSaveProgressDialog(){
+ savingProgress=false;
  const overlay=$("saveProgressOverlay");if(!overlay)return;
  overlay.hidden=true;overlay.setAttribute("aria-hidden","true");
  shell.classList.remove("save-progress-open");
@@ -420,7 +423,7 @@ function activateRestoredGame(){
  if(!roundCounted)countRound();
  $("restoreCountdownOverlay").hidden=true;
  $("restoreCountdownOverlay").setAttribute("aria-hidden","true");
- send("RESUME");startClock();focusGameFrame();renderProgressButton();
+ send("RESUME");if(deferredClockGames.has(active.id)&&!session.clockStarted){paused=false;setGameState();}else startClock();focusGameFrame();renderProgressButton();
 }
 function startRestoreCountdown(){
  const overlay=$("restoreCountdownOverlay"),number=$("restoreCountdownNumber");
@@ -443,16 +446,30 @@ function restoreProgress(){
  renderProgressButton();
  send("RESTORE_STATE",{requestId:restorePending.requestId,snapshot:savedProgress.state});
 }
+function deferredSnapshotElapsed(id,state,fallback=0){
+ if(!deferredClockGames.has(id))return Math.max(0,Number(fallback)||0);
+ const value=Number(state?.elapsedMs);
+ if(Number.isFinite(value)&&value>=0)return value;
+ return Math.max(0,Number(state?.seconds)||0)*1000;
+}
+function inferDeferredClockStarted(id,state){
+ if(id==="minesweeper")return !!state?.started;
+ if(id==="memory")return !!state?.gameplayStarted||Number(state?.seconds)>0||Number(state?.moves)>0||
+  (Array.isArray(state?.opened)&&state.opened.length>0)||Number(state?.matched)>0;
+ return true;
+}
 function handleProgressSnapshot(payload){
  if(!snapshotRequestId||payload?.requestId!==snapshotRequestId)return;
  snapshotRequestId=null;
  if(payload?.error||!payload?.snapshot||typeof payload.snapshot!=="object"){
-  toast(payload?.error||"保存进度失败");renderProgressButton();return;
+  savingProgress=false;setGameState();toast(payload?.error||"保存进度失败");renderProgressButton();return;
  }
- const elapsedMs=Math.max(0,Number(session?.elapsedMs)||0)+(session?.running?Math.max(0,Date.now()-session.lastTick):0);
+ const liveElapsedMs=Math.max(0,Number(session?.elapsedMs)||0)+(session?.running?Math.max(0,Date.now()-session.lastTick):0);
+ const elapsedMs=deferredSnapshotElapsed(active.id,payload.snapshot,liveElapsedMs);
  const item={schemaVersion:1,gameId:active.id,savedAt:Date.now(),modeIndex,difficulty,
-  elapsedMs,score:Number(session?.score??currentScore)||0,roundCounted:!!roundCounted,state:payload.snapshot};
- if(!writeProgress(active.id,item)){toast("本地存储空间不足，未能保存进度");renderProgressButton();return;}
+  elapsedMs,clockStarted:deferredClockGames.has(active.id)?!!session.clockStarted:true,
+  score:Number(session?.score??currentScore)||0,roundCounted:!!roundCounted,state:payload.snapshot};
+ if(!writeProgress(active.id,item)){savingProgress=false;setGameState();toast("本地存储空间不足，未能保存进度");renderProgressButton();return;}
  savedProgress=item;restoredThisSession=true;renderProgressButton();showSaveProgressDialog();
 }
 function handleProgressRestored(payload){
@@ -461,7 +478,8 @@ function handleProgressRestored(payload){
  if(!payload?.ok){
   toast(payload?.error||"恢复进度失败");renderProgressButton();return;
  }
- session.elapsedMs=Math.max(0,Number(item.elapsedMs)||0);
+ session.elapsedMs=deferredSnapshotElapsed(active.id,item.state,Math.max(0,Number(item.elapsedMs)||0));
+ session.clockStarted=typeof item.clockStarted==="boolean"?item.clockStarted:inferDeferredClockStarted(active.id,item.state);
  session.score=Math.max(0,Number(item.score)||0);session.running=false;session.finished=false;session.needsInit=false;
  currentScore=session.score;roundCounted=!!item.roundCounted;started=true;paused=true;restoredThisSession=true;
  setGameState();renderProgressButton();
@@ -469,14 +487,15 @@ function handleProgressRestored(payload){
  else activateRestoredGame();
 }
 function persistSessionTime(){if(!session||!session.running)return;const now=Date.now(),delta=Math.max(0,now-session.lastTick);session.lastTick=now;session.elapsedMs+=delta;const s=statFor(session.id),key=dateKey(new Date(now));s.totalMs+=delta;s.days[key]=(Number(s.days[key])||0)+delta;}
-function startClock(){if(!session||session.running)return;session.running=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
+function startClock(){if(!session||session.running)return;session.running=true;session.clockStarted=true;session.lastTick=Date.now();started=true;paused=false;setGameState();}
 function stopClock(){if(session&&session.running){persistSessionTime();session.running=false;persistStats();renderHeatmap();renderRanking();}paused=true;setGameState();}
+function freezeClock(){if(session&&session.running){persistSessionTime();session.running=false;persistStats();renderHeatmap();renderRanking();}setGameState();}
 function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(active&&ready)send("HUD_STATE",{ready,started,paused,finished:!!session?.finished,elapsed:fmtClock(session.elapsedMs),modeIndex,difficulty});if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
 function countRound(){if(!session||roundCounted)return;const now=Date.now(),s=statFor(session.id);if(!firstStartedAt){firstStartedAt=inferFirstStartedAt()||now;write("firstStartedAt",firstStartedAt);}s.plays++;s.lastPlayed=dateKey(new Date(now));s.lastPlayedAt=now;roundCounted=true;persistStats();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();}
-function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");startClock();focusGameFrame();toast("开始游戏");}
+function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");if(deferredClockGames.has(active.id)){started=true;paused=false;setGameState();}else startClock();focusGameFrame();toast("开始游戏");}
 function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;clearProgress(session.id);persistStats();setGameState();showGameNotice("已结束",0,true);showGameResult({},true);}
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
-function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");startClock();focusGameFrame();toast("继续游戏");}
+function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");if(deferredClockGames.has(active.id)&&!session.clockStarted){paused=false;setGameState();}else startClock();focusGameFrame();toast("继续游戏");}
 function togglePause(){if(paused)resumeGame();else pauseGame();}
 function toggleGamePause(){if(!ready||session?.finished)return;if(!started){startGame();return;}togglePause();}
 function startOrResumeGame(){if(!ready||session?.finished)return;if(started){if(paused)resumeGame();return;}startGame();}
@@ -488,9 +507,9 @@ function newRound(){
  if(!ready||!session)return;
  clearProgress(session.id);restoredThisSession=false;
  hideGameResult();clearGameNotice();
- stopClock();session.elapsedMs=0;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;
+ stopClock();session.elapsedMs=0;session.clockStarted=false;session.finished=false;session.score=0;session.lastSave=Date.now();session.needsInit=false;
  currentScore=0;started=false;roundCounted=false;paused=true;
- send("NEW_GAME");send("RESUME");countRound();startClock();focusGameFrame();setGameState();renderGameControls();
+ send("NEW_GAME");send("RESUME");countRound();if(deferredClockGames.has(active.id)){started=true;paused=false;}else startClock();focusGameFrame();setGameState();renderGameControls();
 }
 function finishGame(payload={}){if(!session||session.finished)return;stopClock();session.finished=true;clearProgress(session.id);
  const score=Number(payload.score??session.score);if(scoringGames.has(session.id)&&Number.isFinite(score))session.score=score;
@@ -507,7 +526,7 @@ function openGame(id){
  modeIndex=savedProgress?Math.max(0,Math.min((g.modes?.length||1)-1,Number(savedProgress.modeIndex)||0)):0;
  difficulty=savedProgress&&["easy","normal","hard"].includes(savedProgress.difficulty)?savedProgress.difficulty:"normal";
  currentScore=0;helpSource={lines:[],note:""};hideGameResult();
- session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,finished:false,score:0,needsInit:true};
+ session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,clockStarted:false,finished:false,score:0,needsInit:true};
  setBreadcrumb();$("gameActions").classList.remove("hidden");$("helpButton").classList.remove("hidden");
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;renderProgressButton();
  $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("gameNotice").classList.remove("hidden");clearGameNotice();$("helpTitle").textContent=g.name+" · 玩法";
@@ -515,7 +534,7 @@ function openGame(id){
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
 }
 function closeGame(){
- hideSaveProgressDialog();
+ hideSaveProgressDialog();savingProgress=false;
  if(restoreCountdownTimer!==null){clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;}
  $("restoreCountdownOverlay").hidden=true;$("restoreCountdownOverlay").setAttribute("aria-hidden","true");
  snapshotRequestId=null;restorePending=null;
@@ -545,6 +564,8 @@ window.addEventListener("message",event=>{
  if(m.type==="SNAPSHOT"){handleProgressSnapshot(m.payload||{});return;}
  if(m.type==="RESTORED"){handleProgressRestored(m.payload||{});return;}
  if(m.type==="HOTKEY"){if(started&&!session?.finished&&["toggle","pause","start"].includes(m.payload?.action))togglePause();return;}
+ if(m.type==="CLOCK_START"){if(deferredClockGames.has(active.id)&&started&&!paused&&!session?.clockStarted)startClock();return;}
+ if(m.type==="CLOCK_STOP"){if(deferredClockGames.has(active.id))freezeClock();return;}
  if(m.type==="ACTIVITY"){if(!started)startGame();else if(paused)resumeGame();return;}
  
 if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(started)endGame();else startGame();}else if(action==="toggle")toggleGamePause();else if(action==="new")newRound();else if(action==="leave")showLibrary(active.category);else if(action==="mode")setMode(m.payload?.index);else if(action==="difficulty")setDifficulty(m.payload?.value);else if(action==="help")openHelp();return;}

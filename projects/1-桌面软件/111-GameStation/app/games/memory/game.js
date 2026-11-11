@@ -3,7 +3,7 @@
 const allIcons=window.GameMemoryArt?.icons||["🐱","🐶","🐰","🐻","🐼","🦊","🐸","🐥","🐷","🐨","🐧","🐹"];
 const boardEl=document.getElementById("board"),status=document.getElementById("status");
 let cards=[],opened=[],matched=0,moves=0,locked=false,paused=false,over=false;
-let tick=null,flipTimer=null,resultTimer=null,animationTimer=null,resizeObserver=null,seconds=0,pairCount=8,difficulty="normal";
+let tick=null,flipTimer=null,resultTimer=null,animationTimer=null,resizeObserver=null,seconds=0,hostElapsedMs=null,gameplayStarted=false,pairCount=8,difficulty="normal";
 let flipAnimationIndices=new Set(),matchedAnimationIndices=new Set(),closingAnimationIndices=new Set();
 function report(t){status.textContent=t;GameBridge.report(t,{score:Math.max(0,10000-moves*10-seconds*3)});}
 function timeText(){return Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0");}
@@ -59,19 +59,30 @@ function render(){
  fitBoard();
 }
 function stopClock(){if(tick!==null)clearInterval(tick);tick=null;}
-function startClock(){if(tick!==null||paused||over||matched===pairCount)return;tick=setInterval(()=>{seconds++;document.getElementById("time").textContent=timeText();},1000);}
+function startClock(){if(tick!==null||paused||over||matched===pairCount||hostElapsedMs!==null)return;tick=setInterval(()=>{seconds++;document.getElementById("time").textContent=timeText();},1000);}
+window.addEventListener("message",event=>{
+ if(event.source!==window.parent)return;
+ const m=event.data;
+ if(m?.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!=="memory"||m.type!=="HUD_STATE")return;
+ const match=/^(\d+):(\d{2})$/.exec(String(m.payload?.elapsed||""));
+ if(!match)return;
+ hostElapsedMs=(Number(match[1])*60+Number(match[2]))*1000;
+ seconds=Math.floor(hostElapsedMs/1000);
+ if(tick!==null){clearInterval(tick);tick=null;}
+ document.getElementById("time").textContent=timeText();
+});
 function configure(v){difficulty=["easy","normal","hard"].includes(v)?v:"normal";pairCount=difficulty==="easy"?6:difficulty==="hard"?12:8;}
 function newGame(){
  stopClock();clearTimeout(flipTimer);clearTimeout(resultTimer);flipTimer=resultTimer=null;clearAnimations();
  const icons=allIcons.slice(0,pairCount);
  cards=[...icons,...icons].map((icon,i)=>({icon,key:i,open:false,matched:false}));
  for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}
- opened=[];matched=0;moves=0;seconds=0;locked=false;paused=false;over=false;
+ opened=[];matched=0;moves=0;seconds=0;hostElapsedMs=null;gameplayStarted=false;locked=false;paused=false;over=false;
  render();report("翻开两张卡片开始");
 }
 function finishGame(){
  if(over)return;
- over=true;stopClock();
+ over=true;stopClock();GameBridge.send("CLOCK_STOP");
  const score=Math.max(0,10000-moves*10-seconds*3);
  report("全部配对成功！");
  render();
@@ -79,6 +90,7 @@ function finishGame(){
 }
 function flip(i){
  if(paused||over||locked||!cards[i]||cards[i].open||cards[i].matched)return;
+ if(!gameplayStarted){gameplayStarted=true;GameBridge.send("CLOCK_START");}
  startClock();cards[i].open=true;opened.push(i);
  if(opened.length===2){
   moves++;const [a,b]=opened;
@@ -106,7 +118,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
    if(!Array.isArray(icons)||!icons.length||icons.some(v=>typeof v!=="string"))throw new Error("Invalid Memory fixture");
    stopClock();clearTimeout(flipTimer);clearTimeout(resultTimer);flipTimer=resultTimer=null;clearAnimations();
    pairCount=icons.length;cards=icons.concat(icons).map(icon=>({icon,key:icon,open:false,matched:false}));
-   opened=[];matched=0;moves=0;locked=false;paused=false;over=false;seconds=0;render();report("测试牌组");return fixtureState();
+   opened=[];matched=0;moves=0;locked=false;paused=false;over=false;seconds=0;hostElapsedMs=null;gameplayStarted=false;render();report("测试牌组");return fixtureState();
   },
   state:fixtureState,
   flip(i){flip(i);return fixtureState();}
@@ -121,7 +133,7 @@ GameBridge.register({
  pause(){paused=true;report("已暂停");render();},
  resume(){paused=false;if(!over&&(seconds>0||moves>0||opened.length>0||matched>0))startClock();report(over?"本局已完成":"继续挑战");render();},
  setDifficulty(v){configure(v);},
- snapshot(){return{cards:cards.map(c=>({...c})),opened:opened.slice(),matched,moves,seconds,pairCount,difficulty,locked,over};},
+ snapshot(){return{cards:cards.map(c=>({...c})),opened:opened.slice(),matched,moves,seconds,elapsedMs:hostElapsedMs===null?seconds*1000:hostElapsedMs,gameplayStarted,pairCount,difficulty,locked,over};},
  restore(s){
   if(!s||!Array.isArray(s.cards)||!s.cards.length)throw new Error("记忆翻牌存档数据无效");
   stopClock();clearTimeout(flipTimer);clearTimeout(resultTimer);flipTimer=resultTimer=null;clearAnimations();
@@ -130,6 +142,8 @@ GameBridge.register({
   matched=Math.max(0,Number(s.matched)||0);moves=Math.max(0,Number(s.moves)||0);seconds=Math.max(0,Number(s.seconds)||0);
   pairCount=Math.max(1,Number(s.pairCount)||Math.floor(cards.length/2));difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:difficulty;
   locked=!!s.locked;over=!!s.over||matched===pairCount;paused=true;
+  gameplayStarted=typeof s.gameplayStarted==="boolean"?s.gameplayStarted:(seconds>0||moves>0||opened.length>0||matched>0);
+  hostElapsedMs=Math.max(0,Number(s.elapsedMs)||seconds*1000);seconds=Math.floor(hostElapsedMs/1000);
   render();
   if(locked&&opened.length===2){const [a,b]=opened;flipTimer=setTimeout(()=>{if(cards[a]&&cards[b]){cards[a].open=cards[b].open=false;}opened=[];locked=false;flipTimer=null;render();},750);}
   report(over?"本局已完成":"已恢复上次进度");

@@ -50,7 +50,7 @@ function setFace(state="normal"){
  face.dataset.face=key;face.innerHTML=faceSVG[key];face.setAttribute("aria-label",faceLabels[key]);
 }
 let cells=[],nodes=[],started=false,over=false,paused=false,flags=0,opened=0,seconds=0,triggerMine=-1;
-let elapsedMs=0,runningSince=null,timerId=null,resizeObserver=null,flashTimer=null,resultTimer=null,middleTarget=-1,dualTarget=-1;
+let elapsedMs=0,runningSince=null,hostElapsedMs=null,timerId=null,resizeObserver=null,flashTimer=null,resultTimer=null,middleTarget=-1,dualTarget=-1;
 function emptyRecord(){return{played:0,won:0,best:null,streak:0};}
 function readRecords(){
  try{
@@ -127,9 +127,19 @@ function configure(value){
 function now(){return performance.now();}
 function activeMs(){return elapsedMs+(runningSince===null?0:Math.max(0,now()-runningSince));}
 function updateTimer(){
- seconds=Math.min(999,Math.floor(activeMs()/1000));
+ const elapsed=hostElapsedMs===null?activeMs():hostElapsedMs;
+ seconds=Math.min(999,Math.floor(elapsed/1000));
  timerEl.textContent=formatCounter(seconds);
 }
+window.addEventListener("message",event=>{
+ if(event.source!==window.parent)return;
+ const m=event.data;
+ if(m?.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!=="minesweeper"||m.type!=="HUD_STATE")return;
+ const match=/^(\d+):(\d{2})$/.exec(String(m.payload?.elapsed||""));
+ if(!match)return;
+ hostElapsedMs=(Number(match[1])*60+Number(match[2]))*1000;
+ updateTimer();
+});
 function startTimer(){
  if(runningSince===null)runningSince=now();
  if(timerId===null)timerId=setInterval(updateTimer,200);
@@ -232,7 +242,7 @@ function makeBoard(){
  }
  recount();
  started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
- elapsedMs=0;runningSince=null;triggerMine=-1;
+ elapsedMs=0;runningSince=null;hostElapsedMs=null;triggerMine=-1;
  setFace("normal");
  render();renderRecords();fitBoard();report("点击任意方格开始");
 }
@@ -290,6 +300,7 @@ function conclude(won,exploded=-1){
  render();renderRecords();
  const message=won?"扫雷成功 · "+levelNames[difficulty]+" "+formatTime(seconds):"踩到地雷";
  report(won?message+" · 庆祝中":"踩到地雷 · 爆炸中…");
+ GameBridge.send("CLOCK_STOP");
  const settle=()=>GameBridge.send("GAME_OVER",{message,score:opened,win:won,difficulty,seconds});
  if(won){
   boardEl.classList.add("mine-victory-sequence");
@@ -309,7 +320,7 @@ function reveal(index){
   protectFirstClick(index);
   started=true;
   const item=records[difficulty];item.played++;persistRecords();
-  startTimer();renderRecords();
+  startTimer();GameBridge.send("CLOCK_START");renderRecords();
  }
  if(cells[index].mine){conclude(false,index);return;}
  flood(index);render();
@@ -438,7 +449,7 @@ if(isFixture){
     cells[i].mine=true;
    }
    recount();started=false;over=false;paused=false;flags=0;opened=0;seconds=0;
-   elapsedMs=0;runningSince=null;triggerMine=-1;
+   elapsedMs=0;runningSince=null;hostElapsedMs=null;triggerMine=-1;
    setFace("normal");nodes=[];render();fitBoard();report("测试局面");
    return fixtureState();
   },
@@ -473,7 +484,7 @@ GameBridge.register({
  pause(){paused=true;freezeTimer();report("已暂停");},
  resume(){paused=false;if(started&&!over)startTimer();if(!over)report(started?"游戏进行中":"点击任意方格开始");},
  setDifficulty(value){configure(value);},
- snapshot(){return{width:W,height:H,mines:MINES,difficulty,started,flags,opened,seconds,elapsedMs:activeMs(),cells:cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Number(c.n)||0}))};},
+ snapshot(){return{width:W,height:H,mines:MINES,difficulty,started,flags,opened,seconds,elapsedMs:hostElapsedMs===null?activeMs():hostElapsedMs,cells:cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Number(c.n)||0}))};},
  restore(s){
   if(!s||!Number.isInteger(s.width)||!Number.isInteger(s.height)||!Array.isArray(s.cells)||s.cells.length!==s.width*s.height)throw new Error("扫雷存档数据无效");
   stopTimer();if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}
@@ -481,7 +492,7 @@ GameBridge.register({
   boardEl.style.setProperty("--cols",W);boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);levelEl.textContent=levelNames[difficulty]||"自定义";
   cells=s.cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Math.max(0,Number(c.n)||0)}));
   started=!!s.started;over=false;paused=true;flags=Math.max(0,Number(s.flags)||cells.filter(c=>c.flag).length);opened=Math.max(0,Number(s.opened)||cells.filter(c=>c.open&&!c.mine).length);
-  elapsedMs=Math.max(0,Number(s.elapsedMs)||Math.max(0,Number(s.seconds)||0)*1000);runningSince=null;seconds=Math.min(999,Math.floor(elapsedMs/1000));triggerMine=-1;middleTarget=-1;dualTarget=-1;setFace("normal");nodes=[];render();renderRecords();fitBoard();report("已恢复上次进度");
+  elapsedMs=Math.max(0,Number(s.elapsedMs)||Math.max(0,Number(s.seconds)||0)*1000);hostElapsedMs=elapsedMs;runningSince=null;seconds=Math.min(999,Math.floor(elapsedMs/1000));triggerMine=-1;middleTarget=-1;dualTarget=-1;setFace("normal");nodes=[];render();renderRecords();fitBoard();report("已恢复上次进度");
  },
  dispose(){
   paused=true;stopTimer();if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}resizeObserver?.disconnect();

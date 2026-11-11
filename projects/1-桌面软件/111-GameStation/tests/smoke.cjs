@@ -48,10 +48,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.locator("#progressButton").waitFor({state:"visible"});
   assert.equal(await page.locator("#progressButtonLabel").innerText(),"保存进度",name+" must expose save progress during active play");
   assert.equal(await page.locator("#progressButton").isEnabled(),true,name+" save button must be enabled during active play");
+  await page.evaluate(()=>{
+   const overlay=document.querySelector("#gamePauseOverlay");
+   window.__pauseOverlaySeenDuringSave=false;
+   window.__pauseOverlaySaveObserver=new MutationObserver(()=>{if(!overlay.hidden)window.__pauseOverlaySeenDuringSave=true;});
+   window.__pauseOverlaySaveObserver.observe(overlay,{attributes:true,attributeFilter:["hidden","aria-hidden"]});
+  });
   await page.locator("#progressButton").click();
   await page.locator("#saveProgressOverlay").waitFor({state:"visible",timeout:5000});
   assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"),"继续",name+" must pause immediately when saving");
-  await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
+  assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,name+" must replace the pause card with the save dialog, not stack both");
+  const pauseCardFlashed=await page.evaluate(()=>{window.__pauseOverlaySaveObserver?.disconnect();return window.__pauseOverlaySeenDuringSave;});
+  assert.equal(pauseCardFlashed,false,name+" must never flash the small pause card during save");
   for(const id of ["saveProgressContinue","saveProgressNewGame","saveProgressLeave"])
    assert.equal(await page.locator("#"+id).isVisible(),true,name+" save dialog must offer "+id);
   try{
@@ -1215,6 +1223,17 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),81);await fitMine();
   await frame.locator(".mine-cell").nth(8).click({button:"right"});
   assert.ok((await frame.locator(".mine-cell").nth(8).getAttribute("class")).includes("flag"),"right click must place a flag");
+  await page.waitForTimeout(1250);
+  assert.equal(await page.locator("#gameElapsed").innerText(),"00:00","Minesweeper host clock must wait for the first reveal");
+  assert.equal(await frame.locator("#timer").innerText(),"0","Minesweeper in-game clock must wait for the first reveal");
+  await frame.locator(".mine-cell").first().click();
+  await page.waitForTimeout(1250);
+  const mineClockSync={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#timer").innerText()};
+  assert.equal(mineClockSync.host,"00:01","Minesweeper host clock must start on first reveal: "+JSON.stringify(mineClockSync));
+  assert.equal(Number(mineClockSync.game),1,"Minesweeper in-game clock must match host elapsed time: "+JSON.stringify(mineClockSync));
+  await page.locator("#pauseButton").click();
+  assert.equal(await page.locator("#gameElapsed").innerText(),"00:01","Minesweeper host clock must freeze on pause");
+  assert.equal(Number(await frame.locator("#timer").innerText()),1,"Minesweeper in-game clock must freeze at the same value");
   const mineFixture=await browser.newPage({viewport:{width:1000,height:800}});
   await mineFixture.goto(pathToFileURL(path.resolve(__dirname,"../app/games/minesweeper/index.html")).href+"?p111Test=1");
   await mineFixture.waitForFunction(()=>!!window.__p111MineTest);
@@ -1242,6 +1261,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.ok(mineRecessStyle.top&&mineRecessStyle.left&&mineRecessStyle.bg.includes("linear-gradient")&&mineRecessStyle.shadow.includes("inset"),"Opened tiles must use cool-gray recessed texture with upper/left shadows");
   await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
+  await open("记忆翻牌");await start();
+  await page.waitForTimeout(1250);
+  assert.equal(await page.locator("#gameElapsed").innerText(),"00:00","Memory host clock must wait for the first flip");
+  assert.equal(await frame.locator("#time").innerText(),"0:00","Memory in-game clock must wait for the first flip");
+  await frame.locator(".memory-card").first().click();
+  await page.waitForTimeout(1250);
+  const memoryClockSync={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
+  assert.equal(memoryClockSync.host,"00:01","Memory host clock must start on first flip: "+JSON.stringify(memoryClockSync));
+  assert.equal(memoryClockSync.game,"0:01","Memory in-game clock must match host elapsed time: "+JSON.stringify(memoryClockSync));
+  await page.locator("#pauseButton").click();
+  assert.equal(await page.locator("#gameElapsed").innerText(),"00:01","Memory host clock must freeze on pause");
+  assert.equal(await frame.locator("#time").innerText(),"0:01","Memory in-game clock must freeze at the same value");
   await page.locator("#helpButton").click();
   await page.locator("#helpPanel").waitFor({state:"visible"});
   const hotkeyHelp=await page.locator("#helpContent .help-chapter").first().evaluate(section=>({
