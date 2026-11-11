@@ -1187,8 +1187,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     const footer=el.querySelector(".mine-bottom-panel");
     return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(footer),area:rect(el.closest(".game-main-board")),
      horizontal:el.classList.contains("mine-hard-layout")&&matchMedia("(min-width:900px)").matches,
-     direction:getComputedStyle(el).flexDirection,display:getComputedStyle(el).display,
-     footerDirection:getComputedStyle(footer).flexDirection,footerWidth:getComputedStyle(footer).width,
+     direction:getComputedStyle(el).flexDirection,footerDirection:getComputedStyle(footer).flexDirection,
      cssViewport:innerWidth,media900:matchMedia("(min-width:900px)").matches};
    });
    assert.ok(f.footer.bottom<=f.area.bottom+1&&f.footer.top>=f.area.top-1,"Minesweeper timer/counter must remain visible");
@@ -1205,7 +1204,6 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await frame.locator(".mine-cell").count(),256);
   await page.locator('#difficultyControl button[data-difficulty="hard"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);
-  await page.screenshot({path:path.join(artifacts,"minesweeper-hard-layout-debug.png")});
   await fitMine();
   assert.equal(await frame.locator(".mine-classic.mine-hard-layout").count(),1,"Advanced Minesweeper must activate horizontal board/status composition");
   await page.locator('#difficultyControl button[data-difficulty="easy"]').click();

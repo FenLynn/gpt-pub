@@ -313,14 +313,14 @@ body[data-game="minesweeper"]{background:#c7d7e5}
 }
 @media(min-width:900px){
  #game.minesweeper-layout .mine-classic.mine-hard-layout{
-  flex-direction:row;align-items:center;justify-content:center;
-  gap:clamp(12px,1.1vw,16px);padding:8px clamp(16px,3vw,42px);
+  flex-direction:row!important;align-items:center;justify-content:center;
+  gap:clamp(12px,1.1vw,16px)!important;padding:8px clamp(16px,3vw,42px)!important;
  }
  #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-grid{order:1}
  #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-bottom-panel{
-  order:2;flex:0 0 96px;width:96px;height:auto;min-height:0;
-  flex-direction:column;align-items:stretch;justify-content:center;
-  gap:16px;padding:0;
+  order:2!important;flex:0 0 96px!important;width:96px!important;height:auto!important;min-height:0!important;
+  flex-direction:column!important;align-items:stretch;justify-content:center;
+  gap:16px!important;padding:0!important;
  }
  #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-bottom-stat{
   width:100%;justify-content:center;gap:6px;
@@ -331,5 +331,5 @@ body[data-game="minesweeper"]{background:#c7d7e5}
  #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-counter{flex:0 0 56px;width:56px;height:30px;font-size:20px}
 }
 @media(max-width:899px){
- #game.minesweeper-layout .mine-classic.mine-hard-layout{flex-direction:column;align-items:center;justify-content:center}
+ #game.minesweeper-layout .mine-classic.mine-hard-layout{flex-direction:column!important;align-items:center;justify-content:center}
 }
