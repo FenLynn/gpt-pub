@@ -1183,17 +1183,24 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   const mine=frame.locator(".mine-classic");
   async function fitMine(){
    const f=await mine.evaluate(el=>{
-    const rect=node=>{const r=node.getBoundingClientRect();return{top:r.top,bottom:r.bottom,width:r.width,right:r.right,height:r.height};};
-    return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(el.querySelector(".mine-bottom-panel")),area:rect(el.closest(".game-main-board"))};
+    const rect=node=>{const r=node.getBoundingClientRect();return{left:r.left,top:r.top,bottom:r.bottom,width:r.width,right:r.right,height:r.height};};
+    return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(el.querySelector(".mine-bottom-panel")),area:rect(el.closest(".game-main-board")),horizontal:el.classList.contains("mine-hard-layout")&&matchMedia("(min-width:900px)").matches};
    });
-   assert.ok(f.footer.top>=f.grid.bottom-1,"Minesweeper bottom panel must be BELOW the grid");
-   assert.ok(f.footer.bottom<=f.area.bottom+1,"Minesweeper timer/face/counter must be visible, not clipped");
+   assert.ok(f.footer.bottom<=f.area.bottom+1&&f.footer.top>=f.area.top-1,"Minesweeper timer/counter must remain visible");
    assert.ok(f.board.width<=f.area.width+1,"Minesweeper must fit available width");
+   if(f.horizontal){
+    assert.ok(f.footer.left>=f.grid.right-1,"Advanced Minesweeper status must sit to the RIGHT of the minefield");
+    assert.ok(Math.abs((f.footer.top+f.footer.bottom)/2-(f.grid.top+f.grid.bottom)/2)<=4,"Advanced status must be vertically centered beside the board");
+    assert.ok(Math.abs((f.board.left-f.area.left)-(f.area.right-f.board.right))<=3,"Advanced board and status group must leave balanced outer margins");
+   }else{
+    assert.ok(f.footer.top>=f.grid.bottom-1,"Classic Minesweeper status remains BELOW the grid");
+   }
   }
   await page.waitForTimeout(130);await fitMine();
   assert.equal(await frame.locator(".mine-cell").count(),256);
   await page.locator('#difficultyControl button[data-difficulty="hard"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);await fitMine();
+  assert.equal(await frame.locator(".mine-classic.mine-hard-layout").count(),1,"Advanced Minesweeper must activate horizontal board/status composition");
   await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),81);await fitMine();
   await frame.locator(".mine-cell").nth(8).click({button:"right"});
@@ -1209,10 +1216,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await mineFixture.evaluate(()=>{window.__p111MineTest.forceFlag(0);window.__p111MineTest.forceMine(1);window.__p111MineTest.forceNumber(2,8);});
   const symbols=await mineFixture.locator(".mine-cell").evaluateAll(cells=>cells.slice(0,3).map(cell=>{
    const svg=cell.querySelector("svg"),r=svg?.getBoundingClientRect(),b=cell.getBoundingClientRect();
-   return{svg:!!svg,width:r?.width/b.width||0,height:r?.height/b.height||0,font:parseFloat(getComputedStyle(cell).fontSize),cell:b.width,text:cell.textContent.trim()};
+   return{svg:!!svg,number:!!cell.querySelector(".mine-number-svg"),width:r?.width/b.width||0,height:r?.height/b.height||0,text:cell.textContent.trim()};
   }));
   assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
-  assert.ok(symbols[2].text==="8"&&symbols[2].font>=symbols[2].cell*.65,"Minesweeper numbers must scale with cell size");
+  assert.ok(symbols[2].number&&symbols[2].width>=.65&&symbols[2].height>=.65&&symbols[2].text==="","Minesweeper numbers must use large self-contained vector glyphs");
+  const tintStyles=await mineFixture.evaluate(()=>{
+   const a=document.querySelector(".mine-cell.tint-0"),b=document.querySelector(".mine-cell.tint-3");
+   return {top:a&&getComputedStyle(a).backgroundImage,bottom:b&&getComputedStyle(b).backgroundImage,highlight:a&&getComputedStyle(a,"::before").content};
+  });
+  assert.ok(tintStyles.top.includes("radial-gradient")&&tintStyles.top.includes("linear-gradient")&&tintStyles.bottom.includes("linear-gradient")&&tintStyles.highlight!=="none","Covered tiles must use Win7 blue-glass gradients and soft top highlights");
+  await mineFixture.evaluate(()=>{window.__p111MineTest.loadBoard({width:3,height:3,mines:[]});window.__p111MineTest.forceNumber(4,8);});
+  const mineRecessStyle=await mineFixture.locator(".mine-cell").nth(4).evaluate(el=>({top:el.classList.contains("shadow-top"),left:el.classList.contains("shadow-left"),bg:getComputedStyle(el).backgroundImage,shadow:getComputedStyle(el).boxShadow}));
+  assert.ok(mineRecessStyle.top&&mineRecessStyle.left&&mineRecessStyle.bg.includes("linear-gradient")&&mineRecessStyle.shadow.includes("inset"),"Opened tiles must use cool-gray recessed texture with upper/left shadows");
   await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
   await page.locator("#helpButton").click();

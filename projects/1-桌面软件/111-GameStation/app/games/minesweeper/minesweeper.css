@@ -257,3 +257,79 @@ body[data-game="minesweeper"]{background:#c7d7e5}
  72%{opacity:.65;transform:scale(1)}
  100%{opacity:0;transform:scale(1.04)}
 }
+
+/* R41 — Windows 7 blue tiles and engraved numerals; keep R38 endgame FX intact. */
+#game.minesweeper-layout .mine-cell:not(.open):not(.mine){
+ border:1px solid #14448c;border-radius:2px;
+ box-shadow:inset 1px 1px .5px rgba(255,255,255,.42),inset -1px -1px .8px rgba(8,24,70,.45);
+}
+#game.minesweeper-layout .mine-cell:not(.open):not(.mine)::before{
+ content:"";position:absolute;z-index:-1;top:1px;left:2px;right:2px;width:auto;height:36%;
+ border-radius:2px 2px 50% 50% / 1px 1px 25% 25%;
+ background:linear-gradient(to bottom,rgba(255,255,255,.22) 0%,rgba(255,255,255,.02) 80%,transparent 100%);
+ pointer-events:none;
+}
+#game.minesweeper-layout .mine-cell.tint-0{
+ background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.25) 0%,rgba(180,225,255,.08) 22%,transparent 40%),
+ linear-gradient(to bottom,#6eb2fc 0%,#4696f5 32%,#2c7cef 70%,#1c68da 100%);
+ border-color:#14448c;
+}
+#game.minesweeper-layout .mine-cell.tint-1{
+ background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.22) 0%,rgba(150,205,255,.06) 22%,transparent 40%),
+ linear-gradient(to bottom,#5494f4 0%,#367beb 32%,#2164dd 70%,#1650c8 100%);
+ border-color:#113878;
+}
+#game.minesweeper-layout .mine-cell.tint-2{
+ background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.20) 0%,rgba(130,185,255,.05) 22%,transparent 40%),
+ linear-gradient(to bottom,#4480eb 0%,#2b6ce0 32%,#1b57d0 70%,#1243b8 100%);
+ border-color:#0f306e;
+}
+#game.minesweeper-layout .mine-cell.tint-3{
+ background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.18) 0%,rgba(120,175,255,.05) 22%,transparent 40%),
+ linear-gradient(to bottom,#3f79e5 0%,#2965dc 32%,#1951ca 70%,#103eb2 100%);
+ border-color:#0d2a64;
+}
+#game.minesweeper-layout .mine-cell:not(.open):hover{filter:brightness(1.12)}
+#game.minesweeper-layout .mine-cell:not(.open):active{filter:brightness(.96);transform:scale(.98)}
+#game.minesweeper-layout .mine-cell.open{
+ background:linear-gradient(135deg,#e3e8f0 0%,#d4dce5 100%);
+ border:1px solid #8c9eb2;
+ box-shadow:inset .5px .5px 1px rgba(255,255,255,.75),inset -.5px -.5px 1px rgba(0,0,0,.1);
+ color:#182b3e;text-shadow:none;
+}
+#game.minesweeper-layout .mine-cell.open::before{display:none}
+#game.minesweeper-layout .mine-cell.open.shadow-top{
+ box-shadow:inset 0 4px 4px -1px rgba(0,0,0,.55),inset .5px .5px 1px rgba(255,255,255,.4);
+}
+#game.minesweeper-layout .mine-cell.open.shadow-left{
+ box-shadow:inset 4px 0 4px -1px rgba(0,0,0,.55),inset .5px .5px 1px rgba(255,255,255,.4);
+}
+#game.minesweeper-layout .mine-cell.open.shadow-top.shadow-left{
+ box-shadow:inset 0 4px 4px -1px rgba(0,0,0,.55),inset 4px 0 4px -1px rgba(0,0,0,.55),inset .5px .5px 1px rgba(255,255,255,.4);
+}
+#game.minesweeper-layout .mine-cell .mine-number-svg{
+ display:block;width:86%;height:86%;min-width:0;max-width:100%;
+ overflow:visible;pointer-events:none;filter:none;
+}
+@media(min-width:900px){
+ #game.minesweeper-layout .mine-classic.mine-hard-layout{
+  flex-direction:row;align-items:center;justify-content:center;
+  gap:clamp(12px,1.1vw,16px);padding:8px clamp(16px,3vw,42px);
+ }
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-grid{order:1}
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-bottom-panel{
+  order:2;flex:0 0 96px;width:96px;height:auto;min-height:0;
+  flex-direction:column;align-items:stretch;justify-content:center;
+  gap:16px;padding:0;
+ }
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-bottom-stat{
+  width:100%;justify-content:center;gap:6px;
+ }
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-bottom-stat>*{flex-shrink:0}
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-medallion{flex-basis:28px;width:28px;height:28px}
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-medallion svg{width:25px;height:25px}
+ #game.minesweeper-layout .mine-classic.mine-hard-layout .mine-counter{flex:0 0 56px;width:56px;height:30px;font-size:20px}
+}
+@media(max-width:899px){
+ #game.minesweeper-layout .mine-classic.mine-hard-layout{flex-direction:column;align-items:center;justify-content:center}
+}
