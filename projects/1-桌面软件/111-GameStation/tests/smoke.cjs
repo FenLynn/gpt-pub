@@ -1254,8 +1254,20 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(mineClockSync.host,"00:01","Minesweeper host clock must start on first reveal: "+JSON.stringify(mineClockSync));
   assert.equal(Number(mineClockSync.game),1,"Minesweeper in-game clock must match host elapsed time: "+JSON.stringify(mineClockSync));
   await page.locator("#pauseButton").click();
-  assert.equal(await page.locator("#gameElapsed").innerText(),"00:01","Minesweeper host clock must freeze on pause");
-  assert.equal(Number(await frame.locator("#timer").innerText()),1,"Minesweeper in-game clock must freeze at the same value");
+  await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="继续");
+  await page.waitForTimeout(100);
+  const pausedMineClock={
+   host:await page.locator("#gameElapsed").innerText(),
+   game:Number(await frame.locator("#timer").innerText())
+  };
+  const hostPausedSeconds=pausedMineClock.host.split(":").reduce((total,value)=>total*60+Number(value),0);
+  assert.equal(hostPausedSeconds,pausedMineClock.game,"Minesweeper host and in-game clocks must agree at the exact pause point: "+JSON.stringify(pausedMineClock));
+  await page.waitForTimeout(1100);
+  const frozenMineClock={
+   host:await page.locator("#gameElapsed").innerText(),
+   game:Number(await frame.locator("#timer").innerText())
+  };
+  assert.deepEqual(frozenMineClock,pausedMineClock,"Both Minesweeper clocks must remain frozen after pause");
   const mineCold=await browser.newPage({viewport:{width:1000,height:800}});
   await mineCold.addInitScript(()=>{
    let bridge;
