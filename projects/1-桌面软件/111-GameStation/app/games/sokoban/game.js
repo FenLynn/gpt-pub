@@ -219,7 +219,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
  };
 }
 GameBridge.register({
- init(){paused=false;parseLevel(0);pause();},newGame,
+ init(){paused=true;parseLevel(0);setStatus("准备开始 · 把所有木箱推到圆形目标点上。");},newGame,
  pause(){paused=true;updateControls();setStatus("已暂停 · 当前关卡和步数均已保留。");},
  resume(){paused=false;updateControls();setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
  snapshot,restore,dispose(){

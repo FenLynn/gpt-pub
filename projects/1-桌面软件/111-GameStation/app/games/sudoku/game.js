@@ -223,7 +223,10 @@ if(new URLSearchParams(location.search).has("p111Test")){
  };
 }
 GameBridge.register({
- init(payload){level=["easy","normal","hard"].includes(payload?.difficulty)?payload.difficulty:"normal";newGame();pause();},
+ init(payload){
+  level=["easy","normal","hard"].includes(payload?.difficulty)?payload.difficulty:"normal";
+  newGame();paused=true;render();setStatus("准备开始 · 选择空格，再点数字或按键盘 1–9 填写。");
+ },
  newGame,pause(){paused=true;render();setStatus("已暂停 · 当前题目和填写内容均已保留。");},
  resume(){paused=false;render();setStatus("继续解题 · 选择空格输入数字。");},
  setDifficulty(value){if(["easy","normal","hard"].includes(value))level=value;},
