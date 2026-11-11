@@ -166,27 +166,40 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }
   if(name==="国际象棋"){
    const coordinates=await frame.locator("#game").evaluate(root=>{
-    const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};
-    const x=root.querySelector(".chess-axis-x"),y=root.querySelector(".chess-axis-y"),main=box(root.querySelector(".game-main-board"));
-    return{xLabels:[...x.querySelectorAll("span")].map(el=>el.textContent.trim()),
-     yLabels:[...y.querySelectorAll("span")].map(el=>el.textContent.trim()),
-     xFontSize:getComputedStyle(x.querySelector("span")).fontSize,
-     yFontSize:getComputedStyle(y.querySelector("span")).fontSize,
-     xFontWeight:getComputedStyle(x.querySelector("span")).fontWeight,
-     yFontWeight:getComputedStyle(y.querySelector("span")).fontWeight,
-     x:box(x),y:box(y),main,wrapOverflow:getComputedStyle(root.querySelector(".board-wrap")).overflow};
+    const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+    const center=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};
+    const x=root.querySelector(".chess-axis-x"),y=root.querySelector(".chess-axis-y"),
+     frame=box(root.querySelector(".chess-frame")),main=box(root.querySelector(".game-main-board")),
+     squares=[...root.querySelectorAll(".chess-square")],xLabels=[...x.querySelectorAll("span")],
+     yLabels=[...y.querySelectorAll("span")],bottomRow=squares.slice(-8),
+     leftColumn=squares.filter((_,i)=>i%8===0);
+    return{xLabels:xLabels.map(el=>el.textContent.trim()),yLabels:yLabels.map(el=>el.textContent.trim()),
+     xFontSize:getComputedStyle(xLabels[0]).fontSize,yFontSize:getComputedStyle(yLabels[0]).fontSize,
+     xFontWeight:getComputedStyle(xLabels[0]).fontWeight,yFontWeight:getComputedStyle(yLabels[0]).fontWeight,
+     x:box(x),y:box(y),frame,main,
+     xAlignment:Math.max(...xLabels.map((el,i)=>Math.abs(center(el)-center(bottomRow[i])))),
+     yAlignment:Math.max(...yLabels.map((el,i)=>Math.abs(center(el)-center(leftColumn[i])))),
+     wrapOverflow:getComputedStyle(root.querySelector(".board-wrap")).overflow};
    });
    assert.deepEqual(coordinates.xLabels,["a","b","c","d","e","f","g","h"],"Chess file coordinates must show all eight letters");
    assert.deepEqual(coordinates.yLabels,["8","7","6","5","4","3","2","1"],"Chess rank coordinates must show all eight numbers");
-   assert.equal(coordinates.wrapOverflow,"visible","Chess board wrapper must not clip the external coordinate labels");
+   assert.equal(coordinates.wrapOverflow,"visible","Chess board wrapper must preserve coordinate visibility");
    assert.equal(coordinates.xFontSize,"13px","Chess file coordinates must be enlarged for readability");
    assert.equal(coordinates.yFontSize,"13px","Chess rank coordinates must be enlarged for readability");
    assert.equal(coordinates.xFontWeight,"700","Chess file coordinates must use a readable weight");
    assert.equal(coordinates.yFontWeight,"700","Chess rank coordinates must use a readable weight");
-   const inside=rect=>rect.left>=coordinates.main.left-1&&rect.right<=coordinates.main.right+1&&
-    rect.top>=coordinates.main.top-1&&rect.bottom<=coordinates.main.bottom+1;
-   assert.ok(inside(coordinates.x)&&inside(coordinates.y),
-    "All chess coordinates must remain visible inside the main board area: "+JSON.stringify(coordinates));
+   assert.ok(Math.abs(coordinates.x.left-(coordinates.frame.left+15))<=1&&
+    Math.abs(coordinates.x.right-(coordinates.frame.right-15))<=1&&
+    Math.abs(coordinates.x.bottom-coordinates.frame.bottom)<=1&&
+    Math.abs(coordinates.x.height-15)<=1,
+    "Chess file labels must occupy the bottom wooden frame strip: "+JSON.stringify(coordinates));
+   assert.ok(Math.abs(coordinates.y.left-coordinates.frame.left)<=1&&
+    Math.abs(coordinates.y.right-(coordinates.frame.left+15))<=1&&
+    Math.abs(coordinates.y.top-(coordinates.frame.top+15))<=1&&
+    Math.abs(coordinates.y.bottom-(coordinates.frame.bottom-15))<=1,
+    "Chess rank labels must occupy the left wooden frame strip: "+JSON.stringify(coordinates));
+   assert.ok(coordinates.xAlignment<=1.5&&coordinates.yAlignment<=1.5,
+    "Chess coordinates must align exactly with the eight playable file/rank centers: "+JSON.stringify(coordinates));
   }
   if(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋"].includes(name)){
    const timing=await frame.locator("#gs-turn-clock").evaluate(el=>{
@@ -290,6 +303,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }
   if(v.toolsVisible){
    assert.ok(v.tools.x>=v.main.right-2,name+" tools must dock at right without covering the playfield");
+   const sharedRail=await frame.locator(".game-tools").evaluate(el=>{
+    const style=getComputedStyle(el),r=el.getBoundingClientRect();
+    const alpha=(()=>{const m=style.backgroundColor.match(/rgba?\(([^)]+)\)/);if(!m)return 1;const p=m[1].split(",");return p.length===4?Number(p[3]):1;})();
+    return{display:style.display,direction:style.flexDirection,align:style.alignItems,
+     border:style.borderWidth,backgroundAlpha:alpha,width:r.width};
+   });
+   assert.equal(sharedRail.display,"flex",name+" right controls must remain visible in the shared action rail");
+   assert.equal(sharedRail.direction,"column",name+" right controls must use a vertical action stack");
+   assert.equal(sharedRail.align,"stretch",name+" action buttons must share one consistent width");
+   assert.equal(sharedRail.border,"0px",name+" must not add a giant outer frame around right-side controls");
+   assert.equal(sharedRail.backgroundAlpha,0,name+" right rail container must remain transparent like Chess");
+   assert.ok(sharedRail.width>=120,name+" right rail must retain a usable action width: "+JSON.stringify(sharedRail));
    const classicBoards=new Set(["黑白棋","四子棋","海战棋","西洋跳棋（8×8）","中国跳棋","飞行棋","国际象棋"]);
    if(classicBoards.has(name)){
     const proximity=v.tools.x-v.primary.right;
@@ -440,6 +465,25 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     assert.ok(info.history.right<=info.board.left+2&&info.board.right<=info.tools.left+2,
      "Chess must have left history, center board and right controls: "+JSON.stringify(info));
     assert.equal(info.image,"none","Chess stage must have no middle texture");
+   }
+   if(name==="2048"){
+    const rail=await frame.locator("#game").evaluate(root=>{
+     const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+     const tools=root.querySelector(".game-tools"),main=root.querySelector(".game-main-board"),
+      undo=tools.querySelector("#undo"),style=getComputedStyle(tools);
+     return{mainColumn:getComputedStyle(main).gridColumnStart,toolsColumn:getComputedStyle(tools).gridColumnStart,
+      main:box(main),tools:box(tools),undo:box(undo),undoIcon:!!undo.querySelector("svg"),
+      direction:style.flexDirection,border:style.borderWidth,background:style.backgroundColor};
+    });
+    assert.equal(rail.mainColumn,"2","2048 playfield must occupy the centered middle track");
+    assert.equal(rail.toolsColumn,"3","2048 controls must occupy the right-hand track");
+    assert.ok(rail.tools.left>=rail.main.right-1&&rail.undo.left>=rail.tools.left-1&&rail.undo.right<=rail.tools.right+1,
+     "2048 undo action must sit inside the right rail without covering the board: "+JSON.stringify(rail));
+    assert.ok(rail.tools.width>=160&&rail.tools.width<=230&&rail.direction==="column",
+     "2048 right rail must match the chess-style vertical action column: "+JSON.stringify(rail));
+    assert.equal(rail.border,"0px","2048 controls must not be wrapped in a second outer card");
+    assert.equal(rail.background,"rgba(0, 0, 0, 0)","2048 right rail must use the transparent chess-style container");
+    assert.ok(rail.undo.height>=42&&rail.undoIcon,"2048 undo button must keep the shared large icon-button treatment");
    }
    if(name==="五子棋"){
     assert.ok(v.tools.x-v.surface.right<=38,"Gomoku action rail must sit immediately next to the board: "+JSON.stringify(v));

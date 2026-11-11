@@ -1991,7 +1991,8 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  .game-root.game-layout.chess-layout>.game-main-board{overflow:visible!important}
  .game-root.game-layout.chess-layout>.game-main-board>.board-wrap{overflow:visible!important}
  .game-root.game-layout.chess-layout :is(.chess-axis-x,.chess-axis-y) span{
-  color:#59432f!important;font-size:13px!important;font-weight:700!important;line-height:1!important
+  color:#f2d9b6!important;font-size:13px!important;font-weight:700!important;line-height:1!important;
+  text-shadow:0 1px 2px #2e1c10!important
  }
 }
 @media(min-width:701px) and (max-width:900px){
@@ -2079,5 +2080,37 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   max-height:none!important;align-self:center!important;justify-self:start!important;
   overflow:visible!important;overflow-x:visible!important;overflow-y:visible!important;
   transform:translateY(var(--battleship-rail-offset,0px))!important
+ }
+}
+
+
+/* R53 · One Chess-style right action rail for every remaining game module.
+   History-board games, Gomoku and Xiangqi keep their already-measured dedicated
+   three-column geometry. All other games with actions use equal side gutters,
+   a centered playfield and a transparent vertical control rail on the right. */
+@media(min-width:701px){
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout){
+  --gs-side-gutter:clamp(170px,13vw,215px)!important;
+  grid-template-columns:var(--gs-side-gutter) minmax(0,1fr) var(--gs-side-gutter)!important;
+  column-gap:clamp(8px,.8vw,12px)!important;
+  justify-content:center!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout)>.game-main-board{
+  grid-column:2!important;grid-row:1!important;min-width:0!important;min-height:0!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout)>.game-tools{
+  position:relative!important;grid-column:3!important;grid-row:1!important;
+  top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  justify-content:flex-start!important;align-self:center!important;justify-self:stretch!important;
+  box-sizing:border-box!important;width:100%!important;height:max-content!important;
+  min-width:0!important;min-height:0!important;max-height:calc(100% - 12px)!important;
+  margin:0!important;padding:1px!important;gap:clamp(8px,1.3cqh,13px)!important;
+  border:0!important;border-radius:0!important;background:transparent!important;
+  box-shadow:none!important;overflow-x:hidden!important;overflow-y:auto!important;
+  scrollbar-width:none!important
+ }
+ .game-root.game-layout.gs-tools-open:not(.rail-collapsed):not(.xiangqi-layout):not(.gomoku-layout):not(.reversi-layout):not(.connect4-layout):not(.battleship-layout):not(.checkers-layout):not(.chinese-checkers-layout):not(.flight-chess-layout):not(.chess-layout)>.game-tools::-webkit-scrollbar{
+  display:none!important;width:0!important
  }
 }
