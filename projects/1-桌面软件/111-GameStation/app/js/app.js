@@ -531,6 +531,7 @@ function openGame(id){
  renderGameControls();$("startButton").disabled=true;$("newGameButton").disabled=true;$("pauseButton").disabled=true;renderProgressButton();
  $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("gameNotice").classList.remove("hidden");clearGameNotice();$("helpTitle").textContent=g.name+" · 玩法";
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
+ $("gameStage").classList.toggle("is-minesweeper",g.id==="minesweeper");
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
 }
 function closeGame(){
@@ -538,6 +539,7 @@ function closeGame(){
  if(restoreCountdownTimer!==null){clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;}
  $("restoreCountdownOverlay").hidden=true;$("restoreCountdownOverlay").setAttribute("aria-hidden","true");
  snapshotRequestId=null;restorePending=null;
+ $("gameStage").classList.remove("is-minesweeper");
  hideGameResult();if(active){if(ready){if(!paused)send("PAUSE");send("DISPOSE");}if(session?.running)stopClock();if(session)persistStats();frame.src="about:blank";}
  active=null;session=null;savedProgress=null;restoredThisSession=false;ready=false;paused=true;started=false;
  if(gameFullscreenRequested){gameFullscreenRequested=false;syncGameFullscreen();}
