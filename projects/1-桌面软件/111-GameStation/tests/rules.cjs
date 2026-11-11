@@ -268,7 +268,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await sokoban.evaluate(()=>window.__p111SokobanTest.isCornerDeadlock(10)),true,"A non-goal corner must be recognized as a box deadlock");
   const sokoSolutions=[
    ["U",1,1],["LUURR",5,2],["DLUURULL",8,4],["LULUDDRRRURU",12,2],
-   ["LLUULURDDDRRRRUURUL",19,4],["UUDDRRUUDDRRUU",14,3],["DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",34,12]
+   ["LLUULURDDDRRRRUURUL",19,4],["UUDDLLUUDDRRRRUU",16,3],["DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",34,12]
   ];
   for(let i=0;i<sokoSolutions.length;i++){
    boxState=await sokoban.evaluate(index=>window.__p111SokobanTest.loadLevel(index),i);
