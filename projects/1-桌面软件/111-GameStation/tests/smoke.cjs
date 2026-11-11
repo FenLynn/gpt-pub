@@ -45,12 +45,15 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await page.locator("#pauseButton svg").count(),1,"Pause SVG icon must be visible");
  }
  async function progressRoundTrip(name,id){
-  await page.locator("#pauseButton").click();
-  await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
   await page.locator("#progressButton").waitFor({state:"visible"});
-  assert.equal(await page.locator("#progressButtonLabel").innerText(),"保存进度",name+" must expose save progress while paused");
-  assert.equal(await page.locator("#progressButton").isEnabled(),true,name+" save button must be enabled while paused");
+  assert.equal(await page.locator("#progressButtonLabel").innerText(),"保存进度",name+" must expose save progress during active play");
+  assert.equal(await page.locator("#progressButton").isEnabled(),true,name+" save button must be enabled during active play");
   await page.locator("#progressButton").click();
+  await page.locator("#saveProgressOverlay").waitFor({state:"visible",timeout:5000});
+  assert.equal(await page.locator("#pauseButton").getAttribute("aria-label"),"继续",name+" must pause immediately when saving");
+  await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
+  for(const id of ["saveProgressContinue","saveProgressNewGame","saveProgressLeave"])
+   assert.equal(await page.locator("#"+id).isVisible(),true,name+" save dialog must offer "+id);
   try{
    await page.waitForFunction(id=>{
     try{const all=JSON.parse(localStorage.getItem("gamestation.progress")||"{}"),item=all[id];return item?.schemaVersion===1&&item.gameId===id&&item.state&&typeof item.state==="object"&&!Array.isArray(item.state);}
@@ -61,13 +64,14 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     label:document.querySelector("#progressButtonLabel")?.textContent,
     disabled:document.querySelector("#progressButton")?.disabled,
     notice:document.querySelector("#gameNotice")?.innerText,
+    modal:!document.querySelector("#saveProgressOverlay")?.hidden,
     progressKeys:Object.keys(JSON.parse(localStorage.getItem("gamestation.progress")||"{}"))
    }));
    throw new Error(name+" progress save did not persist: "+JSON.stringify(diagnostic));
   }
   const saved=await page.evaluate(id=>JSON.parse(localStorage.getItem("gamestation.progress")||"{}")[id],id);
   assert.ok(Object.keys(saved.state).length>0,name+" snapshot must contain a real game state");
-  await page.locator("#breadcrumbCategory").click();
+  await page.locator("#saveProgressLeave").click();
   await page.locator("#libraryView").waitFor({state:"visible"});
   await open(name);
   await page.waitForFunction(()=>document.querySelector("#progressButtonLabel")?.textContent==="恢复进度",{timeout:5000});
@@ -81,6 +85,17 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }
   await page.waitForFunction(()=>document.querySelector("#progressButtonLabel")?.textContent==="保存进度",{timeout:7000});
   await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="暂停",{timeout:7000});
+  if(id==="2048"){
+   await page.locator("#progressButton").click();
+   await page.locator("#saveProgressOverlay").waitFor({state:"visible",timeout:5000});
+   await page.locator("#saveProgressContinue").click();
+   await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="暂停",{timeout:5000});
+   await page.locator("#progressButton").click();
+   await page.locator("#saveProgressOverlay").waitFor({state:"visible",timeout:5000});
+   await page.locator("#saveProgressNewGame").click();
+   await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="暂停"&&document.querySelector("#progressButtonLabel")?.textContent==="保存进度",{timeout:5000});
+   assert.equal(await page.evaluate(()=>Object.hasOwn(JSON.parse(localStorage.getItem("gamestation.progress")||"{}"),"2048")),false,"New Game from the save dialog must clear the saved round");
+  }
  }
  async function pauseResume(){
   assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,"Pause icon must not cover an active game");
@@ -1168,44 +1183,34 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await page.locator("#modeControl").isVisible(),false,"Minesweeper must not show an empty battle-mode label");
   assert.equal(await page.locator("#difficultyControl").isVisible(),true,"Minesweeper must retain its difficulty selector");
   await start();
-  assert.equal(await frame.locator(".mine-menu-bar").count(),1,"Minesweeper must use a compact Windows-style menu strip");
+  assert.equal(await frame.locator(".mine-menu-bar,#mineMenuGame,#mineMenuHelp").count(),0,"Minesweeper must not render the decorative Game/Help menu row");
   assert.equal(await frame.locator(".game-guide,.game-tools").count(),0,"Minesweeper must not waste board area on side panels");
-  assert.equal(await frame.locator("#mineMenuGame").innerText(),"游戏(G)");
-  await frame.locator("#mineMenuGame").click();
-  assert.equal(await frame.locator("#mineGameMenu").isVisible(),true,"Game menu must open");
-  assert.equal(await frame.locator("#mineGameMenu [data-mine-difficulty]").count(),3,"Game menu must expose all three classic board sizes");
-  await frame.locator("#mineMenuGame").click();
-  await frame.locator("#mineMenuHelp").click();
-  assert.equal(await frame.locator("#mineHelpMenu").isVisible(),true,"Help menu must open");
-  await frame.locator("#mineMenuHelp").click();
-  const mineTimerBox=await frame.locator("#timer").boundingBox(),mineCountBox=await frame.locator("#counter").boundingBox();
-  assert.ok(mineTimerBox.x<mineCountBox.x,"Classic timer belongs on the left and mine counter on the right");
+  const timerIconBox=await frame.locator(".mine-time-medallion").boundingBox(),mineTimerBox=await frame.locator("#timer").boundingBox();
+  const bombIconBox=await frame.locator(".mine-bomb-medallion").boundingBox(),mineCountBox=await frame.locator("#counter").boundingBox();
+  assert.ok(timerIconBox.x<mineTimerBox.x&&bombIconBox.x<mineCountBox.x,"Both status rows must place the icon LEFT of its numeric display");
   const mine=frame.locator(".mine-classic");
   async function fitMine(){
    const f=await mine.evaluate(el=>{
     const rect=node=>{const r=node.getBoundingClientRect();return{left:r.left,top:r.top,bottom:r.bottom,width:r.width,right:r.right,height:r.height};};
     const footer=el.querySelector(".mine-bottom-panel");
     return {board:rect(el),grid:rect(el.querySelector("#board")),footer:rect(footer),area:rect(el.closest(".game-main-board")),
-     horizontal:el.classList.contains("mine-hard-layout")&&matchMedia("(min-width:900px)").matches,
+     horizontal:getComputedStyle(el).flexDirection==="row",
      direction:getComputedStyle(el).flexDirection,footerDirection:getComputedStyle(footer).flexDirection,
      cssViewport:innerWidth,media900:matchMedia("(min-width:900px)").matches};
    });
    assert.ok(f.footer.bottom<=f.area.bottom+1&&f.footer.top>=f.area.top-1,"Minesweeper timer/counter must remain visible");
    assert.ok(f.board.width<=f.area.width+1,"Minesweeper must fit available width");
-   if(f.horizontal){
-    assert.ok(f.footer.left>=f.grid.right-1,"Advanced Minesweeper status must sit to the RIGHT of the minefield: "+JSON.stringify(f));
-    assert.ok(Math.abs((f.footer.top+f.footer.bottom)/2-(f.grid.top+f.grid.bottom)/2)<=4,"Advanced status must be vertically centered beside the board");
-    assert.ok(Math.abs((f.board.left-f.area.left)-(f.area.right-f.board.right))<=3,"Advanced board and status group must leave balanced outer margins");
-   }else{
-    assert.ok(f.footer.top>=f.grid.bottom-1,"Classic Minesweeper status remains BELOW the grid");
-   }
+   assert.ok(f.horizontal&&f.direction==="row","Every Minesweeper difficulty must use a horizontal board/status composition: "+JSON.stringify(f));
+   assert.equal(f.footerDirection,"column","Every Minesweeper status rail must stack timer and mine count vertically");
+   assert.ok(f.footer.left>=f.grid.right-1,"Minesweeper status must sit to the RIGHT of the minefield: "+JSON.stringify(f));
+   assert.ok(Math.abs((f.footer.top+f.footer.bottom)/2-(f.grid.top+f.grid.bottom)/2)<=4,"Minesweeper status must be vertically centered beside the board");
+   assert.ok(Math.abs((f.board.left-f.area.left)-(f.area.right-f.board.right))<=3,"Minesweeper board/status group must leave balanced outer margins");
   }
   await page.waitForTimeout(130);await fitMine();
   assert.equal(await frame.locator(".mine-cell").count(),256);
   await page.locator('#difficultyControl button[data-difficulty="hard"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),480);
   await fitMine();
-  assert.equal(await frame.locator(".mine-classic.mine-hard-layout").count(),1,"Advanced Minesweeper must activate horizontal board/status composition");
   await page.locator('#difficultyControl button[data-difficulty="easy"]').click();
   await page.waitForTimeout(130);assert.equal(await frame.locator(".mine-cell").count(),81);await fitMine();
   await frame.locator(".mine-cell").nth(8).click({button:"right"});
@@ -1225,6 +1230,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }));
   assert.ok(symbols[0].svg&&symbols[1].svg&&symbols[0].width>=.65&&symbols[0].height>=.65&&symbols[1].width>=.65&&symbols[1].height>=.65,"Minesweeper flag and mine SVGs must occupy most of each cell");
   assert.ok(symbols[2].number&&symbols[2].width>=.65&&symbols[2].height>=.65&&symbols[2].text==="","Minesweeper numbers must use large self-contained vector glyphs");
+  const flagShape=await mineFixture.locator(".mine-cell").first().locator(".mine-flag-svg path").nth(2).getAttribute("d");
+  assert.equal(flagShape,"M13 5.5L26 9.2L13 17Z","Minesweeper flag must be a single pointed triangular pennant");
   const tintStyles=await mineFixture.evaluate(()=>{
    const a=document.querySelector(".mine-cell.tint-0"),b=document.querySelector(".mine-cell.tint-3");
    return {top:a&&getComputedStyle(a).backgroundImage,bottom:b&&getComputedStyle(b).backgroundImage,highlight:a&&getComputedStyle(a,"::before").content};

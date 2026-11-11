@@ -12,10 +12,6 @@ const levelEl=document.getElementById("level");
 const openedEl=document.getElementById("openedCount");
 const remainingEl=document.getElementById("remaining");
 const face=document.getElementById("reset");
-const menuGameButton=document.getElementById("mineMenuGame");
-const menuHelpButton=document.getElementById("mineMenuHelp");
-const gameMenu=document.getElementById("mineGameMenu");
-const helpMenu=document.getElementById("mineHelpMenu");
 const gameArea=document.querySelector(".game-main-board");
 const headline=document.getElementById("mineHeadline");
 const bestInline=document.getElementById("mineBestInline");
@@ -25,7 +21,7 @@ const recordWin=document.getElementById("mineRecordWin");
 const isFixture=new URLSearchParams(location.search).has("p111Test");
 const RECORD_KEY="p111-minesweeper-records-v1";
 const levelNames={easy:"初级",normal:"中级",hard:"高级"};
-const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 28h19" stroke="#58616a" stroke-width="2.4" stroke-linecap="round"/><path d="M11.5 27V4.5" stroke="#303a43" stroke-width="2.7" stroke-linecap="round"/><path d="M13 5.5l14 3.2-7.2 5.8 7.2 4.2-14 3.2z" fill="#e52e2e" stroke="#7d171b" stroke-width="1.25" stroke-linejoin="round"/><path d="M13.8 6.8l10 2.3-5.3 4.1-4.7-1.1z" fill="#ff8b82"/><path d="M8 29h16" stroke="#353f47" stroke-width="2.7" stroke-linecap="round"/></svg>';
+const flagSVG='<svg class="mine-symbol mine-flag-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M7 28h19" stroke="#58616a" stroke-width="2.4" stroke-linecap="round"/><path d="M11.5 27V4.5" stroke="#303a43" stroke-width="2.7" stroke-linecap="round"/><path d="M13 5.5L26 9.2L13 17Z" fill="#e52e2e" stroke="#7d171b" stroke-width="1.25" stroke-linejoin="round"/><path d="M13.8 6.8L22.1 9.2L13.8 14.2Z" fill="#ff8b82"/><path d="M8 29h16" stroke="#353f47" stroke-width="2.7" stroke-linecap="round"/></svg>';
 const bombSVG='<svg class="mine-symbol mine-bomb-svg" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 1.5v5M16 25.5v5M1.5 16h5M25.5 16h5M5.7 5.7l3.7 3.7M22.6 22.6l3.7 3.7M26.3 5.7l-3.7 3.7M9.4 22.6l-3.7 3.7" stroke="#202a32" stroke-width="2.3" stroke-linecap="round"/><path d="M13 7.4l3-2.2 3.1 2.3" fill="none" stroke="#222c34" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="17" r="9.4" fill="#171d22" stroke="#090e12" stroke-width="1.4"/><ellipse cx="12.4" cy="13.2" rx="3.1" ry="2.2" fill="#aebbc3"/><circle cx="21.4" cy="20.7" r="1.1" fill="#05090d"/></svg>';
 const numberGlyphs={
  1:{top:"#2a58d4",bottom:"#11328e",path:"M10.8 11.8 16.2 6h4v17.5h4.6v3.3h-16v-3.3h6V11l-3.6 1.8z"},
@@ -100,23 +96,19 @@ function fitBoard(){
  const classic=document.querySelector(".mine-classic"),footer=document.querySelector(".mine-bottom-panel");
  const classicStyle=getComputedStyle(classic),gridStyle=getComputedStyle(boardEl);
  const px=value=>Number.parseFloat(value)||0;
- const horizontal=classic.classList.contains("mine-hard-layout")&&window.matchMedia("(min-width:900px)").matches;
  const footerRect=footer.getBoundingClientRect();
- const classicGapX=horizontal?px(classicStyle.columnGap):0;
- const classicGapY=horizontal?0:px(classicStyle.rowGap);
  const overheadX=px(classicStyle.paddingLeft)+px(classicStyle.paddingRight)+
   px(classicStyle.borderLeftWidth)+px(classicStyle.borderRightWidth)+
   px(gridStyle.paddingLeft)+px(gridStyle.paddingRight)+px(gridStyle.borderLeftWidth)+
   px(gridStyle.borderRightWidth)+Math.max(0,W-1)*px(gridStyle.columnGap)+
-  (horizontal?footerRect.width+classicGapX:0);
- const overheadY=(horizontal?0:footerRect.height)+classicGapY+
-  px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+
+  footerRect.width+px(classicStyle.columnGap);
+ const overheadY=px(classicStyle.paddingTop)+px(classicStyle.paddingBottom)+
   px(classicStyle.borderTopWidth)+px(classicStyle.borderBottomWidth)+
   px(gridStyle.paddingTop)+px(gridStyle.paddingBottom)+px(gridStyle.borderTopWidth)+
   px(gridStyle.borderBottomWidth)+Math.max(0,H-1)*px(gridStyle.rowGap);
  const availX=Math.max(0,rect.width-px(areaStyle.paddingLeft)-px(areaStyle.paddingRight)-overheadX-3);
  const availY=Math.max(0,rect.height-px(areaStyle.paddingTop)-px(areaStyle.paddingBottom)-overheadY-3);
- const size=Math.max(10,Math.min(51,availX/W,availY/H));
+ const size=Math.max(7,Math.min(51,availX/W,availY/H));
  const rounded=Math.floor(size*10)/10;
  boardEl.style.setProperty("--mine-cell-size",rounded+"px");
  boardEl.dataset.cellSize=String(rounded);
@@ -127,7 +119,6 @@ function configure(value){
  else if(difficulty==="hard"){W=30;H=16;MINES=99;}
  else{W=16;H=16;MINES=40;}
  levelEl.textContent=levelNames[difficulty];
- document.querySelector(".mine-classic")?.classList.toggle("mine-hard-layout",W>=30);
  boardEl.style.setProperty("--cols",W);
  boardEl.dataset.rows=String(H);
  boardEl.dataset.columns=String(W);
@@ -421,36 +412,9 @@ boardEl.addEventListener("keydown",event=>{
 });
 function newGame(){makeBoard();}
 face.addEventListener("click",()=>GameBridge.send("REQUEST_NEW_GAME"));
-function closeMineMenus(){
- for(const [button,popup] of [[menuGameButton,gameMenu],[menuHelpButton,helpMenu]]){
-  if(button&&popup){popup.hidden=true;button.setAttribute("aria-expanded","false");}
- }
-}
-function toggleMineMenu(button,popup){
- if(!button||!popup)return;
- const opening=popup.hidden;closeMineMenus();popup.hidden=!opening;
- button.setAttribute("aria-expanded",String(opening));
-}
-menuGameButton?.addEventListener("click",()=>toggleMineMenu(menuGameButton,gameMenu));
-menuHelpButton?.addEventListener("click",()=>toggleMineMenu(menuHelpButton,helpMenu));
-gameMenu?.addEventListener("click",event=>{
- const action=event.target.closest("[data-mine-action]");
- const difficultyButton=event.target.closest("[data-mine-difficulty]");
- closeMineMenus();
- if(action?.dataset.mineAction==="new")GameBridge.send("REQUEST_NEW_GAME");
- if(action?.dataset.mineAction==="help")GameBridge.send("CONTROL",{action:"help"});
- if(difficultyButton)GameBridge.send("CONTROL",{action:"difficulty",value:difficultyButton.dataset.mineDifficulty});
-});
-helpMenu?.addEventListener("click",event=>{
- if(event.target.closest('[data-mine-action="help"]')){closeMineMenus();GameBridge.send("CONTROL",{action:"help"});}
-});
-document.addEventListener("pointerdown",event=>{
- if(!event.target.closest(".mine-menu-root"))closeMineMenus();
-});
 window.addEventListener("keydown",event=>{
- if(event.key==="Escape"){closeMineMenus();return;}
- if(event.key==="F1"&&!event.repeat){event.preventDefault();closeMineMenus();GameBridge.send("CONTROL",{action:"help"});return;}
- if(event.key==="F2"&&!event.repeat){event.preventDefault();closeMineMenus();GameBridge.send("REQUEST_NEW_GAME");}
+ if(event.key==="F1"&&!event.repeat){event.preventDefault();GameBridge.send("CONTROL",{action:"help"});return;}
+ if(event.key==="F2"&&!event.repeat){event.preventDefault();GameBridge.send("REQUEST_NEW_GAME");}
 });
 window.addEventListener("resize",fitBoard);
 if(typeof ResizeObserver!=="undefined"){
@@ -466,7 +430,6 @@ if(isFixture){
   loadBoard({width=3,height=3,mines=[]}={}){
    stopTimer();if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}
    W=Math.max(2,Math.floor(width));H=Math.max(2,Math.floor(height));MINES=mines.length;
-   document.querySelector(".mine-classic")?.classList.toggle("mine-hard-layout",W>=30);
    boardEl.style.setProperty("--cols",W);
    boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);
    cells=Array.from({length:W*H},()=>({mine:false,open:false,flag:false,n:0}));
@@ -515,7 +478,6 @@ GameBridge.register({
   if(!s||!Number.isInteger(s.width)||!Number.isInteger(s.height)||!Array.isArray(s.cells)||s.cells.length!==s.width*s.height)throw new Error("扫雷存档数据无效");
   stopTimer();if(flashTimer!==null){clearTimeout(flashTimer);flashTimer=null;}if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}
   W=s.width;H=s.height;MINES=Math.max(0,Number(s.mines)||0);difficulty=Object.hasOwn(levelNames,s.difficulty)?s.difficulty:"normal";
-  document.querySelector(".mine-classic")?.classList.toggle("mine-hard-layout",W>=30);
   boardEl.style.setProperty("--cols",W);boardEl.dataset.rows=String(H);boardEl.dataset.columns=String(W);levelEl.textContent=levelNames[difficulty]||"自定义";
   cells=s.cells.map(c=>({mine:!!c.mine,open:!!c.open,flag:!!c.flag,n:Math.max(0,Number(c.n)||0)}));
   started=!!s.started;over=false;paused=true;flags=Math.max(0,Number(s.flags)||cells.filter(c=>c.flag).length);opened=Math.max(0,Number(s.opened)||cells.filter(c=>c.open&&!c.mine).length);

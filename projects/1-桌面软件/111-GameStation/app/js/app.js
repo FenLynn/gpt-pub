@@ -384,9 +384,36 @@ function renderProgressButton(){
 }
 function saveProgress(){
  if(!active||!ready||!session||session.finished||snapshotRequestId||restorePending)return;
+ if(!paused){send("PAUSE");stopClock();}
  snapshotRequestId="save-"+Date.now()+"-"+Math.random().toString(16).slice(2);
  renderProgressButton();
  send("SNAPSHOT_REQUEST",{requestId:snapshotRequestId});
+}
+function showSaveProgressDialog(){
+ const overlay=$("saveProgressOverlay");if(!overlay)return;
+ overlay.hidden=false;overlay.setAttribute("aria-hidden","false");
+ shell.classList.add("save-progress-open");
+ requestAnimationFrame(()=>$("saveProgressContinue")?.focus({preventScroll:true}));
+}
+function hideSaveProgressDialog(){
+ const overlay=$("saveProgressOverlay");if(!overlay)return;
+ overlay.hidden=true;overlay.setAttribute("aria-hidden","true");
+ shell.classList.remove("save-progress-open");
+}
+function continueAfterSave(){
+ hideSaveProgressDialog();
+ if(!active||!ready||session?.finished)return;
+ if(started){if(paused)resumeGame();}
+ else startGame();
+}
+function newGameAfterSave(){
+ hideSaveProgressDialog();
+ newRound();
+}
+function leaveAfterSave(){
+ const category=active?.category||"all";
+ hideSaveProgressDialog();
+ showLibrary(category);
 }
 function activateRestoredGame(){
  if(!active||!ready||!session||session.finished)return;
@@ -426,7 +453,7 @@ function handleProgressSnapshot(payload){
  const item={schemaVersion:1,gameId:active.id,savedAt:Date.now(),modeIndex,difficulty,
   elapsedMs,score:Number(session?.score??currentScore)||0,roundCounted:!!roundCounted,state:payload.snapshot};
  if(!writeProgress(active.id,item)){toast("本地存储空间不足，未能保存进度");renderProgressButton();return;}
- savedProgress=item;restoredThisSession=true;renderProgressButton();toast("游戏进度已保存");
+ savedProgress=item;restoredThisSession=true;renderProgressButton();showSaveProgressDialog();
 }
 function handleProgressRestored(payload){
  if(!restorePending||payload?.requestId!==restorePending.requestId)return;
@@ -488,6 +515,7 @@ function openGame(id){
  $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
 }
 function closeGame(){
+ hideSaveProgressDialog();
  if(restoreCountdownTimer!==null){clearInterval(restoreCountdownTimer);restoreCountdownTimer=null;}
  $("restoreCountdownOverlay").hidden=true;$("restoreCountdownOverlay").setAttribute("aria-hidden","true");
  snapshotRequestId=null;restorePending=null;
@@ -573,6 +601,9 @@ $("gameSearch").addEventListener("input",e=>{search=e.target.value.trim().toLowe
  $("gameResultReplay").addEventListener("click",newRound);
  $("gameResultLeave").addEventListener("click",()=>{if(active)showLibrary(active.category);});
 $("progressButton").addEventListener("click",()=>{if(savedProgress&&!restoredThisSession)restoreProgress();else saveProgress();});
+$("saveProgressContinue").addEventListener("click",continueAfterSave);
+$("saveProgressNewGame").addEventListener("click",newGameAfterSave);
+$("saveProgressLeave").addEventListener("click",leaveAfterSave);
  document.querySelectorAll("[data-recent-tab]").forEach(b=>b.addEventListener("click",()=>{
   homeRecentTab=b.dataset.recentTab==="popular"?"popular":"recent";renderHomeRecent();
  }));
@@ -619,7 +650,10 @@ $("exportData").addEventListener("click",exportData);$("importData").addEventLis
 document.querySelectorAll("[data-ranking]").forEach(b=>b.addEventListener("click",()=>{rankingType=b.dataset.ranking;document.querySelectorAll("[data-ranking]").forEach(x=>{const on=x===b;x.classList.toggle("active",on);x.setAttribute("aria-selected",String(on));});renderRanking();}));
 document.addEventListener("click",e=>{if(shell.classList.contains("menu-open")&&!e.target.closest(".sidebar")&&!e.target.closest("#mobileMenu"))shell.classList.remove("menu-open");});
 document.addEventListener("keydown",e=>{
- if(e.key==="Escape"){closeSettings();if(gameFullscreenRequested){e.preventDefault();exitGameFullscreen();}}
+ if(e.key==="Escape"){
+  if(!$("saveProgressOverlay").hidden){e.preventDefault();continueAfterSave();return;}
+  closeSettings();if(gameFullscreenRequested){e.preventDefault();exitGameFullscreen();}
+ }
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}

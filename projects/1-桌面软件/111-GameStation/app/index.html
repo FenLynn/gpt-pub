@@ -8,7 +8,7 @@
   <title>GameStation</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' rx='2' fill='%23397da8'/%3E%3Crect x='18' y='3' width='11' height='11' rx='2' fill='%2368a6c4'/%3E%3Crect x='3' y='18' width='11' height='11' rx='2' fill='%2383b79f'/%3E%3Crect x='18' y='18' width='11' height='11' rx='2' fill='%23b0c7d5'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261109-r11">
-  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261109-r11">
+  <link rel="stylesheet" href="./css/r25.css?v=p111-save-modal-r12">
 </head>
 <body>
 <div class="app-shell" id="appShell">
@@ -149,6 +149,19 @@
             </button>
           </div>
         </div>
+        <section class="save-progress-overlay" id="saveProgressOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="saveProgressTitle">
+          <div class="save-progress-card">
+            <div class="save-progress-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H3V3h2zM7 3v6h10V3M7 21v-7h10v7M9 17h6"/></svg></div>
+            <span class="save-progress-kicker">进度已保存</span>
+            <h2 id="saveProgressTitle">本局已保存并暂停</h2>
+            <p>当前进度已保存在本机。接下来可以继续本局、重新开始或离开。</p>
+            <div class="save-progress-actions">
+              <button type="button" id="saveProgressContinue">继续</button>
+              <button type="button" id="saveProgressNewGame">新开一局</button>
+              <button type="button" id="saveProgressLeave">离开</button>
+            </div>
+          </div>
+        </section>
         <div class="restore-countdown-overlay" id="restoreCountdownOverlay" hidden aria-hidden="true">
           <div class="restore-countdown-card">
             <span>已恢复上次进度</span>
@@ -199,6 +212,6 @@
   </section>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="./js/app.js?v=p111-icons-20261109-r11"></script>
+<script src="./js/app.js?v=p111-save-modal-r12"></script>
 </body>
 </html>

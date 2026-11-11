@@ -11,51 +11,6 @@ body[data-game="minesweeper"]{background:#c7d7e5}
 }
 /* The host titlebar already supplies game title, timer and round controls. */
 #game.minesweeper-layout>.gs-hud{display:none!important}
-#game.minesweeper-layout .mine-menu-bar{
- position:relative;z-index:10;flex:0 0 27px;height:27px;min-height:27px;
- display:flex;align-items:stretch;gap:2px;padding:0 6px;
- border-bottom:1px solid #91a9bd;
- background:linear-gradient(180deg,#fbfdff 0%,#edf4f9 48%,#dce8f1 100%);
- box-shadow:inset 0 1px #fff;
- font:12px/1.2 "Segoe UI","Microsoft YaHei",sans-serif;color:#24394b;
- user-select:none;
-}
-#game.minesweeper-layout .mine-menu-root{position:relative;display:flex;align-items:center}
-#game.minesweeper-layout .mine-menu-button{
- height:23px;min-width:52px;padding:0 8px;border:1px solid transparent;border-radius:2px;
- background:transparent;color:#263d51;font:12px "Segoe UI","Microsoft YaHei",sans-serif;
- text-align:center;cursor:default;
-}
-#game.minesweeper-layout .mine-menu-button:hover,
-#game.minesweeper-layout .mine-menu-button[aria-expanded="true"]{
- border-color:#91b6d1;background:linear-gradient(180deg,#f7fcff,#d6eaf8);
- box-shadow:inset 0 1px #fff;
-}
-#game.minesweeper-layout .mine-menu-popup{
- position:absolute;left:0;top:25px;z-index:30;min-width:176px;padding:4px;
- border:1px solid #7899b2;border-radius:2px;
- background:linear-gradient(135deg,#f8fcff,#e6f0f7);
- box-shadow:2px 4px 12px #243f5738,inset 0 1px #fff;
- color:#253b50;
-}
-#game.minesweeper-layout .mine-menu-popup[hidden]{display:none!important}
-#game.minesweeper-layout .mine-menu-popup button{
- width:100%;height:29px;display:flex;align-items:center;justify-content:space-between;gap:18px;
- padding:0 9px;border:1px solid transparent;border-radius:2px;background:transparent;
- color:#263d51;text-align:left;font:12px "Segoe UI","Microsoft YaHei",sans-serif;
-}
-#game.minesweeper-layout .mine-menu-popup button:hover{
- border-color:#8bb7d6;background:linear-gradient(180deg,#f9fdff,#d8ebf8);
-}
-#game.minesweeper-layout .mine-menu-popup kbd{
- color:#6c8295;font:11px "Segoe UI",sans-serif;background:transparent;
-}
-#game.minesweeper-layout .mine-menu-divider{height:1px;margin:4px 3px;background:#c1d1dd;border-bottom:1px solid #fff}
-#game.minesweeper-layout .mine-help-popup{min-width:270px;padding:8px}
-#game.minesweeper-layout .mine-help-popup p{
- margin:3px 4px 7px;color:#506b81;font:12px/1.55 "Segoe UI","Microsoft YaHei",sans-serif;
-}
-#game.minesweeper-layout .mine-help-popup p strong{display:inline-block;min-width:76px;color:#294d6b}
 #game.minesweeper-layout .game-main-board{
  position:relative;flex:1 1 auto;min-width:0;min-height:0;width:100%;height:auto;
  display:grid;place-items:center;overflow:hidden!important;
@@ -271,22 +226,22 @@ body[data-game="minesweeper"]{background:#c7d7e5}
 }
 #game.minesweeper-layout .mine-cell.tint-0{
  background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.25) 0%,rgba(180,225,255,.08) 22%,transparent 40%),
- linear-gradient(to bottom,#6eb2fc 0%,#4696f5 32%,#2c7cef 70%,#1c68da 100%);
+ linear-gradient(to bottom,#76b8fc 0%,#4c9cf6 32%,#3284f0 70%,#2370df 100%);
  border-color:#14448c;
 }
 #game.minesweeper-layout .mine-cell.tint-1{
  background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.22) 0%,rgba(150,205,255,.06) 22%,transparent 40%),
- linear-gradient(to bottom,#5494f4 0%,#367beb 32%,#2164dd 70%,#1650c8 100%);
+ linear-gradient(to bottom,#5d9cf6 0%,#3e82ef 32%,#286ce2 70%,#1c59ce 100%);
  border-color:#113878;
 }
 #game.minesweeper-layout .mine-cell.tint-2{
  background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.20) 0%,rgba(130,185,255,.05) 22%,transparent 40%),
- linear-gradient(to bottom,#4480eb 0%,#2b6ce0 32%,#1b57d0 70%,#1243b8 100%);
+ linear-gradient(to bottom,#4b88ef 0%,#3374e5 32%,#2460d6 70%,#184bc0 100%);
  border-color:#0f306e;
 }
 #game.minesweeper-layout .mine-cell.tint-3{
  background:radial-gradient(circle at 24% 22%,rgba(255,255,255,.18) 0%,rgba(120,175,255,.05) 22%,transparent 40%),
- linear-gradient(to bottom,#3f79e5 0%,#2965dc 32%,#1951ca 70%,#103eb2 100%);
+ linear-gradient(to bottom,#477fe9 0%,#316bdd 32%,#2258ce 70%,#1645ba 100%);
  border-color:#0d2a64;
 }
 #game.minesweeper-layout .mine-cell:not(.open):hover{filter:brightness(1.12)}
@@ -332,4 +287,36 @@ body[data-game="minesweeper"]{background:#c7d7e5}
 }
 @media(max-width:899px){
  #game.minesweeper-layout .mine-classic.mine-hard-layout{flex-direction:column!important;align-items:center;justify-content:center}
+}
+
+/* R42 — every difficulty uses the same right-hand status rail. */
+#game.minesweeper-layout .mine-classic{
+ flex-direction:row!important;align-items:center!important;justify-content:center!important;
+ gap:clamp(12px,1.1vw,16px)!important;padding:8px 14px!important;
+ margin:0 auto!important;overflow:visible!important;
+}
+#game.minesweeper-layout .mine-grid{order:1!important;flex:none!important}
+#game.minesweeper-layout .mine-bottom-panel{
+ order:2!important;flex:0 0 112px!important;width:112px!important;height:auto!important;min-height:0!important;
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:center!important;
+ gap:16px!important;padding:0!important;overflow:visible!important;
+}
+#game.minesweeper-layout .mine-bottom-stat{
+ width:100%!important;display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:8px!important;min-width:0!important;
+}
+#game.minesweeper-layout .mine-medallion{
+ flex:0 0 36px!important;width:36px!important;height:36px!important;
+}
+#game.minesweeper-layout .mine-medallion svg{width:32px!important;height:32px!important}
+#game.minesweeper-layout .mine-counter{
+ flex:0 0 64px!important;width:64px!important;height:35px!important;
+ font-size:22px!important;
+}
+@media(max-width:520px){
+ #game.minesweeper-layout .mine-classic{gap:8px!important;padding:6px 4px!important}
+ #game.minesweeper-layout .mine-bottom-panel{flex-basis:96px!important;width:96px!important;gap:12px!important}
+ #game.minesweeper-layout .mine-medallion{flex-basis:30px!important;width:30px!important;height:30px!important}
+ #game.minesweeper-layout .mine-medallion svg{width:27px!important;height:27px!important}
+ #game.minesweeper-layout .mine-counter{flex-basis:56px!important;width:56px!important;height:31px!important;font-size:19px!important}
 }
