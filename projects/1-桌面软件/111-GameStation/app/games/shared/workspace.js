@@ -4,13 +4,14 @@
 const root=document.getElementById("game");
 if(!root)return;
 const gameId=document.body.dataset.game||root.dataset.game;
+const hostOwnsToolbar=gameId==="chess";
 if(!document.getElementById("gameWorkspaceStyles")){
  const sheet=document.createElement("link");sheet.id="gameWorkspaceStyles";
  sheet.rel="stylesheet";sheet.href="../shared/workspace.css";document.head.appendChild(sheet);
 }
 root.classList.remove("rail-collapsed");
 root.dataset.workspace="r17";
-let hud=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null;
+let hud=null,notice=null,state={},lastNotice="",lastNoticeAt=0,noticePersistent=false,autoToolsOpen=false,syncUrgentTools=null,setupDone=false;
 function send(action,detail={}){window.GameBridge?.send("CONTROL",{action,...detail});}
 function setExpanded(open){
  const side=root.querySelector(".game-tools");
@@ -134,22 +135,26 @@ function enhancePageActions(){
 }
 
 function setup(){
- if(hud)return;
+ if(setupDone)return;
+ setupDone=true;
  ensureResignAction();
  enhancePageActions();
- hud=document.createElement("section");
- hud.className="gs-hud";
- hud.id="gs-hud";
- hud.setAttribute("aria-label","游戏标题栏");
- hud.innerHTML='<div class="gs-hud-left"><strong class="gs-hud-name"></strong></div>'+
-  '<div class="gs-hud-controls"><div class="gs-hud-options" id="gs-options"></div>'+
-  '<div class="gs-hud-actions">'+
-  '<button type="button" class="gs-hud-button" data-action="start" id="gs-start">开始</button>'+
-  '<button type="button" class="gs-hud-button" data-action="pause" id="gs-pause" disabled>暂停</button>'+
-  '<button type="button" class="gs-hud-button" data-action="new" id="gs-next" disabled>新局</button>'+
-  '<button type="button" class="gs-hud-button" data-action="help" id="gs-help">帮助</button>'+
-  '</div></div>';
- root.prepend(hud);
+ if(!hostOwnsToolbar){
+  hud=document.createElement("section");
+  hud.className="gs-hud";
+  hud.id="gs-hud";
+  hud.setAttribute("aria-label","游戏标题栏");
+  hud.innerHTML='<div class="gs-hud-left"><strong class="gs-hud-name"></strong></div>'+
+   '<div class="gs-hud-controls"><div class="gs-hud-options" id="gs-options"></div>'+
+   '<div class="gs-hud-actions">'+
+   '<button type="button" class="gs-hud-button" data-action="start" id="gs-start">开始</button>'+
+   '<button type="button" class="gs-hud-button" data-action="pause" id="gs-pause" disabled>暂停</button>'+
+   '<button type="button" class="gs-hud-button" data-action="new" id="gs-next" disabled>新局</button>'+
+   '<button type="button" class="gs-hud-button" data-action="help" id="gs-help">帮助</button>'+
+   '</div></div>';
+  root.prepend(hud);
+ }
+
  const side=root.querySelector(".game-tools");
  const main=root.querySelector(".game-main-board")||root;
  notice=document.createElement("div");
@@ -162,7 +167,7 @@ function setup(){
  notice.addEventListener("animationend",()=>{
   if(!noticePersistent)hideNotice();
  });
- hud.addEventListener("click",event=>{
+ if(hud)hud.addEventListener("click",event=>{
   const modeButton=event.target.closest("button[data-mode-index]");
   if(modeButton){
    const index=Number(modeButton.dataset.modeIndex);
@@ -215,22 +220,24 @@ function setup(){
 function initHud(payload){
  setup();
  const p=payload||{};
- hud.querySelector(".gs-hud-name").textContent=String(p.name||document.title);
  state={ready:true,started:false,paused:true,finished:false,elapsed:"00:00",
   modeIndex:p.mode==="two"?1:0,difficulty:p.difficulty||"normal"};
- const options=hud.querySelector("#gs-options");
- options.replaceChildren();
- if(Array.isArray(p.modes)&&p.modes.length>1){
-  options.appendChild(makeSegment("gs-mode","对战方式",
-   p.modes.map((label,index)=>({label,value:index})),"modeIndex",state.modeIndex));
+ if(hud){
+  hud.querySelector(".gs-hud-name").textContent=String(p.name||document.title);
+  const options=hud.querySelector("#gs-options");
+  options.replaceChildren();
+  if(Array.isArray(p.modes)&&p.modes.length>1){
+   options.appendChild(makeSegment("gs-mode","对战方式",
+    p.modes.map((label,index)=>({label,value:index})),"modeIndex",state.modeIndex));
+  }
+  if(p.hasDifficulty){
+   const labels=p.difficultyLabels||["简单","中等","困难"];
+   const values=["easy","normal","hard"];
+   options.appendChild(makeSegment("gs-difficulty","游戏难度",
+    labels.map((label,index)=>({label,value:values[index]||"hard"})),"difficulty",state.difficulty));
+  }
+  renderOptions();
  }
- if(p.hasDifficulty){
-  const labels=p.difficultyLabels||["简单","中等","困难"];
-  const values=["easy","normal","hard"];
-  options.appendChild(makeSegment("gs-difficulty","游戏难度",
-   labels.map((label,index)=>({label,value:values[index]||"hard"})),"difficulty",state.difficulty));
- }
- renderOptions();
  updateHud(state);
  const guide=root.querySelector(".game-guide");
  const lines=guide?[...guide.querySelectorAll(".key-instruction")].map(el=>el.innerText.trim().replace(/\s+/g," ")):[];
@@ -241,16 +248,18 @@ function updateHud(payload){
  setup();
  state={...state,...(payload||{})};
  const started=!!state.started,paused=!!state.paused,finished=!!state.finished;
- const start=hud.querySelector("#gs-start"),pause=hud.querySelector("#gs-pause"),next=hud.querySelector("#gs-next");
- start.textContent=started?"结束":"开始";
- start.classList.toggle("is-running",started);
- start.disabled=!state.ready||finished;
- pause.textContent=started&&paused?"继续":"暂停";
- pause.disabled=!state.ready||!started||finished;
- next.disabled=!state.ready;
+ if(hud){
+  const start=hud.querySelector("#gs-start"),pause=hud.querySelector("#gs-pause"),next=hud.querySelector("#gs-next");
+  start.textContent=started?"结束":"开始";
+  start.classList.toggle("is-running",started);
+  start.disabled=!state.ready||finished;
+  pause.textContent=started&&paused?"继续":"暂停";
+  pause.disabled=!state.ready||!started||finished;
+  next.disabled=!state.ready;
+  renderOptions();
+ }
  const resign=root.querySelector(".game-tools #resignButton");
  if(resign&&resignGames.has(gameId))resign.disabled=!state.ready||!started||paused||finished;
- renderOptions();
  syncUrgentTools?.();
  root.dataset.gsPaused=String(paused);
  if(finished)showNotice("本局结束",true);

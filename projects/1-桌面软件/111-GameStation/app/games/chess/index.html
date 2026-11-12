@@ -5,19 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>国际象棋 · GameStation</title>
 <link rel="stylesheet" href="../shared/game.css">
+<link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=chess-cleanup-20261112-r1">
 <link rel="stylesheet" href="./style.css?v=chess-r2">
 <link rel="stylesheet" href="../shared/turn-clock.css"></head>
 <body data-game="chess">
 <main class="game-root game-layout chess-layout" id="game">
- <aside class="game-guide">
-  <span class="game-guide-kicker">CLASSIC CHESS</span>
-  <h2>国际象棋</h2>
-  <p>白方先行。选择棋子，再选择高亮的合法落点。将死对方王即可获胜。</p>
-  <div class="key-instruction"><strong>鼠标</strong><span>选择棋子 / 确认落点</span></div>
-  <div class="key-instruction"><strong>Esc</strong><span>取消当前选中</span></div>
-  <div class="guide-note">兵到达底线自动升变为后。王车易位、吃过路兵和将军判定均按标准规则处理。</div>
- </aside>
- <aside class="chess-notation-rail" aria-label="国际象棋操作棋谱">
+  <aside class="chess-notation-rail" aria-label="国际象棋操作棋谱">
   <div class="move-panel">
    <div class="move-panel-title"><strong>操作历史</strong><span id="chessHistoryCount">0 步</span></div>
    <ol id="moveList" aria-label="国际象棋逐步棋谱"></ol>
@@ -41,7 +34,7 @@
   <div class="game-tool-note">白色棋子先行。人机模式由你执白；双人模式可在同一台设备轮流操作。</div>
  </aside>
 </main>
-<script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script>
+<script src="../shared/bridge.js"></script><script src="../shared/workspace.js?v=chess-cleanup-20261112-r1"></script>
 <script src="../shared/turn-clock.js"></script><script src="./game.js"></script>
 </body>
 </html>

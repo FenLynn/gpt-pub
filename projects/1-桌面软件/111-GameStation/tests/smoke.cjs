@@ -225,6 +225,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    assert.equal(v.toolsGridColumn,"3",name+" tools must occupy the right track: "+JSON.stringify(v));
   }
   if(name==="国际象棋"){
+   const cleanup=await frame.locator("#game").evaluate(root=>({
+    guide:!!root.querySelector(":scope > .game-guide"),
+    duplicateHud:!!root.querySelector(":scope > .gs-hud"),
+    strayButtons:[...root.querySelectorAll("button")].filter(b=>!b.closest(".chess-board")&&!b.closest(".game-tools")).map(b=>({id:b.id,text:b.textContent.trim()})),
+    rootChildren:[...root.children].map(node=>node.className),
+    workspaceStylesheet:document.querySelector("#gameWorkspaceStyles")?.getAttribute("href")||null
+   }));
+   assert.equal(cleanup.guide,false,"Chess left instruction panel must be removed, not merely collapsed");
+   assert.equal(cleanup.duplicateHud,false,"Chess must use the host toolbar only; no duplicate in-frame HUD");
+   assert.deepEqual(cleanup.strayButtons,[],"Chess must not leave duplicate controls at the lower-left");
+   assert.deepEqual(cleanup.rootChildren,["chess-notation-rail","game-main-board","game-tools"],"Chess must retain only the notation rail, board and right tools");
+   assert.equal(cleanup.workspaceStylesheet,"../shared/workspace.css?v=chess-cleanup-20261112-r1","Chess shared layout stylesheet must preload before first paint");
    const coordinates=await frame.locator("#game").evaluate(root=>{
     const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
     const centerX=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};
