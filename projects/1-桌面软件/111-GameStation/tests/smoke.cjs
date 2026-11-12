@@ -259,12 +259,36 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   }
   if(name==="中国象棋"){
    const geometry=await frame.locator(".xiangqi-board").evaluate(el=>{
-    const r=el.getBoundingClientRect(),pieces=[...el.querySelectorAll(".xiangqi-piece")].map(p=>{const q=p.getBoundingClientRect();return{w:q.width,h:q.height};});
-    return{boardRatio:r.width/r.height,pieceCount:pieces.length,maxPieceDelta:Math.max(...pieces.map(p=>Math.abs(p.w-p.h)))};
+    const r=el.getBoundingClientRect(),style=getComputedStyle(el);
+    const pieces=[...el.querySelectorAll(".xiangqi-piece")].map(p=>{const q=p.getBoundingClientRect();return{w:q.width,h:q.height};});
+    const cells=[...el.querySelectorAll(":scope > .xiangqi-cell")],line=el.querySelector(":scope > .xiangqi-lines");
+    const lineStyle=getComputedStyle(line),border=getComputedStyle(el);
+    const innerW=el.clientWidth,innerH=el.clientHeight,borderL=parseFloat(border.borderLeftWidth),borderT=parseFloat(border.borderTopWidth);
+    const maxCellCenterError=Math.max(...cells.map((cell,index)=>{
+     const q=cell.getBoundingClientRect(),x=index%9,y=Math.floor(index/9);
+     const expectedX=r.left+borderL+innerW*(46+708*x/8)/800;
+     const expectedY=r.top+borderT+innerH*(48+804*y/9)/900;
+     return Math.max(Math.abs(q.left+q.width/2-expectedX),Math.abs(q.top+q.height/2-expectedY));
+    }));
+    return{boardRatio:r.width/r.height,pieceCount:pieces.length,maxPieceDelta:Math.max(...pieces.map(p=>Math.abs(p.w-p.h))),
+     display:style.display,gridColumns:style.gridTemplateColumns,boardAnimation:style.animationName,boardTransition:style.transitionDuration,
+     cellCount:cells.length,cellPosition:cells.length?getComputedStyle(cells[0]).position:"missing",
+     linePosition:lineStyle.position,linePointerEvents:lineStyle.pointerEvents,maxCellCenterError,
+     extraDirectButtons:[...el.children].filter(node=>node.matches("button")&&!node.classList.contains("xiangqi-cell")).length};
    });
    assert.ok(Math.abs(geometry.boardRatio-8/9)<=.015,"Xiangqi board must preserve its 9×10 intersection geometry: "+JSON.stringify(geometry));
    assert.equal(geometry.pieceCount,32,"Xiangqi must render all 32 starting pieces");
    assert.ok(geometry.maxPieceDelta<=.5,"All 32 Xiangqi pieces must be mathematically circular, never oval: "+JSON.stringify(geometry));
+   assert.equal(geometry.display,"block","Xiangqi board must not run a CSS grid over its overlay layers");
+   assert.equal(geometry.gridColumns,"none","Xiangqi board must not create implicit grid rows");
+   assert.equal(geometry.cellCount,90,"Xiangqi must have exactly 90 intersection buttons");
+   assert.equal(geometry.cellPosition,"absolute","Each intersection must be positioned at its board coordinate");
+   assert.equal(geometry.linePosition,"absolute","Board SVG must overlay the board, not occupy a grid cell");
+   assert.equal(geometry.linePointerEvents,"none","Board lines must never intercept piece clicks");
+   assert.equal(geometry.extraDirectButtons,0,"No stray/duplicate buttons may appear at the lower-left of the board");
+   assert.ok(geometry.maxCellCenterError<=1.5,"All 90 buttons must center exactly on the 9×10 board intersections: "+JSON.stringify(geometry));
+   assert.equal(geometry.boardAnimation,"none","Xiangqi board must not flash/scale during startup");
+   assert.equal(geometry.boardTransition,"0s","Xiangqi board dimensions must not animate from small to large");
     const files=await frame.locator(".xiangqi-file-label").allTextContents();
     assert.equal(files.length,18,"Xiangqi must mark 9 columns for each perspective");
     assert.deepEqual(files.slice(0,4),["1","九","2","八"],"Xiangqi black/red route numbers must use opposite perspectives");
