@@ -2,7 +2,7 @@
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("status");
 const boardRoot=document.getElementById("game");
-const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0)boardRoot.style.setProperty("--reversi-board-height",h+"px");};
+const fitHistoryHeight=()=>{const h=el.getBoundingClientRect().height;if(h>0){boardRoot.style.setProperty("--reversi-board-height",h+"px");boardRoot.dataset.boardMeasured="true";}};
 if(typeof ResizeObserver!=="undefined"){new ResizeObserver(fitHistoryHeight).observe(el);}
 else window.addEventListener("resize",fitHistoryHeight);
 requestAnimationFrame(fitHistoryHeight);

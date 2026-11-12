@@ -1854,7 +1854,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
    Visibility keeps geometry measurable and removes the wrong full-height
    rail frame that was briefly drawn before ResizeObserver set its height. */
 @media(min-width:701px){
- .game-root.game-layout:is(.checkers-layout,.chinese-checkers-layout):not([data-board-measured="true"]){
+ .game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chess-layout,.checkers-layout,.chinese-checkers-layout):not([data-board-measured="true"]){
   visibility:hidden!important;
  }
 }

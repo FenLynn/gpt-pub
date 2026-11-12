@@ -10,6 +10,7 @@ const fitHistoryHeight=()=>{
  if(grid.height>0){
   layoutRoot.style.setProperty("--reversi-board-height",grid.height+"px");
   layoutRoot.style.setProperty("--battleship-rail-offset",((grid.top+grid.bottom-stage.top-stage.bottom)/2)+"px");
+  layoutRoot.dataset.boardMeasured="true";
  }
 };
 window.addEventListener("resize",fitHistoryHeight);

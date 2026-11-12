@@ -4,7 +4,7 @@ const boardEl=document.getElementById("board"),frame=document.querySelector(".ch
 const layoutRoot=document.getElementById("game");
 const fitChessRails=()=>{
  const r=frame.getBoundingClientRect();
- if(r.height>0)layoutRoot.style.setProperty("--reversi-board-height",r.height+"px");
+ if(r.height>0){layoutRoot.style.setProperty("--reversi-board-height",r.height+"px");layoutRoot.dataset.boardMeasured="true";}
 };
 if(typeof ResizeObserver!=="undefined")new ResizeObserver(fitChessRails).observe(frame);
 window.addEventListener("resize",fitChessRails);requestAnimationFrame(fitChessRails);

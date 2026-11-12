@@ -16,6 +16,16 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
 (async()=>{
  const root=path.resolve(__dirname,"../app");
  const artifacts=path.resolve(__dirname,"../p111-smoke-artifacts");
+ const measuredRailGames=["reversi","connect4","battleship","chess"];
+ for(const id of measuredRailGames){
+  const html=fs.readFileSync(path.join(root,"games",id,"index.html"),"utf8");
+  const source=fs.readFileSync(path.join(root,"games",id,"game.js"),"utf8");
+  assert.match(html,/data-board-measured="false"/,id+" must hide its history rail before first measurement");
+  assert.match(source,/dataset\.boardMeasured\s*=\s*"true"/,id+" must reveal only after real board geometry is measured");
+ }
+ const workspaceCss=fs.readFileSync(path.join(root,"games","shared","workspace.css"),"utf8");
+ assert.match(workspaceCss,/is\(\.reversi-layout,\.connect4-layout,\.battleship-layout,\.chess-layout,\.checkers-layout,\.chinese-checkers-layout\)/,
+  "All measured history-rail games must share the same first-paint visibility gate");
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,
   args:["--no-sandbox","--disable-dev-shm-usage","--allow-file-access-from-files"]});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
@@ -44,6 +54,11 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.locator("#gameActions:not(.hidden)").waitFor({state:"visible",timeout:10000});
   await page.locator("#startButton:not([disabled])").waitFor({state:"visible",timeout:10000});
   await page.waitForTimeout(55);
+  if(["黑白棋","四子棋","海战棋","国际象棋","西洋跳棋（8×8）","中国跳棋","飞行棋"].includes(name)){
+   const firstPaint=await frame.locator("#game").evaluate(root=>({measured:root.dataset.boardMeasured,visibility:getComputedStyle(root).visibility}));
+   assert.equal(firstPaint.measured,"true",name+" must finish board measurement before becoming visible: "+JSON.stringify(firstPaint));
+   assert.equal(firstPaint.visibility,"visible",name+" must reveal the complete measured layout: "+JSON.stringify(firstPaint));
+  }
   if(name==="中国象棋"){
    const ready=await frame.locator("#game").evaluate(root=>({ready:root.classList.contains("xiangqi-layout-ready"),visibility:getComputedStyle(root).visibility,cells:root.querySelectorAll("#board > .xiangqi-cell").length}));
    const loadingDone=await page.locator("#stageLoading").evaluate(el=>el.classList.contains("done"));
