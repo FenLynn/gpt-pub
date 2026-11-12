@@ -2122,7 +2122,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout){
   grid-template-columns:minmax(0,1fr) minmax(210px,236px)!important;
   grid-template-rows:minmax(0,1fr)!important;
-  column-gap:clamp(10px,1vw,16px)!important;
+  column-gap:0!important;
   padding:0 12px 10px!important;
   justify-content:stretch!important
  }
