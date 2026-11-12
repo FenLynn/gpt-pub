@@ -1192,9 +1192,16 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const main=document.querySelector(".game-main-board").getBoundingClientRect();
    const rail=document.querySelector(".game-tools").getBoundingClientRect();
    const cell=document.querySelector(".soko-cell:not(.void)").getBoundingClientRect();
-   const stage=document.querySelector(".soko-stage");
+   const stage=document.querySelector(".soko-stage"),stageBox=stage.getBoundingClientRect();
+   const panel=document.querySelector(".game-panel").getBoundingClientRect();
+   const bs=getComputedStyle(document.querySelector("#board")),ss=getComputedStyle(stage);
    return{gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
     right:rail.right,cellDelta:Math.abs(cell.width-cell.height),aspect:stage.style.aspectRatio,
+    stageBox:{w:stageBox.width,h:stageBox.height},boardBox:{w:board.width,h:board.height},
+    mainBox:{w:main.width,h:main.height},panelBox:{w:panel.width,h:panel.height},
+    cellBox:{w:cell.width,h:cell.height},boxStyle:{width:bs.width,height:bs.height,
+     aspect:bs.aspectRatio,rows:bs.gridTemplateRows,columns:bs.gridTemplateColumns},
+    stageStyle:{width:ss.width,height:ss.height,aspect:ss.aspectRatio,maxHeight:ss.maxHeight},
     visible:getComputedStyle(document.querySelector(".game-tools")).display};
   });
   assert.ok(sokobanRail.gap>=0&&sokobanRail.gap<=22&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
