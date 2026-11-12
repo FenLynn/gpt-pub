@@ -191,6 +191,7 @@ const board=document.getElementById("board"),status=document.getElementById("sok
  chooseButton=document.getElementById("chooseLevel"),victory=document.getElementById("sokoVictory"),
  levelPicker=document.getElementById("sokoLevelPicker"),levelGrid=document.getElementById("sokoLevelGrid"),
  winTitle=document.getElementById("sokoWinTitle"),winSummary=document.getElementById("sokoWinSummary"),
+ winNote=document.getElementById("sokoWinNote"),
  winNext=document.getElementById("sokoWinNext"),winStay=document.getElementById("sokoWinStay"),
  winPick=document.getElementById("sokoWinPick"),levelPickerClose=document.getElementById("sokoPickerClose"),
  difficultyEl=document.getElementById("sokoDifficulty"),unlockedEl=document.getElementById("sokoUnlocked");
@@ -232,6 +233,7 @@ function closeLevelPicker(){levelPicker.hidden=true;if(complete)showVictory();}
 function showVictory(){
  winTitle.textContent=level===levels.length-1?"全关通关！":"第 "+(level+1)+" 关胜利！";
  winSummary.textContent="移动 "+moves+" 步 · 推动 "+pushes+" 次 · 提示 "+hintCount+" 次";
+ winNote.textContent=level===levels.length-1?"全部关卡已完成，可结束挑战或自由重玩。":"已解锁下一关，是否继续挑战？";
  winNext.textContent=level===levels.length-1?"完成挑战":"进入第 "+(level+2)+" 关";
  winNext.disabled=paused;
  winPick.disabled=paused;
