@@ -47,6 +47,18 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   if(name==="中国象棋"){
    const ready=await frame.locator("#game").evaluate(root=>({ready:root.classList.contains("xiangqi-layout-ready"),visibility:getComputedStyle(root).visibility,cells:root.querySelectorAll("#board > .xiangqi-cell").length,loadingDone:document.querySelector("#stageLoading")?.classList.contains("done")}));
    assert.ok(ready.ready&&ready.visibility==="visible"&&ready.cells===90&&ready.loadingDone,"Xiangqi must stay covered until all 90 buttons and final rail geometry are ready: "+JSON.stringify(ready));
+   const cleanup=await frame.locator("#game").evaluate(root=>({
+    rogueButtons:[...root.querySelectorAll("button")].filter(b=>!b.closest(".xiangqi-board")&&!(b.closest(".game-tools")&&["undoButton","flip","resignButton"].includes(b.id))).map(b=>({id:b.id,text:b.textContent.trim(),parent:b.parentElement?.className})),
+    leftButtons:root.querySelectorAll(".xiangqi-record-rail button,.xiangqi-record-rail input,.xiangqi-record-rail select,.xiangqi-record-rail summary").length,
+    legacy:root.querySelectorAll(".gs-hud,.gs-notice,.game-guide").length,
+    rightActions:[...root.querySelectorAll(".game-tools > button")].map(b=>b.id),
+    rootChildren:[...root.children].map(n=>n.className)
+   }));
+   assert.deepEqual(cleanup.rogueButtons,[],"Xiangqi must not retain stray controls outside the board and right action rail: "+JSON.stringify(cleanup));
+   assert.equal(cleanup.leftButtons,0,"Xiangqi left notation rail must contain no buttons or form controls");
+   assert.equal(cleanup.legacy,0,"Xiangqi must remove duplicate legacy HUD/guide/notice elements");
+   assert.deepEqual(cleanup.rightActions,["undoButton","flip","resignButton"],"Only the three intended actions may remain on the right");
+   assert.deepEqual(cleanup.rootChildren,["xiangqi-record-rail","game-main-board","game-tools"],"Xiangqi must have exactly three layout regions and no implicit bottom row");
    assert.equal(await page.evaluate(()=>window.__xqPrematureReveal),false,"Host loading cover must never disappear before Xiangqi layout-ready handshake");
    await page.evaluate(()=>window.__xqStageObserver?.disconnect());
   }
@@ -607,7 +619,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      "Xiangqi notation and buttons must stay close to the actual board: "+JSON.stringify({leftGap,rightGap,geometry}));
     assert.ok(geometry.glyphFont>=geometry.pieceWidth*.62&&geometry.glyphFont<=geometry.pieceWidth*.9,
      "Xiangqi glyphs must be large and proportional to their circular pieces: "+JSON.stringify(geometry));
-    assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.some(href=>href.startsWith("./xiangqi.css?v=xq-layout-ready-20261112-r1")),
+    assert.ok(geometry.styles.some(href=>href.startsWith("../shared/workspace.css?v=xq-prune-20261112-r2"))&&geometry.styles.some(href=>href.startsWith("./xiangqi.css?v=xq-prune-20261112-r2")),
      "Xiangqi dedicated stylesheet must be cache-busted and loaded in HEAD, preventing a legacy layout flash");
     const scroll=await frame.locator("#moveList").evaluate(list=>{
      const beforeWidth=list.getBoundingClientRect().width;

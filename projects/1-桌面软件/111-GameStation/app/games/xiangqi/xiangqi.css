@@ -247,3 +247,17 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 .game-root.game-layout.xiangqi-layout.rail-collapsed>.game-tools{
  grid-column:3!important;grid-row:1!important;display:flex!important
 }
+
+/* R59: only the notation rail, board and right action rail may occupy the Xiangqi grid. */
+.game-root.game-layout.xiangqi-layout{grid-auto-flow:row!important;grid-auto-rows:minmax(0,1fr)!important}
+.game-root.game-layout.xiangqi-layout>.xiangqi-record-rail,
+.game-root.game-layout.xiangqi-layout>.game-main-board,
+.game-root.game-layout.xiangqi-layout>.game-tools{grid-row:1!important}
+.game-root.game-layout.xiangqi-layout>.game-tools{
+ grid-column:3!important;position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+ align-self:stretch!important;justify-self:start!important
+}
+.game-root.game-layout.xiangqi-layout>.xiangqi-record-rail button,
+.game-root.game-layout.xiangqi-layout>.xiangqi-record-rail input,
+.game-root.game-layout.xiangqi-layout>.xiangqi-record-rail select,
+.game-root.game-layout.xiangqi-layout>.xiangqi-record-rail summary{display:none!important}

@@ -18,6 +18,20 @@ function tryMarkLayoutReady(){
  layoutReadySent=true;root.classList.add("xiangqi-layout-ready");
  GameBridge.send("LAYOUT_READY",{boardWidth:Math.round(boardRect.width),boardHeight:Math.round(boardRect.height),cellCount:cells.length});
 }
+function pruneLegacyControls(){
+ const rail=root.querySelector(".xiangqi-record-rail"),tools=root.querySelector(".game-tools");
+ const allowedRoot=new Set([rail,boardArea,tools]);
+ [...root.children].forEach(node=>{if(!allowedRoot.has(node))node.remove();});
+ root.querySelectorAll(".gs-hud,.gs-notice,.game-guide").forEach(node=>node.remove());
+ const allowedActions=new Set(["undoButton","flip","resignButton"]);
+ root.querySelectorAll("button").forEach(button=>{
+  if(button.closest(".xiangqi-board"))return;
+  if(button.closest(".game-tools")&&allowedActions.has(button.id))return;
+  button.remove();
+ });
+ rail?.querySelectorAll("button,input,select,summary").forEach(node=>node.remove());
+}
+pruneLegacyControls();
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],positionTrail=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
 const values={"帅":15000,"将":15000,"车":1000,"马":460,"炮":475,"仕":200,"士":200,"相":210,"象":210,"兵":105,"卒":105};
