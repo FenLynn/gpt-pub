@@ -207,7 +207,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const history=el.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
    const gridColumns=getComputedStyle(el).gridTemplateColumns.split(/\s+/).map(value=>parseFloat(value));
    const mainBox=box(main),toolBox=tools?box(tools):null;
-   return {root:box(el),main:mainBox,surface:box(surface),primary:box(primary),history:history?box(history):null,
+   const panel=el.querySelector(".game-main-board>.game-panel");
+   return {rootClass:el.className,panelJustify:panel?getComputedStyle(panel).justifyItems:null,primaryJustify:primary?getComputedStyle(primary).justifySelf:null,primaryMargin:primary?getComputedStyle(primary).marginLeft+" / "+getComputedStyle(primary).marginRight:null,root:box(el),main:mainBox,surface:box(surface),primary:box(primary),history:history?box(history):null,
     gridColumns,historyGridColumn:history?getComputedStyle(history).gridColumnStart:null,
     mainGridColumn:main?getComputedStyle(main).gridColumnStart:null,
     toolsGridColumn:tools?getComputedStyle(tools).gridColumnStart:null,
