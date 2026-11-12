@@ -99,6 +99,10 @@
  box-sizing:border-box!important;aspect-ratio:auto!important;
  min-width:0!important;min-height:0!important;
  width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;
+ /* Override the legacy 9-column !important grid in shared game.css with the
+    actual dimensions supplied by the currently selected classic map. */
+ grid-template-columns:repeat(var(--soko-cols,9),minmax(0,1fr))!important;
+ grid-template-rows:repeat(var(--soko-rows,7),minmax(0,1fr))!important;
 }
 .sokoban-layout .soko-overlay[hidden]{display:none!important}
 .sokoban-layout .soko-overlay{
