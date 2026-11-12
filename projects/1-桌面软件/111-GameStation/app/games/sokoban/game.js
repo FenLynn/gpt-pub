@@ -34,13 +34,13 @@ function refreshLevelPicker(){
   if(index===level)button.classList.add("current");
   if(bestResults[index])button.classList.add("cleared");
   button.dataset.stage=String(index<23?1:index<45?2:index<68?3:4);
-  button.disabled=index>unlockedThrough||paused;
-  button.setAttribute("aria-label","第"+(index+1)+"关 "+difficultyName(index)+(button.disabled?" 未解锁":bestResults[index]?" 已通关":" 可挑战"));
+  button.disabled=paused;
+  button.setAttribute("aria-label","第"+(index+1)+"关 "+difficultyName(index)+(bestResults[index]?" 已通关":index>unlockedThrough?" 自由挑战":" 可挑战"));
   button.textContent=String(index+1).padStart(2,"0")+(bestResults[index]?" ✓":"");
   button.addEventListener("click",()=>{
-   if(index>unlockedThrough||paused)return;
+   if(paused)return;
    parseLevel(index);
-   setStatus("已选择第 "+(index+1)+" 关 · "+difficultyName(index)+"。");
+   setStatus("已选择第 "+(index+1)+" 关 · "+difficultyName(index)+(index>unlockedThrough?" · 自由挑战":"")+"。");
   });
   fragment.appendChild(button);
  });
@@ -54,7 +54,7 @@ function closeLevelPicker(){levelPicker.hidden=true;if(complete)showVictory();}
 function showVictory(){
  winTitle.textContent=level===levels.length-1?"全关通关！":"第 "+(level+1)+" 关胜利！";
  winSummary.textContent="移动 "+moves+" 步 · 推动 "+pushes+" 次 · 提示 "+hintCount+" 次";
- winNote.textContent=level===levels.length-1?"全部关卡已完成，可结束挑战或自由重玩。":"已解锁下一关，是否继续挑战？";
+ winNote.textContent=level===levels.length-1?"全部关卡已完成，可结束挑战或自由重玩。":"已记录最高进度；可继续下一关，也可自由选择任意关卡。";
  winNext.textContent=level===levels.length-1?"完成挑战":"进入第 "+(level+2)+" 关";
  winNext.disabled=paused;
  winPick.disabled=paused;
@@ -232,7 +232,7 @@ function updateStats(){
  const done=completedGoals(),total=goals.size;
  levelEl.textContent=(level+1)+" / "+levels.length;
  difficultyEl.textContent=difficultyName(level);
- unlockedEl.textContent=(unlockedThrough+1)+" / "+levels.length;
+ unlockedEl.textContent="第 "+(unlockedThrough+1)+" / "+levels.length+" 关";
  movesEl.textContent=String(moves);pushesEl.textContent=String(pushes);
  goalProgressEl.textContent=done+" / "+total;goalBar.style.width=(total?Math.round(done/total*100):0)+"%";updateControls();
 }
@@ -395,14 +395,14 @@ if(new URLSearchParams(location.search).has("p111Test")){
   loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
   move(dx,dy){move(dx,dy);return fixtureState();},undo(){undo();return fixtureState();},
   nextLevel(){nextLevel();return fixtureState();},resetLevel(){resetLevel();return fixtureState();},
-  openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(index<=unlockedThrough&&!paused)parseLevel(index);return fixtureState();},
+  openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(Number.isInteger(index)&&index>=0&&index<levels.length&&!paused)parseLevel(index);return fixtureState();},
   snapshot,restore,isCornerDeadlock,levelCount:levels.length,levelRows:index=>levels[index]?.slice()||[],
   levelInfo(index){const d=decodeLevel(levels[index]);return{width:d.width,height:d.height,boxes:d.boxes.size,goals:d.goals.size,players:d.player>=0?1:0,voids:d.voids.size,sourceId:window.GAME_SOKOBAN_LEVEL_ORIGINAL_IDS?.[index],difficultyScore:window.GAME_SOKOBAN_LEVEL_DIFFICULTY_SCORES?.[index]};},
   hintPath(){return findHintPath();}
  };
 }
 GameBridge.register({
- init(){paused=true;parseLevel(0);setStatus("准备开始 · 经典挑战共 90 关，先观察路线再推动木箱。");},newGame,
+ init(){paused=true;parseLevel(0);setStatus("准备开始 · 经典挑战共 90 关，四阶段递增，可自由选关。");},newGame,
  pause(){paused=true;updateControls();setStatus("已暂停 · 当前关卡和步数均已保留。");},
  resume(){paused=false;updateControls();if(complete){showVictory();setStatus("本关已胜利 · 请选择下一关或留在本关。");}
   else setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
