@@ -1147,7 +1147,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
        copies:document.querySelectorAll('link[href*="shared/workspace.css"]').length,
        guide:getComputedStyle(root.querySelector(".game-guide")).display};
      });
-     assert.ok(preload.head&&preload.parent==="HEAD"&&preload.href==="../shared/workspace.css"&&preload.loaded&&preload.copies===1&&preload.guide==="none",
+     assert.ok(preload.head&&preload.parent==="HEAD"&&preload.href==="../shared/workspace.css?v=history-firstpaint-20261112-r1"&&preload.loaded&&preload.copies===1&&preload.guide==="none",
       "Battleship must preload exactly one shared workspace stylesheet before first paint: "+JSON.stringify(preload));
     }
     if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
