@@ -1459,6 +1459,10 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await sokobanFixture.waitForFunction(()=>!!window.__p111SokobanTest);
   const sokobanCatalog=await sokobanFixture.evaluate(()=>Array.from({length:window.__p111SokobanTest.levelCount},(_,i)=>window.__p111SokobanTest.levelInfo(i)));
   assert.equal(sokobanCatalog.length,90,"Sokoban must ship the complete 90-level classic collection");
+  assert.ok(sokobanCatalog.every((level,i)=>Number.isFinite(level.difficultyScore)&&(i===0||level.difficultyScore>=sokobanCatalog[i-1].difficultyScore)),
+   "Sokoban levels must be ordered by increasing, reproducible difficulty score");
+  assert.ok(sokobanCatalog[22].difficultyScore<sokobanCatalog[23].difficultyScore&&sokobanCatalog[44].difficultyScore<sokobanCatalog[45].difficultyScore&&sokobanCatalog[67].difficultyScore<sokobanCatalog[68].difficultyScore,
+   "The four Sokoban stages must have strictly increasing difficulty bands");
   assert.ok(sokobanCatalog.every(level=>level.players===1&&level.boxes===level.goals&&level.boxes>=6&&level.width>=11&&level.width<=20&&level.height>=10&&level.height<=17),
    "Every Sokoban level must have a valid player, matching boxes/goals and a genuinely larger board: "+JSON.stringify(sokobanCatalog.filter(level=>level.players!==1||level.boxes!==level.goals)));
   assert.ok(Math.max(...sokobanCatalog.map(level=>level.boxes))>=30,"Sokoban campaign must include multi-dozen-box challenge boards");

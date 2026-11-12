@@ -23,7 +23,7 @@ const solverDirections=[
  {dx:-1,dy:0,code:"L",label:"向左"},{dx:1,dy:0,code:"R",label:"向右"}
 ];
 function difficultyName(index){
- return index<15?"经典挑战 I":index<35?"经典挑战 II":index<60?"经典挑战 III":"经典挑战 IV";
+ return index<23?"经典挑战 I":index<45?"经典挑战 II":index<68?"经典挑战 III":"经典挑战 IV";
 }
 function hideOverlays(){victory.hidden=true;levelPicker.hidden=true;}
 function refreshLevelPicker(){
@@ -33,7 +33,7 @@ function refreshLevelPicker(){
   button.type="button";button.className="soko-level-option";
   if(index===level)button.classList.add("current");
   if(bestResults[index])button.classList.add("cleared");
-  button.dataset.stage=String(index<15?1:index<35?2:index<60?3:4);
+  button.dataset.stage=String(index<23?1:index<45?2:index<68?3:4);
   button.disabled=index>unlockedThrough||paused;
   button.setAttribute("aria-label","第"+(index+1)+"关 "+difficultyName(index)+(button.disabled?" 未解锁":bestResults[index]?" 已通关":" 可挑战"));
   button.textContent=String(index+1).padStart(2,"0")+(bestResults[index]?" ✓":"");
@@ -397,7 +397,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
   nextLevel(){nextLevel();return fixtureState();},resetLevel(){resetLevel();return fixtureState();},
   openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(index<=unlockedThrough&&!paused)parseLevel(index);return fixtureState();},
   snapshot,restore,isCornerDeadlock,levelCount:levels.length,levelRows:index=>levels[index]?.slice()||[],
-  levelInfo(index){const d=decodeLevel(levels[index]);return{width:d.width,height:d.height,boxes:d.boxes.size,goals:d.goals.size,players:d.player>=0?1:0,voids:d.voids.size};},
+  levelInfo(index){const d=decodeLevel(levels[index]);return{width:d.width,height:d.height,boxes:d.boxes.size,goals:d.goals.size,players:d.player>=0?1:0,voids:d.voids.size,sourceId:window.GAME_SOKOBAN_LEVEL_ORIGINAL_IDS?.[index],difficultyScore:window.GAME_SOKOBAN_LEVEL_DIFFICULTY_SCORES?.[index]};},
   hintPath(){return findHintPath();}
  };
 }
