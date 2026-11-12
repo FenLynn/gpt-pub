@@ -86,3 +86,59 @@
 }
 .sokoban-layout .game-tools>#hint:not(:disabled){border-color:#c8dce8;background:linear-gradient(145deg,#fff,#eef6fa);color:#376a87}
 .sokoban-layout .game-tools>#hint svg{color:#b58a3f}
+
+/* R57 - In-board victory settlement and unlocked level picker. */
+.sokoban-layout .game-main-board>.game-panel{display:grid!important;place-items:center!important;min-height:0}
+.sokoban-layout .soko-stage{
+ position:relative;display:grid;place-items:center;width:min(100%,calc(100cqh * 9 / 7));
+ max-width:100%;max-height:100%;aspect-ratio:9/7;isolation:isolate;
+}
+.sokoban-layout .soko-stage #board{
+ width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;
+}
+.sokoban-layout .soko-overlay[hidden]{display:none!important}
+.sokoban-layout .soko-overlay{
+ position:absolute;z-index:5;inset:0;display:grid;place-items:center;
+ background:rgba(23,44,48,.45);backdrop-filter:blur(5px);
+ border-radius:12px;padding:clamp(8px,2cqh,20px);overflow:auto;
+}
+.sokoban-layout .soko-dialog{
+ width:min(100%,360px);max-height:100%;display:flex;flex-direction:column;align-items:center;
+ padding:clamp(10px,2.3cqh,22px);gap:9px;
+ background:linear-gradient(160deg,#fffef9,#f2fbf6);border:1px solid #dcf0e3;
+ border-radius:18px;box-shadow:0 18px 46px #102e3559;text-align:center;
+}
+.sokoban-layout .soko-dialog h2{font-size:clamp(17px,2.7cqh,24px);line-height:1.2;margin:2px 0;color:#286c51}
+.sokoban-layout .soko-win-symbol{
+ display:grid;place-items:center;width:44px;height:44px;border-radius:50%;
+ background:linear-gradient(140deg,#fff3be,#e7b955);color:#9a641d;font-size:26px;
+ box-shadow:0 5px 16px #9e822d27;
+}
+.sokoban-layout .soko-dialog p{margin:0;color:#506c60;font-size:12px;line-height:1.4}
+.sokoban-layout .soko-dialog .soko-win-note{color:#789083;font-size:11px}
+.sokoban-layout .soko-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:4px}
+.sokoban-layout .soko-action{
+ min-height:38px;max-width:100%;padding:7px 12px;border-radius:9px;
+ font-size:12px;font-weight:700;cursor:pointer;border:1px solid #c8dbd1;
+ background:#fff;color:#48685a;
+}
+.sokoban-layout .soko-action.primary{background:#458c67;color:#fff;border-color:#458c67}
+.sokoban-layout .soko-action.text-link{border:0;background:transparent;color:#427a61;min-height:30px}
+.sokoban-layout .soko-action:hover:not(:disabled){filter:brightness(.96)}
+.sokoban-layout .soko-action:disabled{opacity:.48;cursor:not-allowed}
+.sokoban-layout .soko-picker-dialog{width:min(100%,440px);gap:9px}
+.sokoban-layout .soko-level-grid{
+ display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:100%;
+ overflow:auto;min-height:0;padding:2px;flex:1 1 auto;
+}
+.sokoban-layout .soko-level-option{
+ min-width:0;min-height:34px;border:1px solid #d3e4d9;border-radius:8px;
+ background:#f8fbf8;color:#5a7a66;font-size:12px;font-variant-numeric:tabular-nums;
+ font-weight:760;cursor:pointer;
+}
+.sokoban-layout .soko-level-option.current{outline:2px solid #5c9c75;outline-offset:-2px}
+.sokoban-layout .soko-level-option.cleared{background:#e4f7e9;color:#2e8555}
+.sokoban-layout .soko-level-option:disabled{opacity:.32;cursor:not-allowed;background:#e8eee9}
+.sokoban-layout .soko-level-option:hover:not(:disabled){border-color:#6fb38a;background:#eaf7ef}
+@media(max-width:700px){.sokoban-layout .soko-dialog{gap:5px;padding:10px}.sokoban-layout .soko-level-option{min-height:29px}}
+@media(prefers-reduced-motion:reduce){.sokoban-layout .soko-overlay{backdrop-filter:none}}
