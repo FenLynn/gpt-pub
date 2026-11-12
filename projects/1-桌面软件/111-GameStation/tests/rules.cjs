@@ -280,7 +280,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.ok(memoryBoardSize.width>0&&memoryBoardSize.height>0,"Memory board must size itself to the available play area");
   await memory.close();
 
-  // Sokoban: seven handcrafted levels must all be solvable; test pushes, deadlocks, undo, next and restore.
+  // Sokoban: twelve handcrafted levels must all be solvable; test pushes, deadlocks, undo, next and restore.
   const sokoban=await browser.newPage({viewport:{width:900,height:700}});
   sokoban.on("pageerror",e=>errors.push("Sokoban: "+e.message));
   await sokoban.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sokoban/index.html")).href+"?p111Test=1");
@@ -330,7 +330,8 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.equal(await sokoban.evaluate(()=>window.__p111SokobanTest.isCornerDeadlock(10)),true,"A non-goal corner must be recognized as a box deadlock");
   const sokoSolutions=[
    ["U",1,1],["LUURR",5,2],["DLUURULL",8,4],["LULUDDRRRURU",12,2],
-   ["LLUULURDDDRRRRUURUL",19,4],["UUDDLLUUDDRRRRUU",16,3],["DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",34,12]
+   ["LLUULURDDDRRRRUURUL",19,4],["UUDDLLUUDDRRRRUU",16,3],["DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",34,12],
+   ["ULLUDRRRRU",10,2],["UUDRRU",6,2],["ULURURRDL",9,4],["LLUUDDRRRRUU",12,4],["UUDLLUDRRRRU",12,3]
   ];
   for(let i=0;i<sokoSolutions.length;i++){
    boxState=await sokoban.evaluate(index=>window.__p111SokobanTest.loadLevel(index),i);
