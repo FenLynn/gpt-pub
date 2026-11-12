@@ -607,8 +607,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      "Xiangqi notation and buttons must stay close to the actual board: "+JSON.stringify({leftGap,rightGap,geometry}));
     assert.ok(geometry.glyphFont>=geometry.pieceWidth*.62&&geometry.glyphFont<=geometry.pieceWidth*.9,
      "Xiangqi glyphs must be large and proportional to their circular pieces: "+JSON.stringify(geometry));
-    assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.includes("./xiangqi.css"),
-     "Xiangqi dedicated stylesheet must be loaded in HEAD, preventing a legacy layout flash");
+    assert.ok(geometry.styles.includes("../shared/workspace.css")&&geometry.styles.some(href=>href.startsWith("./xiangqi.css?v=xq-layout-ready-20261112-r1")),
+     "Xiangqi dedicated stylesheet must be cache-busted and loaded in HEAD, preventing a legacy layout flash");
     const scroll=await frame.locator("#moveList").evaluate(list=>{
      const beforeWidth=list.getBoundingClientRect().width;
      const dummy=document.createElement("li");dummy.textContent="测试棋谱滚动定位";
