@@ -113,15 +113,25 @@ function isBlocked(x,y){return !isInside(x,y)||walls.has(y*width+x)||voids.has(y
 function completedGoals(){let count=0;for(const goal of goals)if(boxes.has(goal))count++;return count;}
 function isComplete(){return goals.size===boxes.size&&completedGoals()===goals.size;}
 function computeStaticDeadSquares(){
- const canReachGoal=new Set(goals),queue=[...goals];
- for(let cursor=0;cursor<queue.length;cursor++){
-  const index=queue[cursor],x=index%width,y=Math.floor(index/width);
-  for(const direction of solverDirections){
-   const px=x-direction.dx,py=y-direction.dy,sx=x-2*direction.dx,sy=y-2*direction.dy;
-   if(isBlocked(px,py)||isBlocked(sx,sy))continue;
-   const previous=py*width+px;
-   if(!canReachGoal.has(previous)){canReachGoal.add(previous);queue.push(previous);}
+ // Reverse-push distances from every goal. A square is statically dead when
+ // no goal can be reached by a box even with all other boxes removed.
+ goalDistanceMaps=[];
+ const canReachGoal=new Set();
+ for(const goal of goals){
+  const distances=new Map([[goal,0]]),queue=[goal];
+  for(let cursor=0;cursor<queue.length;cursor++){
+   const index=queue[cursor],x=index%width,y=Math.floor(index/width);
+   for(const direction of solverDirections){
+    const px=x-direction.dx,py=y-direction.dy,sx=x-2*direction.dx,sy=y-2*direction.dy;
+    if(isBlocked(px,py)||isBlocked(sx,sy))continue;
+    const previous=py*width+px;
+    if(!distances.has(previous)){
+     distances.set(previous,distances.get(index)+1);queue.push(previous);
+    }
+   }
   }
+  goalDistanceMaps.push(distances);
+  for(const index of distances.keys())canReachGoal.add(index);
  }
  const dead=new Set();
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
@@ -206,6 +216,39 @@ function findSolutionPath(maxStates=50000){
   segments.push(step.walk.concat(step.push));key=step.previous;
  }
  return segments.reverse().flat();
+}
+function findHintPath(){
+ if(complete)return [];
+ // Small puzzles can use the exact push-state solver; classic campaigns
+ // contain up to several dozen boxes, where exhaustive search is unsuitable.
+ if(boxes.size<=4){
+  const exact=findSolutionPath(12000);
+  if(exact&&exact.length)return [exact[0]];
+ }
+ const occupied=new Set(boxes),reach=reachableFrom(player,occupied);
+ const distanceCost=nextBoxes=>nextBoxes.reduce((sum,index)=>{
+  let best=Infinity;
+  for(const distances of goalDistanceMaps)best=Math.min(best,distances.get(index)??Infinity);
+  return sum+(Number.isFinite(best)?best:100000);
+ },0);
+ const baseline=distanceCost([...boxes]);
+ let bestChoice=null;
+ for(const box of boxes)for(const direction of solverDirections){
+  const x=box%width,y=Math.floor(box/width);
+  const behindX=x-direction.dx,behindY=y-direction.dy,behind=behindY*width+behindX;
+  if(isBlocked(behindX,behindY)||!reach.parents.has(behind))continue;
+  const nx=x+direction.dx,ny=y+direction.dy,destination=ny*width+nx;
+  if(isBlocked(nx,ny)||occupied.has(destination)||staticDeadSquares.has(destination))continue;
+  const nextBoxes=[...occupied].filter(index=>index!==box).concat(destination);
+  if(isTwoByTwoDeadlock(new Set(nextBoxes),destination))continue;
+  const walk=reach.pathTo(behind);
+  if(!walk)continue;
+  const score=(distanceCost(nextBoxes)-baseline)*10+walk.length*.15+
+   (goals.has(box)?20:0)-(goals.has(destination)?8:0);
+  const candidate={score,path:walk.concat(direction.code)};
+  if(!bestChoice||candidate.score<bestChoice.score)bestChoice=candidate;
+ }
+ return bestChoice?[bestChoice.path[0]]:null;
 }
 function hint(){
  if(paused||complete)return;
