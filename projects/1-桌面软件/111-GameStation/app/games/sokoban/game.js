@@ -158,12 +158,18 @@ function reachableFrom(start,occupied){
 function isTwoByTwoDeadlock(occupied,anchor){
  const x=anchor%width,y=Math.floor(anchor/width);
  for(const oy of [-1,0])for(const ox of [-1,0]){
-  const cells=[(y+oy)*width+x+ox,(y+oy)*width+x+ox+1,(y+oy+1)*width+x+ox,(y+oy+1)*width+x+ox+1];
-  const full=cells.every(index=>{
-   const cx=index%width,cy=Math.floor(index/width);
-   return !isInside(cx,cy)||walls.has(index)||voids.has(index)||occupied.has(index);
+  const cells=[[x+ox,y+oy],[x+ox+1,y+oy],[x+ox,y+oy+1],[x+ox+1,y+oy+1]];
+  const full=cells.every(([cx,cy])=>{
+   if(!isInside(cx,cy))return true;
+   const index=cy*width+cx;
+   return walls.has(index)||voids.has(index)||occupied.has(index);
   });
-  if(full&&cells.some(index=>occupied.has(index)&&!goals.has(index)))return true;
+  const trappedBox=cells.some(([cx,cy])=>{
+   if(!isInside(cx,cy))return false;
+   const index=cy*width+cx;
+   return occupied.has(index)&&!goals.has(index);
+  });
+  if(full&&trappedBox)return true;
  }
  return false;
 }
