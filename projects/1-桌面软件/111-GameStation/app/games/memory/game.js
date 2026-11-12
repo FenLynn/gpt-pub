@@ -2,7 +2,7 @@
 "use strict";
 const allIcons=window.GameMemoryArt?.icons||["🐱","🐶","🐰","🐻","🐼","🦊","🐸","🐥","🐷","🐨","🐧","🐹"];
 const boardEl=document.getElementById("board"),status=document.getElementById("status");
-let cards=[],opened=[],matched=0,moves=0,locked=false,paused=false,over=false;
+let cards=[],opened=[],matched=0,moves=0,streak=0,bestStreak=0,locked=false,paused=false,over=false;
 let tick=null,flipTimer=null,resultTimer=null,animationTimer=null,resizeObserver=null,seconds=0,hostElapsedMs=null,gameplayStarted=false,pairCount=8,difficulty="normal";
 let flipAnimationIndices=new Set(),matchedAnimationIndices=new Set(),closingAnimationIndices=new Set();
 function report(t){status.textContent=t;GameBridge.report(t,{score:Math.max(0,10000-moves*10-seconds*3)});}
@@ -55,6 +55,9 @@ function render(){
  });
  document.getElementById("moves").textContent=moves;
  document.getElementById("pairs").textContent=matched+" / "+pairCount;
+ document.getElementById("streak").textContent=String(streak);
+ document.getElementById("bestStreak").textContent=String(bestStreak);
+ document.getElementById("accuracy").textContent=moves?Math.round(matched/moves*100)+"%":"—";
  document.getElementById("time").textContent=timeText();
  fitBoard();
 }
@@ -77,7 +80,7 @@ function newGame(){
  const icons=allIcons.slice(0,pairCount);
  cards=[...icons,...icons].map((icon,i)=>({icon,key:i,open:false,matched:false}));
  for(let i=cards.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cards[i],cards[j]]=[cards[j],cards[i]];}
- opened=[];matched=0;moves=0;seconds=0;hostElapsedMs=null;gameplayStarted=false;locked=false;paused=false;over=false;
+ opened=[];matched=0;moves=0;streak=0;bestStreak=0;seconds=0;hostElapsedMs=null;gameplayStarted=false;locked=false;paused=false;over=false;
  render();report("翻开两张卡片开始");
 }
 function finishGame(){
@@ -95,12 +98,12 @@ function flip(i){
  if(opened.length===2){
   moves++;const [a,b]=opened;
   if(cards[a].icon===cards[b].icon){
-   cards[a].matched=cards[b].matched=true;matched++;opened=[];
+   cards[a].matched=cards[b].matched=true;matched++;streak++;bestStreak=Math.max(bestStreak,streak);opened=[];
    animateCards({matched:[a,b]});
    if(matched===pairCount){finishGame();return;}
-   report("配对成功");
+   report(streak>=2?"连续配对 "+streak+" 次！":"配对成功");
   }else{
-   locked=true;animateCards({flip:[a,b]});report("不一样，再记住位置");
+   locked=true;streak=0;animateCards({flip:[a,b]});report("不一样，再记住位置");
    flipTimer=setTimeout(()=>{
     cards[a].open=cards[b].open=false;opened=[];locked=false;flipTimer=null;
     animateCards({closing:[a,b]});render();
@@ -112,13 +115,13 @@ function flip(i){
  render();
 }
 if(new URLSearchParams(location.search).has("p111Test")){
- const fixtureState=()=>({cards:cards.map(c=>({icon:c.icon,open:c.open,matched:c.matched})),opened:opened.slice(),matched,moves,locked,paused,over,seconds,pairCount,resultPending:resultTimer!==null});
+ const fixtureState=()=>({cards:cards.map(c=>({icon:c.icon,open:c.open,matched:c.matched})),opened:opened.slice(),matched,moves,streak,bestStreak,locked,paused,over,seconds,pairCount,resultPending:resultTimer!==null});
  window.__p111MemoryTest={
   loadDeck(icons){
    if(!Array.isArray(icons)||!icons.length||icons.some(v=>typeof v!=="string"))throw new Error("Invalid Memory fixture");
    stopClock();clearTimeout(flipTimer);clearTimeout(resultTimer);flipTimer=resultTimer=null;clearAnimations();
    pairCount=icons.length;cards=icons.concat(icons).map(icon=>({icon,key:icon,open:false,matched:false}));
-   opened=[];matched=0;moves=0;locked=false;paused=false;over=false;seconds=0;hostElapsedMs=null;gameplayStarted=false;render();report("测试牌组");return fixtureState();
+   opened=[];matched=0;moves=0;streak=0;bestStreak=0;locked=false;paused=false;over=false;seconds=0;hostElapsedMs=null;gameplayStarted=false;render();report("测试牌组");return fixtureState();
   },
   state:fixtureState,
   flip(i){flip(i);return fixtureState();}
@@ -133,13 +136,15 @@ GameBridge.register({
  pause(){paused=true;report("已暂停");render();},
  resume(){paused=false;if(!over&&(seconds>0||moves>0||opened.length>0||matched>0))startClock();report(over?"本局已完成":"继续挑战");render();},
  setDifficulty(v){configure(v);},
- snapshot(){return{cards:cards.map(c=>({...c})),opened:opened.slice(),matched,moves,seconds,elapsedMs:hostElapsedMs===null?seconds*1000:hostElapsedMs,gameplayStarted,pairCount,difficulty,locked,over};},
+ snapshot(){return{cards:cards.map(c=>({...c})),opened:opened.slice(),matched,moves,streak,bestStreak,seconds,elapsedMs:hostElapsedMs===null?seconds*1000:hostElapsedMs,gameplayStarted,pairCount,difficulty,locked,over};},
  restore(s){
   if(!s||!Array.isArray(s.cards)||!s.cards.length)throw new Error("记忆翻牌存档数据无效");
   stopClock();clearTimeout(flipTimer);clearTimeout(resultTimer);flipTimer=resultTimer=null;clearAnimations();
   cards=s.cards.map(c=>({icon:String(c.icon),key:Number(c.key),open:!!c.open,matched:!!c.matched}));
   opened=Array.isArray(s.opened)?s.opened.map(Number).filter(i=>Number.isInteger(i)&&i>=0&&i<cards.length):[];
-  matched=Math.max(0,Number(s.matched)||0);moves=Math.max(0,Number(s.moves)||0);seconds=Math.max(0,Number(s.seconds)||0);
+  matched=Math.max(0,Number(s.matched)||0);moves=Math.max(0,Number(s.moves)||0);
+  streak=Math.max(0,Math.min(matched,Math.floor(Number(s.streak)||0)));
+  bestStreak=Math.max(streak,Math.min(matched,Math.floor(Number(s.bestStreak)||0)));seconds=Math.max(0,Number(s.seconds)||0);
   pairCount=Math.max(1,Number(s.pairCount)||Math.floor(cards.length/2));difficulty=["easy","normal","hard"].includes(s.difficulty)?s.difficulty:difficulty;
   locked=!!s.locked;over=!!s.over||matched===pairCount;paused=true;
   gameplayStarted=typeof s.gameplayStarted==="boolean"?s.gameplayStarted:(seconds>0||moves>0||opened.length>0||matched>0);
