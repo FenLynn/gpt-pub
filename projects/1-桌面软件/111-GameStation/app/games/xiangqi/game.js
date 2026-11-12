@@ -3,6 +3,7 @@
 const root=document.getElementById("game"),el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot"),boardArea=document.querySelector(".game-main-board");
 let boardObserver=null,layoutReadySent=false;
 function syncRecordRailHeight(){const rail=document.querySelector(".xiangqi-record-rail"),actual=el.getBoundingClientRect().height;if(rail&&actual>0)rail.style.setProperty("--xiangqi-record-height",actual+"px");}
+function onLayoutResize(){syncRecordRailHeight();tryMarkLayoutReady();}
 function tryMarkLayoutReady(){
  if(layoutReadySent||!root.classList.contains("gs-tools-open")||root.classList.contains("rail-collapsed"))return;
  const boardRect=el.getBoundingClientRect(),mainRect=boardArea.getBoundingClientRect();
@@ -417,8 +418,8 @@ document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render(
 document.getElementById("undoButton").addEventListener("click",undo);
 document.getElementById("xiangqiReplay").addEventListener("click",()=>GameBridge.send("REQUEST_NEW_GAME"));
 document.getElementById("xiangqiLeave").addEventListener("click",()=>GameBridge.send("CONTROL",{action:"leave"}));
-window.addEventListener("resize",()=>{syncRecordRailHeight();tryMarkLayoutReady();});
-if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(()=>{syncRecordRailHeight();tryMarkLayoutReady();});boardObserver.observe(boardArea);}
+window.addEventListener("resize",onLayoutResize);
+if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(onLayoutResize);boardObserver.observe(boardArea);}
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111XiangqiTest={
   loadPosition(pieces,side="red"){
@@ -474,5 +475,5 @@ window.addEventListener("message",event=>{
  if(m?.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!=="xiangqi")return;
  /* Manual ending is settled by the host; native effects remain for actual results. */
 });
-GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(over)return;if(turn==="black"&&mode==="ai"){report(nextTurnStatus()+" · AI 思考中");scheduleAI();}else report(nextTurnStatus());},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},snapshot(){return{board:clone(board),turn,mode,difficulty,flip,history:history.map(h=>({...h,board:clone(h.board),move:h.move?{...h.move}:null})),positionTrail:positionTrail.map(p=>({...p})),turnClock:window.GameTurnClock?.snapshot?.()||null};},restore(s){if(!s||!Array.isArray(s.board)||s.board.length!==10||s.board.some(r=>!Array.isArray(r)||r.length!==9))throw new Error("中国象棋存档数据无效");clearTimeout(aiTimer);board=clone(s.board);turn=s.turn==="black"?"black":"red";mode=s.mode==="two"?"two":"ai";difficulty=s.difficulty||difficulty;flip=!!s.flip;history=Array.isArray(s.history)?s.history.map(h=>({...h,board:clone(h.board),move:h.move?{...h.move}:null})):[];positionTrail=Array.isArray(s.positionTrail)?s.positionTrail.map(p=>({...p})):[];selected=null;selectedMoves=[];over=false;paused=true;clearResult();window.GameTurnClock?.restore?.(s.turnClock);render();report("已恢复上次进度 · "+nextTurnStatus());},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",syncRecordRailHeight);}});
+GameBridge.register({init(p){mode=p.mode||"ai";difficulty=p.difficulty||"normal";newGame();},newGame,pause(){paused=true;clearTimeout(aiTimer);report("已暂停");},resume(){paused=false;if(over)return;if(turn==="black"&&mode==="ai"){report(nextTurnStatus()+" · AI 思考中");scheduleAI();}else report(nextTurnStatus());},setMode(v){mode=v==="two"?"two":"ai";},setDifficulty(v){difficulty=v||"normal";},snapshot(){return{board:clone(board),turn,mode,difficulty,flip,history:history.map(h=>({...h,board:clone(h.board),move:h.move?{...h.move}:null})),positionTrail:positionTrail.map(p=>({...p})),turnClock:window.GameTurnClock?.snapshot?.()||null};},restore(s){if(!s||!Array.isArray(s.board)||s.board.length!==10||s.board.some(r=>!Array.isArray(r)||r.length!==9))throw new Error("中国象棋存档数据无效");clearTimeout(aiTimer);board=clone(s.board);turn=s.turn==="black"?"black":"red";mode=s.mode==="two"?"two":"ai";difficulty=s.difficulty||difficulty;flip=!!s.flip;history=Array.isArray(s.history)?s.history.map(h=>({...h,board:clone(h.board),move:h.move?{...h.move}:null})):[];positionTrail=Array.isArray(s.positionTrail)?s.positionTrail.map(p=>({...p})):[];selected=null;selectedMoves=[];over=false;paused=true;clearResult();window.GameTurnClock?.restore?.(s.turnClock);render();report("已恢复上次进度 · "+nextTurnStatus());},dispose(){clearTimeout(aiTimer);boardObserver?.disconnect();window.removeEventListener("resize",onLayoutResize);}});
 })();
