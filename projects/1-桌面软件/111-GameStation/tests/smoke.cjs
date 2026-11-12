@@ -1449,6 +1449,12 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.ok(sudokuRail.gap>=0&&sudokuRail.gap<=22&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
    "Sudoku right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sudokuRail));
   await sudokuFixture.screenshot({path:path.join(artifacts,"sudoku-large-digits-adjacent-rail.png")});
+  await sudokuFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
+  const sudokuCentered=await sudokuFixture.evaluate(()=>{
+   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector("#board").getBoundingClientRect();
+   return Math.abs((board.left+board.right-main.left-main.right)/2);
+  });
+  assert.ok(sudokuCentered<=2,"Sudoku board must return to center when the right rail is collapsed: "+sudokuCentered);
   await sudokuFixture.setViewportSize({width:1366,height:768});
   const sudokuCompact=await sudokuFixture.locator(".sudoku-cell").first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
   assert.ok(sudokuCompact>=22,"Sudoku digits must remain large at 1366×768: "+sudokuCompact);
@@ -1486,6 +1492,12 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   const firstLevelHint=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.hintPath());
   assert.ok(Array.isArray(firstLevelHint)&&firstLevelHint.length===1,"The Sokoban hint must return one responsive, legal next-step suggestion");
   await sokobanFixture.screenshot({path:path.join(artifacts,"sokoban-90-levels-adjacent-rail.png")});
+  await sokobanFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
+  const sokobanCentered=await sokobanFixture.evaluate(()=>{
+   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector(".soko-stage").getBoundingClientRect();
+   return Math.abs((board.left+board.right-main.left-main.right)/2);
+  });
+  assert.ok(sokobanCentered<=2,"Sokoban board must return to center when the right rail is collapsed: "+sokobanCentered);
   await sokobanFixture.setViewportSize({width:1366,height:768});
   const compactSokoban=await sokobanFixture.locator(".soko-cell:not(.void)").first().boundingBox();
   assert.ok(compactSokoban&&Math.abs(compactSokoban.width-compactSokoban.height)<=1.5,"Sokoban cells must remain square at 1366×768: "+JSON.stringify(compactSokoban));
