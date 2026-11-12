@@ -206,10 +206,12 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const primary=el.classList.contains("battleship-layout")?el.querySelector(".fleet-boards"):surface;
    const history=el.querySelector(".xiangqi-record-rail,.chess-notation-rail,.reversi-record-rail");
    const gridColumns=getComputedStyle(el).gridTemplateColumns.split(/\s+/).map(value=>parseFloat(value));
-   return {root:box(el),main:box(main),surface:box(surface),primary:box(primary),history:history?box(history):null,
+   const mainBox=box(main),toolBox=tools?box(tools):null;
+   return {root:box(el),main:mainBox,surface:box(surface),primary:box(primary),history:history?box(history):null,
     gridColumns,historyGridColumn:history?getComputedStyle(history).gridColumnStart:null,
     mainGridColumn:main?getComputedStyle(main).gridColumnStart:null,
     toolsGridColumn:tools?getComputedStyle(tools).gridColumnStart:null,
+    toolsCenterDelta:toolBox?Math.abs((toolBox.y+toolBox.height/2)-(mainBox.y+mainBox.height/2)):null,
     expectedHistoryWidth:innerWidth<=900?240:Math.min(340,Math.max(280,innerWidth*.24)),
     tools:tools?box(tools):null,toolsVisible:!!tools&&getComputedStyle(tools).display!=="none",
     guide:el.querySelector(".game-guide")?getComputedStyle(el.querySelector(".game-guide")).display:"none",
@@ -218,7 +220,14 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     battleship:el.classList.contains("battleship-layout"),overflow:document.documentElement.scrollWidth,viewport:innerWidth};
   });
   const centerOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.root.x+v.root.width/2));
-  if(name==="飞行棋"){
+  if(name==="数独"||name==="推箱子"){
+   const railGap=v.tools.x-v.primary.right;
+   assert.ok(railGap>=0&&railGap<=22,name+" right controls must sit directly beside the board: "+JSON.stringify({railGap,geometry:v}));
+   assert.ok(v.toolsCenterDelta<=4,name+" right controls must be vertically centered: "+JSON.stringify(v));
+   assert.equal(v.mainGridColumn,"1",name+" playfield must occupy the first grid track");
+   assert.equal(v.toolsGridColumn,"2",name+" right controls must occupy the adjacent second track");
+   assert.equal(v.gridColumns.length,2,name+" must use a compact two-track board-and-controls layout: "+JSON.stringify(v));
+  }else if(name==="飞行棋"){
    const centerTrackOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.main.x+v.main.width/2));
    assert.ok(centerTrackOffset<=2.5,"Flight Chess board must center in the actual space between its wider history rail and compact right controls: "+JSON.stringify({centerTrackOffset,geometry:v}));
    assert.ok(v.history.right<=v.primary.x+2,"Flight Chess history rail must not overlap the physical board: "+JSON.stringify(v));

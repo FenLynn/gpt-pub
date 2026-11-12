@@ -2116,28 +2116,28 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 
  
 /* R62 · Sudoku and Sokoban use a true adjacent, vertically centered right rail.
-   Keep the board at the right edge of the play column so the controls sit beside
-   the board instead of floating at the far edge of a symmetric empty gutter. */
+   The host titlebar lives outside the iframe, so the playfield occupies the full
+   iframe height. An ID-qualified selector overrides the generic three-track rail. */
 @media(min-width:701px){
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout){
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout){
   grid-template-columns:minmax(0,1fr) minmax(210px,236px)!important;
-  grid-template-rows:52px minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;
   column-gap:clamp(10px,1vw,16px)!important;
   padding:0 12px 10px!important;
   justify-content:stretch!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.gs-hud{
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.gs-hud{
   grid-column:1/-1!important;grid-row:1!important;width:100%!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-main-board{
-  grid-column:1!important;grid-row:2!important;min-width:0!important;min-height:0!important;
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-main-board{
+  grid-column:1!important;grid-row:1!important;min-width:0!important;min-height:0!important;
   width:100%!important;height:100%!important;justify-self:stretch!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-main-board>.game-panel{
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-main-board>.game-panel{
   justify-items:end!important;align-items:center!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-tools{
-  position:relative!important;grid-column:2!important;grid-row:2!important;
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-tools{
+  position:relative!important;grid-column:2!important;grid-row:1!important;
   top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
   display:flex!important;flex-direction:column!important;align-items:stretch!important;
   justify-content:flex-start!important;align-self:center!important;justify-self:stretch!important;
@@ -2148,7 +2148,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   background:transparent!important;box-shadow:none!important;
   overflow-x:hidden!important;overflow-y:auto!important;scrollbar-width:none!important
  }
- .game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-tools::-webkit-scrollbar{
+ #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-tools::-webkit-scrollbar{
   display:none!important;width:0!important
  }
 }
