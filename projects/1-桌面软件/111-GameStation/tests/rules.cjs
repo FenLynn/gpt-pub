@@ -6,6 +6,19 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,args:["--no-sandbox","--disable-dev-shm-usage","--allow-file-access-from-files"]});
  const page=await browser.newPage({viewport:{width:1200,height:900}});
  const errors=[];page.on("pageerror",err=>errors.push(err.message));
+ const openTools=async(target,gameId,name)=>{
+  const opened=await target.evaluate(({gameId,name})=>{
+   const sessionId="p111-rules";
+   const base={channel:"gamestation",protocolVersion:1,gameId,sessionId};
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{...base,type:"INIT",payload:{
+    sessionId,name,mode:"ai",difficulty:"normal",modes:[],hasDifficulty:false
+   }}}));
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{...base,type:"SET_RAIL",payload:{collapsed:false}}}));
+   return document.querySelector(".game-root")?.classList.contains("gs-tools-open")===true;
+  },{gameId,name});
+  assert.equal(opened,true,gameId+" right-side tools rail must open through the real host SET_RAIL message");
+  await target.locator("#hint").waitFor({state:"visible"});
+ };
  try{
   const src=pathToFileURL(path.resolve(__dirname,"../app/games/chess/index.html")).href+"?p111Test=1";
   await page.goto(src);
@@ -247,6 +260,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   sokoban.on("pageerror",e=>errors.push("Sokoban: "+e.message));
   await sokoban.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sokoban/index.html")).href+"?p111Test=1");
   await sokoban.waitForFunction(()=>!!window.__p111SokobanTest);
+  await openTools(sokoban,"sokoban","推箱子");
   let boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
   assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.deepEqual(boxState.goals,[22]);
   assert.equal(boxState.level,0);assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
@@ -328,6 +342,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   sudoku.on("pageerror",e=>errors.push("Sudoku: "+e.message));
   await sudoku.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sudoku/index.html")).href+"?p111Test=1");
   await sudoku.waitForFunction(()=>!!window.__p111SudokuTest);
+  await openTools(sudoku,"sudoku","数独");
   const sudokuSolution=[
    [5,3,4,6,7,8,9,1,2],[6,7,2,1,9,5,3,4,8],[1,9,8,3,4,2,5,6,7],
    [8,5,9,7,6,1,4,2,3],[4,2,6,8,5,3,7,9,1],[7,1,3,9,2,4,8,5,6],
@@ -335,11 +350,21 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   ];
   const sudokuPuzzle=sudokuSolution.map(row=>row.slice());sudokuPuzzle[0][0]=0;sudokuPuzzle[0][1]=0;
   let sudokuState=await sudoku.evaluate(([p,s])=>window.__p111SudokuTest.loadPuzzle(p,s),[sudokuPuzzle,sudokuSolution]);
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(0));
+  await sudoku.locator("#hint").click();
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.state());
+  assert.equal(sudokuState.puzzle[0][0],0,"Sudoku hint must not enter the answer automatically");
+  assert.equal(sudokuState.hintValue,5);assert.match(sudokuState.status,/应填 5/);
   sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(2));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(1));
   assert.equal(sudokuState.puzzle[0][2],4,"Sudoku must protect given clues");
   sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(0));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(4));
-  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.check());
-  assert.ok(sudokuState.status.includes("发现 1 个错误"),"Sudoku check must identify incorrect entries");
+  await sudoku.locator("#check").click();
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.state());
+  assert.ok(sudokuState.status.includes("发现 1 个错误"),"Sudoku check button must identify incorrect entries");
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(1));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(3));
+  await sudoku.locator("#undo").click();
+  sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.state());
+  assert.equal(sudokuState.puzzle[0][1],0,"Sudoku undo button must remove the latest entry");
   sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(1));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(3));
   sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.select(0));sudokuState=await sudoku.evaluate(()=>window.__p111SudokuTest.put(5));
   assert.equal(sudokuState.over,true);assert.deepEqual(sudokuState.puzzle,sudokuSolution,"Sudoku must finish only when every cell matches the solution");
