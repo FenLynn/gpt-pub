@@ -31,11 +31,25 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  }
  async function open(name){
   await library();game=name;
+  if(name==="中国象棋")await page.evaluate(()=>{
+   const stage=document.querySelector("#stageLoading");window.__xqPrematureReveal=false;
+   window.__xqStageObserver?.disconnect();window.__xqStageObserver=new MutationObserver(()=>{
+    if(!stage.classList.contains("done"))return;
+    const root=document.querySelector("#gameFrame")?.contentDocument?.querySelector("#game");
+    if(!root?.classList.contains("xiangqi-layout-ready"))window.__xqPrematureReveal=true;
+   });window.__xqStageObserver.observe(stage,{attributes:true,attributeFilter:["class"]});
+  });
   await page.locator(".game-card").filter({hasText:name}).click();
   await frame.locator("#game").waitFor({state:"visible",timeout:10000});
   await page.locator("#gameActions:not(.hidden)").waitFor({state:"visible",timeout:10000});
   await page.locator("#startButton:not([disabled])").waitFor({state:"visible",timeout:10000});
   await page.waitForTimeout(55);
+  if(name==="中国象棋"){
+   const ready=await frame.locator("#game").evaluate(root=>({ready:root.classList.contains("xiangqi-layout-ready"),visibility:getComputedStyle(root).visibility,cells:root.querySelectorAll("#board > .xiangqi-cell").length,loadingDone:document.querySelector("#stageLoading")?.classList.contains("done")}));
+   assert.ok(ready.ready&&ready.visibility==="visible"&&ready.cells===90&&ready.loadingDone,"Xiangqi must stay covered until all 90 buttons and final rail geometry are ready: "+JSON.stringify(ready));
+   assert.equal(await page.evaluate(()=>window.__xqPrematureReveal),false,"Host loading cover must never disappear before Xiangqi layout-ready handshake");
+   await page.evaluate(()=>window.__xqStageObserver?.disconnect());
+  }
   return frame;
  }
  async function start(){
