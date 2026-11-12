@@ -1140,13 +1140,16 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    document.querySelector("#game").classList.add("gs-tools-open");
   });
   const sudokuRail=await sudokuFixture.evaluate(()=>{
-   const board=document.querySelector("#board").getBoundingClientRect();
+   const boardEl=document.querySelector("#board"),board=boardEl.getBoundingClientRect();
    const main=document.querySelector(".game-main-board").getBoundingClientRect();
+   const panel=document.querySelector(".game-main-board>.game-panel"),panelBox=panel.getBoundingClientRect();
    const rail=document.querySelector(".game-tools").getBoundingClientRect();
-   const cell=document.querySelector(".sudoku-cell");
+   const cell=document.querySelector(".sudoku-cell"),panelStyle=getComputedStyle(panel),boardStyle=getComputedStyle(boardEl);
    return{font:parseFloat(getComputedStyle(cell).fontSize),padFont:parseFloat(getComputedStyle(document.querySelector(".number-pad button")).fontSize),
     gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
-    right:rail.right,visible:getComputedStyle(document.querySelector(".game-tools")).display};
+    right:rail.right,visible:getComputedStyle(document.querySelector(".game-tools")).display,
+    rootClass:document.querySelector("#game").className,panel:{x:panelBox.x,right:panelBox.right,width:panelBox.width,display:panelStyle.display,justifyContent:panelStyle.justifyContent,justifyItems:panelStyle.justifyItems},
+    board:{x:board.x,right:board.right,width:board.width,justifySelf:boardStyle.justifySelf,marginLeft:boardStyle.marginLeft,marginRight:boardStyle.marginRight}};
   });
   assert.ok(sudokuRail.font>=28&&sudokuRail.padFont>=19,"Sudoku board digits and number pad must be substantially larger: "+JSON.stringify(sudokuRail));
   assert.ok(sudokuRail.gap>=0&&sudokuRail.gap<=22&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
