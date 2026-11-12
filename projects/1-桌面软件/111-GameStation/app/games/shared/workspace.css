@@ -2136,6 +2136,12 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-main-board>.game-panel{
   justify-items:end!important;align-items:center!important
  }
+ /* Explicitly align the actual square board to the control-side edge.
+    The generic .game-panel centering rule can otherwise win at compact widths. */
+ #game.sudoku-layout>.game-main-board>.game-panel>#board,
+ #game.sokoban-layout>.game-main-board>.game-panel>.soko-stage{
+  justify-self:end!important;margin-left:auto!important;margin-right:0!important
+ }
  #game.game-root.game-layout.gs-tools-open:not(.rail-collapsed):is(.sudoku-layout,.sokoban-layout)>.game-tools{
   position:relative!important;grid-column:2!important;grid-row:1!important;
   top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
