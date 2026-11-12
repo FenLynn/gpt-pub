@@ -2043,6 +2043,19 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   cannonPage.on("pageerror",err=>errors.push("Xiangqi rules: "+err.message));
   await cannonPage.goto(pathToFileURL(path.resolve(root,"games/xiangqi/index.html")).href+"?p111Test=1");
   await cannonPage.waitForFunction(()=>typeof window.__p111XiangqiTest?.loadPosition==="function");
+  // Standalone file:// rule pages need the same INIT/SET_RAIL lifecycle as
+  // a real GameStation iframe before testing visible pointer interactions.
+  await cannonPage.evaluate(()=>{
+   const sessionId="p111-cannon-smoke";
+   const base={channel:"gamestation",protocolVersion:1,gameId:"xiangqi",sessionId};
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{
+    ...base,type:"INIT",payload:{sessionId,mode:"two",difficulty:"normal"}
+   }}));
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{
+    ...base,type:"SET_RAIL",payload:{collapsed:false}
+   }}));
+  });
+  await cannonPage.locator("#board .xiangqi-cell").first().waitFor({state:"visible"});
   const cannonLoad=(pieces,side="red")=>cannonPage.evaluate(([p,s])=>window.__p111XiangqiTest.loadPosition(p,s),[pieces,side]);
   const cannonMoves=()=>cannonPage.evaluate(()=>window.__p111XiangqiTest.legal("red"));
   const cannonBase=[[4,0,"black","将"],[4,9,"red","帅"],[4,6,"red","兵"]];
