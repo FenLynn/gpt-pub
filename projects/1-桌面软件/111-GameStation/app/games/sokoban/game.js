@@ -2,7 +2,7 @@
 "use strict";
 const levels=window.GAME_SOKOBAN_LEVELS;
 if(!Array.isArray(levels)||levels.length!==90)throw new Error("经典推箱子关卡集未正确加载");
-const board=const board=document.getElementById("board"),stage=document.querySelector(".soko-stage"),status=document.getElementById("sokobanStatus"),
+const board=document.getElementById("board"),stage=document.querySelector(".soko-stage"),status=document.getElementById("sokobanStatus"),
  levelEl=document.getElementById("level"),movesEl=document.getElementById("moves"),
  pushesEl=document.getElementById("pushes"),goalProgressEl=document.getElementById("goalProgress"),
  goalBar=document.getElementById("goalBar"),undoButton=document.getElementById("undo"),
