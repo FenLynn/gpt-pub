@@ -1134,6 +1134,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   const sudokuFixture=await browser.newPage({viewport:{width:1440,height:1000}});
   await sudokuFixture.goto(pathToFileURL(path.resolve(root,"games/sudoku/index.html")).href+"?p111Test=1");
   await sudokuFixture.waitForFunction(()=>!!window.__p111SudokuTest);
+  await sudokuFixture.waitForFunction(()=>!!document.querySelector("#gameWorkspaceStyles")?.sheet);
   await sudokuFixture.evaluate(()=>{
    window.__p111SudokuTest.newGame("hard");
    document.querySelector("#game").classList.add("gs-tools-open");
@@ -1165,6 +1166,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   const sokobanFixture=await browser.newPage({viewport:{width:1440,height:1000}});
   await sokobanFixture.goto(pathToFileURL(path.resolve(root,"games/sokoban/index.html")).href+"?p111Test=1");
   await sokobanFixture.waitForFunction(()=>!!window.__p111SokobanTest);
+  await sokobanFixture.waitForFunction(()=>!!document.querySelector("#gameWorkspaceStyles")?.sheet);
   const sokobanCatalog=await sokobanFixture.evaluate(()=>Array.from({length:window.__p111SokobanTest.levelCount},(_,i)=>window.__p111SokobanTest.levelInfo(i)));
   assert.equal(sokobanCatalog.length,90,"Sokoban must ship the complete 90-level classic collection");
   assert.ok(sokobanCatalog.every((level,i)=>Number.isFinite(level.difficultyScore)&&(i===0||level.difficultyScore>=sokobanCatalog[i-1].difficultyScore)),
