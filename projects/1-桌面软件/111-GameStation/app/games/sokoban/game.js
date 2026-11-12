@@ -267,9 +267,17 @@ function fitStage(){
  if(!stage||!width||!height)return;
  const panel=stage.parentElement;
  if(!panel)return;
- const bounds=panel.getBoundingClientRect(),css=getComputedStyle(panel);
- const availableWidth=bounds.width-parseFloat(css.paddingLeft||0)-parseFloat(css.paddingRight||0);
- const availableHeight=bounds.height-parseFloat(css.paddingTop||0)-parseFloat(css.paddingBottom||0);
+ const area=stage.closest(".game-main-board");
+ const innerSize=element=>{
+  const bounds=element.getBoundingClientRect(),css=getComputedStyle(element);
+  return{
+   width:bounds.width-parseFloat(css.paddingLeft||0)-parseFloat(css.paddingRight||0),
+   height:bounds.height-parseFloat(css.paddingTop||0)-parseFloat(css.paddingBottom||0)
+  };
+ };
+ const panelSize=innerSize(panel),areaSize=area?innerSize(area):panelSize;
+ const availableWidth=Math.min(panelSize.width,areaSize.width)-2;
+ const availableHeight=Math.min(panelSize.height,areaSize.height)-2;
  // The grid's 4px gaps, 10px padding and 3px border must be subtracted
  // before sizing cells; outer-board aspect ratio alone distorts rectangular maps.
  const gap=4,edge=13;
