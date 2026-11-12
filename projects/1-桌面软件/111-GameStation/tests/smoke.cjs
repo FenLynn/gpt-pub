@@ -45,8 +45,9 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.locator("#startButton:not([disabled])").waitFor({state:"visible",timeout:10000});
   await page.waitForTimeout(55);
   if(name==="中国象棋"){
-   const ready=await frame.locator("#game").evaluate(root=>({ready:root.classList.contains("xiangqi-layout-ready"),visibility:getComputedStyle(root).visibility,cells:root.querySelectorAll("#board > .xiangqi-cell").length,loadingDone:document.querySelector("#stageLoading")?.classList.contains("done")}));
-   assert.ok(ready.ready&&ready.visibility==="visible"&&ready.cells===90&&ready.loadingDone,"Xiangqi must stay covered until all 90 buttons and final rail geometry are ready: "+JSON.stringify(ready));
+   const ready=await frame.locator("#game").evaluate(root=>({ready:root.classList.contains("xiangqi-layout-ready"),visibility:getComputedStyle(root).visibility,cells:root.querySelectorAll("#board > .xiangqi-cell").length}));
+   const loadingDone=await page.locator("#stageLoading").evaluate(el=>el.classList.contains("done"));
+   assert.ok(ready.ready&&ready.visibility==="visible"&&ready.cells===90&&loadingDone,"Xiangqi must stay covered until all 90 buttons and final rail geometry are ready: "+JSON.stringify({...ready,loadingDone}));
    const cleanup=await frame.locator("#game").evaluate(root=>({
     rogueButtons:[...root.querySelectorAll("button")].filter(b=>!b.closest(".xiangqi-board")&&!(b.closest(".game-tools")&&["undoButton","flip","resignButton"].includes(b.id))).map(b=>({id:b.id,text:b.textContent.trim(),parent:b.parentElement?.className})),
     leftButtons:root.querySelectorAll(".xiangqi-record-rail button,.xiangqi-record-rail input,.xiangqi-record-rail select,.xiangqi-record-rail summary").length,
