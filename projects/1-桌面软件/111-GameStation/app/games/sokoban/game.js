@@ -410,7 +410,19 @@ if(stageObserver)stageObserver.observe(stagePanel);
 window.addEventListener("resize",fitStage);
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111SokobanTest={
-  loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
+  loadLevel(index){paused=false;parseLevel(index);return fixtureState();},
+  // Browser rule fixture: exercises the real move/settlement/snapshot pipeline
+  // without pretending the 90 classical maps are one-push tutorial boards.
+  loadFixture(rows,index=0){
+   const layout=decodeLevel(rows);
+   paused=false;hideOverlays();clearHintHighlight();hintCount=0;
+   level=Math.max(0,Math.min(levels.length-1,index));
+   width=layout.width;height=layout.height;walls=layout.walls;voids=layout.voids;
+   boxes=layout.boxes;goals=layout.goals;player=layout.player;
+   staticDeadSquares=computeStaticDeadSquares();moves=0;pushes=0;history=[];
+   complete=isComplete();fitStage();render();setStatus("规则测试局面");
+   return fixtureState();
+  },state:fixtureState,
   move(dx,dy){move(dx,dy);return fixtureState();},undo(){undo();return fixtureState();},
   nextLevel(){nextLevel();return fixtureState();},resetLevel(){resetLevel();return fixtureState();},
   openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(Number.isInteger(index)&&index>=0&&index<levels.length&&!paused)parseLevel(index);return fixtureState();},
