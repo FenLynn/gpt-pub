@@ -239,6 +239,8 @@ function updateStats(){
 function render(){
  const fragment=document.createDocumentFragment(),deadlocked=new Set();
  for(const box of boxes)if(isCornerDeadlock(box))deadlocked.add(box);
+ board.style.setProperty("--soko-cols",String(width));
+ board.style.setProperty("--soko-rows",String(height));
  board.style.gridTemplateColumns="repeat("+width+",minmax(0,1fr))";
  board.style.gridTemplateRows="repeat("+height+",minmax(0,1fr))";board.style.aspectRatio=width+" / "+height;
  board.setAttribute("aria-rowcount",String(height));board.setAttribute("aria-colcount",String(width));
