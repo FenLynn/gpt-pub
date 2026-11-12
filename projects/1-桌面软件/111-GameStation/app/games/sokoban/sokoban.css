@@ -10,6 +10,7 @@
  position:relative;display:grid;place-items:center;min-width:0;min-height:0;width:auto!important;height:auto!important;
  aspect-ratio:auto!important;border:1px solid #d1ddcf;border-radius:4px;background:#edf3e8;box-shadow:inset 0 1px rgba(255,255,255,.88)
 }
+.sokoban-layout #board .soko-cell.void{visibility:hidden!important;border-color:transparent!important;background:transparent!important;box-shadow:none!important}
 .sokoban-layout #board .soko-cell.wall{
  border:1px solid #3f5e64;border-radius:3px;
  background:repeating-linear-gradient(180deg,#6d898c 0 8px,#5e7b7f 8px 12px,#4d696e 12px 15px);
@@ -52,6 +53,7 @@
 .sokoban-layout .soko-dir.right{grid-column:3;grid-row:2}.sokoban-layout .soko-dir.down{grid-column:2;grid-row:3}
 .sokoban-layout .soko-dpad-center{grid-column:2;grid-row:2;display:grid;place-items:center;color:#91a39b;font-size:9px;font-weight:700}
 .sokoban-layout .soko-key-hint{color:#8a9a91;font-size:9px;line-height:1.4;text-align:center}
+.sokoban-layout .soko-source-note{color:#91a197;font-size:9px;line-height:1.35;text-align:center}
 .sokoban-layout .soko-legend{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
 .sokoban-layout .soko-legend>div{
  display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;padding:5px 3px;
@@ -91,7 +93,7 @@
 .sokoban-layout .game-main-board>.game-panel{display:grid!important;place-items:center!important;min-height:0}
 .sokoban-layout .soko-stage{
  position:relative;display:grid;place-items:center;width:min(100cqw,calc(100cqh * 9 / 7));
- height:auto;max-width:100%;max-height:100%;aspect-ratio:9/7;isolation:isolate;
+ height:min(100cqh,calc(100cqw * 7 / 9));max-width:100%;max-height:100%;aspect-ratio:9/7;isolation:isolate;
 }
 .sokoban-layout .soko-stage #board{
  width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;
@@ -128,7 +130,7 @@
 .sokoban-layout .soko-action:disabled{opacity:.48;cursor:not-allowed}
 .sokoban-layout .soko-picker-dialog{width:min(100%,440px);gap:9px}
 .sokoban-layout .soko-level-grid{
- display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;width:100%;
+ display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:6px;width:100%;
  overflow:auto;min-height:0;padding:2px;flex:1 1 auto;
 }
 .sokoban-layout .soko-level-option{
@@ -140,5 +142,5 @@
 .sokoban-layout .soko-level-option.cleared{background:#e4f7e9;color:#2e8555}
 .sokoban-layout .soko-level-option:disabled{opacity:.32;cursor:not-allowed;background:#e8eee9}
 .sokoban-layout .soko-level-option:hover:not(:disabled){border-color:#6fb38a;background:#eaf7ef}
-@media(max-width:700px){.sokoban-layout .soko-dialog{gap:5px;padding:10px}.sokoban-layout .soko-level-option{min-height:29px}}
+@media(max-width:700px){.sokoban-layout .soko-dialog{gap:5px;padding:10px}.sokoban-layout .soko-level-grid{grid-template-columns:repeat(7,minmax(0,1fr))}.sokoban-layout .soko-level-option{min-height:29px}}
 @media(prefers-reduced-motion:reduce){.sokoban-layout .soko-overlay{backdrop-filter:none}}
