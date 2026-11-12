@@ -83,6 +83,19 @@ function newGame(){
  opened=[];matched=0;moves=0;streak=0;bestStreak=0;seconds=0;hostElapsedMs=null;gameplayStarted=false;locked=false;paused=false;over=false;
  render();report("翻开两张卡片开始");
 }
+function closeMismatch(){
+ flipTimer=null;
+ if(paused||over||!locked||opened.length!==2)return;
+ const [a,b]=opened;
+ if(cards[a])cards[a].open=false;
+ if(cards[b])cards[b].open=false;
+ opened=[];locked=false;
+ animateCards({closing:[a,b]});render();
+}
+function scheduleMismatchClose(){
+ if(flipTimer!==null){clearTimeout(flipTimer);flipTimer=null;}
+ if(!paused&&!over&&locked&&opened.length===2)flipTimer=setTimeout(closeMismatch,750);
+}
 function finishGame(){
  if(over)return;
  over=true;stopClock();GameBridge.send("CLOCK_STOP");
@@ -104,10 +117,7 @@ function flip(i){
    report(streak>=2?"连续配对 "+streak+" 次！":"配对成功");
   }else{
    locked=true;streak=0;animateCards({flip:[a,b]});report("不一样，再记住位置");
-   flipTimer=setTimeout(()=>{
-    cards[a].open=cards[b].open=false;opened=[];locked=false;flipTimer=null;
-    animateCards({closing:[a,b]});render();
-   },750);
+   scheduleMismatchClose();
   }
  }else{
   animateCards({flip:[i]});
@@ -124,6 +134,8 @@ if(new URLSearchParams(location.search).has("p111Test")){
    opened=[];matched=0;moves=0;streak=0;bestStreak=0;locked=false;paused=false;over=false;seconds=0;hostElapsedMs=null;gameplayStarted=false;render();report("测试牌组");return fixtureState();
   },
   state:fixtureState,
+  pause(){paused=true;if(flipTimer!==null){clearTimeout(flipTimer);flipTimer=null;}render();return fixtureState();},
+  resume(){paused=false;scheduleMismatchClose();render();return fixtureState();},
   flip(i){flip(i);return fixtureState();}
  };
 }
@@ -133,8 +145,8 @@ window.addEventListener("resize",fitBoard);
 GameBridge.register({
  init(p){configure(p.difficulty);newGame();},
  newGame,
- pause(){paused=true;report("已暂停");render();},
- resume(){paused=false;if(!over&&(seconds>0||moves>0||opened.length>0||matched>0))startClock();report(over?"本局已完成":"继续挑战");render();},
+ pause(){paused=true;if(flipTimer!==null){clearTimeout(flipTimer);flipTimer=null;}report("已暂停");render();},
+ resume(){paused=false;scheduleMismatchClose();if(!over&&(seconds>0||moves>0||opened.length>0||matched>0))startClock();report(over?"本局已完成":"继续挑战");render();},
  setDifficulty(v){configure(v);},
  snapshot(){return{cards:cards.map(c=>({...c})),opened:opened.slice(),matched,moves,streak,bestStreak,seconds,elapsedMs:hostElapsedMs===null?seconds*1000:hostElapsedMs,gameplayStarted,pairCount,difficulty,locked,over};},
  restore(s){
@@ -150,7 +162,6 @@ GameBridge.register({
   gameplayStarted=typeof s.gameplayStarted==="boolean"?s.gameplayStarted:(seconds>0||moves>0||opened.length>0||matched>0);
   hostElapsedMs=Math.max(0,Number(s.elapsedMs)||seconds*1000);seconds=Math.floor(hostElapsedMs/1000);
   render();
-  if(locked&&opened.length===2){const [a,b]=opened;flipTimer=setTimeout(()=>{if(cards[a]&&cards[b]){cards[a].open=cards[b].open=false;}opened=[];locked=false;flipTimer=null;render();},750);}
   report(over?"本局已完成":"已恢复上次进度");
  },
  dispose(){
