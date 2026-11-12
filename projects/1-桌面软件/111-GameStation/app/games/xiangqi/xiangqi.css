@@ -3,6 +3,7 @@
    Prior R34: isolate the visual system and preload shared workspace styles.
    Preload workspace CSS in <head> so the legacy left-guide rail never flashes. */
 html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f8!important}
+.game-root.xiangqi-layout:not(.xiangqi-layout-ready){visibility:hidden!important}
 .game-root.game-layout.xiangqi-layout,
 .game-root.game-layout.xiangqi-layout.gs-tools-open,
 .game-root.game-layout.xiangqi-layout.rail-collapsed,
