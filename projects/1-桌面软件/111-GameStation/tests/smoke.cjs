@@ -1340,13 +1340,24 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(await page.locator("#gameElapsed").innerText(),"00:00","Memory host clock must wait for the first flip");
   assert.equal(await frame.locator("#time").innerText(),"0:00","Memory in-game clock must wait for the first flip");
   await frame.locator(".memory-card").first().click();
-  await page.waitForTimeout(1250);
+  await page.waitForFunction(()=>{
+   const host=document.querySelector("#gameElapsed")?.textContent?.trim();
+   const game=document.querySelector("#gameFrame")?.contentDocument?.querySelector("#time")?.textContent?.trim();
+   return host==="00:01"&&game==="0:01";
+  },null,{timeout:3500});
   const memoryClockSync={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
   assert.equal(memoryClockSync.host,"00:01","Memory host clock must start on first flip: "+JSON.stringify(memoryClockSync));
   assert.equal(memoryClockSync.game,"0:01","Memory in-game clock must match host elapsed time: "+JSON.stringify(memoryClockSync));
   await page.locator("#pauseButton").click();
-  assert.equal(await page.locator("#gameElapsed").innerText(),"00:01","Memory host clock must freeze on pause");
-  assert.equal(await frame.locator("#time").innerText(),"0:01","Memory in-game clock must freeze at the same value");
+  await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="继续");
+  await page.waitForTimeout(100);
+  const pausedMemoryClock={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
+  const hostPausedSeconds=pausedMemoryClock.host.split(":").reduce((total,value)=>total*60+Number(value),0);
+  const gamePausedSeconds=pausedMemoryClock.game.split(":").reduce((total,value)=>total*60+Number(value),0);
+  assert.equal(hostPausedSeconds,gamePausedSeconds,"Memory host and in-game clocks must agree at the exact pause point: "+JSON.stringify(pausedMemoryClock));
+  await page.waitForTimeout(1100);
+  const frozenMemoryClock={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
+  assert.deepEqual(frozenMemoryClock,pausedMemoryClock,"Both Memory clocks must remain frozen after pause");
   await page.locator("#helpButton").click();
   await page.locator("#helpPanel").waitFor({state:"visible"});
   const hotkeyHelp=await page.locator("#helpContent .help-chapter").first().evaluate(section=>({
