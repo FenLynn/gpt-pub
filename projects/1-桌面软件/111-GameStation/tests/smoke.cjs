@@ -1352,9 +1352,9 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForFunction(()=>document.querySelector("#pauseButton")?.getAttribute("aria-label")==="继续");
   await page.waitForTimeout(100);
   const pausedMemoryClock={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
-  const hostPausedSeconds=pausedMemoryClock.host.split(":").reduce((total,value)=>total*60+Number(value),0);
-  const gamePausedSeconds=pausedMemoryClock.game.split(":").reduce((total,value)=>total*60+Number(value),0);
-  assert.equal(hostPausedSeconds,gamePausedSeconds,"Memory host and in-game clocks must agree at the exact pause point: "+JSON.stringify(pausedMemoryClock));
+  const memoryHostPausedSeconds=pausedMemoryClock.host.split(":").reduce((total,value)=>total*60+Number(value),0);
+  const memoryGamePausedSeconds=pausedMemoryClock.game.split(":").reduce((total,value)=>total*60+Number(value),0);
+  assert.equal(memoryHostPausedSeconds,memoryGamePausedSeconds,"Memory host and in-game clocks must agree at the exact pause point: "+JSON.stringify(pausedMemoryClock));
   await page.waitForTimeout(1100);
   const frozenMemoryClock={host:await page.locator("#gameElapsed").innerText(),game:await frame.locator("#time").innerText()};
   assert.deepEqual(frozenMemoryClock,pausedMemoryClock,"Both Memory clocks must remain frozen after pause");
