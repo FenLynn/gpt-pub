@@ -26,6 +26,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  const workspaceCss=fs.readFileSync(path.join(root,"games","shared","workspace.css"),"utf8");
  assert.match(workspaceCss,/is\(\.reversi-layout,\.connect4-layout,\.battleship-layout,\.chess-layout,\.checkers-layout,\.chinese-checkers-layout\)/,
   "All measured history-rail games must share the same first-paint visibility gate");
+ const sudokuPage=fs.readFileSync(path.join(root,"games","sudoku","index.html"),"utf8");
+ assert.match(sudokuPage,/sudoku.css\\?v=sudoku-r50-20261112-r1/,"Sudoku typography update must invalidate the previous cached stylesheet");
  const sokobanLevelsSource=fs.readFileSync(path.join(root,"games","sokoban","levels.js"),"utf8");
  assert.match(sokobanLevelsSource,/GAME_SOKOBAN_LEVELS\s*=\s*\[/,"Sokoban must bundle its offline 90-level classic collection");
  const sokobanPage=fs.readFileSync(path.join(root,"games","sokoban","index.html"),"utf8");
@@ -1128,6 +1130,85 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const cards=await page.locator(".game-card").first().evaluate(el=>el.getBoundingClientRect().height);
   assert.ok(cards<125,"library game cards must be compact, not giant blank blocks");
   await page.screenshot({path:path.join(artifacts,"library-1440x1000.png")});
+  // Sudoku typography and the two puzzle-game side rails: test the real file:// pages.
+  const sudokuFixture=await browser.newPage({viewport:{width:1440,height:1000}});
+  await sudokuFixture.goto(pathToFileURL(path.resolve(root,"games/sudoku/index.html")).href+"?p111Test=1");
+  await sudokuFixture.waitForFunction(()=>!!window.__p111SudokuTest);
+  await sudokuFixture.evaluate(()=>{
+   window.__p111SudokuTest.newGame("hard");
+   document.querySelector("#game").classList.add("gs-tools-open");
+  });
+  const sudokuRail=await sudokuFixture.evaluate(()=>{
+   const board=document.querySelector("#board").getBoundingClientRect();
+   const main=document.querySelector(".game-main-board").getBoundingClientRect();
+   const rail=document.querySelector(".game-tools").getBoundingClientRect();
+   const cell=document.querySelector(".sudoku-cell");
+   return{font:parseFloat(getComputedStyle(cell).fontSize),padFont:parseFloat(getComputedStyle(document.querySelector(".number-pad button")).fontSize),
+    gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
+    right:rail.right,visible:getComputedStyle(document.querySelector(".game-tools")).display};
+  });
+  assert.ok(sudokuRail.font>=28&&sudokuRail.padFont>=19,"Sudoku board digits and number pad must be substantially larger: "+JSON.stringify(sudokuRail));
+  assert.ok(sudokuRail.gap>=0&&sudokuRail.gap<=22&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
+   "Sudoku right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sudokuRail));
+  await sudokuFixture.screenshot({path:path.join(artifacts,"sudoku-large-digits-adjacent-rail.png")});
+  await sudokuFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
+  const sudokuCentered=await sudokuFixture.evaluate(()=>{
+   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector("#board").getBoundingClientRect();
+   return Math.abs((board.left+board.right-main.left-main.right)/2);
+  });
+  assert.ok(sudokuCentered<=2,"Sudoku board must return to center when the right rail is collapsed: "+sudokuCentered);
+  await sudokuFixture.setViewportSize({width:1366,height:768});
+  const sudokuCompact=await sudokuFixture.locator(".sudoku-cell").first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+  assert.ok(sudokuCompact>=22,"Sudoku digits must remain large at 1366×768: "+sudokuCompact);
+  await sudokuFixture.close();
+
+  const sokobanFixture=await browser.newPage({viewport:{width:1440,height:1000}});
+  await sokobanFixture.goto(pathToFileURL(path.resolve(root,"games/sokoban/index.html")).href+"?p111Test=1");
+  await sokobanFixture.waitForFunction(()=>!!window.__p111SokobanTest);
+  const sokobanCatalog=await sokobanFixture.evaluate(()=>Array.from({length:window.__p111SokobanTest.levelCount},(_,i)=>window.__p111SokobanTest.levelInfo(i)));
+  assert.equal(sokobanCatalog.length,90,"Sokoban must ship the complete 90-level classic collection");
+  assert.ok(sokobanCatalog.every((level,i)=>Number.isFinite(level.difficultyScore)&&(i===0||level.difficultyScore>=sokobanCatalog[i-1].difficultyScore)),
+   "Sokoban levels must be ordered by increasing, reproducible difficulty score");
+  assert.ok(sokobanCatalog[22].difficultyScore<sokobanCatalog[23].difficultyScore&&sokobanCatalog[44].difficultyScore<sokobanCatalog[45].difficultyScore&&sokobanCatalog[67].difficultyScore<sokobanCatalog[68].difficultyScore,
+   "The four Sokoban stages must have strictly increasing difficulty bands");
+  assert.ok(sokobanCatalog.every(level=>level.players===1&&level.boxes===level.goals&&level.boxes>=6&&level.width>=11&&level.width<=20&&level.height>=10&&level.height<=17),
+   "Every Sokoban level must have a valid player, matching boxes/goals and a genuinely larger board: "+JSON.stringify(sokobanCatalog.filter(level=>level.players!==1||level.boxes!==level.goals)));
+  assert.ok(Math.max(...sokobanCatalog.map(level=>level.boxes))>=30,"Sokoban campaign must include multi-dozen-box challenge boards");
+  await sokobanFixture.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
+  const hardLevel=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.chooseLevel(89));
+  assert.equal(hardLevel.level,89,"All 90 classic Sokoban levels must be directly selectable without clearing 89 earlier levels");
+  assert.ok(hardLevel.boxes.length>=20,"The hardest campaign stage must be reachable immediately and contain a genuinely dense box layout");
+  await sokobanFixture.evaluate(()=>{
+   window.__p111SokobanTest.loadLevel(0);
+   document.querySelector("#game").classList.add("gs-tools-open");
+  });
+  const sokobanRail=await sokobanFixture.evaluate(()=>{
+   const board=document.querySelector("#board").getBoundingClientRect();
+   const main=document.querySelector(".game-main-board").getBoundingClientRect();
+   const rail=document.querySelector(".game-tools").getBoundingClientRect();
+   const cell=document.querySelector(".soko-cell:not(.void)").getBoundingClientRect();
+   const stage=document.querySelector(".soko-stage");
+   return{gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
+    right:rail.right,cellDelta:Math.abs(cell.width-cell.height),aspect:stage.style.aspectRatio,
+    visible:getComputedStyle(document.querySelector(".game-tools")).display};
+  });
+  assert.ok(sokobanRail.gap>=0&&sokobanRail.gap<=22&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
+   "Sokoban right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sokobanRail));
+  assert.ok(sokobanRail.cellDelta<=1.5,"Sokoban variable-size boards must keep square cells: "+JSON.stringify(sokobanRail));
+  const firstLevelHint=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.hintPath());
+  assert.ok(Array.isArray(firstLevelHint)&&firstLevelHint.length===1,"The Sokoban hint must return one responsive, legal next-step suggestion");
+  await sokobanFixture.screenshot({path:path.join(artifacts,"sokoban-90-levels-adjacent-rail.png")});
+  await sokobanFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
+  const sokobanCentered=await sokobanFixture.evaluate(()=>{
+   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector(".soko-stage").getBoundingClientRect();
+   return Math.abs((board.left+board.right-main.left-main.right)/2);
+  });
+  assert.ok(sokobanCentered<=2,"Sokoban board must return to center when the right rail is collapsed: "+sokobanCentered);
+  await sokobanFixture.setViewportSize({width:1366,height:768});
+  const compactSokoban=await sokobanFixture.locator(".soko-cell:not(.void)").first().boundingBox();
+  assert.ok(compactSokoban&&Math.abs(compactSokoban.width-compactSokoban.height)<=1.5,"Sokoban cells must remain square at 1366×768: "+JSON.stringify(compactSokoban));
+  await sokobanFixture.close();
+
   for(const size of [{width:1440,height:1000},{width:1366,height:768}]){
    await page.setViewportSize(size);
    await library();
@@ -1431,84 +1512,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await mineFixture.screenshot({path:path.join(artifacts,"minesweeper-symbols.png")});
   await mineFixture.close();
 
-  // Sudoku typography and the two puzzle-game side rails: test the real file:// pages.
-  const sudokuFixture=await browser.newPage({viewport:{width:1440,height:1000}});
-  await sudokuFixture.goto(pathToFileURL(path.resolve(root,"games/sudoku/index.html")).href+"?p111Test=1");
-  await sudokuFixture.waitForFunction(()=>!!window.__p111SudokuTest);
-  await sudokuFixture.evaluate(()=>{
-   window.__p111SudokuTest.newGame("hard");
-   document.querySelector("#game").classList.add("gs-tools-open");
-  });
-  const sudokuRail=await sudokuFixture.evaluate(()=>{
-   const board=document.querySelector("#board").getBoundingClientRect();
-   const main=document.querySelector(".game-main-board").getBoundingClientRect();
-   const rail=document.querySelector(".game-tools").getBoundingClientRect();
-   const cell=document.querySelector(".sudoku-cell");
-   return{font:parseFloat(getComputedStyle(cell).fontSize),padFont:parseFloat(getComputedStyle(document.querySelector(".number-pad button")).fontSize),
-    gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
-    right:rail.right,visible:getComputedStyle(document.querySelector(".game-tools")).display};
-  });
-  assert.ok(sudokuRail.font>=28&&sudokuRail.padFont>=19,"Sudoku board digits and number pad must be substantially larger: "+JSON.stringify(sudokuRail));
-  assert.ok(sudokuRail.gap>=0&&sudokuRail.gap<=22&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
-   "Sudoku right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sudokuRail));
-  await sudokuFixture.screenshot({path:path.join(artifacts,"sudoku-large-digits-adjacent-rail.png")});
-  await sudokuFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
-  const sudokuCentered=await sudokuFixture.evaluate(()=>{
-   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector("#board").getBoundingClientRect();
-   return Math.abs((board.left+board.right-main.left-main.right)/2);
-  });
-  assert.ok(sudokuCentered<=2,"Sudoku board must return to center when the right rail is collapsed: "+sudokuCentered);
-  await sudokuFixture.setViewportSize({width:1366,height:768});
-  const sudokuCompact=await sudokuFixture.locator(".sudoku-cell").first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
-  assert.ok(sudokuCompact>=22,"Sudoku digits must remain large at 1366×768: "+sudokuCompact);
-  await sudokuFixture.close();
 
-  const sokobanFixture=await browser.newPage({viewport:{width:1440,height:1000}});
-  await sokobanFixture.goto(pathToFileURL(path.resolve(root,"games/sokoban/index.html")).href+"?p111Test=1");
-  await sokobanFixture.waitForFunction(()=>!!window.__p111SokobanTest);
-  const sokobanCatalog=await sokobanFixture.evaluate(()=>Array.from({length:window.__p111SokobanTest.levelCount},(_,i)=>window.__p111SokobanTest.levelInfo(i)));
-  assert.equal(sokobanCatalog.length,90,"Sokoban must ship the complete 90-level classic collection");
-  assert.ok(sokobanCatalog.every((level,i)=>Number.isFinite(level.difficultyScore)&&(i===0||level.difficultyScore>=sokobanCatalog[i-1].difficultyScore)),
-   "Sokoban levels must be ordered by increasing, reproducible difficulty score");
-  assert.ok(sokobanCatalog[22].difficultyScore<sokobanCatalog[23].difficultyScore&&sokobanCatalog[44].difficultyScore<sokobanCatalog[45].difficultyScore&&sokobanCatalog[67].difficultyScore<sokobanCatalog[68].difficultyScore,
-   "The four Sokoban stages must have strictly increasing difficulty bands");
-  assert.ok(sokobanCatalog.every(level=>level.players===1&&level.boxes===level.goals&&level.boxes>=6&&level.width>=11&&level.width<=20&&level.height>=10&&level.height<=17),
-   "Every Sokoban level must have a valid player, matching boxes/goals and a genuinely larger board: "+JSON.stringify(sokobanCatalog.filter(level=>level.players!==1||level.boxes!==level.goals)));
-  assert.ok(Math.max(...sokobanCatalog.map(level=>level.boxes))>=30,"Sokoban campaign must include multi-dozen-box challenge boards");
-  await sokobanFixture.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
-  const hardLevel=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.chooseLevel(89));
-  assert.equal(hardLevel.level,89,"All 90 classic Sokoban levels must be directly selectable without clearing 89 earlier levels");
-  assert.ok(hardLevel.boxes.length>=20,"The hardest campaign stage must be reachable immediately and contain a genuinely dense box layout");
-  await sokobanFixture.evaluate(()=>{
-   window.__p111SokobanTest.loadLevel(0);
-   document.querySelector("#game").classList.add("gs-tools-open");
-  });
-  const sokobanRail=await sokobanFixture.evaluate(()=>{
-   const board=document.querySelector("#board").getBoundingClientRect();
-   const main=document.querySelector(".game-main-board").getBoundingClientRect();
-   const rail=document.querySelector(".game-tools").getBoundingClientRect();
-   const cell=document.querySelector(".soko-cell:not(.void)").getBoundingClientRect();
-   const stage=document.querySelector(".soko-stage");
-   return{gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
-    right:rail.right,cellDelta:Math.abs(cell.width-cell.height),aspect:stage.style.aspectRatio,
-    visible:getComputedStyle(document.querySelector(".game-tools")).display};
-  });
-  assert.ok(sokobanRail.gap>=0&&sokobanRail.gap<=22&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
-   "Sokoban right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sokobanRail));
-  assert.ok(sokobanRail.cellDelta<=1.5,"Sokoban variable-size boards must keep square cells: "+JSON.stringify(sokobanRail));
-  const firstLevelHint=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.hintPath());
-  assert.ok(Array.isArray(firstLevelHint)&&firstLevelHint.length===1,"The Sokoban hint must return one responsive, legal next-step suggestion");
-  await sokobanFixture.screenshot({path:path.join(artifacts,"sokoban-90-levels-adjacent-rail.png")});
-  await sokobanFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
-  const sokobanCentered=await sokobanFixture.evaluate(()=>{
-   const main=document.querySelector(".game-main-board").getBoundingClientRect(),board=document.querySelector(".soko-stage").getBoundingClientRect();
-   return Math.abs((board.left+board.right-main.left-main.right)/2);
-  });
-  assert.ok(sokobanCentered<=2,"Sokoban board must return to center when the right rail is collapsed: "+sokobanCentered);
-  await sokobanFixture.setViewportSize({width:1366,height:768});
-  const compactSokoban=await sokobanFixture.locator(".soko-cell:not(.void)").first().boundingBox();
-  assert.ok(compactSokoban&&Math.abs(compactSokoban.width-compactSokoban.height)<=1.5,"Sokoban cells must remain square at 1366×768: "+JSON.stringify(compactSokoban));
-  await sokobanFixture.close();
 
   await open("记忆翻牌");await start();
   await page.waitForTimeout(1250);
