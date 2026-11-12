@@ -27,7 +27,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  assert.match(workspaceCss,/is\(\.reversi-layout,\.connect4-layout,\.battleship-layout,\.chess-layout,\.checkers-layout,\.chinese-checkers-layout\)/,
   "All measured history-rail games must share the same first-paint visibility gate");
  const sudokuPage=fs.readFileSync(path.join(root,"games","sudoku","index.html"),"utf8");
- assert.match(sudokuPage,/sudoku.css\\?v=sudoku-r50-20261112-r1/,"Sudoku typography update must invalidate the previous cached stylesheet");
+ assert.match(sudokuPage,/sudoku\.css\?v=sudoku-r50-20261112-r1/,"Sudoku typography update must invalidate the previous cached stylesheet");
  const sokobanLevelsSource=fs.readFileSync(path.join(root,"games","sokoban","levels.js"),"utf8");
  assert.match(sokobanLevelsSource,/GAME_SOKOBAN_LEVELS\s*=\s*\[/,"Sokoban must bundle its offline 90-level classic collection");
  const sokobanPage=fs.readFileSync(path.join(root,"games","sokoban","index.html"),"utf8");
