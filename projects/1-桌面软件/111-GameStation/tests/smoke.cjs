@@ -251,7 +251,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    assert.equal(cleanup.duplicateHud,false,"Chess must use the host toolbar only; no duplicate in-frame HUD");
    assert.deepEqual(cleanup.strayButtons,[],"Chess must not leave duplicate controls at the lower-left");
    assert.deepEqual(cleanup.rootChildren,["chess-notation-rail","game-main-board","game-tools"],"Chess must retain only the notation rail, board and right tools");
-   assert.equal(cleanup.workspaceStylesheet,"../shared/workspace.css?v=chess-cleanup-20261112-r1","Chess shared layout stylesheet must preload before first paint");
+   assert.equal(cleanup.workspaceStylesheet,"../shared/workspace.css?v=history-firstpaint-20261112-r1","Chess shared layout stylesheet must preload before first paint");
    const coordinates=await frame.locator("#game").evaluate(root=>{
     const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
     const centerX=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};

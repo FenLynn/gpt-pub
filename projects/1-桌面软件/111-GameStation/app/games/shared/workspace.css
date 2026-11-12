@@ -1850,9 +1850,9 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  padding:6px 8px!important;
 }
 
-/* R49.2 · Two checkers screens have a single, measured first paint.
-   Visibility keeps geometry measurable and removes the wrong full-height
-   rail frame that was briefly drawn before ResizeObserver set its height. */
+/* R49.2/R61 · Board-history games share a measured first paint.
+   Visibility keeps geometry measurable and prevents the fallback-height
+   history rail from flashing before ResizeObserver sets its final height. */
 @media(min-width:701px){
  .game-root.game-layout:is(.reversi-layout,.connect4-layout,.battleship-layout,.chess-layout,.checkers-layout,.chinese-checkers-layout):not([data-board-measured="true"]){
   visibility:hidden!important;
