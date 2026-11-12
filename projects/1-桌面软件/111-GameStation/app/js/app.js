@@ -544,7 +544,7 @@ function openGame(id){
  $("gameElapsed").textContent="00:00";$("hostGameTimer").classList.remove("hidden");$("gameNotice").classList.remove("hidden");clearGameNotice();$("helpTitle").textContent=g.name+" · 玩法";
  homeView.classList.add("hidden");libraryView.classList.add("hidden");workspaceView.classList.remove("hidden");
  $("gameStage").classList.toggle("is-minesweeper",g.id==="minesweeper");
- $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";frame.src=g.entry+(g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":"");closeHelp();shell.classList.remove("menu-open");
+ $("stageLoading").classList.remove("done");frame.title=g.name+" 游戏";const entryQuery=g.id==="gomoku"&&location.search.includes("p111Test=1")?"?p111Test=1":g.id==="xiangqi"?"?v=xq-layout-ready-20261112-r1":"";frame.src=g.entry+entryQuery;closeHelp();shell.classList.remove("menu-open");
 }
 function closeGame(){
  hideSaveProgressDialog();savingProgress=false;
@@ -569,12 +569,13 @@ window.addEventListener("message",event=>{
   send("PAUSE");
   paused=true;
   setGameState();
-  $("stageLoading").classList.add("done");
   send("SET_RAIL",{collapsed:false});
+  if(active.id!=="xiangqi")$("stageLoading").classList.add("done");
   renderProgressButton();
   return;
  }
  if(m.sessionId!==sessionId)return;
+ if(m.type==="LAYOUT_READY"&&active.id==="xiangqi"){$("stageLoading").classList.add("done");return;}
  if(m.type==="SNAPSHOT"){handleProgressSnapshot(m.payload||{});return;}
  if(m.type==="RESTORED"){handleProgressRestored(m.payload||{});return;}
  if(m.type==="HOTKEY"){if(started&&!session?.finished&&["toggle","pause","start"].includes(m.payload?.action))togglePause();return;}
