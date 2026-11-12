@@ -1,17 +1,41 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推箱子</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./sokoban.css?v=sokoban-r50"></head><body data-game="sokoban"><main class="game-root game-layout sokoban-layout" id="game">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>推箱子</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./sokoban.css?v=sokoban-r57"></head><body data-game="sokoban"><main class="game-root game-layout sokoban-layout" id="game">
 <aside class="game-guide"><div class="game-guide-kicker">SOKOBAN</div><h2>推箱子规则</h2>
 <p class="key-instruction">你是蓝色圆点，木箱是棕色方块，金色圆环是目标点。</p>
 <p class="key-instruction">走到箱子背后，再朝目标方向移动；每次只能推一个箱子，不能拉箱子，也不能穿过墙。</p>
 <p class="key-instruction">所有箱子都压在目标点上才算过关。推入非目标角落的箱子无法自行取出。</p>
 <p class="key-instruction">方向键或 WASD 移动；Z 撤销一步；R 重开本关。也可以点击右侧方向按钮。</p>
 <div class="game-tool-note">先观察箱子到目标的路线，再决定从哪一侧靠近。不要急着推；如果箱子卡住，立即撤销一步重新规划。</div></aside>
-<section class="game-main-board"><div class="game-panel"><div id="board" class="game-grid" role="grid" aria-label="推箱子棋盘"></div></div></section>
+<section class="game-main-board"><div class="game-panel"><div class="soko-stage">
+<div id="board" class="game-grid" role="grid" aria-label="推箱子棋盘"></div>
+<section class="soko-overlay" id="sokoVictory" role="dialog" aria-modal="true" aria-labelledby="sokoWinTitle" hidden>
+ <div class="soko-dialog">
+  <div class="soko-win-symbol" aria-hidden="true">★</div>
+  <h2 id="sokoWinTitle">本关胜利！</h2>
+  <p id="sokoWinSummary">移动 0 步 · 推动 0 次</p>
+  <p class="soko-win-note">已解锁下一关，是否继续挑战？</p>
+  <div class="soko-dialog-actions">
+   <button type="button" class="soko-action secondary" id="sokoWinStay">留在本关</button>
+   <button type="button" class="soko-action primary" id="sokoWinNext">下一关</button>
+  </div>
+  <button type="button" class="soko-action text-link" id="sokoWinPick">选择已解锁关卡</button>
+ </div>
+</section>
+<section class="soko-overlay" id="sokoLevelPicker" role="dialog" aria-modal="true" aria-label="选择推箱子关卡" hidden>
+ <div class="soko-dialog soko-picker-dialog">
+  <h2>选择关卡</h2>
+  <p class="soko-win-note">通关后解锁下一关，可自由重玩已解锁关卡。</p>
+  <div id="sokoLevelGrid" class="soko-level-grid" role="group" aria-label="关卡列表"></div>
+  <button type="button" class="soko-action secondary" id="sokoPickerClose">返回棋盘</button>
+ </div>
+</section>
+</div></div></section>
 <aside class="game-tools">
  <div class="game-tools-heading">本关状态</div>
  <div class="game-status sokoban-status" id="sokobanStatus" aria-live="polite">把所有木箱推到圆形目标点上。</div>
  <div class="soko-stats">
-  <div><span>关卡</span><strong id="level">1 / 12</strong></div><div><span>移动</span><strong id="moves">0</strong></div>
+  <div><span>关卡</span><strong id="level">1 / 20</strong></div><div><span>移动</span><strong id="moves">0</strong></div>
   <div><span>推动</span><strong id="pushes">0</strong></div><div><span>到位</span><strong id="goalProgress">0 / 1</strong></div>
+  <div><span>难度</span><strong id="sokoDifficulty">入门</strong></div><div><span>已解锁</span><strong id="sokoUnlocked">1 / 20</strong></div>
  </div>
  <div class="soko-progress" aria-label="目标完成进度"><span id="goalBar"></span></div>
  <div class="game-tools-heading">路线提示</div>
@@ -32,6 +56,7 @@
  <div class="game-tools-heading">关卡操作</div>
  <button class="game-btn" id="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6"/></svg><span>撤销一步</span></button>
  <button class="game-btn" id="reset"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M19 12a7 7 0 1 1-2.05-4.95L20 12"/></svg><span>重开本关</span></button>
+ <button class="game-btn" id="chooseLevel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>选择关卡</span></button>
  <button class="game-btn primary" id="next" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg><span>下一关</span></button>
 </aside></main>
-<script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js?v=sokoban-r51"></script></body></html>
+<script src="../shared/bridge.js"></script><script src="../shared/workspace.js"></script><script src="./game.js?v=sokoban-r57"></script></body></html>
