@@ -15,7 +15,7 @@ const board=document.getElementById("board"),stage=document.querySelector(".soko
  winNext=document.getElementById("sokoWinNext"),winStay=document.getElementById("sokoWinStay"),
  winPick=document.getElementById("sokoWinPick"),levelPickerClose=document.getElementById("sokoPickerClose"),
  difficultyEl=document.getElementById("sokoDifficulty"),unlockedEl=document.getElementById("sokoUnlocked");
-let level=0,width=0,height=0,player=0,boxes=new Set(),goals=new Set(),walls=new Set(),voids=new Set(),staticDeadSquares=new Set(),
+let level=0,width=0,height=0,player=0,boxes=new Set(),goals=new Set(),walls=new Set(),voids=new Set(),staticDeadSquares=new Set(),goalDistanceMaps=[],
  moves=0,pushes=0,history=[],paused=true,complete=false,hintCount=0,hintTimer=null,
  unlockedThrough=0,bestResults={};
 const solverDirections=[
@@ -210,8 +210,8 @@ function findSolutionPath(maxStates=50000){
 function hint(){
  if(paused||complete)return;
  clearHintHighlight();
- const path=findSolutionPath();
- if(!path){setStatus("当前局面未能在搜索范围内找到路线；可撤销最近一次推箱操作，再重新规划。");return;}
+ const path=findHintPath();
+ if(!path){setStatus("当前局面没有安全的直接推送建议；可撤销最近一步或重新规划。");return;}
  if(!path.length){setStatus("所有箱子已经到位，本关完成。");return;}
  const direction=solverDirections.find(item=>item.code===path[0]);
  const target=(Math.floor(player/width)+direction.dy)*width+(player%width)+direction.dx;
@@ -219,7 +219,7 @@ function hint(){
  if(button){button.classList.add("suggested");hintTimer=setTimeout(()=>{button.classList.remove("suggested");hintTimer=null;},1800);}
  hintCount++;
  setStatus("建议下一步："+direction.label+(pushing?"推动前方木箱":"移动一步")+
-  "。这是搜索到的可行路线第一步；提示不会自动移动。");
+  "。提示依据箱子到目标点的可达性评估，不保证全局最优，也不会自动移动。");
 }
 function updateControls(){
  undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;hintButton.disabled=paused||complete;
@@ -398,7 +398,7 @@ if(new URLSearchParams(location.search).has("p111Test")){
   openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(index<=unlockedThrough&&!paused)parseLevel(index);return fixtureState();},
   snapshot,restore,isCornerDeadlock,levelCount:levels.length,levelRows:index=>levels[index]?.slice()||[],
   levelInfo(index){const d=decodeLevel(levels[index]);return{width:d.width,height:d.height,boxes:d.boxes.size,goals:d.goals.size,players:d.player>=0?1:0,voids:d.voids.size};},
-  solvePath(){return findSolutionPath();}
+  hintPath(){return findHintPath();}
  };
 }
 GameBridge.register({

@@ -1470,8 +1470,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.ok(sokobanRail.gap>=0&&sokobanRail.gap<=22&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
    "Sokoban right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sokobanRail));
   assert.ok(sokobanRail.cellDelta<=1.5,"Sokoban variable-size boards must keep square cells: "+JSON.stringify(sokobanRail));
-  const firstLevelPath=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.solvePath());
-  assert.ok(Array.isArray(firstLevelPath)&&firstLevelPath.length>0,"The push-state hint solver must find a valid route for the first classic level");
+  const firstLevelHint=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.hintPath());
+  assert.ok(Array.isArray(firstLevelHint)&&firstLevelHint.length===1,"The Sokoban hint must return one responsive, legal next-step suggestion");
   await sokobanFixture.screenshot({path:path.join(artifacts,"sokoban-90-levels-adjacent-rail.png")});
   await sokobanFixture.setViewportSize({width:1366,height:768});
   const compactSokoban=await sokobanFixture.locator(".soko-cell:not(.void)").first().boundingBox();
