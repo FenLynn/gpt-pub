@@ -90,8 +90,8 @@
 /* R57 - In-board victory settlement and unlocked level picker. */
 .sokoban-layout .game-main-board>.game-panel{display:grid!important;place-items:center!important;min-height:0}
 .sokoban-layout .soko-stage{
- position:relative;display:grid;place-items:center;width:min(100%,calc(100cqh * 9 / 7));
- max-width:100%;max-height:100%;aspect-ratio:9/7;isolation:isolate;
+ position:relative;display:grid;place-items:center;width:min(100cqw,calc(100cqh * 9 / 7));
+ height:auto;max-width:100%;max-height:100%;aspect-ratio:9/7;isolation:isolate;
 }
 .sokoban-layout .soko-stage #board{
  width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;
