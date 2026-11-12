@@ -1,8 +1,22 @@
 (function(){
 "use strict";
-const el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot"),boardArea=document.querySelector(".game-main-board");
-let boardObserver=null;
+const root=document.getElementById("game"),el=document.getElementById("board"),status=document.getElementById("status"),turnText=document.getElementById("turnText"),turnDot=document.getElementById("turnDot"),boardArea=document.querySelector(".game-main-board");
+let boardObserver=null,layoutReadySent=false;
 function syncRecordRailHeight(){const rail=document.querySelector(".xiangqi-record-rail"),actual=el.getBoundingClientRect().height;if(rail&&actual>0)rail.style.setProperty("--xiangqi-record-height",actual+"px");}
+function tryMarkLayoutReady(){
+ if(layoutReadySent||!root.classList.contains("gs-tools-open")||root.classList.contains("rail-collapsed"))return;
+ const boardRect=el.getBoundingClientRect(),mainRect=boardArea.getBoundingClientRect();
+ const rail=root.querySelector(".xiangqi-record-rail"),tools=root.querySelector(".game-tools");
+ const railRect=rail?.getBoundingClientRect(),toolsRect=tools?.getBoundingClientRect();
+ const cells=[...el.querySelectorAll(":scope > .xiangqi-cell")];
+ if(cells.length!==90||boardRect.width<100||boardRect.height<100||mainRect.width<100||mainRect.height<100||!railRect||!toolsRect||railRect.width<100||toolsRect.width<40)return;
+ if(Math.abs(boardRect.width/boardRect.height-8/9)>.02)return;
+ if(window.innerWidth>900&&(railRect.right>mainRect.left+2||mainRect.right>toolsRect.left+2))return;
+ const outOfBoard=cells.some(cell=>{const r=cell.getBoundingClientRect();return r.left<boardRect.left-1||r.top<boardRect.top-1||r.right>boardRect.right+1||r.bottom>boardRect.bottom+1;});
+ if(outOfBoard)return;
+ layoutReadySent=true;root.classList.add("xiangqi-layout-ready");
+ GameBridge.send("LAYOUT_READY",{boardWidth:Math.round(boardRect.width),boardHeight:Math.round(boardRect.height),cellCount:cells.length});
+}
 let board=[],turn="red",mode="ai",difficulty="normal",paused=false,over=false,flip=false,selected=null,selectedMoves=[],history=[],positionTrail=[],aiTimer=null;
 const opposite=s=>s==="red"?"black":"red";
 const values={"帅":15000,"将":15000,"车":1000,"马":460,"炮":475,"仕":200,"士":200,"相":210,"象":210,"兵":105,"卒":105};
@@ -323,7 +337,7 @@ function render(animatedMove=null){
  if(el.querySelector(".xiangqi-lines")?.dataset.flip!==String(flip)){
   el.querySelector(".xiangqi-lines")?.remove();drawBoardLines();
  }
- syncRecordRailHeight();
+ syncRecordRailHeight();tryMarkLayoutReady();
  animatePiece(animatedMove);
 }
 function animatePiece(move){
@@ -403,8 +417,8 @@ document.getElementById("flip").addEventListener("click",()=>{flip=!flip;render(
 document.getElementById("undoButton").addEventListener("click",undo);
 document.getElementById("xiangqiReplay").addEventListener("click",()=>GameBridge.send("REQUEST_NEW_GAME"));
 document.getElementById("xiangqiLeave").addEventListener("click",()=>GameBridge.send("CONTROL",{action:"leave"}));
-window.addEventListener("resize",syncRecordRailHeight);
-if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(syncRecordRailHeight);boardObserver.observe(boardArea);}
+window.addEventListener("resize",()=>{syncRecordRailHeight();tryMarkLayoutReady();});
+if(typeof ResizeObserver!=="undefined"){boardObserver=new ResizeObserver(()=>{syncRecordRailHeight();tryMarkLayoutReady();});boardObserver.observe(boardArea);}
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111XiangqiTest={
   loadPosition(pieces,side="red"){
