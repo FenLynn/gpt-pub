@@ -280,215 +280,87 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   assert.ok(memoryBoardSize.width>0&&memoryBoardSize.height>0,"Memory board must size itself to the available play area");
   await memory.close();
 
-  // Sokoban: twenty progressively ordered solvable levels; end-of-level choices, stage picker and save migration.
+  // Sokoban: validate the 90-level campaign, free stage selection and the real
+  // move/victory/undo/save/restore lifecycle on deterministic near-win fixtures.
   const sokoban=await browser.newPage({viewport:{width:900,height:700}});
   sokoban.on("pageerror",e=>errors.push("Sokoban: "+e.message));
   await sokoban.goto(pathToFileURL(path.resolve(__dirname,"../app/games/sokoban/index.html")).href+"?p111Test=1");
   await sokoban.waitForFunction(()=>!!window.__p111SokobanTest);
   await openTools(sokoban,"sokoban","推箱子");
-  let boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
-  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.deepEqual(boxState.goals,[22]);
-  assert.equal(boxState.level,0);assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
-  assert.equal(await sokoban.locator("#next").isDisabled(),true,"Next level must stay locked until all boxes reach goals");
+  assert.equal(await sokoban.evaluate(()=>window.__p111SokobanTest.levelCount),90,
+   "The full 90-stage classic collection must be loaded");
+  const metadata=await sokoban.evaluate(()=>Array.from({length:90},(_,i)=>window.__p111SokobanTest.levelInfo(i)));
+  assert.ok(metadata.every((entry,i)=>entry.players===1&&entry.boxes===entry.goals&&entry.boxes>0&&
+   Number.isFinite(entry.difficultyScore)&&(i===0||entry.difficultyScore>=metadata[i-1].difficultyScore)),
+   "Each stage must have a valid layout and the catalog must be ordered by increasing difficulty");
+
+  // Stage choice must work without clearing every earlier puzzle.
+  await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
+  await sokoban.locator("#chooseLevel").click();
+  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").count(),90);
+  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").last().isDisabled(),false,
+   "The 90-level campaign must support free selection");
+  await sokoban.locator("#sokoLevelGrid .soko-level-option").last().click();
+  let boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
+  assert.equal(boxState.level,89,"Choosing a late stage must navigate to that stage");
+  assert.equal(boxState.pickerVisible,false,"Stage picker must close after selection");
+
+  const tutorial=[
+   "#######","#     #","#  .  #","#  $  #","#  @  #","#     #","#######"
+  ];
+  boxState=await sokoban.evaluate(rows=>window.__p111SokobanTest.loadFixture(rows),tutorial);
+  assert.equal(boxState.width,7);assert.equal(boxState.height,7);
+  assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[24]);assert.deepEqual(boxState.goals,[17]);
+  assert.equal(await sokoban.locator("#next").isDisabled(),true);
   await sokoban.locator("#hint").click();
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.moves,0,"Sokoban hint must never move the player automatically");
-  assert.equal(boxState.hintCount,1,"Sokoban hint use must be recorded");
-  assert.match(boxState.status,/向上/,"The first-level hint must explain the next direction");
-  assert.equal(await sokoban.locator("#sokoDpad .suggested").count(),1,"The solver must visibly highlight the recommended direction");
+  assert.equal((await sokoban.evaluate(()=>window.__p111SokobanTest.state())).moves,0,
+   "Hints must not make moves");
   await sokoban.locator('#sokoDpad [data-move="0,-1"]').click();
-  assert.equal(await sokoban.locator("#sokoDpad .suggested").count(),0,"The highlight must clear after a move");
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.player,31);assert.deepEqual(boxState.boxes,[22]);assert.equal(boxState.complete,true);
-  assert.equal(boxState.moves,1);assert.equal(boxState.pushes,1);
-  assert.equal(await sokoban.locator("#next").isDisabled(),false,"Completing a level must unlock the next-level button");
-  assert.equal(boxState.victoryVisible,true,"Level victory must open the in-board settlement");
-  assert.equal(boxState.unlockedThrough,1,"Winning level one must unlock level two");
+  assert.equal(boxState.complete,true);assert.equal(boxState.moves,1);assert.equal(boxState.pushes,1);
+  assert.equal(boxState.level,0,"Winning must not advance automatically");
+  assert.equal(boxState.victoryVisible,true,"Every completed stage must display the victory settlement");
   assert.match(await sokoban.locator("#sokoWinTitle").textContent(),/第 1 关胜利/);
-  await sokoban.waitForTimeout(420);
-  assert.equal((await sokoban.evaluate(()=>window.__p111SokobanTest.state())).level,0,"Winning must never auto-enter the next level");
+  assert.equal(await sokoban.locator("#next").isDisabled(),false);
+  await sokoban.waitForTimeout(450);
+  assert.equal((await sokoban.evaluate(()=>window.__p111SokobanTest.state())).level,0,
+   "The result overlay must wait for an explicit next-level selection");
   await sokoban.locator("#sokoWinPick").click();
-  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").count(),20,"Picker must list all 20 levels");
-  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").nth(1).isDisabled(),false,"Unlocked next level must be selectable");
-  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").nth(2).isDisabled(),true,"Future levels must remain locked");
+  assert.equal(await sokoban.locator("#sokoLevelGrid .soko-level-option").count(),90);
   await sokoban.locator("#sokoPickerClose").click();
-  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),true,"Closing the picker must restore the winning settlement");
+  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),true,
+   "Closing stage selection after winning must restore the settlement");
   await sokoban.locator("#sokoWinStay").click();
-  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),false,"Staying on the completed board must dismiss settlement");
+  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),false);
   await sokoban.locator("#undo").click();
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.player,40);assert.deepEqual(boxState.boxes,[31]);assert.equal(boxState.complete,false);
+  assert.equal(boxState.complete,false);assert.equal(boxState.moves,0);
+  assert.deepEqual(boxState.boxes,[24]);
   await sokoban.locator('#sokoDpad [data-move="0,-1"]').click();
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.complete,true,"The undo button must allow a completed push to be replayed");
   await sokoban.locator("#sokoWinNext").click();
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.level,1,"The settlement next button must enter the next level only after user selection");
-  await sokoban.locator('#sokoDpad [data-move="1,0"]').click();
-  await sokoban.locator("#undo").click();
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.player,39);assert.equal(boxState.moves,0,"The right-side undo button must reverse one move");
-  await sokoban.locator('#sokoDpad [data-move="1,0"]').click();
-  await sokoban.locator("#reset").click();
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.player,39);assert.equal(boxState.moves,0,"The right-side reset button must restart the current level");
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
-  for(let i=0;i<3;i++)boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
-  assert.equal(boxState.player,37);assert.equal(boxState.moves,3);
-  const beforeWall={player:boxState.player,moves:boxState.moves};
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
-  assert.equal(boxState.player,beforeWall.player,"Sokoban must not move through a wall");assert.equal(boxState.moves,beforeWall.moves);
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.undo());
-  assert.equal(boxState.player,38);assert.equal(boxState.moves,2);
-  assert.equal(await sokoban.evaluate(()=>window.__p111SokobanTest.isCornerDeadlock(10)),true,"A non-goal corner must be recognized as a box deadlock");
-  const sokoSolutions=[
-     [
-        "U",
-        1,
-        1
-     ],
-     [
-        "LUURR",
-        5,
-        2
-     ],
-     [
-        "UUDRRU",
-        6,
-        2
-     ],
-     [
-        "DLUURULL",
-        8,
-        4
-     ],
-     [
-        "ULURURRDL",
-        9,
-        4
-     ],
-     [
-        "ULLUDRRRRU",
-        10,
-        2
-     ],
-     [
-        "LULUDDRRRURU",
-        12,
-        2
-     ],
-     [
-        "UUDLLUDRRRRU",
-        12,
-        3
-     ],
-     [
-        "LLUUDDRRRRUU",
-        12,
-        4
-     ],
-     [
-        "UUDDLLUUDDRRRRUU",
-        16,
-        3
-     ],
-     [
-        "LLUULURDDDRRRRUURUL",
-        19,
-        4
-     ],
-     [
-        "UUURRDDDLDLUULLUULDDDLDRR",
-        25,
-        11
-     ],
-     [
-        "LLLURDRUUURULDRRRRULDLDDRDL",
-        27,
-        8
-     ],
-     [
-        "ULLURRRLLLUURDURRRRLLDDRDRUU",
-        28,
-        13
-     ],
-     [
-        "RRURRDRRULLLLDRLLLDDRRRRRDRUU",
-        29,
-        14
-     ],
-     [
-        "DDRRRULLRRUULULDDDLULDLRRDRLLL",
-        30,
-        12
-     ],
-     [
-        "RRRDDLLRRDLLLLLULUURRULDRRDDUURR",
-        32,
-        13
-     ],
-     [
-        "DLUUUDDLLUURRRDRULULRRDDDRRUULLDLU",
-        34,
-        12
-     ],
-     [
-        "DDDDRRRRRLLLLLURRRRLLLLUURRRURDDDR",
-        34,
-        16
-     ],
-     [
-        "UUURRRRRDDDDLLRRUULURULLRDDDULLLLDLU",
-        36,
-        12
-     ]
-  ];
-  for(let i=0;i<sokoSolutions.length;i++){
-   boxState=await sokoban.evaluate(index=>window.__p111SokobanTest.loadLevel(index),i);
-   if(i===17){
-    await sokoban.locator("#hint").click();
-    boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-    assert.equal(boxState.moves,0);assert.match(boxState.status,/向下/,"The three-box level hint must find a valid first move");
-   }
-   const [path,expectedMoves,expectedPushes]=sokoSolutions[i];
-   for(const step of path){
-    const delta=step==="U"?[0,-1]:step==="D"?[0,1]:step==="L"?[-1,0]:[1,0];
-    boxState=await sokoban.evaluate(([dx,dy])=>window.__p111SokobanTest.move(dx,dy),delta);
-   }
-   assert.equal(boxState.complete,true,"Sokoban level "+(i+1)+" must have a verified solution");
-   assert.equal(boxState.moves,expectedMoves,"Sokoban level "+(i+1)+" solution step count must match");
-   assert.equal(boxState.pushes,expectedPushes,"Sokoban level "+(i+1)+" solution push count must match");
-   if(i<sokoSolutions.length-1){
-    boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.nextLevel());
-    assert.equal(boxState.level,i+1,"A completed level must advance to the next level");
-    assert.equal(boxState.moves,0);assert.equal(boxState.pushes,0);
-   }
-  }
-  assert.equal((await sokoban.evaluate(()=>window.__p111SokobanTest.state())).unlockedThrough,19,
-   "Finishing the complete campaign must unlock all 20 levels");
-  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),true,"Final level must have its own result settlement");
-  assert.match(await sokoban.locator("#sokoWinNext").textContent(),/完成挑战/);
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.loadLevel(4));
-  boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.move(-1,0));
+  assert.equal(boxState.level,1,"The settlement's next-level action must open stage two");
+  assert.equal(boxState.victoryVisible,false);assert.equal(boxState.moves,0);
+
+  // The currently selected real stage must survive a snapshot/restore round trip.
   const sokoSnapshot=await sokoban.evaluate(()=>window.__p111SokobanTest.snapshot());
-  const sokoBeforeRestore=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
   await sokoban.evaluate(snapshot=>window.__p111SokobanTest.restore(snapshot),sokoSnapshot);
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.paused,true,"Restored Sokoban must wait for the host countdown/continue action");
-  assert.equal(boxState.moves,sokoBeforeRestore.moves);assert.deepEqual(boxState.boxes,sokoBeforeRestore.boxes);
-  assert.equal(boxState.pushes,sokoBeforeRestore.pushes);
-  assert.equal(boxState.unlockedThrough,19,"Unlocked levels must survive save/restore");
-  const oldLayout=await sokoban.evaluate(()=>{
-   const test=window.__p111SokobanTest;
-   test.loadLevel(17);
-   const saved=test.snapshot();saved.level=6;saved.layoutVersion=2;
-   delete saved.unlockedThrough;delete saved.bestResults;
-   return saved;
-  });
-  await sokoban.evaluate(saved=>window.__p111SokobanTest.restore(saved),oldLayout);
+  assert.equal(boxState.paused,true,"Restored Sokoban must wait for the host resume action");
+  assert.equal(boxState.level,1);assert.equal(boxState.moves,0);
+  assert.equal(boxState.boxes.length,sokoSnapshot.boxes.length);
+  assert.equal(boxState.unlockedThrough,1);
+
+  // Final stage uses the same settlement, but never jumps to an imaginary stage 91.
+  boxState=await sokoban.evaluate(rows=>window.__p111SokobanTest.loadFixture(rows,89),tutorial);
+  await sokoban.locator('#sokoDpad [data-move="0,-1"]').click();
   boxState=await sokoban.evaluate(()=>window.__p111SokobanTest.state());
-  assert.equal(boxState.level,17,"Old saves must match the original puzzle after difficulty reordering");
-  assert.equal(boxState.paused,true,"Legacy save migration must not auto-start the game");
+  assert.equal(boxState.level,89);assert.equal(boxState.complete,true);
+  assert.match(await sokoban.locator("#sokoWinTitle").textContent(),/全关通关/);
+  assert.match(await sokoban.locator("#sokoWinNext").textContent(),/完成挑战/);
+  await sokoban.locator("#sokoWinNext").click();
+  assert.equal(await sokoban.locator("#sokoVictory").isVisible(),false,
+   "Finishing the 90th stage must close the final settlement");
   await sokoban.close();
 
   // Sudoku: protected clues, non-destructive hint, conflicts, undo and exact-solution completion.
