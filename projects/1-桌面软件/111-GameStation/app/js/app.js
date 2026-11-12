@@ -569,8 +569,8 @@ window.addEventListener("message",event=>{
   send("PAUSE");
   paused=true;
   setGameState();
-  send("SET_RAIL",{collapsed:false});
-  if(active.id!=="xiangqi")$("stageLoading").classList.add("done");
+  if(active.id==="xiangqi")send("SET_RAIL",{collapsed:false});
+  else{$("stageLoading").classList.add("done");send("SET_RAIL",{collapsed:false});}
   renderProgressButton();
   return;
  }
