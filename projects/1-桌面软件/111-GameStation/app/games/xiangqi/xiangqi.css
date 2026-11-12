@@ -126,7 +126,11 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  background:linear-gradient(145deg,#fff,#fff1ed)!important
 }
 .game-root.xiangqi-layout .xiangqi-board{
- position:relative!important;
+ position:relative!important;display:block!important;box-sizing:border-box!important;
+ /* One coordinate system only: SVG and 90 intersections are absolute overlays,
+    never CSS-grid items. This prevents an implicit 11th row / ghost button. */
+ grid-template-columns:none!important;grid-template-rows:none!important;
+ animation:none!important;transition:none!important;transform:none!important;
  width:min(calc(100cqw - 14px),calc((100cqh - 18px) * 8 / 9))!important;
  height:min(calc(100cqh - 18px),calc((100cqw - 14px) * 9 / 8))!important;
  max-width:100%!important;max-height:100%!important;aspect-ratio:8/9!important;
@@ -136,7 +140,12 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
  linear-gradient(135deg,#f3dfb7,#e9ce9b 55%,#e0c18d)!important;
  box-shadow:inset 0 0 0 2px #fce9c6,0 10px 26px #63442931!important
 }
-.xiangqi-layout .xiangqi-lines{z-index:0!important}
+.xiangqi-layout .xiangqi-lines{
+ position:absolute!important;inset:0!important;z-index:0!important;
+ display:block!important;width:100%!important;height:100%!important;
+ max-width:none!important;max-height:none!important;margin:0!important;
+ overflow:visible!important;pointer-events:none!important
+}
 .xiangqi-layout .xiangqi-lines line,.xiangqi-layout .xiangqi-lines path{
  stroke:#785431!important;stroke-width:2!important
 }
@@ -144,9 +153,16 @@ html,body[data-game="xiangqi"],body[data-game="xiangqi"] #game{background:#eaf2f
 .xiangqi-layout .xiangqi-river-label{fill:#9b6b37!important;font-size:32px!important;
  font-family:"STKaiti","KaiTi","Noto Serif CJK SC",serif;font-weight:690!important;letter-spacing:5px}
 .xiangqi-layout .xiangqi-file-label{font:700 19px/1 "STKaiti","KaiTi","Noto Serif CJK SC",serif;fill:#745534}
-.xiangqi-layout .xiangqi-cell{z-index:2!important;display:grid!important;place-items:center!important;
- container-type:inline-size!important;
- border:0!important;padding:0!important;background:transparent!important}
+.xiangqi-layout .xiangqi-cell{
+ position:absolute!important;z-index:2!important;display:grid!important;place-items:center!important;
+ transform:translate(-50%,-50%)!important;box-sizing:border-box!important;
+ margin:0!important;padding:0!important;border:0!important;border-radius:0!important;
+ appearance:none!important;-webkit-appearance:none!important;
+ container-type:inline-size!important;cursor:pointer!important;
+ background:transparent!important;transition:none!important;animation:none!important
+}
+.xiangqi-layout .xiangqi-cell:focus{outline:none}
+.xiangqi-layout .xiangqi-cell:focus-visible{outline:2px solid #548cb0!important;outline-offset:-2px!important;border-radius:3px!important}
 .xiangqi-layout .xiangqi-cell.target{background:radial-gradient(circle,#5caf827b 0 17%,transparent 22%)!important}
 .xiangqi-layout .xiangqi-cell.selected{background:radial-gradient(circle,#ffd67e83 0 50%,transparent 54%)!important}
 .game-root.game-layout.xiangqi-layout .xiangqi-piece{
