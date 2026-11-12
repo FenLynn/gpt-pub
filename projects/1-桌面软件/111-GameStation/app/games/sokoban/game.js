@@ -265,10 +265,23 @@ function render(){
 }
 function fitStage(){
  if(!stage||!width||!height)return;
- const ratio=width/height;
- stage.style.aspectRatio=width+" / "+height;
- stage.style.width="min(100cqw, calc(100cqh * "+ratio+"))";
- stage.style.height="min(100cqh, calc(100cqw * "+(1/ratio)+"))";
+ const panel=stage.parentElement;
+ if(!panel)return;
+ const bounds=panel.getBoundingClientRect(),css=getComputedStyle(panel);
+ const availableWidth=bounds.width-parseFloat(css.paddingLeft||0)-parseFloat(css.paddingRight||0);
+ const availableHeight=bounds.height-parseFloat(css.paddingTop||0)-parseFloat(css.paddingBottom||0);
+ // The grid's 4px gaps, 10px padding and 3px border must be subtracted
+ // before sizing cells; outer-board aspect ratio alone distorts rectangular maps.
+ const gap=4,edge=13;
+ const cell=Math.min((availableWidth-2*edge-gap*(width-1))/width,
+  (availableHeight-2*edge-gap*(height-1))/height);
+ if(!Number.isFinite(cell)||cell<=0)return;
+ const side=Math.max(1,Math.floor(cell*100)/100);
+ const boardWidth=width*side+gap*(width-1)+2*edge;
+ const boardHeight=height*side+gap*(height-1)+2*edge;
+ stage.style.width=boardWidth+"px";
+ stage.style.height=boardHeight+"px";
+ stage.style.aspectRatio=boardWidth+" / "+boardHeight;
 }
 function parseLevel(index){
  clearHintHighlight();hideOverlays();hintCount=0;
@@ -390,6 +403,11 @@ winStay.addEventListener("click",()=>{victory.hidden=true;setStatus("第 "+(leve
 winPick.addEventListener("click",openLevelPicker);
 levelPickerClose.addEventListener("click",closeLevelPicker);
 window.addEventListener("keydown",key);
+const stagePanel=stage?.parentElement;
+const stageObserver=typeof ResizeObserver!=="undefined"&&stagePanel
+ ?new ResizeObserver(fitStage):null;
+if(stageObserver)stageObserver.observe(stagePanel);
+window.addEventListener("resize",fitStage);
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111SokobanTest={
   loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
@@ -407,7 +425,7 @@ GameBridge.register({
  resume(){paused=false;updateControls();if(complete){showVictory();setStatus("本关已胜利 · 请选择下一关或留在本关。");}
   else setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
  snapshot,restore,dispose(){
-   paused=true;clearHintHighlight();window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);
+   paused=true;clearHintHighlight();stageObserver?.disconnect();window.removeEventListener("resize",fitStage);window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);
    undoButton.removeEventListener("click",undo);resetButton.removeEventListener("click",resetLevel);
    nextButton.removeEventListener("click",nextLevel);hintButton.removeEventListener("click",hint);
   },
