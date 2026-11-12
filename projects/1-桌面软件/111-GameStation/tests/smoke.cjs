@@ -30,6 +30,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  assert.match(sokobanLevelsSource,/GAME_SOKOBAN_LEVELS\s*=\s*\[/,"Sokoban must bundle its offline 90-level classic collection");
  const sokobanPage=fs.readFileSync(path.join(root,"games","sokoban","index.html"),"utf8");
  assert.ok(sokobanPage.indexOf("levels.js")<sokobanPage.indexOf("game.js"),"Sokoban level data must load before game logic");
+ assert.match(sokobanPage,/90 关均可自由挑战/,"All Sokoban levels must be clearly presented as freely selectable");
+ assert.doesNotMatch(sokobanPage,/选择已解锁关卡|可自由重玩已解锁关卡/,"Sokoban picker must not imply advanced levels are locked");
  assert.match(workspaceCss,/is\(\.sudoku-layout,\.sokoban-layout\)/,"Sudoku and Sokoban must use the adjacent centered control-rail layout");
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,
   args:["--no-sandbox","--disable-dev-shm-usage","--allow-file-access-from-files"]});

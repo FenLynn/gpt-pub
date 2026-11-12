@@ -386,7 +386,7 @@ undoButton.addEventListener("click",undo);resetButton.addEventListener("click",r
 nextButton.addEventListener("click",nextLevel);hintButton.addEventListener("click",hint);
 chooseButton.addEventListener("click",openLevelPicker);
 winNext.addEventListener("click",finishOrNext);
-winStay.addEventListener("click",()=>{victory.hidden=true;setStatus("第 "+(level+1)+" 关已通关；可在右侧选择下一关或重玩。");});
+winStay.addEventListener("click",()=>{victory.hidden=true;setStatus("第 "+(level+1)+" 关已通关；可继续挑战下一关，也可自由选关。");});
 winPick.addEventListener("click",openLevelPicker);
 levelPickerClose.addEventListener("click",closeLevelPicker);
 window.addEventListener("keydown",key);
