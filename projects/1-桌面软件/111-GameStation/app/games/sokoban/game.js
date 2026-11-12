@@ -1,31 +1,263 @@
 (function(){
 "use strict";
 const levels=[
-["#########","#       #","#   .   #","#   $   #","#   @   #","#       #","#########"],
-["#########","#       #","#  $ .  #","#  #    #","#  @    #","#       #","#########"],
-["#########","# .     #","# #     #","#   $@  #","#       #","#       #","#########"],
-["#########","# .   . #","# $ # $ #","#   #   #","#   @   #","#       #","#########"],
-["#########","#  . .  #","# $   $ #","#  # #  #","#   @   #","#       #","#########"],
-["#########","# . . . #","# $ $ $ #","#  # #  #","#   @   #","#       #","#########"],
-["#########","# . . . #","# $   $ #","# #   # #","#  $@   #","#       #","#########"],
-["#########","# .   . #","# $   $ #","#       #","#   @   #","#       #","#########"],
-["#########","# . .   #","# $ $   #","#       #","# @     #","#       #","#########"],
-["#########","#   .   #","#   $   #","#   .   #","#   $   #","#   @   #","#########"],
-["#########","# .   . #","#   #   #","# $   $ #","#   @   #","#       #","#########"],
-["#########","# . . . #","# $ $ $ #","#       #","#   @   #","#       #","#########"]
+ [
+  "#########",
+  "#       #",
+  "#   .   #",
+  "#   $   #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#       #",
+  "#  $ .  #",
+  "#  #    #",
+  "#  @    #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# . .   #",
+  "# $ $   #",
+  "#       #",
+  "# @     #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .     #",
+  "# #     #",
+  "#   $@  #",
+  "#       #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#   .   #",
+  "#   $   #",
+  "#   .   #",
+  "#   $   #",
+  "#   @   #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .   . #",
+  "# $   $ #",
+  "#       #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .   . #",
+  "# $ # $ #",
+  "#   #   #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# . . . #",
+  "# $ $ $ #",
+  "#       #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .   . #",
+  "#   #   #",
+  "# $   $ #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# . . . #",
+  "# $ $ $ #",
+  "#  # #  #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#  . .  #",
+  "# $   $ #",
+  "#  # #  #",
+  "#   @   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#       #",
+  "# $ #. $#",
+  "#       #",
+  "#   #@$ #",
+  "#   .  .#",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .  .$ #",
+  "#       #",
+  "# # # # #",
+  "# $  $  #",
+  "#   +   #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# $   ..#",
+  "# $# #  #",
+  "# *     #",
+  "#   # $.#",
+  "#  @    #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# .   $ #",
+  "#@$  . .#",
+  "# # # # #",
+  "# $     #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# * #   #",
+  "#     $ #",
+  "# # @ # #",
+  "#.$   $ #",
+  "#.    . #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#.$ #   #",
+  "#  $@  .#",
+  "# #   # #",
+  "#     $ #",
+  "#.  . $ #",
+  "#########"
+ ],
+ [
+  "#########",
+  "# . . . #",
+  "# $   $ #",
+  "# #   # #",
+  "#  $@   #",
+  "#       #",
+  "#########"
+ ],
+ [
+  "#########",
+  "#@      #",
+  "# $     #",
+  "# # # # #",
+  "# $    .#",
+  "# $  . .#",
+  "#########"
+ ],
+ [
+  "#########",
+  "#   .   #",
+  "#. # #$ #",
+  "#     $ #",
+  "# @ # $ #",
+  "#   . * #",
+  "#########"
+ ]
 ];
 const board=document.getElementById("board"),status=document.getElementById("sokobanStatus"),
  levelEl=document.getElementById("level"),movesEl=document.getElementById("moves"),
  pushesEl=document.getElementById("pushes"),goalProgressEl=document.getElementById("goalProgress"),
  goalBar=document.getElementById("goalBar"),undoButton=document.getElementById("undo"),
  resetButton=document.getElementById("reset"),nextButton=document.getElementById("next"),
- hintButton=document.getElementById("hint"),dpad=document.getElementById("sokoDpad");
+ hintButton=document.getElementById("hint"),dpad=document.getElementById("sokoDpad"),
+ chooseButton=document.getElementById("chooseLevel"),victory=document.getElementById("sokoVictory"),
+ levelPicker=document.getElementById("sokoLevelPicker"),levelGrid=document.getElementById("sokoLevelGrid"),
+ winTitle=document.getElementById("sokoWinTitle"),winSummary=document.getElementById("sokoWinSummary"),
+ winNext=document.getElementById("sokoWinNext"),winStay=document.getElementById("sokoWinStay"),
+ winPick=document.getElementById("sokoWinPick"),levelPickerClose=document.getElementById("sokoPickerClose"),
+ difficultyEl=document.getElementById("sokoDifficulty"),unlockedEl=document.getElementById("sokoUnlocked");
 let level=0,width=9,height=7,player=0,boxes=new Set(),goals=new Set(),walls=new Set(),
- moves=0,pushes=0,history=[],paused=true,complete=false,hintCount=0,hintTimer=null;
+ moves=0,pushes=0,history=[],paused=true,complete=false,hintCount=0,hintTimer=null,
+ unlockedThrough=0,bestResults={};
 const solverDirections=[
  {dx:0,dy:-1,code:"U",label:"向上"},{dx:0,dy:1,code:"D",label:"向下"},
  {dx:-1,dy:0,code:"L",label:"向左"},{dx:1,dy:0,code:"R",label:"向右"}
 ];
+function difficultyName(index){
+ return index<4?"入门":index<8?"基础":index<12?"进阶":index<16?"挑战":"大师";
+}
+function hideOverlays(){victory.hidden=true;levelPicker.hidden=true;}
+function refreshLevelPicker(){
+ const fragment=document.createDocumentFragment();
+ levels.forEach((_,index)=>{
+  const button=document.createElement("button");
+  button.type="button";button.className="soko-level-option";
+  if(index===level)button.classList.add("current");
+  if(bestResults[index])button.classList.add("cleared");
+  button.disabled=index>unlockedThrough||paused;
+  button.setAttribute("aria-label","第"+(index+1)+"关 "+difficultyName(index)+(button.disabled?" 未解锁":bestResults[index]?" 已通关":" 可挑战"));
+  button.textContent=String(index+1).padStart(2,"0")+(bestResults[index]?" ✓":"");
+  button.addEventListener("click",()=>{
+   if(index>unlockedThrough||paused)return;
+   parseLevel(index);
+   setStatus("已选择第 "+(index+1)+" 关 · "+difficultyName(index)+"。");
+  });
+  fragment.appendChild(button);
+ });
+ levelGrid.replaceChildren(fragment);
+}
+function openLevelPicker(){
+ if(paused)return;
+ victory.hidden=true;levelPicker.hidden=false;refreshLevelPicker();
+}
+function closeLevelPicker(){levelPicker.hidden=true;if(complete)showVictory();}
+function showVictory(){
+ winTitle.textContent=level===levels.length-1?"全关通关！":"第 "+(level+1)+" 关胜利！";
+ winSummary.textContent="移动 "+moves+" 步 · 推动 "+pushes+" 次 · 提示 "+hintCount+" 次";
+ winNext.textContent=level===levels.length-1?"完成挑战":"进入第 "+(level+2)+" 关";
+ winNext.disabled=paused;
+ winPick.disabled=paused;
+ victory.hidden=false;levelPicker.hidden=true;
+}
+function finishOrNext(){
+ if(paused||!complete)return;
+ if(level===levels.length-1){
+  victory.hidden=true;
+  GameBridge.send("GAME_OVER",{message:"推箱子全部 "+levels.length+" 关通关",score:moves,win:true});
+ }else nextLevel();
+}
+function mapIndexForBoard(w,h,wallSet,goalSet){
+ for(let i=0;i<levels.length;i++){
+  const rows=levels[i];if(rows.length!==h||rows[0].length!==w)continue;
+  const expectWalls=new Set(),expectGoals=new Set();
+  rows.forEach((row,y)=>[...row].forEach((symbol,x)=>{
+   const pos=y*w+x;
+   if(symbol==="#")expectWalls.add(pos);
+   if(symbol==="."||symbol==="*"||symbol==="+")expectGoals.add(pos);
+  }));
+  if(expectWalls.size===wallSet.size&&expectGoals.size===goalSet.size&&
+   [...wallSet].every(pos=>expectWalls.has(pos))&&[...goalSet].every(pos=>expectGoals.has(pos)))return i;
+ }
+ return null;
+}
 function setStatus(message,notify){status.textContent=message;if(notify)GameBridge.report(message,{score:moves});}
 function isInside(x,y){return x>=0&&x<width&&y>=0&&y<height;}
 function isBlocked(x,y){return !isInside(x,y)||walls.has(y*width+x);}
@@ -87,12 +319,16 @@ function hint(){
 function updateControls(){
  undoButton.disabled=paused||history.length===0;resetButton.disabled=paused;hintButton.disabled=paused||complete;
  nextButton.disabled=paused||!complete||level>=levels.length-1;
+ chooseButton.disabled=paused;winNext.disabled=paused;winPick.disabled=paused;
  nextButton.querySelector("span").textContent=level>=levels.length-1?"全部通关":"下一关";
  dpad.querySelectorAll("button[data-move]").forEach(button=>button.disabled=paused||complete);
 }
 function updateStats(){
  const done=completedGoals(),total=goals.size;
- levelEl.textContent=(level+1)+" / "+levels.length;movesEl.textContent=String(moves);pushesEl.textContent=String(pushes);
+ levelEl.textContent=(level+1)+" / "+levels.length;
+ difficultyEl.textContent=difficultyName(level);
+ unlockedEl.textContent=(unlockedThrough+1)+" / "+levels.length;
+ movesEl.textContent=String(moves);pushesEl.textContent=String(pushes);
  goalProgressEl.textContent=done+" / "+total;goalBar.style.width=(total?Math.round(done/total*100):0)+"%";updateControls();
 }
 function render(){
@@ -122,7 +358,7 @@ function render(){
  board.replaceChildren(fragment);updateStats();
 }
 function parseLevel(index){
- clearHintHighlight();hintCount=0;
+ clearHintHighlight();hideOverlays();hintCount=0;
  level=Math.max(0,Math.min(levels.length-1,Math.floor(Number(index)||0)));
  const rows=levels[level];width=rows[0].length;height=rows.length;
  walls=new Set();boxes=new Set();goals=new Set();player=-1;
@@ -150,8 +386,12 @@ function move(dx,dy){
  save();if(pushed){boxes.delete(target);boxes.add(destination);pushes++;}
  player=target;moves++;complete=isComplete();render();
  if(complete){
-  if(level===levels.length-1){setStatus("全部 "+levels.length+" 关通关！",true);GameBridge.send("GAME_OVER",{message:"推箱子全部通关",score:moves,win:true});}
-  else setStatus("本关完成！点击右侧「下一关」继续。",true);
+  unlockedThrough=Math.max(unlockedThrough,Math.min(level+1,levels.length-1));
+  const prior=bestResults[level];
+  if(!prior||moves<prior.moves||(moves===prior.moves&&pushes<prior.pushes))bestResults[level]={moves,pushes};
+  updateStats();
+  setStatus(level===levels.length-1?"全部 "+levels.length+" 关通关！":"第 "+(level+1)+" 关胜利！请在结算中选择下一关。",true);
+  showVictory();
  }else if(pushed&&isCornerDeadlock(destination))setStatus("注意：箱子被推入角落，已经无法移动。按 Z 或点击撤销一步。");
  else if(pushed)setStatus("推动成功 · "+completedGoals()+" / "+goals.size+" 个箱子已到位。");
  else setStatus("移动 "+moves+" 步 · 已推动 "+pushes+" 次。");
@@ -161,7 +401,7 @@ function undo(){
  if(paused||!history.length)return false;
  clearHintHighlight();
  const previous=history.pop();player=previous.player;boxes=new Set(previous.boxes);
- moves=previous.moves;pushes=previous.pushes;complete=isComplete();render();
+ moves=previous.moves;pushes=previous.pushes;complete=isComplete();hideOverlays();render();
  setStatus("已撤销一步 · 可以重新规划推动方向。");return true;
 }
 function resetLevel(){if(paused)return;parseLevel(level);setStatus("本关已重置，从头规划路线。");}
@@ -179,7 +419,8 @@ function key(event){
 }
 function dpadClick(event){const button=event.target.closest("button[data-move]");if(!button)return;const parts=button.dataset.move.split(",").map(Number);move(parts[0],parts[1]);}
 function snapshot(){
- return{layoutVersion:2,level,width,height,player,boxes:[...boxes],goals:[...goals],walls:[...walls],
+ return{layoutVersion:3,level,width,height,player,boxes:[...boxes],goals:[...goals],walls:[...walls],
+  unlockedThrough,bestResults,
   moves,pushes,complete,hintCount,history:history.map(item=>({player:item.player,boxes:item.boxes.slice(),moves:item.moves,pushes:item.pushes}))};
 }
 function restore(saved){
@@ -201,32 +442,57 @@ function restore(saved){
   player:item.player,boxes:item.boxes.map(Number),moves:Math.max(0,Number(item.moves)||0),pushes:Math.max(0,Number(item.pushes)||0)
  })): [];
  if(nextHistory.some(item=>!validIndex(item.player,total)||new Set(item.boxes).size!==item.boxes.length||item.boxes.some(index=>!validIndex(index,total)||nextWalls.has(index))))throw new Error("推箱子撤销记录无效");
- level=Math.max(0,Math.min(levels.length-1,saved.level));width=nextWidth;height=nextHeight;
+ const matchedIndex=mapIndexForBoard(nextWidth,nextHeight,nextWalls,nextGoals);
+ level=matchedIndex===null?Math.max(0,Math.min(levels.length-1,saved.level)):matchedIndex;
+ const legacyProgress=!Number.isInteger(saved.unlockedThrough)&&saved.layoutVersion!==3&&saved.level>=7?17:0;
+ unlockedThrough=Math.max(level,legacyProgress,Number.isInteger(saved.unlockedThrough)?Math.min(levels.length-1,Math.max(0,saved.unlockedThrough)):0);
+ bestResults={};
+ if(saved.bestResults&&typeof saved.bestResults==="object"&&!Array.isArray(saved.bestResults)){
+  for(const [key,value] of Object.entries(saved.bestResults)){
+   const index=Number(key);
+   if(Number.isInteger(index)&&index>=0&&index<levels.length&&
+    Number.isFinite(value?.moves)&&value.moves>=0&&Number.isFinite(value?.pushes)&&value.pushes>=0)
+    bestResults[index]={moves:Math.floor(value.moves),pushes:Math.floor(value.pushes)};
+  }
+ }
+ width=nextWidth;height=nextHeight;
  walls=nextWalls;goals=nextGoals;boxes=nextBoxes;player=saved.player;
  moves=Math.max(0,Number(saved.moves)||0);pushes=Math.max(0,Number(saved.pushes)||0);
  hintCount=Math.max(0,Number(saved.hintCount)||0);
- history=nextHistory;complete=isComplete();paused=true;render();setStatus("进度已恢复 · 点击顶部「继续」后接着推箱子。");
+ history=nextHistory;complete=isComplete();paused=true;
+ if(complete){unlockedThrough=Math.max(unlockedThrough,Math.min(level+1,levels.length-1));}
+ render();
+ if(complete){showVictory();setStatus("本关已完成 · 点击顶部「继续」后可选择下一关。");}
+ else setStatus("进度已恢复 · 点击顶部「继续」后接着推箱子。");
 }
 function fixtureState(){
  return{level,width,height,player,boxes:[...boxes].sort((a,b)=>a-b),goals:[...goals].sort((a,b)=>a-b),
-  walls:[...walls].sort((a,b)=>a-b),moves,pushes,hintCount,paused,complete,status:status.textContent,history:history.length};
+  walls:[...walls].sort((a,b)=>a-b),moves,pushes,hintCount,paused,complete,status:status.textContent,
+  unlockedThrough,bestResults:{...bestResults},victoryVisible:!victory.hidden,pickerVisible:!levelPicker.hidden,history:history.length};
 }
 dpad.addEventListener("click",dpadClick);
 undoButton.addEventListener("click",undo);resetButton.addEventListener("click",resetLevel);
 nextButton.addEventListener("click",nextLevel);hintButton.addEventListener("click",hint);
+chooseButton.addEventListener("click",openLevelPicker);
+winNext.addEventListener("click",finishOrNext);
+winStay.addEventListener("click",()=>{victory.hidden=true;setStatus("第 "+(level+1)+" 关已通关；可在右侧选择下一关或重玩。");});
+winPick.addEventListener("click",openLevelPicker);
+levelPickerClose.addEventListener("click",closeLevelPicker);
 window.addEventListener("keydown",key);
 if(new URLSearchParams(location.search).has("p111Test")){
  window.__p111SokobanTest={
   loadLevel(index){paused=false;parseLevel(index);return fixtureState();},state:fixtureState,
   move(dx,dy){move(dx,dy);return fixtureState();},undo(){undo();return fixtureState();},
   nextLevel(){nextLevel();return fixtureState();},resetLevel(){resetLevel();return fixtureState();},
+  openLevelPicker(){openLevelPicker();return fixtureState();},chooseLevel(index){if(index<=unlockedThrough&&!paused)parseLevel(index);return fixtureState();},
   snapshot,restore,isCornerDeadlock,levelCount:levels.length,levelRows:index=>levels[index]?.slice()||[]
  };
 }
 GameBridge.register({
  init(){paused=true;parseLevel(0);setStatus("准备开始 · 把所有木箱推到圆形目标点上。");},newGame,
  pause(){paused=true;updateControls();setStatus("已暂停 · 当前关卡和步数均已保留。");},
- resume(){paused=false;updateControls();setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
+ resume(){paused=false;updateControls();if(complete){showVictory();setStatus("本关已胜利 · 请选择下一关或留在本关。");}
+  else setStatus("继续闯关 · 方向键或右侧方向按钮移动。");},
  snapshot,restore,dispose(){
    paused=true;clearHintHighlight();window.removeEventListener("keydown",key);dpad.removeEventListener("click",dpadClick);
    undoButton.removeEventListener("click",undo);resetButton.removeEventListener("click",resetLevel);
