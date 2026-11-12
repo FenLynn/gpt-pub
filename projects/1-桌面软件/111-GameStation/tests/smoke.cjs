@@ -1475,6 +1475,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.ok(sokobanCatalog.every(level=>level.players===1&&level.boxes===level.goals&&level.boxes>=6&&level.width>=11&&level.width<=20&&level.height>=10&&level.height<=17),
    "Every Sokoban level must have a valid player, matching boxes/goals and a genuinely larger board: "+JSON.stringify(sokobanCatalog.filter(level=>level.players!==1||level.boxes!==level.goals)));
   assert.ok(Math.max(...sokobanCatalog.map(level=>level.boxes))>=30,"Sokoban campaign must include multi-dozen-box challenge boards");
+  await sokobanFixture.evaluate(()=>window.__p111SokobanTest.loadLevel(0));
   const hardLevel=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.chooseLevel(89));
   assert.equal(hardLevel.level,89,"All 90 classic Sokoban levels must be directly selectable without clearing 89 earlier levels");
   assert.ok(hardLevel.boxes.length>=20,"The hardest campaign stage must be reachable immediately and contain a genuinely dense box layout");
