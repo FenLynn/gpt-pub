@@ -2143,8 +2143,8 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
   justify-content:flex-start!important;align-self:center!important;justify-self:stretch!important;
   box-sizing:border-box!important;width:100%!important;height:max-content!important;
   min-width:0!important;min-height:0!important;max-height:calc(100% - 20px)!important;
-  margin:0!important;padding:5px 2px 5px 12px!important;gap:clamp(7px,1.1cqh,11px)!important;
-  border:0!important;border-left:1px solid #dce6ed!important;border-radius:0!important;
+  margin:0!important;padding:5px 2px 5px 8px!important;gap:clamp(7px,1.1cqh,11px)!important;
+  border:0!important;border-radius:0!important;
   background:transparent!important;box-shadow:none!important;
   overflow-x:hidden!important;overflow-y:auto!important;scrollbar-width:none!important
  }
