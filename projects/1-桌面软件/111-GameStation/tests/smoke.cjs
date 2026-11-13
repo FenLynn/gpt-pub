@@ -23,6 +23,11 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.match(html,/data-board-measured="false"/,id+" must hide its history rail before first measurement");
   assert.match(source,/dataset\.boardMeasured\s*=\s*"true"/,id+" must reveal only after real board geometry is measured");
  }
+ for(const id of gameIds){
+  const html=fs.readFileSync(path.join(root,"games",id,"index.html"),"utf8");
+  const head=html.split("</head>")[0];
+  assert.equal((head.match(/shared\/workspace\.css/g)||[]).length,1,id+" must load one workspace stylesheet before first paint");
+ }
  const workspaceCss=fs.readFileSync(path.join(root,"games","shared","workspace.css"),"utf8");
  assert.match(workspaceCss,/is\(\.reversi-layout,\.connect4-layout,\.battleship-layout,\.chess-layout,\.checkers-layout,\.chinese-checkers-layout\)/,
   "All measured history-rail games must share the same first-paint visibility gate");
@@ -34,7 +39,6 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  assert.ok(sokobanPage.indexOf("levels.js")<sokobanPage.indexOf("game.js"),"Sokoban level data must load before game logic");
  assert.match(sokobanPage,/90 关均可自由挑战/,"All Sokoban levels must be clearly presented as freely selectable");
  assert.doesNotMatch(sokobanPage,/选择已解锁关卡|可自由重玩已解锁关卡/,"Sokoban picker must not imply advanced levels are locked");
- assert.match(workspaceCss,/is\(\.sudoku-layout,\.sokoban-layout\)/,"Sudoku and Sokoban must use the adjacent centered control-rail layout");
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN,
   args:["--no-sandbox","--disable-dev-shm-usage","--allow-file-access-from-files"]});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});
@@ -227,11 +231,11 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   const centerOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.root.x+v.root.width/2));
   if(name==="数独"||name==="推箱子"){
    const railGap=v.tools.x-v.primary.right;
-   assert.ok(railGap>=0&&railGap<=22,name+" right controls must sit directly beside the board: "+JSON.stringify({railGap,geometry:v}));
+   assert.ok(railGap>=0&&centerOffset<=2.5,name+" centered board must leave room for the right controls: "+JSON.stringify({railGap,centerOffset,geometry:v}));
    assert.ok(v.toolsCenterDelta<=4,name+" right controls must be vertically centered: "+JSON.stringify(v));
-   assert.equal(v.mainGridColumn,"1",name+" playfield must occupy the first grid track");
-   assert.equal(v.toolsGridColumn,"2",name+" right controls must occupy the adjacent second track");
-   assert.equal(v.gridColumns.length,2,name+" must use a compact two-track board-and-controls layout: "+JSON.stringify(v));
+   assert.equal(v.mainGridColumn,"2",name+" playfield must occupy the center track");
+   assert.equal(v.toolsGridColumn,"3",name+" controls must occupy the right track");
+   assert.equal(v.gridColumns.length,3,name+" must use the shared symmetric workspace: "+JSON.stringify(v));
   }else if(name==="飞行棋"){
    const centerTrackOffset=Math.abs((v.primary.x+v.primary.width/2)-(v.main.x+v.main.width/2));
    assert.ok(centerTrackOffset<=2.5,"Flight Chess board must center in the actual space between its wider history rail and compact right controls: "+JSON.stringify({centerTrackOffset,geometry:v}));
@@ -270,7 +274,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    assert.equal(cleanup.duplicateHud,false,"Chess must use the host toolbar only; no duplicate in-frame HUD");
    assert.deepEqual(cleanup.strayButtons,[],"Chess must not leave duplicate controls at the lower-left");
    assert.deepEqual(cleanup.rootChildren,["chess-notation-rail","game-main-board","game-tools"],"Chess must retain only the notation rail, board and right tools");
-   assert.equal(cleanup.workspaceStylesheet,"../shared/workspace.css?v=history-firstpaint-20261112-r1","Chess shared layout stylesheet must preload before first paint");
+   assert.equal(cleanup.workspaceStylesheet,"../shared/workspace.css?v=workspace-layout-20261113","Chess shared layout stylesheet must preload before first paint");
    const coordinates=await frame.locator("#game").evaluate(root=>{
     const box=el=>{const r=el.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
     const centerX=el=>{const r=el.getBoundingClientRect();return r.left+r.width/2;};
@@ -666,7 +670,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      "Xiangqi notation and buttons must stay close to the actual board: "+JSON.stringify({leftGap,rightGap,geometry}));
     assert.ok(geometry.glyphFont>=geometry.pieceWidth*.62&&geometry.glyphFont<=geometry.pieceWidth*.9,
      "Xiangqi glyphs must be large and proportional to their circular pieces: "+JSON.stringify(geometry));
-    assert.ok(geometry.styles.some(href=>href.startsWith("../shared/workspace.css?v=xq-prune-20261112-r2"))&&geometry.styles.some(href=>href.startsWith("./xiangqi.css?v=xq-prune-20261112-r2")),
+    assert.ok(geometry.styles.some(href=>href.startsWith("../shared/workspace.css?v=workspace-layout-20261113"))&&geometry.styles.some(href=>href.startsWith("./xiangqi.css?v=xq-prune-20261112-r2")),
      "Xiangqi dedicated stylesheet must be cache-busted and loaded in HEAD, preventing a legacy layout flash");
     const scroll=await frame.locator("#moveList").evaluate(list=>{
      const beforeWidth=list.getBoundingClientRect().width;
@@ -732,35 +736,14 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   assert.equal(header.noticeParent,"topbar",name+" live status must occupy the center of the titlebar");
   assert.equal(header.noticePosition,"static",name+" titlebar notification must participate in the topbar grid");
   assert.notEqual(header.noticeDisplay,"none",name+" center notification region must remain present");
-  if(name==="五子棋"){
-   assert.ok(header.notice.width>=(width<=1390?195:214)&&header.notice.width<=285,name+" Gomoku LED must remain longer while fitting the desktop header: "+JSON.stringify(header));
-   const led=await page.locator("#gameNotice").evaluate(box=>{
-    const speaker=box.querySelector(".game-notice-speaker"),window=box.querySelector(".game-notice-window"),
-      label=box.querySelector(".game-notice-text"),screen=getComputedStyle(window),text=getComputedStyle(label);
-    return{speakerRight:speaker.getBoundingClientRect().right,screenLeft:window.getBoundingClientRect().left,
-      speakerWidth:speaker.getBoundingClientRect().width,rays:speaker.querySelectorAll(".speaker-pulse-rays path").length,
-      pulseName:getComputedStyle(speaker.querySelector(".speaker-pulse-rays")).animationName,
-      pulseCount:getComputedStyle(speaker.querySelector(".speaker-pulse-rays")).animationIterationCount,
-      screenWidth:window.getBoundingClientRect().width,textColor:text.color,textFont:parseFloat(text.fontSize),
-      screenPaddingTop:parseFloat(screen.paddingTop),screenBackground:screen.backgroundColor,
-      modeBorder:getComputedStyle(document.querySelector("#modeControl")).borderTopWidth,
-      difficultyBorder:getComputedStyle(document.querySelector("#difficultyControl")).borderTopWidth};
-   });
-   assert.ok(led.speakerRight<led.screenLeft&&led.screenWidth>=(width<=1390?165:180),"Gomoku speaker belongs outside a long LED screen: "+JSON.stringify(led));
-   assert.ok(led.speakerWidth>=38&&led.rays===3&&led.pulseName==="gs-notice-pulse"&&led.pulseCount==="2",
-    "LED speaker must be large and flash three rays exactly twice for an incoming message: "+JSON.stringify(led));
-   assert.ok(led.textColor==="rgb(255, 255, 255)"&&led.textFont>=14&&led.screenPaddingTop<=3,"Gomoku LED must have large white tightly-spaced text: "+JSON.stringify(led));
-   assert.equal(led.modeBorder,"1px","Gomoku mode switches need a shared outline");
-   assert.equal(led.difficultyBorder,"1px","Gomoku difficulty switches need a shared outline");
-   if(width<=1390){
-    const breadcrumb=await page.locator("#topbar .breadcrumbs").evaluate(el=>{
-     const r=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();
-     return{left:r.left,barLeft:b.left,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,text:el.innerText};
-    });
-    assert.ok(breadcrumb.left>=breadcrumb.barLeft+3&&breadcrumb.scrollWidth<=breadcrumb.clientWidth+2,
-     "Narrow desktop Gomoku breadcrumb must not be clipped: "+JSON.stringify(breadcrumb));
-   }
-  }else assert.ok(header.notice.width>=(width<=1390?195:214)&&header.notice.width<=285,name+" all game headers must share the Gomoku LED dimensions: "+JSON.stringify(header));
+  const status=await page.locator("#gameNotice").evaluate(box=>({
+   dot:box.querySelectorAll(".game-notice-dot").length,
+   speaker:box.querySelectorAll(".game-notice-speaker").length,
+   height:box.getBoundingClientRect().height,
+   animation:getComputedStyle(box.querySelector(".game-notice-text")).animationName
+  }));
+  assert.ok(header.notice.width>=120&&status.height===32&&status.dot===1&&status.speaker===0,
+   name+" must use the shared compact topbar status: "+JSON.stringify(status));
   assert.ok(Math.abs(header.notice.centerY-header.bar.centerY)<=2,name+" notification region must align with the titlebar: "+JSON.stringify(header));
   const crumb=await page.evaluate(()=>({root:document.querySelector("#breadcrumbRoot").textContent.trim(),
    category:document.querySelector("#breadcrumbCategory").textContent.trim(),
@@ -769,10 +752,10 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    gameSeparator:!document.querySelector("#crumbGameSep").classList.contains("hidden"),
    gameName:!document.querySelector("#breadcrumbGame").classList.contains("hidden"),
    clusterMarginLeft:getComputedStyle(document.querySelector(".game-topbar-cluster")).marginLeft}));
-  assert.equal(crumb.root,"Game",name+" breadcrumb root must be Game");
+  assert.equal(crumb.root,"Home",name+" breadcrumb root must be Home");
   assert.ok(["棋类","益智","街机","卡牌"].includes(crumb.category),name+" breadcrumb must show its category: "+JSON.stringify(crumb));
   assert.equal(crumb.game,name,name+" breadcrumb must show the active game as the final segment");
-  assert.equal(crumb.categorySeparator,true,name+" breadcrumb must retain Game > category");
+  assert.equal(crumb.categorySeparator,true,name+" breadcrumb must retain Home > category");
   assert.equal(crumb.gameSeparator,true,name+" breadcrumb must retain category > game");
   assert.equal(crumb.gameName,true,name+" active game breadcrumb must be visible");
   assert.equal(crumb.clusterMarginLeft,"0px",name+" titlebar cluster must not carry a hidden auto-spacer");
@@ -1146,14 +1129,14 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const rail=document.querySelector(".game-tools").getBoundingClientRect();
    const cell=document.querySelector(".sudoku-cell"),panelStyle=getComputedStyle(panel),boardStyle=getComputedStyle(boardEl);
    return{font:parseFloat(getComputedStyle(cell).fontSize),padFont:parseFloat(getComputedStyle(document.querySelector(".number-pad button")).fontSize),
-    gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
+    gap:rail.left-board.right,boardCenterDelta:Math.abs((board.left+board.right-innerWidth)/2),centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
     right:rail.right,visible:getComputedStyle(document.querySelector(".game-tools")).display,
     rootClass:document.querySelector("#game").className,panel:{x:panelBox.x,right:panelBox.right,width:panelBox.width,display:panelStyle.display,justifyContent:panelStyle.justifyContent,justifyItems:panelStyle.justifyItems},
     board:{x:board.x,right:board.right,width:board.width,justifySelf:boardStyle.justifySelf,marginLeft:boardStyle.marginLeft,marginRight:boardStyle.marginRight}};
   });
   assert.ok(sudokuRail.font>=28&&sudokuRail.padFont>=19,"Sudoku board digits and number pad must be substantially larger: "+JSON.stringify(sudokuRail));
-  assert.ok(sudokuRail.gap>=0&&sudokuRail.gap<=22&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
-   "Sudoku right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sudokuRail));
+  assert.ok(sudokuRail.gap>=0&&sudokuRail.boardCenterDelta<=3&&sudokuRail.centerDelta<=4&&sudokuRail.right<=1430&&sudokuRail.visible==="flex",
+   "Sudoku board must center in the workspace and its controls must sit to the right: "+JSON.stringify(sudokuRail));
   await sudokuFixture.screenshot({path:path.join(artifacts,"sudoku-large-digits-adjacent-rail.png")});
   await sudokuFixture.evaluate(()=>document.querySelector("#game").classList.remove("gs-tools-open"));
   const sudokuCentered=await sudokuFixture.evaluate(()=>{
@@ -1195,7 +1178,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    const stage=document.querySelector(".soko-stage"),stageBox=stage.getBoundingClientRect();
    const panel=document.querySelector(".game-panel").getBoundingClientRect();
    const bs=getComputedStyle(document.querySelector("#board")),ss=getComputedStyle(stage);
-   return{gap:rail.left-board.right,centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
+   return{gap:rail.left-board.right,boardCenterDelta:Math.abs((board.left+board.right-innerWidth)/2),centerDelta:Math.abs((rail.top+rail.bottom-main.top-main.bottom)/2),
     right:rail.right,cellDelta:Math.abs(cell.width-cell.height),aspect:stage.style.aspectRatio,
     stageBox:{w:stageBox.width,h:stageBox.height},boardBox:{w:board.width,h:board.height},
     mainBox:{w:main.width,h:main.height},panelBox:{w:panel.width,h:panel.height},
@@ -1204,8 +1187,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     stageStyle:{width:ss.width,height:ss.height,aspect:ss.aspectRatio,maxHeight:ss.maxHeight},
     visible:getComputedStyle(document.querySelector(".game-tools")).display};
   });
-  assert.ok(sokobanRail.gap>=0&&sokobanRail.gap<=22&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
-   "Sokoban right rail must sit immediately beside the board and be vertically centered: "+JSON.stringify(sokobanRail));
+  assert.ok(sokobanRail.gap>=0&&sokobanRail.boardCenterDelta<=3&&sokobanRail.centerDelta<=4&&sokobanRail.right<=1430&&sokobanRail.visible==="flex",
+   "Sokoban board must center in the workspace and its controls must sit to the right: "+JSON.stringify(sokobanRail));
   assert.ok(sokobanRail.cellDelta<=1.5,"Sokoban variable-size boards must keep square cells: "+JSON.stringify(sokobanRail));
   const firstLevelHint=await sokobanFixture.evaluate(()=>window.__p111SokobanTest.hintPath());
   assert.ok(Array.isArray(firstLevelHint)&&firstLevelHint.length===1,"The Sokoban hint must return one responsive, legal next-step suggestion");
@@ -1257,7 +1240,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
        copies:document.querySelectorAll('link[href*="shared/workspace.css"]').length,
        guide:getComputedStyle(root.querySelector(".game-guide")).display};
      });
-     assert.ok(preload.head&&preload.parent==="HEAD"&&preload.href==="../shared/workspace.css?v=history-firstpaint-20261112-r1"&&preload.loaded&&preload.copies===1&&preload.guide==="none",
+     assert.ok(preload.head&&preload.parent==="HEAD"&&preload.href==="../shared/workspace.css?v=workspace-layout-20261113"&&preload.loaded&&preload.copies===1&&preload.guide==="none",
       "Battleship must preload exactly one shared workspace stylesheet before first paint: "+JSON.stringify(preload));
     }
     if(name==="西洋跳棋（8×8）"||name==="中国跳棋"){
@@ -1323,17 +1306,17 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     await viewCheck(name,size.width,size.height);
     if(!noticeChecked){
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("已暂停"));
-    await page.locator("#gameNotice.visible").waitFor({timeout:1500});
+    await page.waitForFunction(()=>document.querySelector("#gameNoticeText")?.textContent==="已暂停",null,{timeout:1500});
     const r=await page.locator("#gameNotice").evaluate(el=>{const x=el.getBoundingClientRect(),b=document.querySelector("#topbar").getBoundingClientRect();return{top:x.top,bottom:x.bottom,x:x.left,right:x.right,width:x.width,centerX:x.left+x.width/2,centerY:x.top+x.height/2,barTop:b.top,barBottom:b.bottom,barCenterX:b.left+b.width/2,message:el.textContent,parent:el.parentElement.id};});
     assert.equal(r.parent,"topbar","live status must be rendered in the topbar center");
     assert.ok(r.top>=r.barTop-1&&r.bottom<=r.barBottom+1,"game notices must stay inside the titlebar, never below the game");
-    assert.ok(r.width>=214&&r.width<=285,"Gomoku LED must be about twice the former width: "+JSON.stringify(r));
+    assert.ok(r.width>=120&&r.width<=180,"The status should fit a compact slot in the header: "+JSON.stringify(r));
     assert.match(r.message,/已暂停/);
     const shortLed=await page.locator("#gameNotice").evaluate(el=>{
      const window=el.querySelector(".game-notice-window"),text=el.querySelector(".game-notice-text");
      return{marquee:el.classList.contains("marquee"),align:getComputedStyle(window).justifyContent,weight:getComputedStyle(text).fontWeight};
     });
-    assert.deepEqual(shortLed,{marquee:false,align:"center",weight:"400"},"Short LED text must be regular-weight and centered: "+JSON.stringify(shortLed));
+    assert.deepEqual(shortLed,{marquee:false,align:"center",weight:"600"},"Short status text must stay still and centered: "+JSON.stringify(shortLed));
     await frame.locator("#game").evaluate(()=>window.GameBridge.report("这是一段专门用于检查顶部LED在内容较长时能够自动滚动播放的状态提示文字"));
     await page.waitForFunction(()=>document.querySelector("#gameNotice")?.classList.contains("marquee"),{timeout:1500});
     const longLed=await page.locator("#gameNotice").evaluate(el=>{
@@ -1341,8 +1324,10 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      return{align:getComputedStyle(window).justifyContent,weight:getComputedStyle(text).fontWeight,animation:getComputedStyle(text).animationName};
     });
     assert.equal(longLed.align,"flex-start","Long LED text must scroll from the left edge");
-    assert.equal(longLed.weight,"400","Long LED text must remain regular-weight");
-    assert.equal(longLed.animation,"led-scroll","Long LED text must animate horizontally: "+JSON.stringify(longLed));
+    assert.equal(longLed.weight,"600","Long status text must use the same weight");
+    assert.equal(longLed.animation,"game-status-scroll","Long status text must scroll horizontally: "+JSON.stringify(longLed));
+    const longRect=await page.locator("#gameNotice").boundingBox();
+    assert.ok(Math.abs(longRect.x-r.x)<1&&Math.abs(longRect.width-r.width)<1,"Messages must not shift the header layout");
     assert.equal(await page.locator("#toast").evaluate(el=>el.classList.contains("show")),false,"no bottom toast while a game is open");
     noticeChecked=true;
    }
@@ -1386,9 +1371,9 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.waitForFunction(()=>document.querySelector("#gameFrame")?.contentDocument?.getElementById("score")?.textContent==="0");
   assert.equal(await frame.locator("#score").innerText(),"0","Next after scoring must reset the real in-game score");
   await open("扫雷");
-  const mineLoading=await page.locator("#stageLoading").evaluate(el=>({display:getComputedStyle(el).display,scoped:el.parentElement.classList.contains("is-minesweeper")}));
-  assert.equal(mineLoading.scoped,true,"Minesweeper must scope the loading-layer exception to its own game stage");
-  assert.equal(mineLoading.display,"none","Minesweeper must not flash the generic centered loading strip");
+  await page.locator("#stageLoading.done").waitFor({state:"hidden"});
+  assert.equal(await frame.locator("#gameWorkspaceStyles").evaluate(el=>Boolean(el.sheet)),true,
+   "Minesweeper must load the shared layout before showing the board");
   const mineCssSource=fs.readFileSync(path.join(root,"games/minesweeper/minesweeper.css"),"utf8");
   assert.ok(!mineCssSource.includes("mine-hard-layout"),"Minesweeper must not retain the superseded hard-only layout CSS");
   assert.ok(!mineCssSource.includes(".mine-bottom-left")&&!mineCssSource.includes(".mine-bottom-right"),"Minesweeper must not retain unused bottom alignment selectors");
@@ -2075,13 +2060,12 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await cannonPage.close();
   // The breadcrumb is an actual navigation path: Game -> category -> current game.
   await library();await open("五子棋");
-  assert.equal((await page.locator("#topbar .breadcrumbs").innerText()).replace(/\s+/g,""),"Game›棋类›五子棋");
+  assert.equal((await page.locator("#topbar .breadcrumbs").innerText()).replace(/\s+/g,""),"Home›棋类›五子棋");
   await page.locator("#breadcrumbCategory").click();
   await page.locator("#libraryView").waitFor({state:"visible"});
   assert.equal(await page.locator("#libraryTitle").innerText(),"棋类","Category breadcrumb must open the corresponding game menu");
   await page.locator("#breadcrumbRoot").click();
-  await page.locator("#libraryView").waitFor({state:"visible"});
-  assert.equal(await page.locator("#libraryTitle").innerText(),"全部游戏","Game breadcrumb must open the all-games menu");
+  await page.locator("#homeView").waitFor({state:"visible"});
   assert.deepEqual(remote,[],"No remote HTTP/CDN resources are permitted in file:// mode");
   assert.deepEqual(errors,[],"No uncaught errors in host or game frames");
   console.log("P111 R33 Chromium regression passed: 24 games × two desktop viewports (48 screenshots), 24 save/restore round trips, Windows 7 Minesweeper UI/menu/chord flow and shared game lifecycles.");

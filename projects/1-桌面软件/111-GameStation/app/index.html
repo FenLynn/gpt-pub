@@ -7,8 +7,8 @@
   <meta name="description" content="GameStation · 完全离线的个人游戏工作台">
   <title>GameStation</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' rx='2' fill='%23397da8'/%3E%3Crect x='18' y='3' width='11' height='11' rx='2' fill='%2368a6c4'/%3E%3Crect x='3' y='18' width='11' height='11' rx='2' fill='%2383b79f'/%3E%3Crect x='18' y='18' width='11' height='11' rx='2' fill='%23b0c7d5'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261111-r45">
-  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261111-r13">
+  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r63">
+  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r63">
 </head>
 <body>
 <div class="app-shell" id="appShell">
@@ -35,10 +35,10 @@
     <header class="topbar" id="topbar">
       <div class="topbar-leading"><div class="topbar-left">
         <button class="mobile-menu" id="mobileMenu" aria-label="打开导航">☰</button>
-        <div class="breadcrumbs" aria-label="当前位置"><button type="button" class="breadcrumb-link" id="breadcrumbRoot">Game</button><i id="crumbCategorySep">›</i><button type="button" class="breadcrumb-link" id="breadcrumbCategory">首页</button><i id="crumbGameSep" class="hidden">›</i><strong id="breadcrumbGame" class="hidden"></strong></div>
+        <div class="breadcrumbs" aria-label="当前位置"><button type="button" class="breadcrumb-link" id="breadcrumbRoot">Home</button><i id="crumbCategorySep">›</i><button type="button" class="breadcrumb-link" id="breadcrumbCategory">首页</button><i id="crumbGameSep" class="hidden">›</i><strong id="breadcrumbGame" class="hidden"></strong></div>
       </div></div>
       <div class="game-notice-center hidden" id="gameNotice" role="status" aria-live="polite" aria-atomic="true">
-        <svg class="game-notice-speaker" viewBox="0 0 32 24" aria-hidden="true"><path class="speaker-body" d="M3 9v6h4l6 5V4L7 9H3z"/><g class="speaker-pulse-rays"><path d="M17 8l4-3"/><path d="M18 12h5"/><path d="M17 16l4 3"/></g></svg>
+        <span class="game-notice-dot" aria-hidden="true"></span>
         <span class="game-notice-window"><span class="game-notice-text" id="gameNoticeText"></span></span>
       </div>
       <div class="game-topbar-cluster">
@@ -213,6 +213,6 @@
   </section>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="./js/app.js?v=p111-xiangqi-prune-r2"></script>
+<script src="./js/app.js?v=workspace-layout-20261113"></script>
 </body>
 </html>

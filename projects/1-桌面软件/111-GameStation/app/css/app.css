@@ -127,10 +127,12 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .workspace-view{padding:0;background:#f5f8fa}
 .game-stage{position:relative;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;background:#f5f8fa}
 .game-stage iframe{display:block;width:100%;height:100%;border:0;background:#f5f8fa}
-.stage-loading{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;gap:10px;background:#f5f8fa;color:#7890a3;font-size:13px;pointer-events:none;transition:opacity .16s}
-.stage-loading.done{opacity:0}
+.stage-loading{position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--workspace,#edf2f5);color:#526b7c;font-size:13px}
+.stage-loading.done{visibility:hidden;pointer-events:none}
+.stage-loading.failed .loading-spinner{display:none}
+.stage-loading:not(.failed)>span:last-child{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 /* Minesweeper enters directly; skip the generic centered spinner/text strip. */
-#gameStage.is-minesweeper>.stage-loading{display:none!important}
+
 .loading-spinner{width:16px;height:16px;border:2px solid #d9e5ed;border-top-color:#5e9bc0;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .help-panel{position:fixed;top:58px;right:22px;z-index:100;width:min(370px,calc(100vw - 24px));max-height:min(78vh,680px);display:flex;flex-direction:column;border:1px solid #dce7ef;border-radius:11px;background:#fff;box-shadow:0 14px 40px rgba(36,69,92,.16);overflow:hidden}
@@ -637,7 +639,6 @@ body{font-size:15px}
 .workspace-view,.game-stage,.game-stage iframe{background:var(--workspace)}
 .game-stage{position:relative;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
 .game-stage iframe{display:block;width:100%;height:100%;border:0}
-.stage-loading{background:#edf2f5eb;color:#718a9a}
 .help-panel{top:68px;right:22px;width:min(370px,calc(100vw - 24px));max-height:min(78vh,680px);border:1px solid #d9e5ec;border-radius:14px;background:#fff;box-shadow:0 16px 42px #24455c2e;overflow:hidden}
 .help-header{height:48px;background:#f8fbfd;border-bottom:1px solid #edf2f5;cursor:move}
 .help-header strong{color:#34566e;font-size:14px}.help-content{padding:9px 13px 13px}
@@ -760,7 +761,6 @@ body{font-size:15px}
 }
 
 
-
 /* P111 R11 · desktop shell, one button language, and a balanced home dashboard */
 @media(min-width:701px){
  :root{--sidebar:218px;--topbar:54px;--shell:#edf5fa;--shell-line:#d8e5ee;--page:#f2f6f9;--workspace:#eaf0f4}
@@ -850,7 +850,6 @@ body{font-size:15px}
  .ranking-list{flex:1;min-height:0}
  .ranking-foot{margin-top:auto}
 }
-
 
 
 /* P111 R11.1 · desktop home hierarchy: hero, activity/recent, categories, featured games */
@@ -964,7 +963,7 @@ body{font-size:15px}
 
 
 /* R19 · In-game only! Do not change Home / Library header layout. */
-.game-notice-center{display:none!important}
+
 .main-area:has(#workspaceView:not(.hidden)) .topbar{
  display:grid!important;grid-template-columns:minmax(95px,160px) max-content minmax(120px,1fr) max-content max-content!important;
  grid-template-rows:minmax(0,1fr)!important;align-items:center!important;gap:6px!important;
@@ -982,13 +981,8 @@ body{font-size:15px}
  border:1px solid #d7e5ee;border-radius:8px;background:#e4f0f8
 }
 .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer strong{font-size:15px!important;font-weight:800!important;color:#275473!important}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-center{
- grid-column:3!important;grid-row:1!important;display:flex!important;align-items:center;justify-content:center;
- min-width:0;width:100%;height:31px;padding:0 8px;overflow:hidden;text-overflow:ellipsis;
- border:1px solid transparent;border-radius:8px;white-space:nowrap;text-align:center;
- color:#28688e;font-size:12px;font-weight:750;opacity:0;transition:opacity .16s ease,background .16s ease
-}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-center.visible{opacity:1;border-color:#cfe3ef;background:#e1f0f9}
+
+
 .main-area:has(#workspaceView:not(.hidden)) .topbar .game-controls:not(.hidden){
  grid-column:4!important;grid-row:1!important;order:0!important;display:flex!important;
  align-items:center!important;justify-content:flex-end!important;gap:5px!important;
@@ -1023,7 +1017,7 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-left{grid-column:1!important;grid-row:1!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){grid-column:2!important;grid-row:1!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important}
- .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:1/-1!important;grid-row:2!important}
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar .game-controls:not(.hidden){display:none!important}
 }
 
@@ -1212,16 +1206,7 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){grid-column:2!important;grid-row:1!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
 }
-.game-notice-overlay{
- position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:5;
- display:flex;align-items:center;justify-content:center;min-width:110px;max-width:min(82%,640px);
- min-height:22px;padding:0 12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
- border:1px solid transparent;border-top:0;border-radius:0 0 8px 8px;background:rgba(225,240,249,.88);
- color:#28688e;font-size:11px;font-weight:760;line-height:1.1;text-align:center;
- box-shadow:0 3px 9px rgba(30,60,82,.10);backdrop-filter:blur(8px);
- opacity:0;pointer-events:none;transition:opacity .16s ease,border-color .16s ease,background .16s ease
-}
-.game-notice-overlay.visible{opacity:1;border-color:#cfe3ef;background:rgba(225,240,249,.96)}
+
 
 /* R21.9 · Requested HUD order: timer left, live notice center, game actions right. */
 .topbar-leading{display:flex;align-items:center;min-width:0;flex:1;gap:12px}
@@ -1252,16 +1237,8 @@ body{font-size:15px}
  justify-content:flex-end!important;gap:5px!important;min-width:0!important;max-width:none!important;
  width:auto!important;height:auto!important;flex:1 1 auto!important;margin:0!important;overflow:visible!important
 }
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-center{
- grid-column:2!important;grid-row:1!important;display:flex!important;align-items:center!important;justify-content:center!important;
- min-width:0!important;width:100%!important;height:31px!important;padding:0 10px!important;overflow:hidden!important;
- border:1px solid transparent!important;border-radius:8px!important;white-space:nowrap!important;text-align:center!important;
- color:#28688e!important;font-size:12px!important;font-weight:750!important;opacity:0!important;
- transition:opacity .16s ease,background .16s ease!important
-}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-center.visible{
- opacity:1!important;border-color:#cfe3ef!important;background:#e1f0f9!important
-}
+
+
 .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
  grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
  align-items:center!important;justify-content:flex-end!important;gap:5px!important;
@@ -1291,7 +1268,7 @@ body{font-size:15px}
   align-items:center!important;width:100%!important;min-width:0!important;max-width:100%!important;
   height:30px!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:none
  }
- .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:2!important;grid-row:1!important}
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{
   grid-column:3!important;grid-row:1!important;justify-self:end!important;display:flex!important;
   align-items:center!important;justify-content:flex-end!important;gap:4px!important;min-width:0!important
@@ -1304,7 +1281,7 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .game-controls{display:none!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{grid-column:1!important;grid-row:1!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){min-width:58px!important;width:58px!important;height:27px!important}
- .main-area:has(#workspaceView:not(.hidden)) .game-notice-center{grid-column:2!important;grid-row:1!important;min-width:0!important}
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{grid-column:3!important;grid-row:1!important;gap:2px!important}
 }
 

@@ -70,13 +70,8 @@
 .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{display:flex!important;align-items:center!important;flex:0 1 190px!important;min-width:130px!important;max-width:190px!important;width:auto!important;height:auto!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar-leading .topbar-left{display:flex!important;align-items:center!important;flex:1 1 auto!important;max-width:100%!important;min-width:0!important;width:auto!important;height:auto!important}
 .main-area:has(#workspaceView:not(.hidden)) .breadcrumbs{min-width:0!important;max-width:100%!important;overflow:hidden!important;white-space:nowrap!important}
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;flex:0 0 130px!important;width:130px!important;min-width:130px!important;max-width:130px!important;height:32px!important;padding:0 7px!important;margin:0!important;grid-column:auto!important;grid-row:auto!important;border:1px solid #304940!important;border-radius:7px!important;background:linear-gradient(180deg,#1a2828,#0b1818)!important;color:#b4edc7!important;box-shadow:inset 0 2px 5px #0009!important;opacity:.88!important;overflow:hidden!important;text-align:left!important;white-space:nowrap!important}
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice.visible{border-color:#4b7866!important;opacity:1!important}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{width:15px!important;height:15px!important;flex:none!important;fill:none!important;stroke:#80dba7!important;stroke-width:1.8!important;stroke-linecap:round!important;stroke-linejoin:round!important}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-window{display:block!important;flex:1 1 auto!important;min-width:0!important;overflow:hidden!important;white-space:nowrap!important}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{display:inline-block!important;white-space:nowrap!important;color:#bdf2c9!important;font:750 10px/1.15 Consolas,"Segoe UI",sans-serif!important;letter-spacing:.03em!important;text-shadow:0 0 6px #50d89463!important}
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-text{animation:led-scroll var(--led-duration,7s) ease-in-out infinite alternate!important}
-@keyframes led-scroll{from{transform:translateX(0)}to{transform:translateX(calc(-1 * var(--led-shift,0px)))}}
+
+
 .main-area:has(#workspaceView:not(.hidden)) .game-topbar-cluster{display:flex!important;align-items:center!important;flex:0 0 auto!important;min-width:0!important;gap:8px!important;margin-left:auto!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer:not(.hidden){display:flex!important;position:static!important;flex:0 0 68px!important;width:68px!important;min-width:68px!important;height:32px!important;padding:0!important;margin:0!important;left:auto!important;top:auto!important;transform:none!important;grid-column:auto!important;grid-row:auto!important;align-items:center!important;justify-content:center!important;border:1px solid #d5e4ec!important;border-radius:8px!important;background:#e2f0f7!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .host-game-timer strong{font:800 15px/1 Consolas,monospace!important;color:#275473!important}
@@ -98,7 +93,7 @@
 @media(min-width:901px) and (max-width:1150px){
  .main-area:has(#workspaceView:not(.hidden)) #topbar{gap:5px!important;padding:0 6px!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{flex-basis:125px!important;min-width:94px!important}
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){width:112px!important;min-width:112px!important;max-width:112px!important;flex-basis:112px!important}
+
  .main-area:has(#workspaceView:not(.hidden)) .game-topbar-cluster{gap:4px!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{padding:0 5px!important}
 }
@@ -106,12 +101,12 @@
  .main-area:has(#workspaceView:not(.hidden)) #topbar{height:68px!important;min-height:68px!important;flex-wrap:wrap!important;align-content:center!important;row-gap:3px!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{order:1!important;flex:1 1 125px!important}
  .main-area:has(#workspaceView:not(.hidden)) .game-topbar-cluster{order:2!important;gap:3px!important}
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){order:3!important;flex:1 1 100%!important;width:auto!important;max-width:none!important;min-width:0!important;height:25px!important}
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar .game-controls:not(.hidden){max-width:42vw!important;overflow-x:auto!important;scrollbar-width:none!important}
 }
 @media(prefers-reduced-motion:reduce){
  #homeView .heatmap-cell:not(.empty),#homeView .recent-game,#homeView .recent-tab,#homeView .poster-progress i,#homeView .home-game-poster.arriving .poster-art{animation:none!important;transition:none!important}
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-text{animation:none!important}
+
 }
 
 
@@ -176,31 +171,35 @@
  #homeView .poster-tips p{font-size:14px!important}
  #homeView .poster-details{gap:12px!important}
 }
-/* R33 — One shared, Gomoku-approved header design for all 24 games. */
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
- display:flex!important;align-items:center!important;gap:8px!important;
- flex:0 1 280px!important;width:280px!important;min-width:240px!important;max-width:280px!important;
- height:34px!important;padding:0!important;border:0!important;border-radius:0!important;
- background:transparent!important;box-shadow:none!important;overflow:visible!important;
- margin-left:auto!important;margin-right:auto!important;opacity:1!important
+/* Reserve the status width so messages cannot shift the timer or controls. */
+#gameNotice{
+ display:flex;align-items:center;gap:8px;flex:0 0 clamp(120px,10vw,156px);
+ min-width:0;height:32px;padding:0 10px;box-sizing:border-box;overflow:hidden;
+ border:1px solid #d1dfe8;border-radius:8px;background:#f2f7fa;color:#405e72;
 }
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
- width:21px!important;height:21px!important;flex:none!important;
- stroke:#5289a2!important;stroke-width:2!important
+#gameNotice[data-tone="attention"]{border-color:#e1c597;background:#f9eedb;color:#77501f}
+#gameNotice[data-tone="result"]{border-color:#b9d4c5;background:#e7f2eb;color:#285f49}
+#topbar:has(#gameNotice:not(.hidden)){
+ background:#fcfdff;border-bottom-color:#e3e9f1;
 }
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-window{
- display:flex!important;align-items:center!important;justify-content:flex-start!important;
- box-sizing:border-box!important;flex:1!important;height:32px!important;min-width:0!important;
- padding:1px 9px!important;border:1px solid #243d38!important;border-radius:7px!important;
- background:linear-gradient(180deg,#192724,#091210)!important;
- box-shadow:inset 0 1px 5px #000a,0 1px 2px #1f423620!important;
- white-space:nowrap!important;overflow:hidden!important
+.game-notice-dot{width:6px;height:6px;flex:none;border-radius:50%;background:currentColor;opacity:.72}
+.game-notice-window{display:flex;justify-content:center;flex:1;min-width:0;overflow:hidden}
+.game-notice-text{flex:none;white-space:nowrap;font-size:13px;font-weight:600}
+#gameNotice.marquee .game-notice-window{justify-content:flex-start}
+@media(prefers-reduced-motion:no-preference){
+ #gameNotice.marquee .game-notice-text{animation:game-status-scroll var(--led-duration,7s) ease-in-out infinite alternate}
 }
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{
- color:#fff!important;font:800 15px/1.1 "Segoe UI",Arial,sans-serif!important;
- letter-spacing:.025em!important;text-shadow:0 0 5px #ffffff55!important;
- white-space:nowrap!important
+@media(prefers-reduced-motion:reduce){
+ #gameNotice.marquee .game-notice-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
+@keyframes game-status-scroll{to{transform:translateX(calc(-1 * var(--led-shift,0px)))}}
+@media(max-width:900px){
+ #gameNotice{order:3;flex:1 1 100%;height:25px}
+}
+
+/* Shared desktop controls. */
+
+
 .main-area:has(#workspaceView:not(.hidden)) .game-topbar-cluster{
  margin-left:0!important
 }
@@ -213,8 +212,8 @@
  padding:2px!important;border:1px solid #c6d9e6!important;border-radius:9px!important;
  background:#e7f1f7!important;box-shadow:inset 0 1px 2px #54778c10!important
 }
-.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{margin-left:57px!important}
-.main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{margin-left:38px!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{margin-left:51px!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{margin-left:32px!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl:before,
 .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl:before{
  position:absolute!important;top:50%!important;left:auto!important;
@@ -239,9 +238,7 @@
  color:#176fa8!important;box-shadow:0 2px 5px #285a771a!important
 }
 @media(min-width:901px) and (max-width:1450px){
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
-  flex-basis:240px!important;width:240px!important;min-width:215px!important
- }
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
   flex-basis:150px!important;min-width:112px!important
  }
@@ -252,15 +249,7 @@
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{
   flex:0 0 156px!important;min-width:156px!important;max-width:156px!important
  }
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){
-  flex:0 1 207px!important;width:207px!important;max-width:207px!important;min-width:196px!important
- }
- .main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{
-  margin-left:51px!important
- }
- .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{
-  margin-left:32px!important
- }
+
  .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{
   min-width:40px!important;padding:0 5px!important
  }
@@ -458,36 +447,6 @@
 #gameStage .game-pause-resume:active{transform:scale(.97)}
 @media(prefers-reduced-motion:reduce){#gameStage .game-pause-resume{transition:none!important}}
 
-/* R27 — LED text is regular weight; short messages center, long messages scroll. */
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice .game-notice-window{
- display:flex!important;align-items:center!important;justify-content:center!important
-}
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-window{
- justify-content:flex-start!important
-}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{
- font-weight:400!important;text-shadow:none!important;letter-spacing:.02em!important
-}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-window{
- justify-content:center!important
-}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) #gameNotice.marquee .game-notice-window{
- justify-content:flex-start!important
-}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{
- font-weight:400!important;text-shadow:none!important;letter-spacing:.02em!important
-}
-@media(max-width:900px) and (prefers-reduced-motion:no-preference){
- .main-area:has(#workspaceView:not(.hidden)) #gameNotice.marquee .game-notice-text{
-  animation:led-scroll var(--led-duration,7s) ease-in-out infinite alternate!important
- }
-}
-
-/* Keep the LED label at its intrinsic width so overflow detection and marquee travel stay exact. */
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-text{flex:0 0 auto!important}
-.main-area:has(#workspaceView:not(.hidden) #gameFrame[src*="/gomoku/"]) .game-notice-text{flex:0 0 auto!important}
-
-
 /* R30 — size the poster from its actual card width, not the browser viewport. */
 @media(min-width:701px){
  #homeView .home-game-poster{container-type:size!important}
@@ -535,28 +494,6 @@
 }
 .main-area:has(#workspaceView:not(.hidden)) #startButton.end-action svg rect{
  fill:currentColor!important;stroke:none!important
-}
-.main-area:has(#workspaceView:not(.hidden)) #gameNotice:not(.hidden){gap:4px!important}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker{
- width:27px!important;height:27px!important;overflow:visible!important;
- transform:translateX(-6px) scale(1.44)!important;transform-origin:center!important;
- stroke:#5289a2!important;stroke-width:2.2!important;stroke-linecap:round!important;stroke-linejoin:round!important
-}
-.main-area:has(#workspaceView:not(.hidden)) .speaker-body{fill:none;stroke:inherit}
-.main-area:has(#workspaceView:not(.hidden)) .speaker-pulse-rays{
- opacity:0;transform-origin:17px 12px
-}
-.main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker.is-pulsing .speaker-pulse-rays{
- animation:gs-notice-pulse .4s ease-out 2 both!important
-}
-@keyframes gs-notice-pulse{
- 0%,100%{opacity:0;transform:translateX(0)}
- 25%,65%{opacity:1;transform:translateX(2px)}
-}
-@media(prefers-reduced-motion:reduce){
- .main-area:has(#workspaceView:not(.hidden)) .game-notice-speaker.is-pulsing .speaker-pulse-rays{
-  animation:none!important;opacity:1!important
- }
 }
 
 

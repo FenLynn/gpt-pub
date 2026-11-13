@@ -10,6 +10,25 @@ const native={
 };
 let handlers={},sessionId=null,disposed=false,timerPaused=false,preserveDuringPause=false,nextTimerId=1,pendingKey=null,activityPending=false;
 const timers=new Map();
+let layoutFrame=null;
+function reportFirstLayout(){
+ if(gameId==="xiangqi"||!root||layoutFrame!==null)return;
+ const deadline=performance.now()+1500;
+ const check=()=>{
+  if(disposed)return;
+  const board=root.querySelector(".game-main-board")||root;
+  const rect=board.getBoundingClientRect();
+  if(rect.width>0&&rect.height>0&&getComputedStyle(root).visibility!=="hidden"){
+   send("LAYOUT_READY");
+  }else if(performance.now()<deadline){
+   layoutFrame=native.requestAnimationFrame(check);
+  }else{
+   send("LAYOUT_ERROR",{message:"游戏布局未完成，请返回后重新进入"});
+  }
+ };
+ // Layout work must continue while the new game is still paused.
+ layoutFrame=native.requestAnimationFrame(()=>{layoutFrame=native.requestAnimationFrame(check);});
+}
 function arm(record){
  if(timerPaused||disposed||!timers.has(record.id))return;
  if(record.kind==="raf"){
@@ -110,7 +129,7 @@ function handleHostShortcut(event){
  }
 }
 function handlePointerActivity(event){
- if(disposed||!sessionId||!timerPaused||activityPending||isEditableTarget(event.target)||(event.target instanceof Element&&event.target.closest(".gs-hud,.game-tools")))return;
+ if(disposed||!sessionId||!timerPaused||activityPending||isEditableTarget(event.target)||(event.target instanceof Element&&event.target.closest(".game-tools")))return;
  activityPending=true;send("ACTIVITY");
 }
 window.addEventListener("keydown",handleHostShortcut,true);
@@ -164,7 +183,9 @@ window.addEventListener("message",event=>{
   root?.classList.toggle("rail-collapsed",!!m.payload?.collapsed);
   root?.classList.toggle("gs-tools-open",!m.payload?.collapsed);
   window.dispatchEvent(new Event("resize"));
+  reportFirstLayout();
  }else if(m.type==="DISPOSE"){
+  if(layoutFrame!==null)native.cancelAnimationFrame(layoutFrame);
   suspendTimers();safeCall("dispose");disposeTimers();
  }
 });
