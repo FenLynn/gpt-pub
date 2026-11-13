@@ -7,8 +7,9 @@
   <meta name="description" content="GameStation · 完全离线的个人游戏工作台">
   <title>GameStation</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' rx='2' fill='%23397da8'/%3E%3Crect x='18' y='3' width='11' height='11' rx='2' fill='%2368a6c4'/%3E%3Crect x='3' y='18' width='11' height='11' rx='2' fill='%2383b79f'/%3E%3Crect x='18' y='18' width='11' height='11' rx='2' fill='%23b0c7d5'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r64">
-  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r64">
+  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r65">
+  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r65">
+  <link rel="stylesheet" href="./css/round-dialogs.css?v=20261113-r65">
 </head>
 <body>
 <div class="app-shell" id="appShell">
@@ -141,45 +142,46 @@
         <iframe id="gameFrame" title="GameStation 游戏区域" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
         <button id="exitFullscreenButton" class="game-fullscreen-exit" type="button" aria-label="退出全屏" title="退出全屏（Esc）" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M3 15h6v6M21 15h-6v6"/></svg><span>退出全屏</span></button>
         <div class="game-pause-overlay" id="gamePauseOverlay" hidden aria-hidden="true">
-          <div class="game-pause-content">
+          <div class="game-pause-content round-dialog-card">
             <div class="game-pause-title" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg><span>已暂停</span></div>
             <button class="game-pause-resume" id="gamePauseResume" type="button" aria-label="继续游戏" title="继续游戏（Enter）">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
-              <span>继续</span>
+              <span>继续游戏</span>
             </button>
           </div>
         </div>
         <section class="save-progress-overlay" id="saveProgressOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="saveProgressTitle">
-          <div class="save-progress-card">
+          <div class="save-progress-card round-dialog-card">
             <div class="save-progress-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H3V3h2zM7 3v6h10V3M7 21v-7h10v7M9 17h6"/></svg></div>
-            <span class="save-progress-kicker">进度已保存</span>
-            <h2 id="saveProgressTitle">本局已保存并暂停</h2>
-            <p>当前进度已保存在本机。接下来可以继续本局、重新开始或离开。</p>
+            <h2 id="saveProgressTitle">进度已保存</h2>
+            <p>已保存到本机 · 本局用时 <strong id="saveProgressElapsed">00:00</strong></p>
             <div class="save-progress-actions">
-              <button type="button" id="saveProgressContinue">继续</button>
-              <button type="button" id="saveProgressNewGame">新开一局</button>
-              <button type="button" id="saveProgressLeave">离开</button>
+              <button type="button" id="saveProgressContinue">继续本局</button>
+              <button type="button" id="saveProgressLeave">返回游戏库</button>
             </div>
+            <button class="round-dialog-quiet" type="button" id="saveProgressNewGame" title="开始新一局并清除本局存档">新开一局</button>
           </div>
         </section>
         <div class="restore-countdown-overlay" id="restoreCountdownOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="恢复进度倒计时">
-          <div class="restore-countdown-card">
-            <button type="button" class="restore-countdown-close" id="restoreCountdownCancel" aria-label="取消倒计时，保持暂停" title="取消倒计时">×</button>
-            <span>已恢复上次进度</span>
-            <strong id="restoreCountdownNumber">3</strong>
-            <span>准备好，马上继续</span>
+          <div class="restore-countdown-card round-dialog-card">
+            <h2>已恢复上次进度</h2>
+            <div class="restore-countdown-face"><strong id="restoreCountdownNumber">3</strong></div>
+            <p>倒计时结束后继续游戏</p>
+            <button type="button" id="restoreCountdownCancel">保持暂停</button>
           </div>
         </div>
-        <section class="game-result-overlay" id="gameResultOverlay" hidden aria-hidden="true" aria-label="本局结算">
-          <div class="game-result-card" id="gameResultCard" data-result="ended">
+        <section class="game-result-overlay" id="gameResultOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="gameResultTitle">
+          <div class="game-result-card round-dialog-card" id="gameResultCard" data-result="ended">
             <div class="game-result-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg></div>
-            <span class="game-result-kicker">已结束</span>
             <h2 id="gameResultTitle">本局结束</h2>
-            <p id="gameResultMessage">本局已结束</p>
-            <div class="game-result-score" id="gameResultScore" hidden><span id="gameResultScoreLabel">本局得分</span><strong id="gameResultScoreValue">0</strong></div>
+            <p id="gameResultMessage" hidden></p>
+            <dl class="round-result-metrics">
+              <div><dt>本局用时</dt><dd id="gameResultElapsed">00:00</dd></div>
+              <div id="gameResultScore" hidden><dt id="gameResultScoreLabel">本局得分</dt><dd id="gameResultScoreValue">0</dd></div>
+            </dl>
             <div class="game-result-actions">
               <button type="button" id="gameResultReplay">再来一局</button>
-              <button type="button" id="gameResultLeave">离开</button>
+              <button type="button" id="gameResultLeave">返回游戏库</button>
             </div>
           </div>
         </section>
@@ -213,6 +215,6 @@
   </section>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="./js/app.js?v=workspace-polish-20261113"></script>
+<script src="./js/app.js?v=round-dialogs-20261113"></script>
 </body>
 </html>

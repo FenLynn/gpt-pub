@@ -142,7 +142,8 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   if(countdownRestoreGames.has(id)){
    await page.locator("#restoreCountdownOverlay").waitFor({state:"visible",timeout:3000});
    assert.equal(await page.locator("#restoreCountdownNumber").innerText(),"3",name+" must show the full three-second restore countdown");
-   assert.equal(await page.locator("#restoreCountdownCancel").isVisible(),true,name+" restore countdown must expose a close X");
+   assert.equal(await page.locator("#restoreCountdownCancel").innerText(),"保持暂停",name+" restore countdown must offer an explicit pause action");
+   assert.equal(await page.locator("#gamePauseOverlay").isVisible(),false,name+" must not draw a pause card behind the countdown");
    if(id==="minesweeper"){
     await page.locator("#restoreCountdownCancel").click();
     await page.locator("#restoreCountdownOverlay").waitFor({state:"hidden",timeout:2000});
@@ -175,6 +176,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await page.locator("#pauseButton").click();
   await page.waitForFunction(()=>document.querySelector("#pauseButton").getAttribute("aria-label")==="继续");
   await page.locator("#gamePauseOverlay").waitFor({state:"visible"});
+  await page.locator(".game-pause-content").evaluate(el=>Promise.all(el.getAnimations().map(animation=>animation.finished)));
   const geometry=await page.locator("#gamePauseResume").evaluate(el=>{
    const icon=el.querySelector("svg"),r=el.closest(".game-pause-content").getBoundingClientRect(),
     stage=document.querySelector("#gameStage").getBoundingClientRect();
@@ -187,10 +189,10 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     centerDx:Math.abs((r.left+r.right-stage.left-stage.right)/2),
     centerDy:Math.abs((r.top+r.bottom-stage.top-stage.bottom)/2)};
   });
-  assert.ok(geometry.icon&&geometry.clockIcon&&geometry.title==="已暂停"&&geometry.buttonText==="继续"
-    &&geometry.buttonTop-geometry.titleBottom>=20&&geometry.cardWidth>=250&&geometry.cardWidth<=340
+  assert.ok(geometry.icon&&geometry.clockIcon&&geometry.title==="已暂停"&&geometry.buttonText==="继续游戏"
+    &&geometry.buttonTop-geometry.titleBottom>=12&&geometry.cardWidth>=220&&geometry.cardWidth<=260
     &&geometry.cardWidth>geometry.cardHeight&&geometry.cardBackground.startsWith("rgba(")
-    &&geometry.cardAlpha>=.48&&geometry.cardAlpha<=.52
+    &&geometry.cardAlpha>=.9&&geometry.cardAlpha<1
     &&geometry.centerDx<2&&geometry.centerDy<2,
    "All games need centered title-above-resume pause UI: "+JSON.stringify(geometry));
   if(game==="中国象棋")await page.screenshot({path:path.join(artifacts,"xiangqi-paused.png")});
@@ -1335,14 +1337,15 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
     await page.locator("#startButton").click();
     await page.locator("#gameResultOverlay").waitFor({state:"visible"});
     const summary=await page.locator("#gameResultOverlay").evaluate(el=>({
-     status:el.querySelector(".game-result-kicker").textContent,
      title:el.querySelector("#gameResultTitle").textContent,
+     elapsed:el.querySelector("#gameResultElapsed").textContent,
      actions:[...el.querySelectorAll(".game-result-actions button")].map(x=>x.textContent),
      points:getComputedStyle(el.querySelector("#gameResultScore")).display!=="none"
     }));
     const hasPoints=new Set(["2048","记忆翻牌","俄罗斯方块","贪吃蛇","Pong","魂斗罗（原创模式）","超级玛丽","90 坦克","斗地主","麻将","三国杀"]);
-    assert.equal(summary.status,"已结束",name+" manual ending should say 已结束");
-    assert.deepEqual(summary.actions,["再来一局","离开"],name+" must offer restart and exit");
+    assert.equal(summary.title,"本局结束",name+" manual ending should say 本局结束");
+    assert.match(summary.elapsed,/^\d+:\d{2}$/,name+" result must show the round duration");
+    assert.deepEqual(summary.actions,["再来一局","返回游戏库"],name+" must offer restart and exit");
     assert.equal(summary.points,hasPoints.has(name),name+" show score only for games with genuine points");
     assert.ok((await page.locator("#gameNoticeText").innerText()).includes("已结束"),name+" LED should announce termination");
     if(name==="五子棋")await page.screenshot({path:path.join(artifacts,"gomoku-manual-ended.png")});

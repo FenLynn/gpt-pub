@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="../shared/game.css">
 <link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113">
 <link rel="stylesheet" href="./xiangqi.css?v=xq-prune-20261112-r2">
-<link rel="stylesheet" href="../shared/turn-clock.css"></head>
+<link rel="stylesheet" href="../shared/turn-clock.css"><link rel="stylesheet" href="../../css/round-dialogs.css?v=20261113-r65"></head>
 <body data-game="xiangqi">
 <main class="game-root game-layout xiangqi-layout" id="game">
   <aside class="xiangqi-record-rail" aria-label="对局棋谱">
@@ -20,14 +20,13 @@
     <div class="board-wrap">
       <div class="xiangqi-board" id="board" aria-label="中国象棋棋盘">
         <section class="xiangqi-result" id="xiangqiResult" hidden aria-live="assertive">
-          <div class="xiangqi-result-card">
+          <div class="xiangqi-result-card round-dialog-card">
             <div class="xiangqi-result-seal" id="xiangqiResultSeal">勝</div>
-            <span class="xiangqi-result-eyebrow">本局结算</span>
             <h2 id="xiangqiResultTitle">红方获胜</h2>
             <p id="xiangqiResultDescription"></p>
             <div class="xiangqi-result-buttons">
-              <button id="xiangqiReplay" type="button">再开一局</button>
-              <button id="xiangqiLeave" type="button">离开</button>
+              <button id="xiangqiReplay" type="button">再来一局</button>
+              <button id="xiangqiLeave" type="button">返回游戏库</button>
             </div>
           </div>
         </section>

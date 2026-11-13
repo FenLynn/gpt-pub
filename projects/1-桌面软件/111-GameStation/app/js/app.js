@@ -119,28 +119,31 @@ function showGameResult(payload={},manual=false){
  const side=String(payload.winner||"").trim()||
   raw.match(/(黑色棋子|白色棋子|黑方|白方|红方|黄方|蓝方|绿方)(?:将死)?获胜/)?.[1]||"";
  let title=manual?"本局结束":payload.win===true?"本局获胜":"本局结束";
- let message=manual?"本局已结束，可以再来一局或离开":raw||"本局已结束";
+ let message=manual?"":raw;
  let result=manual?"ended":payload.win===true?"win":payload.win===false?"loss":"ended";
  if(hasTwoPlayerMode&&!manual){
-  if(draw){title="平局";message="双方战成平局，可以再来一局";result="draw";}
+  if(draw){title="平局";message="";result="draw";}
   else if(localDuel){
    title=side?side+"获胜":"本局结束";
-   message=side?side+"取得胜利，可以再来一局":message;
+   if(side&&raw.includes(side+"获胜"))message="";
    result=side?"win":"ended";
   }else{
    title=payload.win===true?"获胜":payload.win===false?"失败":"本局结束";
-   message=payload.win===true?"恭喜获胜！可以再来一局":
-    payload.win===false?"本局失败，再挑战一次":message;
+   if(side&&raw.startsWith(side))message=raw.split(" · ").slice(1).join(" · ");
    result=payload.win===true?"win":payload.win===false?"loss":"ended";
   }
  }
  card.dataset.result=result;
  $("gameResultTitle").textContent=title;
- $("gameResultMessage").textContent=message;
+ const detail=$("gameResultMessage");
+ detail.textContent=message===title?"":message;
+ detail.hidden=!detail.textContent;
+ $("gameResultElapsed").textContent=fmtClock(session?.elapsedMs||0);
  $("gameResultScore").hidden=!scoringGames.has(active.id);
  $("gameResultScoreLabel").textContent=active.id==="doudizhu"?"本局结算":"本局得分";
  $("gameResultScoreValue").textContent=String(Number.isFinite(score)?score:0);
  el.hidden=false;el.setAttribute("aria-hidden","false");
+ requestAnimationFrame(()=>{if(!el.hidden)$("gameResultReplay").focus({preventScroll:true});});
 }
 function statFor(id){if(!stats[id])stats[id]={plays:0,wins:0,totalMs:0,bestScore:0,lastPlayed:"",lastPlayedAt:0,days:{}};const s=stats[id];s.plays=Number(s.plays)||0;s.wins=Number(s.wins)||0;s.totalMs=Number(s.totalMs)||0;s.bestScore=Number(s.bestScore)||0;s.lastPlayedAt=Math.max(0,Number(s.lastPlayedAt)||0);s.days=s.days||{};return s;}
 function persistStats(){write("stats",stats);}
@@ -350,7 +353,7 @@ function setGameState(){
  $("startButton").classList.toggle("end-action",started);$("startButton").disabled=!ready||finished||(!started&&!paused);
  $("pauseButton").innerHTML=started&&!finished&&paused?icons.resume:icons.pause;$("pauseButton").setAttribute("aria-label",pauseLabel);$("pauseButton").title=pauseLabel;$("pauseButton").classList.toggle("continue-action",started&&!finished&&paused);
  $("pauseButton").disabled=!ready||!started||finished;
- const overlay=$("gamePauseOverlay"),visible=!!active&&ready&&started&&paused&&!finished&&!savingProgress;
+ const overlay=$("gamePauseOverlay"),visible=!!active&&ready&&started&&paused&&!finished&&!savingProgress&&$("restoreCountdownOverlay").hidden;
  overlay.hidden=!visible;overlay.setAttribute("aria-hidden",String(!visible));
  $("newGameButton").innerHTML=icons.next;$("newGameButton").setAttribute("aria-label","下一局");$("newGameButton").title="下一局";$("newGameButton").disabled=!ready;
  if(active&&ready)send("HUD_STATE",{ready,started,paused,finished,elapsed:session?fmtClock(session.elapsedMs):"00:00",modeIndex,difficulty});
@@ -396,7 +399,8 @@ function saveProgress(){
  renderProgressButton();
  send("SNAPSHOT_REQUEST",{requestId:snapshotRequestId});
 }
-function showSaveProgressDialog(){
+function showSaveProgressDialog(elapsedMs){
+ $("saveProgressElapsed").textContent=fmtClock(elapsedMs);
  const overlay=$("saveProgressOverlay");if(!overlay)return;
  overlay.hidden=false;overlay.setAttribute("aria-hidden","false");
  shell.classList.add("save-progress-open");
@@ -448,12 +452,15 @@ function startRestoreCountdown(){
  clearRestoreCountdown();
  let remaining=3;number.textContent="3";
  overlay.hidden=false;overlay.setAttribute("aria-hidden","false");
- renderProgressButton();
+ const face=number.parentElement;
+ face.dataset.second="3";
  restoreCountdownTimer=setInterval(()=>{
   remaining--;
-  if(remaining>0){number.textContent=String(remaining);return;}
-  clearRestoreCountdown();activateRestoredGame();
+  if(remaining>0){number.textContent=String(remaining);face.dataset.second=String(remaining);return;}
+  activateRestoredGame();
  },1000);
+ setGameState();
+ $("restoreCountdownCancel").focus({preventScroll:true});
 }
 function restoreProgress(){
  if(!active||!ready||!savedProgress||restoredThisSession||restorePending||snapshotRequestId)return;
@@ -486,7 +493,7 @@ function handleProgressSnapshot(payload){
   elapsedMs,clockStarted:deferredClockGames.has(active.id)?!!session.clockStarted:true,
   score:Number(session?.score??currentScore)||0,roundCounted:!!roundCounted,state:payload.snapshot};
  if(!writeProgress(active.id,item)){savingProgress=false;setGameState();toast("本地存储空间不足，未能保存进度");renderProgressButton();return;}
- savedProgress=item;restoredThisSession=true;renderProgressButton();showSaveProgressDialog();
+ savedProgress=item;restoredThisSession=true;renderProgressButton();showSaveProgressDialog(elapsedMs);
 }
 function handleProgressRestored(payload){
  if(!restorePending||payload?.requestId!==restorePending.requestId)return;
@@ -498,7 +505,6 @@ function handleProgressRestored(payload){
  session.clockStarted=typeof item.clockStarted==="boolean"?item.clockStarted:inferDeferredClockStarted(active.id,item.state);
  session.score=Math.max(0,Number(item.score)||0);session.running=false;session.finished=false;session.needsInit=false;
  currentScore=session.score;roundCounted=!!item.roundCounted;started=true;paused=true;restoredThisSession=true;
- setGameState();renderProgressButton();
  if(countdownRestoreGames.has(active.id))startRestoreCountdown();
  else activateRestoredGame();
 }
@@ -509,9 +515,9 @@ function freezeClock(){if(session&&session.running){persistSessionTime();session
 function updateSessionDisplay(){if(session&&session.running){persistSessionTime();$("gameElapsed").textContent=fmtClock(session.elapsedMs);if(active&&ready)send("HUD_STATE",{ready,started,paused,finished:!!session?.finished,elapsed:fmtClock(session.elapsedMs),modeIndex,difficulty});if(Date.now()-session.lastSave>5000){session.lastSave=Date.now();persistStats();}}}
 function countRound(){if(!session||roundCounted)return;const now=Date.now(),s=statFor(session.id);if(!firstStartedAt){firstStartedAt=inferFirstStartedAt()||now;write("firstStartedAt",firstStartedAt);}s.plays++;s.lastPlayed=dateKey(new Date(now));s.lastPlayedAt=now;roundCounted=true;persistStats();renderRanking();renderHomeRecent();renderHomePoster();renderHomeMetrics();}
 function startGame(){if(!ready||!paused||started||session?.finished)return;if(session?.needsInit){send("NEW_GAME");session.needsInit=false;}if(!roundCounted)countRound();send("RESUME");if(deferredClockGames.has(active.id)){started=true;paused=false;setGameState();}else startClock();focusGameFrame();toast("开始游戏");}
-function endGame(){if(!ready||!started||session?.finished)return;if(!paused)send("PAUSE");stopClock();session.finished=true;clearProgress(session.id);persistStats();setGameState();showGameNotice("已结束",0,true);showGameResult({},true);}
+function endGame(){if(!ready||!started||session?.finished)return;clearRestoreCountdown();if(!paused)send("PAUSE");stopClock();session.finished=true;clearProgress(session.id);persistStats();setGameState();showGameNotice("已结束",0,true);showGameResult({},true);}
 function pauseGame(){if(!ready||!started||paused||session?.finished)return;send("PAUSE");stopClock();toast("已暂停");}
-function resumeGame(){if(!ready||!started||!paused||session?.finished)return;send("RESUME");if(deferredClockGames.has(active.id)&&!session.clockStarted){paused=false;setGameState();}else startClock();focusGameFrame();toast("继续游戏");}
+function resumeGame(){if(!ready||!started||!paused||session?.finished||restoreCountdownTimer!==null||!$("saveProgressOverlay").hidden)return;send("RESUME");if(deferredClockGames.has(active.id)&&!session.clockStarted){paused=false;setGameState();}else startClock();focusGameFrame();toast("继续游戏");}
 function togglePause(){if(paused)resumeGame();else pauseGame();}
 function toggleGamePause(){if(!ready||session?.finished)return;if(!started){startGame();return;}togglePause();}
 function startOrResumeGame(){if(!ready||session?.finished)return;if(started){if(paused)resumeGame();return;}startGame();}
@@ -552,7 +558,7 @@ function openGame(id){
  $("stageLoading").classList.remove("done","failed");$("stageLoading").lastElementChild.textContent="正在载入";
  frame.title=g.name+" 游戏";
  const entryURL=new URL(g.entry,location.href);
- entryURL.searchParams.set("v","workspace-polish-20261113");
+ entryURL.searchParams.set("v","round-dialogs-20261113");
  if(g.id==="gomoku"&&location.search.includes("p111Test=1"))entryURL.searchParams.set("p111Test","1");
  frame.src=entryURL.href;closeHelp();shell.classList.remove("menu-open");
 }
@@ -710,6 +716,7 @@ document.addEventListener("keydown",e=>{
  }
  const target=e.target instanceof Element?e.target:null;
  const editable=!!target&&(target.matches("input,textarea,select")||target.isContentEditable||!!target.closest("[contenteditable='true']"));
+ if(restoreCountdownTimer!==null||!$("saveProgressOverlay").hidden)return;
  if(e.key==="/"&&!editable){e.preventDefault();if(!libraryView.classList.contains("hidden"))$("gameSearch").focus();}
  if(!active||!ready||!started||session?.finished||e.repeat||editable||(e.key!=="Enter"&&e.key.toLowerCase()!=="p"))return;
  e.preventDefault();togglePause();
