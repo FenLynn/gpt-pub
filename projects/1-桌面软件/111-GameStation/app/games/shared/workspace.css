@@ -1,11 +1,11 @@
 /* P111 R16 · one full-height game surface instead of a fixed three-column dashboard. */
-html,body,body[data-game],#game{width:100%;height:100%;margin:0;overflow:hidden;background:#eaf2f8!important}
+html,body,body[data-game],#game{width:100%;height:100%;margin:0;overflow:hidden;background:#f0f5f9!important}
 .game-root.game-layout,.game-root.game-layout.card-table-layout,.game-root.game-layout.solitaire-layout,
 .game-root.game-layout.rail-collapsed,.game-root.game-layout.card-table-layout.rail-collapsed{
 position:relative!important;display:grid!important;grid-template-columns:minmax(0,1fr)!important;
 grid-template-rows:52px minmax(0,1fr)!important;gap:0!important;padding:0!important;margin:0!important;
 height:100%!important;min-height:0!important;max-height:100%!important;width:100%!important;
-overflow:hidden!important;background:#eaf2f8!important;align-items:stretch!important;justify-items:stretch!important}
+overflow:hidden!important;background:#f0f5f9!important;align-items:stretch!important;justify-items:stretch!important}
 .game-root.game-layout>.game-guide{display:none!important}
 .game-root.game-layout>.game-main-board,.game-root.game-layout.rail-collapsed>.game-main-board{
 grid-column:1!important;grid-row:2!important;width:100%!important;height:100%!important;
@@ -284,13 +284,13 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .game-root.game-layout>.game-tools>.gs-page-action{
  display:flex!important;align-items:center!important;justify-content:center!important;gap:9px!important;
  flex:none!important;width:100%!important;min-height:42px!important;height:auto!important;padding:8px 12px!important;
- border:1px solid #cbdce6!important;border-radius:9px!important;background:#f9fbfd!important;
+ border:1px solid #cbdce6!important;border-radius:9px!important;background:#fbfcfe!important;
  color:#305e7b!important;font-size:14px!important;font-weight:740!important;line-height:1.25!important;
  box-shadow:0 1px 2px #2448620d!important;
  transition:background .16s,border-color .16s!important
 }
 .game-root.game-layout>.game-tools>.gs-page-action:hover:not(:disabled){
- background:#edf4f8!important;border-color:#a9c3d3!important
+ background:#eef4fb!important;border-color:#b8cfe1!important
 }
 .game-root.game-layout>.game-tools>.gs-page-action:active:not(:disabled){background:#e5eff5!important}
 .game-root.game-layout>.game-tools>.gs-page-action:disabled{opacity:.45!important;cursor:not-allowed}
@@ -305,7 +305,7 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
 .game-root.game-layout .game-tools .rule-toggle-list .game-btn{
  min-height:36px!important;height:auto!important;padding:7px 10px!important;
  border:1px solid #c8dae5!important;border-radius:9px!important;
- background:#f9fbfd!important;
+ background:#fbfcfe!important;
  color:#3a6883!important;font-size:13px!important;font-weight:720!important;line-height:1.25!important;
  box-shadow:inset 0 1px #fff,0 2px 6px #204c6510!important;
  transition:background .16s,transform .16s,border-color .16s!important
@@ -2019,9 +2019,18 @@ grid-template-columns:minmax(0,1fr)!important;grid-template-rows:44px minmax(0,1
  }
  #game > :is(.reversi-record-rail,.chess-notation-rail,.xiangqi-record-rail){
   border-color:#d5e2eb!important;border-radius:10px!important;
-  background:#f7fafc!important;box-shadow:none!important
+  background:#fbfcfe!important;box-shadow:none!important
  }
 }
 .game-root.game-layout .game-tools button:focus-visible{
  outline:2px solid #548db0;outline-offset:2px
 }
+
+#game .game-tools :is(.gs-page-action,.game-action-group .game-btn,.rule-toggle-list .game-btn){
+ font-weight:650!important;
+}
+#game .game-tools :is(.gs-page-action,.game-action-group .game-btn,.rule-toggle-list .game-btn):disabled{
+ opacity:1!important;color:#60778a!important;background:#f3f6fa!important;
+ border-color:#dce6ef!important;box-shadow:none!important;
+}
+#game .game-tools :is(.game-action-group,.rule-toggle-list) .game-btn:hover:not(:disabled){transform:none!important}

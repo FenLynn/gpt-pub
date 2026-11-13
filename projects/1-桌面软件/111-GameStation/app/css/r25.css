@@ -20,29 +20,29 @@
  #homeView .recent-copy{min-width:0!important;width:auto!important;overflow:hidden!important;text-align:left!important}
  #homeView .recent-copy strong{font-size:12px!important;line-height:1.4!important;white-space:normal!important;overflow-wrap:anywhere!important}
  #homeView .recent-empty{grid-column:1/-1;display:grid;place-items:center;width:100%;height:100%;padding:8px;font-size:12px;text-align:center;color:#90a2ad}
- #homeView .home-game-poster{position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:0;overflow:hidden;padding:15px 17px 14px;border:1px solid #dce6e9;border-radius:12px;background:linear-gradient(128deg,#174b62,#297a6f);color:#f4fcfa;box-shadow:0 8px 18px #203d4e20}
- #homeView .home-game-poster:before{content:"";position:absolute;z-index:-1;right:-60px;top:-85px;width:235px;height:235px;border:1px solid #ffffff3b;border-radius:50%;box-shadow:0 0 0 20px #ffffff0d,0 0 0 44px #ffffff09}
- #homeView .home-game-poster[data-category="arcade"]{background:linear-gradient(128deg,#5d4852,#965a48)}
- #homeView .home-game-poster[data-category="puzzle"]{background:linear-gradient(128deg,#365175,#615684)}
- #homeView .home-game-poster[data-category="card"]{background:linear-gradient(128deg,#3b515b,#776c51)}
- #homeView .poster-top{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#d9ece8;font-size:10px;font-weight:760;letter-spacing:.6px}
+ #homeView .home-game-poster{position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:space-between;min-width:0;min-height:0;overflow:hidden;padding:15px 17px 14px;border:1px solid #dce6e9;border-radius:12px;background:linear-gradient(145deg,#f1f7fc,#e3eef6);color:#27465f;box-shadow:none}
+ #homeView .home-game-poster:before{content:"";position:absolute;z-index:-1;right:-60px;top:-85px;width:235px;height:235px;border:1px solid #506f8c19;border-radius:50%;box-shadow:0 0 0 20px #506f8c08,0 0 0 44px #506f8c06}
+ #homeView .home-game-poster[data-category="arcade"]{background:linear-gradient(128deg,#faf4ee,#f4e8dc)}
+ #homeView .home-game-poster[data-category="puzzle"]{background:linear-gradient(128deg,#f5f2fb,#e9e4f6)}
+ #homeView .home-game-poster[data-category="card"]{background:linear-gradient(128deg,#f2f7f2,#e3efe5)}
+ #homeView .poster-top{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#4d687f;font-size:10px;font-weight:760;letter-spacing:.6px}
  #homeView #homePosterCount{font-family:Consolas,monospace}
- #homeView .poster-art{display:grid;place-items:center;flex:1;min-height:68px;padding:5px 0;color:#fff;font-size:clamp(60px,5.6vw,95px);line-height:1;filter:drop-shadow(0 12px 14px #0b242b4b)}
+ #homeView .poster-art{display:grid;place-items:center;flex:1;min-height:68px;padding:5px 0;color:#fff;font-size:clamp(60px,5.6vw,95px);line-height:1;filter:drop-shadow(0 3px 6px #38577525)}
  #homeView .poster-art .game-icon-glyph{font-size:inherit}
  #homeView .poster-art .game-tank-icon{width:95px;height:95px;fill:#eff8f0}
- #homeView .poster-category{font-size:10px;color:#cee8df;font-weight:760;letter-spacing:.6px}
- #homeView .poster-copy h3{margin:5px 0 4px;color:#fff;font-size:22px;line-height:1.2;font-weight:800}
- #homeView .poster-copy p{margin:0;color:#dae9e5;font-size:11px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+ #homeView .poster-category{font-size:10px;color:#4d687f;font-weight:760;letter-spacing:.6px}
+ #homeView .poster-copy h3{margin:5px 0 4px;color:#253f59;font-size:22px;line-height:1.2;font-weight:800}
+ #homeView .poster-copy p{margin:0;color:#3c5870;font-size:11px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
  #homeView .poster-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
  #homeView #homePosterPlay{height:35px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 12px;border:1px solid #ffffffb0;border-radius:8px;background:#f8fcfa;color:#275d69;font-size:12px;font-weight:750;box-shadow:0 3px 9px #1335342e;transition:transform .16s,box-shadow .16s}
  #homeView #homePosterPlay:hover{transform:translateY(-2px);box-shadow:0 7px 14px #0a2d2c55}
  #homeView #homePosterPlay:active{transform:translateY(0) scale(.98)}
  #homeView #homePosterPlay svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
  #homeView .poster-dots{display:flex;align-items:center;gap:5px}
- #homeView .poster-dots i{display:block;width:5px;height:5px;border-radius:4px;background:#ffffff62;transition:width .18s}
- #homeView .poster-dots i.active{width:15px;background:#fff}
+ #homeView .poster-dots i{display:block;width:5px;height:5px;border-radius:4px;background:#55758e55;transition:width .18s}
+ #homeView .poster-dots i.active{width:15px;background:#527da4}
  #homeView .poster-progress{position:absolute;bottom:0;left:0;right:0;height:3px;background:#ffffff1a}
- #homeView .poster-progress i{display:block;height:100%;background:#a8eccb;animation:poster-track 6.5s linear forwards}
+ #homeView .poster-progress i{display:block;height:100%;background:#7298b7;animation:poster-track 6.5s linear forwards}
  #homeView .home-game-poster.arriving .poster-art{animation:poster-arrive .46s cubic-bezier(.2,.77,.2,1) both}
 }
 @keyframes poster-track{from{width:0}to{width:100%}}
@@ -64,7 +64,7 @@
  #homeView .recent-copy strong{font-size:10px}
  #homeView .home-game-poster{display:none!important}
 }
-/* Universal header geometry: breadcrumb, fixed LED, timer, modes, actions. */
+/* Shared header geometry and grouped game controls. */
 .topbar .game-topbar-cluster{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0}
 .main-area:has(#workspaceView:not(.hidden)) #topbar{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;padding:0 12px!important;overflow:hidden!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{display:flex!important;align-items:center!important;flex:0 1 190px!important;min-width:130px!important;max-width:190px!important;width:auto!important;height:auto!important}
@@ -85,11 +85,11 @@
 .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl:before{content:"难度"!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{min-width:0!important;height:28px!important;padding:0 7px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;color:#667f91!important;font-size:11px!important;font-weight:700!important;transition:transform .16s,background .16s}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button[aria-pressed="true"]{background:#fff!important;border-color:#d3e3eb!important;color:#2378ab!important;box-shadow:0 1px 4px #2b4d601a!important}
-.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button:hover{transform:translateY(-1px)}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button:hover{background:#ffffff8c}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .topbar-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;flex:0 0 auto!important;min-width:0!important;width:auto!important;margin:0!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .round-actions:not(.hidden){display:flex!important;align-items:center!important;gap:4px!important;padding:0!important;border:0!important}
-.main-area:has(#workspaceView:not(.hidden)) .topbar .top-action{transition:transform .17s,box-shadow .17s!important}
-.main-area:has(#workspaceView:not(.hidden)) .topbar .top-action:hover:not(:disabled){transform:translateY(-2px)!important;box-shadow:0 5px 13px #22506a21!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .top-action{transition:background .14s,border-color .14s,color .14s!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar .top-action:hover:not(:disabled){box-shadow:none!important}
 @media(min-width:901px) and (max-width:1150px){
  .main-area:has(#workspaceView:not(.hidden)) #topbar{gap:5px!important;padding:0 6px!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar-leading{flex-basis:125px!important;min-width:94px!important}
@@ -146,15 +146,15 @@
  #homeView .poster-copy h3{font-size:26px!important;line-height:1.18!important;margin:7px 0 8px!important}
  #homeView .poster-copy p{
   display:block!important;overflow:visible!important;
-  font-size:14px!important;line-height:1.6!important;color:#ecf7f4!important
+  font-size:14px!important;line-height:1.6!important;color:#3c5870!important
  }
  #homeView .poster-tips{
   display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;
-  padding-left:18px;border-left:1px solid #ffffff46
+  padding-left:18px;border-left:1px solid #5d799335
  }
- #homeView .poster-tips-label{font-size:13px;font-weight:800;letter-spacing:.25px;color:#cbf2e3}
+ #homeView .poster-tips-label{font-size:13px;font-weight:800;letter-spacing:.25px;color:#46627a}
  #homeView .poster-tips p{
-  margin:0;color:#fff;font-size:15px;font-weight:590;line-height:1.65;
+  margin:0;color:#304d67;font-size:15px;font-weight:590;line-height:1.65;
   overflow-wrap:anywhere
  }
  #homeView #homePosterPlay{height:40px!important;font-size:14px!important}
@@ -209,8 +209,8 @@
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control{
  position:relative!important;display:flex!important;align-items:center!important;gap:0!important;
  min-height:31px!important;height:31px!important;
- padding:2px!important;border:1px solid #c6d9e6!important;border-radius:9px!important;
- background:#e7f1f7!important;box-shadow:inset 0 1px 2px #54778c10!important
+ padding:2px!important;border:1px solid #dbe5ee!important;border-radius:8px!important;
+ background:#f0f4f8!important;box-shadow:none!important
 }
 .main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl{margin-left:51px!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl{margin-left:32px!important}
@@ -226,7 +226,7 @@
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{
  min-width:44px!important;height:27px!important;margin:0!important;
  border:1px solid transparent!important;border-radius:6px!important;
- background:transparent!important;color:#627f92!important;
+ background:transparent!important;color:#4d687f!important;
  font-size:12px!important;font-weight:700!important;padding:0 8px!important;
  box-shadow:none!important
 }
@@ -234,7 +234,7 @@
  border-left-color:#ccdde8!important
 }
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button[aria-pressed="true"]{
- background:#fff!important;border-color:#abccdf!important;
+ background:#fff!important;border-color:#c9d9e7!important;
  color:#176fa8!important;box-shadow:0 2px 5px #285a771a!important
 }
 @media(min-width:901px) and (max-width:1450px){
@@ -301,22 +301,22 @@
  #homeView .poster-copy h3{font-size:26px!important;line-height:1.18!important;margin:7px 0 8px!important}
  #homeView .poster-copy p{
   display:block!important;overflow:visible!important;
-  font-size:14px!important;line-height:1.6!important;color:#ecf7f4!important
+  font-size:14px!important;line-height:1.6!important;color:#3c5870!important
  }
  #homeView .poster-tips{
   display:flex!important;flex-direction:column!important;align-items:flex-start!important;
   gap:8px!important;min-width:0!important;margin-top:auto!important;
-  padding:13px 0 0!important;border:0!important;border-top:1px solid #ffffff46!important
+  padding:13px 0 0!important;border:0!important;border-top:1px solid #5d799335!important
  }
- #homeView .poster-tips-label{font-size:13px!important;font-weight:800!important;color:#cbf2e3!important}
- #homeView .poster-tips p{margin:0!important;color:#fff!important;font-size:15px!important;font-weight:590!important;line-height:1.65!important}
+ #homeView .poster-tips-label{font-size:13px!important;font-weight:800!important;color:#46627a!important}
+ #homeView .poster-tips p{margin:0!important;color:#304d67!important;font-size:15px!important;font-weight:590!important;line-height:1.65!important}
  #homeView .poster-bottom{
   position:absolute!important;left:19px!important;bottom:15px!important;
   display:flex!important;align-items:center!important;justify-content:flex-start!important;
   gap:13px!important;margin:0!important;z-index:2
  }
  #homeView #homePosterCount{
-  display:block!important;color:#d9ece8!important;
+  display:block!important;color:#4d687f!important;
   font:650 12px/1 Consolas,monospace!important;letter-spacing:.04em
  }
  #homeView .poster-dots{display:flex!important;align-items:center!important;gap:5px!important}
@@ -381,7 +381,7 @@
  #homeView .poster-copy p{font-size:14px!important;line-height:1.5!important}
  #homeView .poster-tips{
   margin-top:11px!important;padding:10px 0 0!important;
-  border:0!important;border-top:1px solid #ffffff46!important;gap:7px!important
+  border:0!important;border-top:1px solid #5d799335!important;gap:7px!important
  }
  #homeView .poster-tips p{font-size:14px!important;line-height:1.55!important}
  #homeView .poster-bottom{

@@ -7,8 +7,8 @@
   <meta name="description" content="GameStation · 完全离线的个人游戏工作台">
   <title>GameStation</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' rx='2' fill='%23397da8'/%3E%3Crect x='18' y='3' width='11' height='11' rx='2' fill='%2368a6c4'/%3E%3Crect x='3' y='18' width='11' height='11' rx='2' fill='%2383b79f'/%3E%3Crect x='18' y='18' width='11' height='11' rx='2' fill='%23b0c7d5'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r63">
-  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r63">
+  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r64">
+  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r64">
 </head>
 <body>
 <div class="app-shell" id="appShell">
@@ -18,16 +18,16 @@
       <strong>GameStation</strong>
     </a>
     <nav class="side-nav" aria-label="游戏导航">
-      <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span><span>首页</span></button>
+      <button class="nav-item active" data-view="home"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5M9 21v-7h6v7"/></svg><span>首页</span></button>
       <div class="nav-divider"></div>
-      <button class="nav-item" data-category="all"><span class="nav-icon">▦</span><span>全部游戏</span><b id="count-all">19</b></button>
-      <button class="nav-item" data-category="board"><span class="nav-icon">♟</span><span>棋类对战</span><b id="count-board">6</b></button>
-      <button class="nav-item" data-category="puzzle"><span class="nav-icon">▧</span><span>益智解谜</span><b id="count-puzzle">5</b></button>
-      <button class="nav-item" data-category="arcade"><span class="nav-icon">◉</span><span>街机动作</span><b id="count-arcade">4</b></button>
-      <button class="nav-item" data-category="card"><span class="nav-icon">♣</span><span>卡牌桌游</span><b id="count-card">4</b></button>
+      <button class="nav-item" data-category="all"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zm10 0h6v6h-6zm0 10h6v6h-6zm-10 0h6v6H4z"/></svg><span>全部游戏</span><b id="count-all">19</b></button>
+      <button class="nav-item" data-category="board"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 1 1.4 5.65L15 13h2l1 4H6l1-4h2l1.6-4.35A3 3 0 0 1 12 3ZM5 21h14"/></svg><span>棋类对战</span><b id="count-board">6</b></button>
+      <button class="nav-item" data-category="puzzle"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h5V4h6v5h5v6h-5v5H9v-5H4z"/></svg><span>益智解谜</span><b id="count-puzzle">5</b></button>
+      <button class="nav-item" data-category="arcade"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h10a4 4 0 0 1 3.9 3.1l1 4.5a2 2 0 0 1-3.3 1.9L16 15H8l-2.6 2.5a2 2 0 0 1-3.3-1.9l1-4.5A4 4 0 0 1 7 8Zm0 2v4m-2-2h4m6 0h.01m3 0h.01"/></svg><span>街机动作</span><b id="count-arcade">4</b></button>
+      <button class="nav-item" data-category="card"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h11a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM4 8v12a2 2 0 0 0 2 2h10m-2.5-14 3 3.5-3 3.5-3-3.5z"/></svg><span>卡牌桌游</span><b id="count-card">4</b></button>
     </nav>
     <div class="sidebar-bottom">
-      <button class="nav-item settings-link" id="settingsButton"><span class="nav-icon">⚙</span><span>全局设置</span></button>
+      <button class="nav-item settings-link" id="settingsButton"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l.5 2.5 2 .9 2.2-1.1 2 3.5-1.8 1.6.2 2.2 1.8 1.6-2 3.5-2.3-.9-2 .9L14 21h-4l-.5-2.3-2-.9-2.3.9-2-3.5L5 13.6l.2-2.2-1.8-1.6 2-3.5 2.2 1.1 2-.9zM15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"/></svg><span>全局设置</span></button>
     </div>
   </aside>
 
@@ -129,7 +129,7 @@
     <section class="library-view view-panel hidden" id="libraryView">
       <div class="library-heading">
         <div><h1 id="libraryTitle">全部游戏</h1><span id="libraryCount">22 款</span></div>
-        <label class="search-box"><span>⌕</span><input id="gameSearch" type="search" placeholder="搜索游戏" autocomplete="off"></label>
+        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg><input id="gameSearch" aria-label="搜索游戏" type="search" placeholder="搜索游戏" autocomplete="off"></label>
       </div>
       <div class="game-grid" id="gameGrid" aria-live="polite"></div>
       <div class="empty-state hidden" id="emptyState">没有找到匹配的游戏。</div>
@@ -213,6 +213,6 @@
   </section>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<script src="./js/app.js?v=workspace-layout-20261113"></script>
+<script src="./js/app.js?v=workspace-polish-20261113"></script>
 </body>
 </html>

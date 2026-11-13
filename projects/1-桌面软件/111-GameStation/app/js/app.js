@@ -552,7 +552,7 @@ function openGame(id){
  $("stageLoading").classList.remove("done","failed");$("stageLoading").lastElementChild.textContent="正在载入";
  frame.title=g.name+" 游戏";
  const entryURL=new URL(g.entry,location.href);
- entryURL.searchParams.set("v","workspace-layout-20261113");
+ entryURL.searchParams.set("v","workspace-polish-20261113");
  if(g.id==="gomoku"&&location.search.includes("p111Test=1"))entryURL.searchParams.set("p111Test","1");
  frame.src=entryURL.href;closeHelp();shell.classList.remove("menu-open");
 }

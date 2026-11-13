@@ -1424,3 +1424,105 @@ body{font-size:15px}
  .main-area:has(#workspaceView:not(.hidden)) .topbar #helpButton{min-width:44px!important;padding:0 5px!important;font-size:11px!important}
  .main-area:has(#workspaceView:not(.hidden)) .topbar #fullscreenButton{width:30px!important;min-width:30px!important;height:30px!important}
 }
+
+/* Shared surface and control treatment for the host. */
+:root{
+ --page:#f3f6fa;--shell:#f8fafc;--shell-line:#e0e7ef;--workspace:#f0f5f9;
+ --ui-line:#d9e4ee;--ui-ink:#29465f;--ui-muted:#587084;
+ --ui-panel:#fff;--ui-soft:#f6f9fc;--ui-hover:#edf4fb;--ui-blue:#255e92;
+ --ui-shadow:0 1px 2px #1b3a5810,0 8px 24px #45627c0b;
+ --ui-dialog-shadow:0 16px 48px #183b5729;
+}
+#sidebar,#sidebar .brand{background:var(--shell);border-color:var(--shell-line)}
+#sidebar .brand strong{color:#203c56;font-weight:750;letter-spacing:-.018em}
+#sidebar .nav-item{color:var(--ui-muted);border-radius:9px}
+#sidebar .nav-item:is(:hover,.active){color:var(--ui-blue);background:var(--ui-hover)}
+#sidebar .nav-item.active{background:#e7f0fa}
+#sidebar .nav-icon,.search-box svg{
+ width:18px;height:18px;flex:none;fill:none;stroke:currentColor;
+ stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;
+}
+#sidebar .nav-item b{font-variant-numeric:tabular-nums;color:#617a91}
+#topbar{background:#fcfdff;border-bottom-color:var(--shell-line)}
+#topbar .breadcrumbs{color:#617a91}
+#topbar .breadcrumbs strong{color:var(--ui-ink)}
+#topbar :is(.top-action,.help-action,.icon-action){
+ border-color:var(--ui-line);background:var(--ui-panel);color:var(--ui-ink);
+ border-radius:8px;box-shadow:0 1px 2px #23475d0a;
+}
+#topbar :is(.top-action,.help-action,.icon-action):hover:not(:disabled){
+ background:var(--ui-hover);border-color:#bfd4e6;color:var(--ui-blue);
+}
+#topbar :is(.top-action,.help-action,.icon-action):disabled{
+ opacity:1;color:#637c91;background:#f4f7fa;border-color:#e2e9f0;box-shadow:none;
+}
+#topbar #startButton.start-action:not(.end-action):not(:disabled){
+ color:#286747;background:#eaf5ee;border-color:#c8e0d2;
+}
+#topbar #startButton.start-action:not(.end-action):hover:not(:disabled){background:#def0e5}
+#topbar #startButton.end-action{color:#944c45!important;background:#fcf3f1!important;border-color:#e9d1cc!important}
+#topbar #startButton.end-action:hover:not(:disabled){background:#f8e8e4!important}
+#topbar #pauseButton.continue-action:not(:disabled){color:#255e92;background:#e7f0fb;border-color:#c5d8ea}
+#topbar .host-game-timer:not(.hidden){background:#eef4fa!important;border-color:var(--ui-line)!important}
+#topbar .host-game-timer strong{color:#2e526f!important;font:700 14px/1 ui-monospace,Consolas,monospace!important}
+#topbar #gameNotice{background:#f2f6fa;border-color:var(--ui-line);color:#38566e}
+#topbar #gameNotice[data-tone="attention"]{background:#faf0df;border-color:#e8cfaa;color:#714b20}
+#topbar #gameNotice[data-tone="result"]{background:#eaf4ee;border-color:#c8ded0;color:#285f49}
+#topbar #gameNotice.hidden{display:none!important}
+
+#homeView :is(.activity-panel,.recent-panel,.ranking-panel),#libraryView .game-card{
+ background:var(--ui-panel);border-color:var(--ui-line);border-radius:12px;box-shadow:var(--ui-shadow);
+}
+#homeView .home-hero{border-color:#d8e5ef;box-shadow:var(--ui-shadow)}
+#homeView .recent-empty{color:var(--ui-muted)}
+#libraryView .game-card:hover{border-color:#b8d0e4;background:#f8fbff;transform:none}
+#libraryView .game-card-title{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ white-space:normal;line-height:1.3;color:var(--ui-ink);
+}
+#libraryView .game-card-meta,#libraryView .game-card-arrow{color:var(--ui-muted)}
+#libraryView .search-box{border-color:var(--ui-line);color:#607990;box-shadow:0 1px 2px #23475d0a}
+#libraryView .search-box input::placeholder{color:#627b91}
+#libraryView .search-box:focus-within{border-color:#85acd0;box-shadow:0 0 0 2px #4c88bd26}
+
+:is(.help-panel,.settings-panel){border-color:var(--ui-line);border-radius:14px;background:var(--ui-panel);box-shadow:var(--ui-dialog-shadow)}
+:is(.help-header,.settings-heading){border-bottom-color:#e6edf3}
+.settings-section{border-bottom-color:#e6edf3}
+.settings-section p,.settings-footer{color:var(--ui-muted)}
+:is(.help-header,.settings-heading) button,.setting-row select,
+.setting-actions button,.settings-footer button{
+ border:1px solid var(--ui-line);border-radius:8px;background:var(--ui-soft);color:var(--ui-ink);
+}
+.settings-footer button{background:#e9f2fc;border-color:#c8daec;color:var(--ui-blue)}
+:is(.help-header,.settings-heading,.setting-actions,.settings-footer) button:hover{background:var(--ui-hover);color:var(--ui-blue)}
+#clearData.danger-action{color:#944c45}
+
+#gameStage :is(.game-result-card,.restore-countdown-card,.save-progress-card){
+ background:#fcfdff;border-color:var(--ui-line);border-radius:14px;box-shadow:var(--ui-dialog-shadow);
+}
+#gameStage .game-pause-content{background:#f3f8fc80;border-color:#cfdeea;border-radius:14px;box-shadow:var(--ui-dialog-shadow)}
+#gameStage .game-pause-title{color:var(--ui-ink);font-size:25px;letter-spacing:.02em}
+#gameStage :is(.game-result-actions,.save-progress-actions) button,
+#gameStage :is(.game-pause-resume,.restore-countdown-close){
+ border:1px solid var(--ui-line);border-radius:9px;background:var(--ui-panel);
+ color:var(--ui-ink);box-shadow:none;transition:background .14s,border-color .14s;
+}
+#gameStage :is(.game-result-actions,.save-progress-actions) button:first-child,#gameStage .game-pause-resume{
+ border-color:#c7daec;background:#eaf3fb;color:var(--ui-blue);
+}
+#gameStage :is(.game-result-actions,.save-progress-actions) button:hover,
+#gameStage :is(.game-pause-resume,.restore-countdown-close):hover{
+ background:#e5effa;border-color:#b9d1e6;box-shadow:none;transform:none;filter:none;
+}
+#gameStage .game-pause-resume span{font-size:16px;letter-spacing:0}
+#gameStage .game-pause-resume svg{width:19px;height:19px}
+#gameStage :is(.game-result-kicker,.save-progress-kicker){color:var(--ui-muted);letter-spacing:.04em}
+#gameStage .save-progress-seal{background:#eaf3fc;color:var(--ui-blue);box-shadow:none}
+#gameStage .game-result-seal{background:#f7eedb;color:#805b2d}
+#gameStage .game-result-card[data-result="loss"] .game-result-seal{background:#edf2f7;color:#526b82}
+
+:where(button,a,select):focus-visible{outline:2px solid #3a78ae;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){
+ #gameStage :is(.game-result-actions,.save-progress-actions) button,
+ #gameStage :is(.game-pause-resume,.restore-countdown-close){transition:none}
+}
