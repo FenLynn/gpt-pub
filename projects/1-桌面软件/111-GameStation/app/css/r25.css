@@ -81,7 +81,7 @@
 /* Empty mode/difficulty groups must disappear completely, including their ::before labels. */
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control.hidden,
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control[hidden]{display:none!important}
-.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl:before{content:"对战方式"!important}
+.main-area:has(#workspaceView:not(.hidden)) .topbar #modeControl:before{content:attr(data-label)!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar #difficultyControl:before{content:"难度"!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button{min-width:0!important;height:28px!important;padding:0 7px!important;border:1px solid transparent!important;border-radius:7px!important;background:transparent!important;color:#667f91!important;font-size:11px!important;font-weight:700!important;transition:transform .16s,background .16s}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .segment-control button[aria-pressed="true"]{background:#fff!important;border-color:#d3e3eb!important;color:#2378ab!important;box-shadow:0 1px 4px #2b4d601a!important}

@@ -1,9 +1,7 @@
 (function(){
 "use strict";
 const el=document.getElementById("board"),status=document.getElementById("sudokuStatus");
-const levelEl=document.getElementById("level"),filledEl=document.getElementById("filled"),
- remainingEl=document.getElementById("remaining"),conflictsEl=document.getElementById("conflicts"),
- hintCountEl=document.getElementById("hintCount"),numbersEl=document.getElementById("numbers");
+const remainingEl=document.getElementById("remaining"),progress=document.getElementById("sudokuProgress"),numbersEl=document.getElementById("numbers");
 let puzzle=null,solution=null,selected=-1,paused=true,level="normal",given=null,over=false,
  history=[],checkedErrors=new Set(),hasChecked=false,hintCell=-1,hintValue=0,hintCount=0;
 const basePuzzle=[
@@ -17,7 +15,6 @@ const baseSolution=[
 [9,6,1,5,3,7,2,8,4],[2,8,7,4,1,9,6,3,5],[3,4,5,2,8,6,1,7,9]
 ];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function difficultyName(){return level==="easy"?"简单":level==="hard"?"困难":"标准";}
 function transformedPuzzle(){
  const bands=shuffle([0,1,2]),stacks=shuffle([0,1,2]);
  const rows=bands.flatMap(b=>shuffle([0,1,2]).map(r=>b*3+r));
@@ -59,13 +56,14 @@ function getWrongEntries(){
  return errors;
 }
 function updateStats(){
- const filled=filledCount(),conflicts=getConflicts();
- filledEl.textContent=filled+" / 81";remainingEl.textContent=String(81-filled);
- conflictsEl.textContent=String(conflicts.size);hintCountEl.textContent=String(hintCount);
- levelEl.textContent=difficultyName();
+ const filled=filledCount();
+ remainingEl.textContent=String(81-filled);progress.value=filled;
  document.getElementById("undo").disabled=paused||history.length===0||over;
  document.getElementById("hint").disabled=paused||over;document.getElementById("check").disabled=paused||over;
- numbersEl.querySelectorAll("button").forEach(button=>button.disabled=paused||over);
+ numbersEl.querySelectorAll("button").forEach(button=>{
+  button.disabled=paused||over;
+  button.classList.toggle("suggested",hintCell===selected&&hintValue>0&&Number(button.dataset.number)===hintValue);
+ });
 }
 function render(){
  if(!puzzle||!given)return;
@@ -95,9 +93,7 @@ function render(){
 function select(index){
  if(!Number.isInteger(index)||index<0||index>=81)return;
  selected=index;hintCell=-1;hintValue=0;
- const y=Math.floor(index/9),x=index%9;
- if(given[y][x])setStatus("第"+(y+1)+"行第"+(x+1)+"列是题目给定数字。");
- else setStatus("第"+(y+1)+"行第"+(x+1)+"列 · 输入 1–9 填写。");
+ setStatus("");
  render();
 }
 function saveHistory(){
@@ -117,7 +113,10 @@ function put(value){
  if(isSolved()){
   over=true;setStatus("恭喜！数独全部正确，完成本局。");updateStats();
   GameBridge.send("GAME_OVER",{message:"数独完成",score:81,win:true});
- }else setStatus(value?"已填写数字 · "+filledCount()+" / 81":"已清除该格 · "+filledCount()+" / 81");
+ }else{
+  const conflicts=getConflicts();
+  setStatus(conflicts.has(selected)?"该格与同行、同列或同宫的数字冲突。":"");
+ }
  return true;
 }
 function hint(){
@@ -127,15 +126,14 @@ function hint(){
  if(given[y][x]){setStatus("该格已经是题目给定数字，请选择空格。");return;}
  if(puzzle[y][x]){setStatus("该格已有数字；如需修改，请直接输入新数字。");return;}
  hintCell=selected;hintValue=solution[y][x];hintCount++;
- setStatus("提示：第"+(y+1)+"行第"+(x+1)+"列应填 "+hintValue+"。按数字键或点右侧数字输入。");
+ setStatus("所选格应填 "+hintValue+"。");
  render();
 }
 function check(){
  if(paused||over)return;
  checkedErrors=getWrongEntries();hasChecked=true;
- const conflicts=getConflicts(),wrong=checkedErrors.size;render();
- if(wrong)setStatus("检查完成：发现 "+wrong+" 个错误，涉及 "+conflicts.size+" 个冲突格。");
- else setStatus("目前填写正确，还剩 "+(81-filledCount())+" 格。");
+ const wrong=checkedErrors.size;render();
+ setStatus(wrong?"发现 "+wrong+" 个错误，已在棋盘标出。":"目前填写正确。");
 }
 function undo(){
  if(paused||over||!history.length)return;
@@ -162,7 +160,7 @@ function key(event){
 function newGame(){
  transformedPuzzle();given=puzzle.map(row=>row.map(Boolean));selected=-1;over=false;
  history=[];checkedErrors=new Set();hasChecked=false;hintCell=-1;hintValue=0;hintCount=0;
- paused=false;render();setStatus("选择空格，再点数字或按键盘 1–9 填写。");
+ paused=false;render();setStatus("");
 }
 function validGrid(grid){
  return Array.isArray(grid)&&grid.length===9&&grid.every(row=>Array.isArray(row)&&row.length===9&&row.every(value=>Number.isInteger(value)&&value>=0&&value<=9));
@@ -194,7 +192,7 @@ function restore(saved){
  hasChecked=!!saved.hasChecked;hintCell=Number.isInteger(saved.hintCell)&&saved.hintCell>=0&&saved.hintCell<81?saved.hintCell:-1;
  hintValue=Number.isInteger(saved.hintValue)&&saved.hintValue>=1&&saved.hintValue<=9?saved.hintValue:0;
  hintCount=Math.max(0,Number(saved.hintCount)||0);over=!!saved.over&&isSolved();paused=true;
- render();setStatus("进度已恢复，点击顶部「继续」后接着解题。");
+ render();setStatus("");
 }
 function fixtureState(){
  return{puzzle:puzzle.map(row=>row.slice()),solution:solution.map(row=>row.slice()),given:given.map(row=>row.slice()),
@@ -225,10 +223,10 @@ if(new URLSearchParams(location.search).has("p111Test")){
 GameBridge.register({
  init(payload){
   level=["easy","normal","hard"].includes(payload?.difficulty)?payload.difficulty:"normal";
-  newGame();paused=true;render();setStatus("准备开始 · 选择空格，再点数字或按键盘 1–9 填写。");
+  newGame();paused=true;render();setStatus("");
  },
- newGame,pause(){paused=true;render();setStatus("已暂停 · 当前题目和填写内容均已保留。");},
- resume(){paused=false;render();setStatus("继续解题 · 选择空格输入数字。");},
+ newGame,pause(){paused=true;render();setStatus("");},
+ resume(){paused=false;render();setStatus("");},
  setDifficulty(value){if(["easy","normal","hard"].includes(value))level=value;},
  snapshot,restore,dispose(){paused=true;window.removeEventListener("keydown",key);}
 });

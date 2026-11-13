@@ -10,7 +10,9 @@ const profiles={easy:{gravity:900,min:115,lock:620},normal:{gravity:590,min:82,l
 const previews=[nextCanvas,document.getElementById("nextSecond"),document.getElementById("nextThird")];
 const holdButton=document.getElementById("holdButton"),holdCanvas=document.getElementById("holdCanvas"),holdEmpty=document.getElementById("holdEmpty"),levelProgress=document.getElementById("levelProgress");
 const reducedMotion=matchMedia("(prefers-reduced-motion: reduce)");
-let bag=[],queue=[],heldKind=null,holdUsed=false,lockElapsed=0,lockResets=0,combo=0,clearEffect=null;
+let mode="classic",bag=[],queue=[],heldKind=null,holdUsed=false,lockElapsed=0,lockResets=0,combo=0,clearEffect=null;
+const sprintTarget=40;
+const advanced=()=>mode!=="classic";
 const level=()=>Math.floor(lines/10)+1;
 const profile=()=>profiles[difficulty];
 const gravity=()=>Math.max(profile().min,Math.round(profile().gravity*.82**(level()-1)));
@@ -36,6 +38,14 @@ function renderPreview(target,preview){
  preview.shape.forEach((row,y)=>row.forEach((cell,x)=>{
   if(cell)paintTile(c,left+x*step+1,top+y*step+1,step-2,preview.color);
  }));
+}
+function setMode(value){
+ mode=["classic","advanced","sprint"].includes(value)?value:"classic";
+ document.getElementById("game").dataset.mode=mode;
+ document.getElementById("previewTitle").textContent=advanced()?"接下来":"下一块";
+ document.getElementById("lineLabel").textContent=mode==="sprint"?"竞速目标":"消行";
+ levelProgress.max=mode==="sprint"?sprintTarget:10;
+ levelProgress.setAttribute("aria-label",mode==="sprint"?"40 行竞速进度":"升级进度");
 }
 function drawNext(){
  renderPreview(previews[0],nextPiece);
@@ -101,10 +111,10 @@ function draw(){
  }
  canvas.dataset.paused=String(paused);
 }
-function updateScore(){scoreEl.textContent=score.toLocaleString("zh-CN");linesEl.textContent=String(lines);levelEl.textContent=String(level());levelProgress.value=lines%10;canvas.dataset.score=String(score);canvas.dataset.gravity=String(speed);canvas.dataset.combo=String(combo);}
+function updateScore(){scoreEl.textContent=score.toLocaleString("zh-CN");linesEl.textContent=mode==="sprint"?`${lines} / ${sprintTarget}`:String(lines);levelEl.textContent=String(level());levelProgress.value=mode==="sprint"?lines:lines%10;canvas.dataset.score=String(score);canvas.dataset.gravity=String(speed);canvas.dataset.combo=String(combo);}
 function stop(){if(rafId!==null)cancelAnimationFrame(rafId);rafId=null;lastFrame=0;}
 function run(){stop();if(paused||over)return;rafId=requestAnimationFrame(frame);}
-function finishGame(message){over=true;paused=true;stop();drawNext();setStatus(message);GameBridge.send("GAME_OVER",{message,score,win:false});updateScore();draw();}
+function finishGame(message,win=false){over=true;paused=true;stop();drawNext();setStatus(message);GameBridge.send("GAME_OVER",{message,score,win});updateScore();draw();}
 function stepDown(){const next={...piece,y:piece.y+1};if(collision(next))return false;piece=next;return true;}
 function frame(now){
  if(paused||over){rafId=null;lastFrame=0;draw();return;}
@@ -129,13 +139,14 @@ function lock(){
  if(cleared.length){
   grid=grid.filter((_,y)=>!cleared.includes(y));
   grid.unshift(...cleared.map(()=>Array(COLS).fill(0)));
-  combo++;
-  score+=([0,100,300,500,800][cleared.length]+50*(combo-1))*level();
+  combo=advanced()?combo+1:0;
+  score+=([0,100,300,500,800][cleared.length]+50*Math.max(0,combo-1))*level();
   lines+=cleared.length;speed=gravity();
   if(!reducedMotion.matches)clearEffect={rows:cleared,age:0};
   const label=cleared.length===4?"四行全消":`消除 ${cleared.length} 行`;
   setStatus(combo>1?`${label} · ${combo} 连消`:label);
  }else combo=0;
+ if(mode==="sprint"&&lines>=sprintTarget){piece=null;finishGame("40 行竞速完成",true);return;}
  holdUsed=false;piece=spawnQueuedPiece();
  if(collision(piece)){finishGame("游戏结束 · 方块堆叠到顶");return;}
  updateScore();draw();
@@ -173,7 +184,7 @@ function rotatePiece(direction=1){
  }
 }
 function hold(){
- if(paused||over||holdUsed||!piece)return;
+ if(!advanced()||paused||over||holdUsed||!piece)return;
  const incoming=heldKind;heldKind=piece.kind;holdUsed=true;
  piece=incoming===null?spawnQueuedPiece():pieceOf(incoming);
  canvas.dataset.pieceKind=String(piece.kind);resetDrop();drawNext();
@@ -199,9 +210,9 @@ window.addEventListener("keydown",onKeyDown);canvas.addEventListener("pointerdow
 // Test-only deterministic fixture API. It is not exposed in normal gameplay.
 if(new URLSearchParams(location.search).has("p111Test")){
  const copyPiece=p=>p?{...p,shape:p.shape.map(row=>row.slice())}:null;
- const fixtureState=()=>({grid:grid.map(row=>row.slice()),piece:copyPiece(piece),nextPiece:copyPiece(nextPiece),score,lines,paused,over,speed,roundSerial,queue:[...queue],heldKind,holdUsed,combo,lockDelay:profile().lock});
+ const fixtureState=()=>({grid:grid.map(row=>row.slice()),piece:copyPiece(piece),nextPiece:copyPiece(nextPiece),score,lines,paused,over,speed,roundSerial,mode,queue:[...queue],heldKind,holdUsed,combo,lockDelay:profile().lock});
  window.__p111TetrisTest={
-  loadState(s){stop();grid=s.grid.map(row=>row.slice());if(grid.length!==ROWS||grid.some(row=>row.length!==COLS))throw new Error("Invalid Tetris grid");piece=copyPiece(s.piece);bag=[];queue=[drawKind(),drawKind()];nextPiece=copyPiece(s.nextPiece||pieceOf(drawKind()));heldKind=null;holdUsed=false;combo=0;clearEffect=null;resetDrop();score=Number(s.score)||0;lines=Number(s.lines)||0;configure(s.difficulty||"normal");over=false;paused=false;dropAccumulator=0;updateScore();draw();return fixtureState();},
+  loadState(s){stop();grid=s.grid.map(row=>row.slice());if(grid.length!==ROWS||grid.some(row=>row.length!==COLS))throw new Error("Invalid Tetris grid");piece=copyPiece(s.piece);bag=[];queue=[drawKind(),drawKind()];nextPiece=copyPiece(s.nextPiece||pieceOf(drawKind()));heldKind=null;holdUsed=false;combo=0;clearEffect=null;resetDrop();score=Number(s.score)||0;lines=Number(s.lines)||0;setMode(s.mode);configure(s.difficulty||"normal");over=false;paused=false;dropAccumulator=0;updateScore();draw();return fixtureState();},
   state:fixtureState,
   move(dx,dy){move(dx,dy);return fixtureState();},
   rotate(direction){rotatePiece(direction);return fixtureState();},
@@ -211,14 +222,14 @@ if(new URLSearchParams(location.search).has("p111Test")){
   stepDown(){const moved=stepDown();if(!moved)lock();draw();return{moved,...fixtureState()};}
  };
 }
-if(window===window.parent){newGame();pause();}
-GameBridge.register({init(payload){configure(payload.difficulty);newGame();},newGame,pause,resume,setDifficulty(value){configure(value);},
- snapshot(){const copy=p=>p?{...p,shape:p.shape.map(row=>row.slice())}:null;return{grid:grid.map(row=>row.slice()),piece:copy(piece),nextPiece:copy(nextPiece),score,lines,difficulty,dropAccumulator,roundSerial,bag:[...bag],queue:[...queue],heldKind,holdUsed,lockElapsed,lockResets,combo};},
+if(window===window.parent){setMode("classic");newGame();pause();}
+GameBridge.register({init(payload){setMode(payload.mode);configure(payload.difficulty);newGame();},newGame,pause,resume,setMode,setDifficulty(value){configure(value);},
+ snapshot(){const copy=p=>p?{...p,shape:p.shape.map(row=>row.slice())}:null;return{grid:grid.map(row=>row.slice()),piece:copy(piece),nextPiece:copy(nextPiece),score,lines,mode,difficulty,dropAccumulator,roundSerial,bag:[...bag],queue:[...queue],heldKind,holdUsed,lockElapsed,lockResets,combo};},
  restore(s){
   const validPiece=p=>p&&Number.isInteger(p.kind)&&p.kind>=0&&p.kind<SHAPES.length&&Array.isArray(p.shape)&&p.shape.length>0&&p.shape.every(row=>Array.isArray(row)&&row.every(v=>v===0||v===1))&&Number.isInteger(p.x)&&Number.isInteger(p.y);
   if(!s||!Array.isArray(s.grid)||s.grid.length!==ROWS||s.grid.some(row=>!Array.isArray(row)||row.length!==COLS)||!validPiece(s.piece)||!validPiece(s.nextPiece))throw new Error("俄罗斯方块存档数据无效");
   stop();grid=s.grid.map(row=>row.slice());piece={...s.piece,shape:s.piece.shape.map(row=>row.slice())};nextPiece={...s.nextPiece,shape:s.nextPiece.shape.map(row=>row.slice())};
-  score=Math.max(0,Number(s.score)||0);lines=Math.max(0,Math.floor(Number(s.lines)||0));configure(s.difficulty||difficulty);
+  score=Math.max(0,Number(s.score)||0);lines=Math.max(0,Math.floor(Number(s.lines)||0));setMode(s.mode??(Array.isArray(s.queue)?"advanced":"classic"));configure(s.difficulty||difficulty);
   const validKind=kind=>Number.isInteger(kind)&&kind>=0&&kind<SHAPES.length;
   bag=Array.isArray(s.bag)&&s.bag.every(validKind)?s.bag.slice(0,7):[];
   queue=Array.isArray(s.queue)&&s.queue.length===2&&s.queue.every(validKind)?[...s.queue]:[drawKind(),drawKind()];

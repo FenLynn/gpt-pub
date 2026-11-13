@@ -15,7 +15,7 @@ const games=[
 {id:"memory",name:"记忆翻牌",category:"puzzle",categoryName:"益智",description:"记住图案位置，完成所有配对。",status:"ready",entry:"./games/memory/index.html",difficulty:true,difficultyLabels:["简单","标准","困难"],tip:"每次翻开两张卡片，寻找相同图案。",help:[["目标","找出所有相同图案的配对。"],["操作","每次点击两张卡片；配对成功会保持翻开，不匹配则稍后盖回。"],["难度","简单、标准和困难对应不同牌数。"],["计分","尽量减少翻牌次数和完成时间。"]]},
 {id:"sudoku",name:"数独",category:"puzzle",categoryName:"益智",description:"用逻辑填满九宫格。",status:"ready",entry:"./games/sudoku/index.html",difficulty:true,difficultyLabels:["简单","标准","困难"],tip:"每行、每列和每个 3×3 宫均需填入 1–9。",help:[["规则","每一行、每一列及每个 3×3 宫都必须包含 1 至 9，且不能重复。"],["操作","选择空格后输入数字；可使用数字键或屏幕数字键。"],["辅助","提示可填入一个正确数字；检查可标出冲突。"],["难度","顶部切换简单、标准、困难。"]]},
 {id:"sokoban",name:"推箱子",category:"puzzle",categoryName:"益智",description:"推动箱子到达所有目标点。",status:"ready",entry:"./games/sokoban/index.html",tip:"方向键移动，Z 撤销，R 重置。",help:[["目标","将所有箱子推到目标点。"],["操作","方向键移动；只能推动箱子，不能拉动。Z 撤销一步，R 重置当前关卡。"],["注意","不要把箱子推入无法离开的角落。"],["关卡","完成当前关卡后进入下一关。"]]},
-{id:"tetris",name:"俄罗斯方块",category:"arcade",categoryName:"街机",description:"预判后续方块，连续消行，挑战更高等级。",status:"ready",entry:"./games/tetris/index.html",difficulty:true,difficultyLabels:["练习","标准","挑战"],tip:"↑ / Z 旋转，↓ 加速，空格落底，C 暂存。",help:[["目标","每消 10 行提升一级。连续消行有额外分数，方块堆到出生区时结束。"],["操作","← / → 移动，↑ / Z 顺时针或逆时针旋转，↓ 加速，空格落底。C 暂存或交换，每块锁定前限一次。"],["难度","练习留出更多调整时间，标准逐级提速，挑战的起始速度更快、锁定时间更短。"]]},
+{id:"tetris",name:"俄罗斯方块",category:"arcade",categoryName:"街机",description:"经典落块、进阶连消或 40 行竞速。",status:"ready",entry:"./games/tetris/index.html",modes:["经典","进阶","竞速"],modeValues:["classic","advanced","sprint"],difficulty:true,difficultyLabels:["练习","标准","挑战"],tip:"↑ / Z 旋转，↓ 加速，空格落底。",help:[["玩法","经典只预览下一块。进阶可看接下来三块，按 C 暂存或交换。竞速沿用进阶操作，消除 40 行完成本局。"],["操作","← / → 移动，↑ / Z 顺时针或逆时针旋转，↓ 加速，空格落底。暂存每块限一次。"],["难度","练习留出更多调整时间，标准逐级提速，挑战的起始速度更快、锁定时间更短。"]]},
 {id:"snake",name:"贪吃蛇",category:"arcade",categoryName:"街机",description:"吃到食物增长，避免碰撞。",status:"ready",entry:"./games/snake/index.html",difficulty:true,difficultyLabels:["慢速","标准","快速"],tip:"方向键控制移动。",help:[["目标","吃到食物增长身体，尽可能获得高分。"],["操作","方向键控制方向；不能直接反向进入自己的身体。"],["难度","慢速、标准、快速对应不同移动速度。"],["结束","撞墙或撞到自身时游戏结束。"]]},
 {id:"pong",name:"Pong",category:"arcade",categoryName:"街机",description:"控制球拍，与电脑争夺分数。",status:"ready",entry:"./games/pong/index.html",difficulty:true,tip:"W/S 或 ↑/↓ 控制球拍，也可使用鼠标。",help:[["目标","先达到目标分数的一方获胜。"],["操作","W/S 或 ↑/↓ 控制左侧球拍，也可移动鼠标。"],["AI 难度","简单反应较慢；中等跟随球路；困难更积极预测落点。"],["比赛","顶部暂停和新局控制整场比赛。"]]},
 {id:"contra",name:"魂斗罗（原创模式）",category:"arcade",categoryName:"街机",description:"原创像素风横版射击。",status:"prototype",entry:"./games/contra/index.html",difficulty:true,tip:"A/D 移动，W 或空格跳跃，J 射击。",help:[["玩法","这是独立原创的横版射击玩法，不包含原作 ROM、图像或音乐。"],["操作","A/D 移动，W 或空格跳跃，J 射击。"],["目标","躲避敌人攻击并击败敌人，尽可能走得更远。"],["难度","调整敌人出现频率、移动速度和玩家容错。"]]},
@@ -330,6 +330,8 @@ function setBreadcrumb(){
 }
 function renderGameControls(){
  const modeEl=$("modeControl"),difficultyEl=$("difficultyControl"),hasModes=Array.isArray(active?.modes)&&active.modes.length>1;
+ const modeLabel=active?.modeValues?"玩法":"对战方式";
+ modeEl.dataset.label=modeLabel;modeEl.setAttribute("aria-label",modeLabel);
  modeEl.classList.toggle("hidden",!hasModes);modeEl.innerHTML="";
  // Battleship implements AI-only play: remove the unused mode placeholder entirely.
  if(active?.id==="battleship"){
@@ -547,6 +549,10 @@ function openGame(id){
  sessionId=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"gs-"+Date.now()+"-"+Math.random().toString(16).slice(2);
  ready=false;paused=true;started=false;roundCounted=false;
  modeIndex=savedProgress?Math.max(0,Math.min((g.modes?.length||1)-1,Number(savedProgress.modeIndex)||0)):0;
+ if(g.id==="tetris"&&savedProgress){
+  const savedMode=g.modeValues.indexOf(savedProgress.state?.mode);
+  modeIndex=savedMode>=0?savedMode:Array.isArray(savedProgress.state?.queue)?1:0;
+ }
  difficulty=savedProgress&&["easy","normal","hard"].includes(savedProgress.difficulty)?savedProgress.difficulty:"normal";
  currentScore=0;helpSource={lines:[],note:""};hideGameResult();
  session={id:g.id,elapsedMs:0,lastTick:0,lastSave:Date.now(),running:false,clockStarted:false,finished:false,score:0,needsInit:true};
@@ -558,7 +564,7 @@ function openGame(id){
  $("stageLoading").classList.remove("done","failed");$("stageLoading").lastElementChild.textContent="正在载入";
  frame.title=g.name+" 游戏";
  const entryURL=new URL(g.entry,location.href);
- entryURL.searchParams.set("v",g.id==="tetris"?"tetris-20261113":"round-dialogs-20261113");
+ entryURL.searchParams.set("v",["tetris","sudoku"].includes(g.id)?"game-rails-20261113":"round-dialogs-20261113");
  if(g.id==="gomoku"&&location.search.includes("p111Test=1"))entryURL.searchParams.set("p111Test","1");
  frame.src=entryURL.href;closeHelp();shell.classList.remove("menu-open");
 }
@@ -580,7 +586,7 @@ window.addEventListener("message",event=>{
  if(!m||m.channel!=="gamestation"||m.protocolVersion!==1||m.gameId!==active.id)return;
  if(m.type==="READY"&&!ready){
   ready=true;
-  send("INIT",{sessionId,mode:["本机双人","本机多人"].includes(active.modes?.[modeIndex])?"two":"ai",difficulty,name:active.name,modes:active.modes||[],hasDifficulty:!!active.difficulty,difficultyLabels:active.difficultyLabels||["简单","中等","困难"]});
+  send("INIT",{sessionId,mode:activeMode(),difficulty,name:active.name,modes:active.modes||[],hasDifficulty:!!active.difficulty,difficultyLabels:active.difficultyLabels||["简单","中等","困难"]});
   send("PAUSE");
   paused=true;
   setGameState();
@@ -639,7 +645,8 @@ if(m.type==="CONTROL"){const action=m.payload?.action;if(action==="start"){if(st
   showGameNotice(m.payload?.message||"游戏模块发生错误",0,true);
  }
 });
-function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:["本机双人","本机多人"].includes(active.modes[modeIndex])?"two":"ai"});newRound();}
+function activeMode(){return active?.modeValues?.[modeIndex]??(["本机双人","本机多人"].includes(active?.modes?.[modeIndex])?"two":"ai");}
+function setMode(index){if(!active?.modes||active.modes.length<2)return;const next=Math.max(0,Math.min(active.modes.length-1,Number(index)));if(next===modeIndex)return;modeIndex=next;renderGameControls();send("SET_MODE",{mode:activeMode()});newRound();}
 function setDifficulty(value){if(!active?.difficulty||["本机双人","本机多人"].includes(active.modes?.[modeIndex])||!["easy","normal","hard"].includes(value)||value===difficulty)return;difficulty=value;renderGameControls();send("SET_DIFFICULTY",{difficulty});newRound();}
 function renderHelp(){const content=$("helpContent");content.innerHTML="";const chapters=active?[["快捷键","Enter：暂停 / 继续；P：暂停 / 继续。游戏区域右键由游戏接管。"],...active.help,...(helpSource.lines.length?[["游戏专用快捷键与鼠标",helpSource.lines.join("；")]]:[]),...(helpSource.note?[["游戏操作提醒",helpSource.note]]:[])]:[["离线运行","所有游戏均在本机浏览器中运行，不需要账号、服务器或网络连接。"],["游戏导航","左侧按棋类、益智、街机和卡牌分类浏览游戏。"],["成绩与记录","首页热力图和排行榜只读取当前浏览器中的本地游戏记录。"],["数据备份","在左下角全局设置中导出或导入 JSON 备份。"]];chapters.forEach((item,i)=>{const section=document.createElement("section");section.className="help-chapter";const button=document.createElement("button");button.type="button";button.innerHTML='<span>'+escapeHtml(item[0])+'</span><span>'+(i===0?"−":"＋")+'</span>';const p=document.createElement("p");p.textContent=item[1];p.hidden=i!==0;button.addEventListener("click",()=>{p.hidden=!p.hidden;button.querySelector("span:last-child").textContent=p.hidden?"＋":"−";});section.append(button,p);content.appendChild(section);});}
 function openHelp(){renderHelp();$("helpPanel").classList.remove("hidden");}

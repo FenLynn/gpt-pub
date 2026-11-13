@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>数独</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./sudoku.css?v=sudoku-r50-20261112-r1"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head><body data-game="sudoku"><main class="game-root game-layout sudoku-layout" id="game">
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>数独</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./sudoku.css?v=game-rails-20261113"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head><body data-game="sudoku"><main class="game-root game-layout sudoku-layout" id="game">
 <aside class="game-guide"><div class="game-guide-kicker">SUDOKU</div><h2>数独规则</h2>
 <p class="key-instruction">每一行必须包含 1–9，且不能重复。</p>
 <p class="key-instruction">每一列必须包含 1–9，且不能重复。</p>
@@ -7,21 +7,15 @@
 <div class="game-tool-note">蓝色区域表示同一行、列或宫；相同数字会同步高亮。红色表示冲突或检查出的错误。提示只告诉你答案，不会擅自填入。</div></aside>
 <section class="game-main-board"><div class="game-panel"><div id="board" class="game-grid" role="grid" aria-label="九宫格数独棋盘"></div></div></section>
 <aside class="game-tools">
- <div class="game-tools-heading">当前进度</div>
- <div class="game-status sudoku-status" id="sudokuStatus" aria-live="polite">选择空格，再点数字或按键盘 1–9 填写。</div>
- <div class="sudoku-metrics">
-  <div><span>难度</span><strong id="level">标准</strong></div>
-  <div><span>已填</span><strong id="filled">30 / 81</strong></div>
-  <div><span>剩余</span><strong id="remaining">51</strong></div>
-  <div><span>冲突格</span><strong id="conflicts">0</strong></div>
-  <div><span>提示次数</span><strong id="hintCount">0</strong></div>
- </div>
- <div class="game-tools-heading">数字输入</div>
- <div class="number-pad" id="numbers" aria-label="数字输入键盘"></div>
- <div class="game-tools-heading">辅助操作</div>
+ <section class="sudoku-control-card" aria-label="数独操作">
+  <div class="sudoku-progress"><span>待填</span><strong id="remaining">51</strong><progress id="sudokuProgress" max="81" value="30" aria-label="填写进度"></progress></div>
+  <div class="number-pad" id="numbers" aria-label="数字输入键盘"></div>
+  <div class="sudoku-actions game-action-group">
  <button class="game-btn" id="hint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M8.5 14.5a6 6 0 1 1 7 0c-.8.6-1.3 1.3-1.5 2.5h-4c-.2-1.2-.7-1.9-1.5-2.5Z"/></svg><span>提示</span></button>
  <button class="game-btn" id="check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg><span>检查</span></button>
- <button class="game-btn" id="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6"/></svg><span>撤销一步</span></button>
- <div class="sudoku-footnote">提示不会自动填数；检查会标出错误。可随时撤销自己的填写。</div>
+ <button class="game-btn" id="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6 4 12l6 6M5 12h8a6 6 0 0 1 6 6"/></svg><span>撤销</span></button>
+   </div>
+ </section>
+ <div class="sudoku-status" id="sudokuStatus" aria-live="polite"></div>
 </aside></main>
-<script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js?v=sudoku-r49"></script></body></html>
+<script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js?v=game-rails-20261113"></script></body></html>

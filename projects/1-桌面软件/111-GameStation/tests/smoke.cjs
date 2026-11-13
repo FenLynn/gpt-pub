@@ -32,7 +32,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
  assert.match(workspaceCss,/is\(\.reversi-layout,\.connect4-layout,\.battleship-layout,\.chess-layout,\.checkers-layout,\.chinese-checkers-layout\)/,
   "All measured history-rail games must share the same first-paint visibility gate");
  const sudokuPage=fs.readFileSync(path.join(root,"games","sudoku","index.html"),"utf8");
- assert.match(sudokuPage,/sudoku\.css\?v=sudoku-r50-20261112-r1/,"Sudoku typography update must invalidate the previous cached stylesheet");
+ assert.match(sudokuPage,/sudoku\.css\?v=game-rails-20261113/,"Sudoku rail update must invalidate the previous cached stylesheet");
  const sokobanLevelsSource=fs.readFileSync(path.join(root,"games","sokoban","levels.js"),"utf8");
  assert.match(sokobanLevelsSource,/GAME_SOKOBAN_LEVELS\s*=\s*\[/,"Sokoban must bundle its offline 90-level classic collection");
  const sokobanPage=fs.readFileSync(path.join(root,"games","sokoban","index.html"),"utf8");
@@ -1269,7 +1269,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
        selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside),actionRects:actions.map(rect)};
      });
      const dualModes=new Set(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","西洋跳棋（8×8）","中国跳棋","飞行棋"]);
-     assert.equal(controls.modes,dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
+     assert.equal(controls.modes,name==="俄罗斯方块"?3:dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
       if(name==="海战棋"){
        const mode=await page.locator("#modeControl").evaluate(el=>({
         hidden:el.hidden,rects:el.getClientRects().length,display:getComputedStyle(el).display,
@@ -1282,7 +1282,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
      assert.equal(controls.selectedModes,controls.modes?1:0,name+" exactly one mode must be selected");
      assert.equal(controls.selectedLevels,controls.levels?1:0,name+" exactly one difficulty must be selected");
      assert.ok(controls.selectorsVisible&&controls.actionsVisible,name+" every header switch and action must remain visible within the viewport: "+JSON.stringify(controls));
-     if(controls.modes){
+     if(dualModes.has(name)){
       await page.locator('#modeControl button[data-mode-index="1"]').click();
       assert.equal(await page.locator('#modeControl button[aria-pressed="true"]').getAttribute("data-mode-index"),"1",name+" mode switching must work");
       const duel=await page.locator("#difficultyControl").evaluate(el=>({
@@ -1558,6 +1558,13 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await open("俄罗斯方块");await start();
   const tetris=frame.locator("#canvas");
   const preview=frame.locator("#nextCanvas");
+  await frame.locator('#game[data-mode="classic"]').waitFor();
+  assert.equal(await frame.locator("#nextSecond").isVisible(),false,"Classic mode shows a single preview");
+  assert.equal(await frame.locator("#holdButton").isVisible(),false,"Classic mode has no hold action");
+  await page.locator('#modeControl button[data-mode-index="1"]').click();
+  await frame.locator('#game[data-mode="advanced"]').waitFor();
+  assert.equal(await frame.locator("#nextThird").isVisible(),true,"Advanced mode keeps the three-piece preview");
+  assert.equal(await frame.locator("#holdButton").isVisible(),true,"Advanced mode keeps hold");
   assert.equal(await preview.count(),1,"Tetris must show a separate next-piece canvas");
   assert.equal(await frame.locator(".tetris-inboard-sidebar #score").count(),1,"Score must be embedded in the game, not the external tools rail");
   const inset=await frame.locator(".tetris-inboard-sidebar").evaluate(el=>{
