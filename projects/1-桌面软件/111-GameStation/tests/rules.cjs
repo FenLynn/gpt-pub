@@ -31,7 +31,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
    await page.locator('[data-square="'+from+'"]').click();
    await page.locator('[data-square="'+to+'"]').click();
   };
-  const piece=async sq=>page.locator('[data-square="'+sq+'"] .chess-piece').innerText().catch(()=>"");
+  const piece=async sq=>page.locator('[data-square="'+sq+'"]').evaluate(el=>el.querySelector('.chess-piece')?.innerText||"");
   const st=()=>page.evaluate(()=>window.__p111ChessTest.state());
   // Both castle directions reposition king AND rook, without creating a new piece.
   await fen("4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1");
@@ -1078,6 +1078,17 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE);
   xiangqi.on("pageerror",err=>errors.push("Xiangqi: "+err.message));
   await xiangqi.goto(pathToFileURL(path.resolve(__dirname,"../app/games/xiangqi/index.html")).href+"?p111Test=1");
   await xiangqi.waitForFunction(()=>typeof window.__p111XiangqiTest?.loadPosition==="function");
+  await xiangqi.evaluate(()=>{
+   const sessionId="p111-rules-xiangqi";
+   const message={channel:"gamestation",protocolVersion:1,gameId:"xiangqi",sessionId};
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{
+    ...message,type:"INIT",payload:{sessionId,mode:"two",difficulty:"normal"}
+   }}));
+   window.dispatchEvent(new MessageEvent("message",{source:window,data:{
+    ...message,type:"SET_RAIL",payload:{collapsed:false}
+   }}));
+  });
+  await xiangqi.locator("#game.xiangqi-layout-ready").waitFor({state:"visible"});
   const load=(pieces,side="red")=>xiangqi.evaluate(([p,s])=>window.__p111XiangqiTest.loadPosition(p,s),[pieces,side]);
   const getMoves=(side="red")=>xiangqi.evaluate(s=>window.__p111XiangqiTest.legal(s),side);
   const base=[[4,0,"black","将"],[4,9,"red","帅"],[4,6,"red","兵"]];
