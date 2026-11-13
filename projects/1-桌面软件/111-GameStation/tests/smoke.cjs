@@ -1586,10 +1586,10 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
   await tetris.press("Space");
   assert.equal(await tetris.getAttribute("data-piece-kind"),queued,"Shown NEXT tetromino must become the following active piece after lock");
   for(let i=0;i<2;i++)await tetris.press("Space");
-  assert.equal(Number(await frame.locator("#score").innerText()),96,"Three hard-dropped O pieces form a six-row stack");
+  assert.ok(Number(await frame.locator("#score").innerText())>=70,"Three hard drops from the shuffled bag must award drop points");
   for(let i=0;i<20;i++){
    if(await tetris.getAttribute("data-piece-can-fall")==="false")break;
-   await tetris.press("ArrowDown");
+   await tetris.evaluate(el=>el.dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true})));
   }
   const ts=await tetris.evaluate(el=>({...el.dataset}));
   assert.equal(ts.pieceCanFall,"false","Tetris piece must stop on the stack");
