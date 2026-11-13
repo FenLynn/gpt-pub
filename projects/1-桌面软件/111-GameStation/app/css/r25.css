@@ -567,6 +567,7 @@
  background:#edf6fb!important;color:#276889!important;
  font-size:12px!important;font-weight:720!important;white-space:nowrap;
 }
+#topbar #progressButton[hidden]{display:none!important}
 .main-area:has(#workspaceView:not(.hidden)) .topbar .progress-action svg{
  display:block;width:15px;height:15px;flex:none;fill:none;stroke:currentColor;
  stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;

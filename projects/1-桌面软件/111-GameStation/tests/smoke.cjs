@@ -772,6 +772,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
    :name==="西洋跳棋（8×8）"?Math.min(v.main.height-8,Math.max(0,v.main.width-8))
    :name==="中国跳棋"?Math.min(v.main.height,Math.max(0,v.main.width-10))
    :name==="飞行棋"?Math.min(v.main.height,Math.max(0,v.main.width-10))
+   :name==="超级玛丽"?Math.min(v.main.height-26,Math.max(0,(v.main.width-52)*9/16))
    :v.battleship?Math.min(v.main.height-58,Math.max(0,(v.main.width-52)/2))
    :v.main.height*.70;
   assert.ok(v.surface.height>=(v.battleship?Math.min(v.main.height*.45,availableHeight)*.90:Math.min(v.main.height*.70,availableHeight)-1),
@@ -1269,7 +1270,7 @@ const countdownRestoreGames=new Set(["minesweeper","memory","2048","tetris","sna
        selectorsVisible:selectors.every(inside),actionsVisible:actions.every(inside),actionRects:actions.map(rect)};
      });
      const dualModes=new Set(["五子棋","中国象棋","国际象棋","黑白棋","四子棋","西洋跳棋（8×8）","中国跳棋","飞行棋"]);
-     assert.equal(controls.modes,name==="俄罗斯方块"?3:dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
+     assert.equal(controls.modes,name==="俄罗斯方块"?3:name==="超级玛丽"||dualModes.has(name)?2:0,name+" mode choices must match implemented gameplay");
       if(name==="海战棋"){
        const mode=await page.locator("#modeControl").evaluate(el=>({
         hidden:el.hidden,rects:el.getClientRects().length,display:getComputedStyle(el).display,
