@@ -1,0 +1,52 @@
+/* P111 — classic carved-wood chessboard; scoped, entirely offline. */
+body[data-game="chess"]{background:#eee9df}
+.chess-layout .game-main-board{overflow:visible}
+.chess-frame{position:relative;width:min(calc(100cqw - 38px),calc(100cqh - 38px));height:min(calc(100cqw - 38px),calc(100cqh - 38px));aspect-ratio:1;max-width:100%;max-height:100%;container-type:size;filter:drop-shadow(0 8px 9px #36241536)}
+.chess-board{position:absolute;inset:0;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));border:15px solid #6b4328;border-radius:3px;overflow:hidden;background:#6b4328;box-shadow:0 0 0 2px #38251b,0 0 0 5px #b88450,0 0 0 7px #4d301f,inset 0 0 0 2px #d2a573}
+.chess-square{position:relative;display:grid;place-items:center;min-width:0;min-height:0;padding:0;border:0;border-radius:0;cursor:pointer;isolation:isolate}
+.chess-square.light{background-color:#e9d4ad;background-image:repeating-linear-gradient(94deg,#fff7dc13 0 3px,#80552e0b 5px 7px,transparent 11px 19px),linear-gradient(125deg,#f5e5c7,#dfc49a)}
+.chess-square.dark{background-color:#8d5834;background-image:repeating-linear-gradient(92deg,#e3ac6020 0 2px,#40251413 5px 7px,transparent 12px 20px),linear-gradient(130deg,#a67146,#744629)}
+.chess-square:hover{filter:brightness(1.055)}
+.chess-square.selected{box-shadow:inset 0 0 0 4px #f2d254}
+.chess-square.last-from,.chess-square.last-to{box-shadow:inset 0 0 0 4px #e8cb648e}
+.chess-square.legal:after{content:"";position:absolute;width:21%;height:21%;border-radius:50%;background:#39704a83;pointer-events:none;z-index:2}
+.chess-square.capture:after{content:"";position:absolute;inset:5%;border:4px solid #bb4536bb;border-radius:50%;pointer-events:none;z-index:2}
+.chess-piece{position:relative;z-index:1;display:grid;place-items:center;width:100%;height:100%;font-family:"DejaVu Sans","Segoe UI Symbol","Noto Sans Symbols 2",serif;font-size:clamp(35px,6.4cqh,79px);line-height:1;user-select:none;pointer-events:none;font-variant-emoji:text}
+.chess-piece.white{color:#fff9e9;-webkit-text-stroke:1.65px #30271f;paint-order:stroke fill;text-shadow:0 2px 0 #674e37,1px 4px 3px #1c1713aa,0 0 2px #1f1b19}
+.chess-piece.black{color:#252320;-webkit-text-stroke:.65px #f0d4a8;paint-order:stroke fill;text-shadow:0 2px 1px #f5e6c29c,1px 4px 3px #170f0cb0}
+/* Coordinate labels live in the wooden frame itself, not in the narrow
+   gaps between the board, history rail and viewport. Each axis exactly spans
+   the corresponding eight playable rows / columns. */
+.chess-axis-x,.chess-axis-y{
+ position:absolute;z-index:4;display:grid;pointer-events:none;
+ color:#f2d9b6;font-family:Georgia,serif;font-size:13px;font-weight:800;
+ line-height:1;text-shadow:0 1px 2px #2e1c10
+}
+.chess-axis-x{
+ left:15px;right:15px;bottom:0;height:15px;
+ grid-template-columns:repeat(8,minmax(0,1fr));align-items:center;text-align:center
+}
+.chess-axis-y{
+ top:15px;bottom:15px;left:0;width:15px;
+ grid-template-rows:repeat(8,minmax(0,1fr));align-items:center;text-align:center
+}
+.chess-axis-x span,.chess-axis-y span{
+ display:flex;align-items:center;justify-content:center;
+ min-width:0;min-height:0;padding:0;line-height:1
+}
+.chess-layout .game-tools .move-panel{min-height:0;display:flex;flex:1;flex-direction:column;border:1px solid #e5dbce;border-radius:10px;background:#fffcf8;overflow:hidden}
+.chess-layout .move-panel-title{padding:9px 11px;border-bottom:1px solid #eee3d6;color:#80634c;font-size:11px;font-weight:760;letter-spacing:.7px}
+.chess-layout #moveList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:2px;min-height:0;margin:0;padding:7px 9px;overflow:auto;list-style:none;counter-reset:move}
+.chess-layout #moveList li{padding:5px 6px;border-radius:5px;color:#765842;font-size:11px;font-variant-numeric:tabular-nums}
+.chess-layout #moveList li:nth-child(4n+1),.chess-layout #moveList li:nth-child(4n+2){background:#f6eee4}
+.chess-layout #moveList li strong{color:#614329}
+.chess-layout .game-tools .side-score>div{padding:8px 10px}
+.chess-layout .turn-dot.white{background:#fff9e9;box-shadow:0 0 0 3px #78563f}
+.chess-layout .turn-dot.black{background:#26221e}
+@media(max-width:700px){
+ .chess-frame{width:min(100cqw,100cqh);height:min(100cqw,100cqh)}
+ .chess-board{border-width:11px}
+ .chess-piece{font-size:clamp(24px,6cqh,46px)}
+ .chess-axis-x{left:11px;right:11px;height:11px;font-size:8px}
+ .chess-axis-y{top:11px;bottom:11px;width:11px;font-size:8px}
+}

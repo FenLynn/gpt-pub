@@ -1,0 +1,65 @@
+.mario-layout .game-main-board {
+  display: grid;
+  place-items: center;
+  background: #eef4fa;
+}
+.mario-layout .mario-viewport {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.mario-layout #canvas.arcade-canvas {
+  display: block;
+  width: min(calc(100cqw - 26px),calc((100cqh - 26px) * 16 / 9)) !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  aspect-ratio: 16/9 !important;
+  border: 2px solid #2c425e !important;
+  border-radius: 10px !important;
+  background: #6486df;
+  box-shadow: 0 8px 24px #223c6432 !important;
+  image-rendering: pixelated;
+}
+.mario-layout .nes-panel {
+  position: relative;
+  width: min(calc(100cqw - 26px),calc((100cqh - 26px) * 16 / 15));
+  aspect-ratio: 16/15;
+  overflow: hidden;
+  border: 3px solid #293b55;
+  border-radius: 11px;
+  background: #101b2a;
+  box-shadow: 0 8px 24px #223c6436;
+}
+.mario-layout #nesScreen { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.mario-layout .nes-picker { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: #182941; }
+.mario-layout .nes-picker-card { max-width: 310px; color: #e9f3fd; text-align: center; }
+.mario-layout .nes-picker-card h2 { margin: 0 0 8px; font-size: clamp(17px,3cqw,23px); }
+.mario-layout .nes-picker-card p { margin: 0 0 14px; color: #bdcde1; font-size: 13px; }
+.mario-layout .nes-file-button {
+  position: relative;
+  display: inline-grid;
+  min-height: 36px;
+  place-items: center;
+  padding: 7px 11px;
+  border: 1px solid #c3d7e9;
+  border-radius: 8px;
+  background: #eaf3fc;
+  color: #285c87;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mario-layout .nes-file-button:focus-within { outline: 2px solid #3d83bc; outline-offset: 2px; }
+.mario-layout #nesFile { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.mario-layout .mario-nes-tools { display: none; }
+.mario-layout[data-mode="cartridge"] .mario-nes-tools { display: grid; gap: 7px; }
+.mario-layout[data-mode="cartridge"] :is(.mario-original,#canvas,#status) { display: none !important; }
+#game.mario-layout:not([data-mode="cartridge"]) > .game-tools { display: none !important; }
+#game.mario-layout:not([data-mode="cartridge"]) { grid-template-columns: minmax(0,1fr) !important; }
+#game.mario-layout:not([data-mode="cartridge"]) > .game-main-board { grid-column: 1 !important; }
+.mario-layout :is(.nes-picker,.nes-panel)[hidden] { display: none; }
+.mario-layout #nesStatus { margin: 0; color: #526b82; font-size: 12px; line-height: 1.5; }

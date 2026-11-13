@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>麻将</title><link rel="stylesheet" href="../shared/game.css"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head>
+<body data-game="mahjong"><main class="game-root game-layout card-table-layout mahjong-layout" id="game">
+  <section class="game-main-board"><div class="card-table-main">
+   <div class="game-row opponents-row" id="opponents"></div>
+   <div class="mahjong-area"><div id="melds" class="mahjong-melds"></div><div id="discards" class="mahjong-discards"></div></div>
+   <div class="mahjong-hand" id="hand"></div>
+  </div></section>
+  <aside class="game-tools">
+   <div class="game-status" id="tableInfo">庄家先打牌</div>
+   <div class="game-info-grid">
+    <div><span>牌墙</span><strong id="wallCount">83</strong></div>
+    <div><span>回合</span><strong id="turnLabel">你</strong></div>
+    <div><span>副露</span><strong id="meldCount">0</strong></div>
+    <div><span>阶段</span><strong id="phaseLabel">等待出牌</strong></div>
+   </div>
+   <div class="game-action-group" id="gameControls">
+    <button class="game-btn primary" id="drawButton">摸牌</button><button class="game-btn" id="huButton">胡牌</button>
+   </div>
+   <div class="game-action-group hidden" id="kongBar" aria-label="杠牌操作"></div>
+   <div class="game-action-group hidden" id="claimBar">
+    <button class="game-btn primary" id="claimHu">胡</button><button class="game-btn" id="claimKong">杠</button>
+    <button class="game-btn" id="claimPong">碰</button><select id="chiChoice" class="game-btn hidden" aria-label="选择吃牌组合"></select><button class="game-btn" id="claimChi">吃</button>
+    <button class="game-btn" id="claimPass">过</button>
+   </div>
+   <details id="rulePanel" class="game-rule-panel">
+    <summary>规则设置</summary>
+    <div class="rule-toggle-list">
+     <label class="rule-toggle"><input id="ruleChi" type="checkbox" checked> 允许吃牌</label>
+     <label class="rule-toggle"><input id="ruleSevenPairs" type="checkbox" checked> 七对胡牌</label>
+     <label class="rule-toggle"><input id="ruleKong" type="checkbox" checked> 允许杠牌</label>
+     <button class="game-btn" id="applyRules">应用规则</button>
+    </div>
+   </details>
+   <div class="game-tool-note">136 张基础牌，四人对局。摸牌后打出一张；按设定规则响应吃、碰、杠和胡。</div>
+  </aside>
+ </main><script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js"></script></body></html>

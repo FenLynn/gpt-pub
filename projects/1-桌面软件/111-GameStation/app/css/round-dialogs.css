@@ -1,0 +1,157 @@
+.round-dialog-card {
+  --round-ink: #29465f;
+  --round-muted: #587084;
+  --round-line: #d9e4ee;
+  --round-accent: #255e92;
+  --round-accent-fill: #eaf3fb;
+  --round-shadow: 0 3px 10px #183b5712, 0 14px 38px #183b5726;
+}
+
+#gameStage > :is(.game-result-overlay,.save-progress-overlay,.restore-countdown-overlay) {
+  background: #223d5428;
+  backdrop-filter: blur(1.5px);
+}
+
+#gameStage > .game-pause-overlay { background: transparent; }
+
+#gameStage .round-dialog-card,
+#game .round-dialog-card {
+  color: var(--round-ink);
+  border: 1px solid var(--round-line);
+  border-radius: 14px;
+  background: #fcfdff;
+  box-shadow: var(--round-shadow);
+}
+
+#gameStage .round-dialog-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px;
+  text-align: center;
+}
+
+#gameStage :is(.save-progress-card,.game-result-card) { width: min(360px,100%); }
+#gameStage :is(.game-pause-content,.restore-countdown-card) {
+  width: min(248px,calc(100% - 24px));
+  min-height: 0;
+  background: #f8fbfdf2;
+}
+#gameStage .game-pause-content { gap: 15px; backdrop-filter: blur(2px); }
+
+.round-dialog-card :is(h2,.game-pause-title) {
+  margin: 0;
+  color: var(--round-ink);
+  font-size: 22px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+#gameStage .round-dialog-card p {
+  min-height: 0;
+  margin: 0;
+  color: var(--round-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.round-dialog-card :is(dd,#saveProgressElapsed,#restoreCountdownNumber) { font-variant-numeric: tabular-nums; }
+#gameStage .round-dialog-card [hidden] { display: none; }
+
+#gameStage .round-dialog-card button,
+#game .round-dialog-card button {
+  min-width: 0;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--round-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+  color: var(--round-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+#gameStage .round-dialog-card button:hover,
+#game .round-dialog-card button:hover {
+  background: #edf4fb;
+  border-color: #bfd4e6;
+  box-shadow: none;
+  filter: none;
+  transform: none;
+}
+#gameStage .round-dialog-card button:active,
+#game .round-dialog-card button:active { transform: scale(.98); }
+#gameStage .round-dialog-card button:focus-visible,
+#game .round-dialog-card button:focus-visible { outline: 2px solid #3a78ae; outline-offset: 2px; }
+#gameStage .round-dialog-card :is(.game-pause-resume,.save-progress-actions button:first-child,.game-result-actions button:first-child),
+#game .round-dialog-card button:first-child {
+  color: var(--round-accent);
+  border-color: #c7daec;
+  background: var(--round-accent-fill);
+}
+#gameStage .round-dialog-card .game-pause-resume span { font-size: inherit; }
+#gameStage .round-dialog-card .round-dialog-quiet {
+  min-height: 26px;
+  height: 26px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--round-muted);
+}
+#gameStage .round-dialog-card :is(.game-result-actions,.save-progress-actions) { margin-top: 5px; }
+
+#gameStage .round-dialog-card :is(.save-progress-seal,.game-result-seal) {
+  width: 40px;
+  height: 40px;
+  background: var(--round-accent-fill);
+  box-shadow: none;
+  color: var(--round-accent);
+}
+#gameStage .round-dialog-card :is(.save-progress-seal,.game-result-seal) svg { width: 21px; height: 21px; }
+#gameStage .round-dialog-card[data-result="win"] .game-result-seal { background: #e8f4ec; color: #327050; }
+#gameStage .round-dialog-card[data-result="loss"] .game-result-seal { background: #f8efed; color: #8d5148; }
+
+.round-result-metrics { display: flex; width: 100%; margin: 4px 0 0; padding: 8px; border-radius: 9px; background: #f0f5fa; }
+.round-result-metrics > div { flex: 1; min-width: 0; padding: 3px 6px; }
+.round-result-metrics > div + div:not([hidden]) { border-inline-start: 1px solid #dce6ee; }
+.round-result-metrics dt { font-size: 11px; color: var(--round-muted); }
+.round-result-metrics dd { margin: 3px 0 0; font-size: 19px; font-weight: 700; }
+
+.restore-countdown-face {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid #d6e4ef;
+  border-radius: 50%;
+  background: #edf4fa;
+}
+#gameStage .restore-countdown-face strong { font: 700 36px/1 ui-monospace,Consolas,monospace; color: var(--round-accent); }
+
+#game .round-dialog-card { width: min(340px,calc(100% - 16px)); padding: 20px; }
+#game .round-dialog-card h2 { color: var(--round-ink); font-size: 22px; }
+#game .round-dialog-card p { color: var(--round-muted); }
+#game .round-dialog-card button { flex: 1; }
+
+@media (prefers-reduced-motion: no-preference) {
+  #gameStage .round-dialog-card,
+  #game .round-dialog-card { animation: round-dialog-in .25s cubic-bezier(.18,.72,.24,1) both; }
+  #gameStage > :is(.game-result-overlay,.save-progress-overlay,.restore-countdown-overlay) {
+    animation: round-scrim-in .18s ease-out both;
+  }
+  .restore-countdown-face[data-second="3"] strong,
+  .restore-countdown-face[data-second="1"] strong { animation: round-count-odd .28s ease-out both; }
+  .restore-countdown-face[data-second="2"] strong { animation: round-count-even .28s ease-out both; }
+}
+@keyframes round-dialog-in { from { opacity: 0; transform: translateY(7px) scale(.985); } }
+@keyframes round-scrim-in { from { opacity: 0; } }
+@keyframes round-count-odd { from { opacity: .32; transform: translateY(3px); } }
+@keyframes round-count-even { from { opacity: .32; transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  #gameStage .round-dialog-card, #game .round-dialog-card { animation: none; }
+  #gameStage .round-dialog-card button, #game .round-dialog-card button { transition: none; }
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>三国杀</title><link rel="stylesheet" href="../shared/game.css"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head>
+<body data-game="sanguosha"><main class="game-root game-layout card-table-layout sanguosha-layout" id="game">
+  <section class="game-main-board"><div class="card-table-main">
+   <div class="game-row opponents-row" id="players"></div>
+   <div class="card-hand" id="hand"></div>
+   <div class="game-log-panel" id="gameLog"></div>
+  </div></section>
+  <aside class="game-tools">
+   <div class="game-status" id="tableInfo">你的回合</div>
+   <div class="game-info-grid">
+    <div><span>角色</span><strong>小乔 · 忠臣</strong></div>
+    <div><span>技能</span><strong>红颜 / 天香</strong></div>
+    <div><span>回合</span><strong id="turnLabel">你</strong></div>
+    <div><span>牌堆</span><strong id="deckCount">60</strong></div>
+   </div>
+   <div class="game-action-group" id="targetPanel"></div>
+   <div class="game-action-group" id="responseBar" style="display:none">
+    <span id="responseText"></span><button class="game-btn primary" id="respondYes">响应</button><button class="game-btn" id="respondNo">不响应</button>
+   </div>
+   <div class="game-action-group" id="tianxiangPanel" style="display:none;flex-direction:column">
+    <span>天香：弃置一张红桃（黑桃视为红桃），将伤害转移给其他角色</span>
+    <div class="game-row" id="tianxiangCards"></div><div class="game-row" id="tianxiangTargets"></div>
+    <button class="game-btn" id="tianxiangCancel">不发动</button>
+   </div>
+   <div class="game-action-group" id="savePanel" style="display:none">
+    <span id="saveText">濒死救援</span><button class="game-btn primary" id="savePeach">使用桃</button><button class="game-btn" id="saveWine">使用酒</button><button class="game-btn" id="saveNo">放弃</button>
+   </div>
+   <div class="game-action-group" id="actionPanel">
+    <span class="metric-pill" id="selectedCard">未选择手牌</span>
+    <button class="game-btn primary" id="useCard" disabled>使用</button>
+    <button class="game-btn" id="cancelCard">取消选择</button><button class="game-btn" id="endTurn">结束回合</button>
+   </div>
+   <div class="game-tool-note" id="skillText">红颜：黑桃视为红桃。天香：受到伤害时，可弃红桃转移伤害并令目标摸牌。</div>
+  </aside>
+ </main><script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js"></script></body></html>

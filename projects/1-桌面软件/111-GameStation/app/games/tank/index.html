@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>90 坦克 · GameStation</title><link rel="stylesheet" href="../shared/game.css"><link rel="stylesheet" href="./style.css"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head>
+<body data-game="tank">
+<main class="game-root game-layout tank-layout" id="game">
+ <aside class="game-guide">
+  <span class="game-guide-kicker">ARCADE TANK BATTLE</span><h2>90 坦克</h2>
+  <p>守住基地，击毁敌方坦克。砖墙可以被炮弹摧毁，钢墙无法穿透。</p>
+  <div class="key-instruction"><strong>↑ ↓ ← →</strong><span>移动坦克 / 改变炮口方向</span></div>
+  <div class="key-instruction"><strong>W A S D</strong><span>移动坦克</span></div>
+  <div class="key-instruction"><strong>Space</strong><span>发射炮弹</span></div>
+  <div class="guide-note">基地位于地图底部。敌方炮弹击中基地即任务失败，消灭全部 20 辆敌军获胜。</div>
+ </aside>
+ <section class="game-main-board"><div class="canvas-panel"><canvas id="canvas" class="arcade-canvas" width="624" height="624" tabindex="0" aria-label="坦克大战地图"></canvas></div></section>
+ <aside class="game-tools">
+  <div class="game-status" id="status">守卫基地</div>
+  <div class="side-score">
+   <div><span>关卡</span><strong id="stage">1</strong></div>
+   <div><span>击毁</span><strong id="kills">0 / 20</strong></div>
+   <div><span>生命</span><strong id="lives">3</strong></div>
+   <div><span>基地</span><strong id="baseState">安全</strong></div>
+  </div>
+  <div class="game-tool-note">优先清理靠近基地的敌军。利用砖墙阻挡敌方炮弹，注意不要被包围。</div>
+ </aside>
+</main>
+<script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js"></script>
+</body></html>

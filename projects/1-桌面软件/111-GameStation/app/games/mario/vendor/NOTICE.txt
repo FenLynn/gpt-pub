@@ -1,0 +1,13 @@
+JSNES 2.1.0 — Copyright 2020 Ben Firshman
+Apache License, Version 2.0. See LICENSE.html for the full license.
+
+Source: bfirsh/jsnes, release tag v2.1.0; npm package jsnes 2.1.0.
+Package SHA-256: 167081846a907e19bdd7cba75c648d827d49ea50e0fb58c079ad1a6613dee3c1
+
+P111 bundled src/nes.js and src/controller.js with esbuild 0.25.12 as the
+P111NES browser global. JSNES Browser and remote cartridge loaders are absent.
+Bundle SHA-256: 2229014ac10b9af62511dd7fb6ca2e813886d4fc23fca9a3039f1696f3a96355
+
+P111 provides its own cartridge picker, controller mapping, canvas output,
+audio scheduling and GameStation lifecycle integration. No game ROMs or
+Nintendo artwork or audio are included in this distribution.

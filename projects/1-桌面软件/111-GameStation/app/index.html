@@ -2,112 +2,219 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7fa">
-  <title>GameStation · 本地游戏工作台</title>
-  <link rel="stylesheet" href="./css/app.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f3f7fb">
+  <meta name="description" content="GameStation · 完全离线的个人游戏工作台">
+  <title>GameStation</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' rx='2' fill='%23397da8'/%3E%3Crect x='18' y='3' width='11' height='11' rx='2' fill='%2368a6c4'/%3E%3Crect x='3' y='18' width='11' height='11' rx='2' fill='%2383b79f'/%3E%3Crect x='18' y='18' width='11' height='11' rx='2' fill='%23b0c7d5'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./css/app.css?v=p111-icons-20261113-r65">
+  <link rel="stylesheet" href="./css/r25.css?v=p111-icons-20261113-r67">
+  <link rel="stylesheet" href="./css/round-dialogs.css?v=20261113-r65">
 </head>
 <body>
-  <div class="app-shell" id="appShell">
-    <aside class="sidebar" id="sidebar">
-      <a class="brand" href="./index.html" aria-label="GameStation 首页">
-        <span class="brand-mark"><i></i><i></i><i></i><i></i></span>
-        <span><strong>GameStation</strong><small>LOCAL PLAYGROUND</small></span>
-      </a>
-      <div class="side-section">
-        <div class="side-label">工作台</div>
-        <button class="nav-item active" data-view="home"><span class="nav-icon">⌂</span><span>游戏库</span><kbd>⌘ 1</kbd></button>
-        <button class="nav-item" data-view="recent"><span class="nav-icon">◷</span><span>最近游玩</span></button>
-        <button class="nav-item" data-view="favorites"><span class="nav-icon">☆</span><span>我的收藏</span></button>
+<div class="app-shell" id="appShell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="./index.html" aria-label="GameStation 首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <strong>GameStation</strong>
+    </a>
+    <nav class="side-nav" aria-label="游戏导航">
+      <button class="nav-item active" data-view="home"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5M5 9.5V21h14V9.5M9 21v-7h6v7"/></svg><span>首页</span></button>
+      <div class="nav-divider"></div>
+      <button class="nav-item" data-category="all"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zm10 0h6v6h-6zm0 10h6v6h-6zm-10 0h6v6H4z"/></svg><span>全部游戏</span><b id="count-all">19</b></button>
+      <button class="nav-item" data-category="board"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 1 1.4 5.65L15 13h2l1 4H6l1-4h2l1.6-4.35A3 3 0 0 1 12 3ZM5 21h14"/></svg><span>棋类对战</span><b id="count-board">6</b></button>
+      <button class="nav-item" data-category="puzzle"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h5V4h6v5h5v6h-5v5H9v-5H4z"/></svg><span>益智解谜</span><b id="count-puzzle">5</b></button>
+      <button class="nav-item" data-category="arcade"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8h10a4 4 0 0 1 3.9 3.1l1 4.5a2 2 0 0 1-3.3 1.9L16 15H8l-2.6 2.5a2 2 0 0 1-3.3-1.9l1-4.5A4 4 0 0 1 7 8Zm0 2v4m-2-2h4m6 0h.01m3 0h.01"/></svg><span>街机动作</span><b id="count-arcade">4</b></button>
+      <button class="nav-item" data-category="card"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h11a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM4 8v12a2 2 0 0 0 2 2h10m-2.5-14 3 3.5-3 3.5-3-3.5z"/></svg><span>卡牌桌游</span><b id="count-card">4</b></button>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="nav-item settings-link" id="settingsButton"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4l.5 2.5 2 .9 2.2-1.1 2 3.5-1.8 1.6.2 2.2 1.8 1.6-2 3.5-2.3-.9-2 .9L14 21h-4l-.5-2.3-2-.9-2.3.9-2-3.5L5 13.6l.2-2.2-1.8-1.6 2-3.5 2.2 1.1 2-.9zM15 12a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z"/></svg><span>全局设置</span></button>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar" id="topbar">
+      <div class="topbar-leading"><div class="topbar-left">
+        <button class="mobile-menu" id="mobileMenu" aria-label="打开导航">☰</button>
+        <div class="breadcrumbs" aria-label="当前位置"><button type="button" class="breadcrumb-link" id="breadcrumbRoot">Home</button><i id="crumbCategorySep">›</i><button type="button" class="breadcrumb-link" id="breadcrumbCategory">首页</button><i id="crumbGameSep" class="hidden">›</i><strong id="breadcrumbGame" class="hidden"></strong></div>
+      </div></div>
+      <div class="game-notice-center hidden" id="gameNotice" role="status" aria-live="polite" aria-atomic="true">
+        <span class="game-notice-dot" aria-hidden="true"></span>
+        <span class="game-notice-window"><span class="game-notice-text" id="gameNoticeText"></span></span>
       </div>
-      <div class="side-section">
-        <div class="side-label">游戏分类</div>
-        <button class="nav-item category active" data-category="all"><span class="category-dot all"></span><span>全部游戏</span><b>6</b></button>
-        <button class="nav-item category" data-category="board"><span class="category-dot board"></span><span>棋类对战</span></button>
-        <button class="nav-item category" data-category="puzzle"><span class="category-dot puzzle"></span><span>益智休闲</span></button>
-        <button class="nav-item category" data-category="arcade"><span class="category-dot arcade"></span><span>经典街机</span></button>
+      <div class="game-topbar-cluster">
+        <span class="elapsed-label host-game-timer hidden" id="hostGameTimer" aria-label="本局用时"><strong id="gameElapsed">00:00</strong></span>
+        <div class="game-controls hidden" id="gameControls">
+          <div class="segment-control hidden" id="modeControl" role="group" aria-label="对战方式"></div>
+          <div class="segment-control hidden" id="difficultyControl" role="group" aria-label="游戏难度"></div>
+        </div>
+        <div class="topbar-actions">
+          <div class="round-actions hidden" id="gameActions">
+            <button class="top-action start-action" id="startButton" title="开始" aria-label="开始" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg></button>
+            <button class="top-action" id="pauseButton" title="暂停" aria-label="暂停" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button>
+            <button class="top-action next-action" id="newGameButton" title="下一局" aria-label="下一局" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14l11-7zM19 5v14"/></svg></button>
+          </div>
+          <button class="top-action progress-action hidden" id="progressButton" type="button" title="保存或恢复本局进度" aria-label="保存进度" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h12l4 4v14H3V3h2zM7 3v6h10V3M7 21v-7h10v7M9 17h6"/></svg><span id="progressButtonLabel">保存进度</span></button>
+          <button class="help-action hidden" id="helpButton" title="游戏帮助" aria-label="帮助">帮助</button>
+          <button class="icon-action" id="fullscreenButton" title="游戏全屏（隐藏导航与顶栏）" aria-label="游戏全屏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5"/></svg></button>
+        </div>
       </div>
-      <div class="sidebar-bottom">
-        <div class="offline-card"><span class="offline-dot"></span><div><strong>本地运行</strong><small>无需账号 · 无需联网</small></div></div>
-        <button class="nav-item" id="settingsButton"><span class="nav-icon">⚙</span><span>使用说明</span></button>
+    </header>
+
+    <section class="home-view view-panel" id="homeView">
+      <div class="home-layout">
+        <section class="home-main">
+          <section class="home-hero">
+            <div class="hero-copy">
+              <div class="date-line"><strong id="homeDate">11月6日 · 星期五</strong><span id="homeTime"></span></div>
+              <h1>今天，玩点什么？</h1>
+            </div>
+            <div class="hero-metrics" aria-label="游戏使用概况">
+              <div class="hero-metric"><span class="hero-metric-label">首次开始游戏</span><strong id="heroFirstPlayed">尚未开始</strong><small>第一局记录</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">已使用天数</span><strong id="heroActiveDays">0 天</strong><small>有游戏记录的日期</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">累计时间</span><strong id="heroTotalTime">0 分</strong><small>所有游戏累计</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">今日时间</span><strong id="heroTodayTime">0 分</strong><small>本地今日</small></div>
+              <div class="hero-metric"><span class="hero-metric-label">最近游戏</span><strong id="heroLastGame">暂无记录</strong><small id="heroLastGameMeta">开始一局后记录</small></div>
+            </div>
+          </section>
+          <section class="activity-panel">
+            <div class="panel-heading">
+              <div class="activity-title"><h2>游戏活动</h2><span id="activityRange">近 12 个月</span></div>
+              <span id="activitySummary">0 天有记录 · 0 分</span>
+            </div>
+            <div class="heatmap-layout">
+              <div class="heatmap-weekdays" aria-label="星期标记"><span>周一</span><span>周三</span><span>周五</span></div>
+              <div class="heatmap-content">
+                <div class="heatmap-months" id="heatmapMonths"></div>
+                <div class="heatmap-grid" id="heatmapGrid" aria-label="过去一年游戏活动"></div>
+                <div class="heatmap-legend"><span>少</span><i class="level-0"></i><i class="level-1"></i><i class="level-2"></i><i class="level-3"></i><i class="level-4"></i><span>多</span></div>
+              </div>
+            </div>
+          </section>
+          <section class="recent-panel" aria-label="最近游玩与轮播海报">
+            <div class="recent-browser">
+              <div class="recent-heading"><div class="recent-tabs" role="tablist" aria-label="游玩记录">
+                <button type="button" class="recent-tab" role="tab" data-recent-tab="recent" aria-selected="true">最近游玩</button>
+                <button type="button" class="recent-tab" role="tab" data-recent-tab="popular" aria-selected="false">常玩游戏</button>
+              </div></div>
+              <div class="recent-list" id="homeRecentList" aria-label="可选择的游戏"></div>
+            </div>
+            <aside class="home-game-poster" id="homeGamePoster" aria-label="自动轮播的游戏海报" data-category="board">
+              <div class="poster-top"><span>精选游戏</span></div>
+              <div class="poster-left">
+                <div class="poster-art" id="homePosterArt" aria-hidden="true"></div>
+                <button id="homePosterPlay" type="button">进入游戏</button>
+              </div>
+              <div class="poster-details">
+                <div class="poster-copy"><span id="homePosterCategory" class="poster-category"></span><h3 id="homePosterTitle"></h3><p id="homePosterDescription"></p></div>
+                <div class="poster-tips"><span class="poster-tips-label">TIPS · 操作提示</span><p id="homePosterTip"></p></div>
+              </div>
+              <div class="poster-bottom"><span id="homePosterCount">01 / 08</span><div class="poster-dots" id="homePosterDots" aria-hidden="true"></div></div>
+            </aside>
+          </section>
+        </section>
+        <aside class="ranking-panel">
+          <div class="ranking-heading"><div class="ranking-title"><span class="ranking-trophy" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M7 3h10v4h3v3c0 3-2.1 5-5 5.6A5.5 5.5 0 0 1 13 18v2h4v2H7v-2h4v-2a5.5 5.5 0 0 1-2-2.4C6.1 15 4 13 4 10V7h3V3zm10 6v4.4c1.8-.6 3-1.8 3-3.4V9h-3zM7 9H4v1c0 1.6 1.2 2.8 3 3.4V9z" fill="currentColor"/></svg></span><h2>游戏排行榜</h2></div><span class="ranking-mark">前十名</span></div>
+          <div class="ranking-tabs" role="tablist" aria-label="排行榜类型">
+            <button class="active" data-ranking="score" role="tab" aria-selected="true">最高分</button>
+            <button data-ranking="time" role="tab" aria-selected="false">时长</button>
+            <button data-ranking="plays" role="tab" aria-selected="false">次数</button>
+          </div>
+          <ol class="ranking-list" id="rankingList"></ol>
+          <div class="ranking-empty hidden" id="rankingEmpty">开始游戏后，这里会记录你的成绩。</div>
+          <div class="ranking-foot"><span class="ranking-foot-dot"></span>仅保存在当前浏览器</div>
+        </aside>
       </div>
-    </aside>
-
-    <main class="main-area">
-      <header class="topbar">
-        <div class="breadcrumbs"><span>GameStation</span><span class="crumb-sep">/</span><strong id="breadcrumbCurrent">游戏库</strong></div>
-        <div class="top-actions">
-          <span class="preview-chip"><span></span>交互预览版</span>
-          <button class="icon-button" id="feedbackOpen" title="提交体验反馈" aria-label="提交体验反馈">✎</button>
-          <button class="avatar-button" title="本地体验">G</button>
-        </div>
-      </header>
-
-      <section class="home-view view-panel" id="homeView">
-        <div class="welcome-row">
-          <div>
-            <div class="eyebrow">YOUR PERSONAL ARCADE</div>
-            <h1>想玩点什么？</h1>
-            <p class="muted">一个入口，收藏你喜欢的经典游戏。所有内容都在本地运行。</p>
-          </div>
-          <div class="welcome-art" aria-hidden="true"><span>♟</span><span>▦</span><span>◉</span></div>
-        </div>
-        <div class="section-heading">
-          <div><h2>游戏库</h2><p>首批 6 款体验模块</p></div>
-          <div class="view-tools"><label class="search-box"><span>⌕</span><input id="gameSearch" type="search" placeholder="搜索游戏…" autocomplete="off"></label><button class="view-toggle active" aria-label="网格视图">▦</button></div>
-        </div>
-        <div class="game-grid" id="gameGrid"></div>
-        <div class="bottom-note"><span class="note-icon">i</span><span>当前为交互原型：部分游戏已可完整试玩，部分仍在验证规则与 AI。你的反馈会直接用于下一轮迭代。</span></div>
-      </section>
-
-      <section class="workspace-view view-panel hidden" id="workspaceView">
-        <div class="workspace-heading">
-          <div class="workspace-title">
-            <button class="back-button" id="backToLibrary" title="返回游戏库">←</button>
-            <div><div class="eyebrow" id="gameCategoryLabel">BOARD GAME</div><h1 id="activeGameTitle">五子棋</h1><p class="muted" id="activeGameDescription"></p></div>
-          </div>
-          <div class="workspace-actions">
-            <label class="difficulty-control hidden" id="difficultyControl">难度 <select id="difficultySelect"><option value="easy">简单</option><option value="normal" selected>中等</option><option value="hard">困难</option></select></label>
-            <button class="secondary-button" id="pauseButton">Ⅱ 暂停</button>
-            <button class="primary-button" id="newGameButton">↻ 新游戏</button>
-            <span class="action-divider"></span>
-            <button class="icon-button" id="immersiveButton" title="沉浸模式" aria-label="沉浸模式">⛶</button>
-            <button class="icon-button" id="fullscreenButton" title="浏览器全屏" aria-label="浏览器全屏">⛶</button>
-          </div>
-        </div>
-        <div class="game-stage-wrap">
-          <div class="game-stage" id="gameStage">
-            <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在加载游戏…</span></div>
-            <iframe id="gameFrame" title="GameStation 游戏工作区" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
-          </div>
-          <div class="stage-footer"><span class="stage-state"><i id="stateDot"></i><span id="stageStateText">等待游戏启动</span></span><span id="stageMeta">本地模块 · 独立运行</span></div>
-        </div>
-      </section>
-
-      <section class="help-view view-panel hidden" id="helpView">
-        <div class="eyebrow">QUICK GUIDE</div><h1>使用说明</h1>
-        <div class="help-card"><h3>这是一个什么版本？</h3><p>这是 GameStation 的第一阶段交互原型，用于验证主页布局、游戏切换、模块通信、沉浸模式和浏览器全屏。它不是正式发行版。</p></div>
-        <div class="help-card"><h3>完全离线</h3><p>网页不加载 CDN、在线字体、远程图片或第三方在线服务。Pages 只是供你在线体验预览；程序设计目标仍是下载后断网本地运行。</p></div>
-        <div class="help-card"><h3>当前游戏完成度</h3><p>五子棋、扫雷、俄罗斯方块和贪吃蛇提供可操作试玩；中国象棋和纸牌目前是交互样例，规则完整性尚未验收。</p></div>
-        <div class="help-card"><h3>如何反馈？</h3><p>点击右上角的铅笔按钮，选择问题类型并描述体验。反馈内容不会自动上传；你可以复制后发回本次对话。</p></div>
-      </section>
-    </main>
-  </div>
-
-  <div class="feedback-backdrop hidden" id="feedbackBackdrop">
-    <section class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
-      <div class="modal-heading"><div><div class="eyebrow">HELP US IMPROVE</div><h2 id="feedbackTitle">体验反馈</h2></div><button class="icon-button" id="feedbackClose" aria-label="关闭">×</button></div>
-      <p class="muted">告诉我哪里好用、哪里别扭，或你希望增加什么。反馈仅在本机整理，不会自动上传。</p>
-      <label class="field-label" for="feedbackType">反馈类型</label>
-      <select id="feedbackType" class="full-field"><option>界面与布局</option><option>操作与交互</option><option>游戏规则或 AI</option><option>性能或兼容性</option><option>新功能建议</option></select>
-      <label class="field-label" for="feedbackText">具体意见</label>
-      <textarea id="feedbackText" class="full-field feedback-textarea" rows="5" placeholder="例如：左侧导航太宽；希望象棋支持悔棋；在 1366px 屏幕上游戏区域太小……"></textarea>
-      <div class="feedback-context" id="feedbackContext">当前页面：游戏库</div>
-      <div class="modal-actions"><button class="secondary-button" id="feedbackCancel">取消</button><button class="primary-button" id="feedbackCopy">复制反馈</button></div>
-      <div class="feedback-hint" id="feedbackHint" aria-live="polite"></div>
     </section>
-  </div>
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./js/app.js"></script>
+
+    <section class="library-view view-panel hidden" id="libraryView">
+      <div class="library-heading">
+        <div><h1 id="libraryTitle">全部游戏</h1><span id="libraryCount">22 款</span></div>
+        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4.5 4.5"/></svg><input id="gameSearch" aria-label="搜索游戏" type="search" placeholder="搜索游戏" autocomplete="off"></label>
+      </div>
+      <div class="game-grid" id="gameGrid" aria-live="polite"></div>
+      <div class="empty-state hidden" id="emptyState">没有找到匹配的游戏。</div>
+    </section>
+
+    <section class="workspace-view view-panel hidden" id="workspaceView">
+      <div class="game-stage" id="gameStage">
+        <div class="stage-loading" id="stageLoading"><span class="loading-spinner"></span><span>正在载入</span></div>
+        <iframe id="gameFrame" title="GameStation 游戏区域" sandbox="allow-scripts allow-same-origin" allow="fullscreen"></iframe>
+        <button id="exitFullscreenButton" class="game-fullscreen-exit" type="button" aria-label="退出全屏" title="退出全屏（Esc）" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3M15 3v6h6M3 15h6v6M21 15h-6v6"/></svg><span>退出全屏</span></button>
+        <div class="game-pause-overlay" id="gamePauseOverlay" hidden aria-hidden="true">
+          <div class="game-pause-content round-dialog-card">
+            <div class="game-pause-title" role="status"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg><span>已暂停</span></div>
+            <button class="game-pause-resume" id="gamePauseResume" type="button" aria-label="继续游戏" title="继续游戏（Enter）">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
+              <span>继续游戏</span>
+            </button>
+          </div>
+        </div>
+        <section class="save-progress-overlay" id="saveProgressOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="saveProgressTitle">
+          <div class="save-progress-card round-dialog-card">
+            <div class="save-progress-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3h12l4 4v14H3V3h2zM7 3v6h10V3M7 21v-7h10v7M9 17h6"/></svg></div>
+            <h2 id="saveProgressTitle">进度已保存</h2>
+            <p>已保存到本机 · 本局用时 <strong id="saveProgressElapsed">00:00</strong></p>
+            <div class="save-progress-actions">
+              <button type="button" id="saveProgressContinue">继续本局</button>
+              <button type="button" id="saveProgressLeave">返回游戏库</button>
+            </div>
+            <button class="round-dialog-quiet" type="button" id="saveProgressNewGame" title="开始新一局并清除本局存档">新开一局</button>
+          </div>
+        </section>
+        <div class="restore-countdown-overlay" id="restoreCountdownOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-label="恢复进度倒计时">
+          <div class="restore-countdown-card round-dialog-card">
+            <h2>已恢复上次进度</h2>
+            <div class="restore-countdown-face"><strong id="restoreCountdownNumber">3</strong></div>
+            <p>倒计时结束后继续游戏</p>
+            <button type="button" id="restoreCountdownCancel">保持暂停</button>
+          </div>
+        </div>
+        <section class="game-result-overlay" id="gameResultOverlay" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="gameResultTitle">
+          <div class="game-result-card round-dialog-card" id="gameResultCard" data-result="ended">
+            <div class="game-result-seal" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg></div>
+            <h2 id="gameResultTitle">本局结束</h2>
+            <p id="gameResultMessage" hidden></p>
+            <dl class="round-result-metrics">
+              <div><dt>本局用时</dt><dd id="gameResultElapsed">00:00</dd></div>
+              <div id="gameResultScore" hidden><dt id="gameResultScoreLabel">本局得分</dt><dd id="gameResultScoreValue">0</dd></div>
+            </dl>
+            <div class="game-result-actions">
+              <button type="button" id="gameResultReplay">再来一局</button>
+              <button type="button" id="gameResultLeave">返回游戏库</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</div>
+
+<section class="help-panel hidden" id="helpPanel" role="dialog" aria-modal="false" aria-labelledby="helpTitle">
+  <header class="help-header" id="helpHeader">
+    <strong id="helpTitle">游戏帮助</strong>
+    <button id="helpClose" aria-label="关闭帮助">×</button>
+  </header>
+  <div class="help-content" id="helpContent"></div>
+</section>
+
+<div class="settings-backdrop hidden" id="settingsBackdrop">
+  <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <header class="settings-heading"><h2 id="settingsTitle">全局设置</h2><button id="settingsClose" aria-label="关闭">×</button></header>
+    <section class="settings-section">
+      <h3>界面</h3>
+      <label class="setting-row"><span>界面字号</span><select id="uiScale"><option value="1">标准</option><option value="1.08">较大</option><option value="1.16">最大</option></select></label>
+    </section>
+    <section class="settings-section">
+      <h3>本地数据</h3>
+      <div class="setting-actions"><button id="exportData">导出数据备份</button><button id="importData">导入数据备份</button><input id="importFile" type="file" accept="application/json,.json" hidden></div>
+      <button class="danger-action" id="clearData">清空本机游戏记录</button>
+      <p>数据只保存在当前浏览器中，不会上传。建议定期导出备份。</p>
+    </section>
+    <div class="settings-footer"><span>完全离线 · 本地运行</span><button id="settingsDone">完成</button></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="./js/app.js?v=mario-nes-20261113"></script>
 </body>
 </html>

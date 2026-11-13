@@ -1,0 +1,86 @@
+/* Sudoku R48 · a calm, readable 9×9 board with clear conflict and selection states. */
+.sudoku-layout .game-main-board{overflow:hidden!important}
+.sudoku-layout #board{
+ display:grid!important;grid-template-columns:repeat(9,minmax(0,1fr));grid-template-rows:repeat(9,minmax(0,1fr));
+ width:min(100cqw,100cqh)!important;height:auto!important;max-width:100%!important;max-height:100%!important;
+ aspect-ratio:1!important;gap:0!important;padding:0!important;overflow:hidden;
+ border:3px solid #647f93;border-radius:9px;background:#fff;
+ box-shadow:0 12px 28px rgba(37,69,91,.14),inset 0 1px #fff;
+}
+.sudoku-layout #board .sudoku-cell{
+ appearance:none;position:relative;display:grid;place-items:center;width:auto!important;height:auto!important;
+ min-width:0;min-height:0;aspect-ratio:auto!important;padding:0;border:0;border-right:1px solid #dce5eb;
+ border-bottom:1px solid #dce5eb;border-radius:0!important;background:#fff;color:#4b6c88;
+ font:700 clamp(22px,3.2cqh,36px)/1 "Segoe UI","Microsoft YaHei",sans-serif;
+ font-variant-numeric:tabular-nums;cursor:pointer;user-select:none;transition:background .12s,color .12s,box-shadow .12s;
+}
+.sudoku-layout #board .sudoku-cell.box-right{border-right:2px solid #91a9ba}
+.sudoku-layout #board .sudoku-cell.box-bottom{border-bottom:2px solid #91a9ba}
+.sudoku-layout #board .sudoku-cell.related{background:#f0f5f8}
+.sudoku-layout #board .sudoku-cell.same-number{background:#dcecf5;color:#245e82}
+.sudoku-layout #board .sudoku-cell.given{color:#315873;font-weight:800}
+.sudoku-layout #board .sudoku-cell.conflict{background:#fff0ec;color:#b24b41}
+.sudoku-layout #board .sudoku-cell.wrong{background:#fbded8;color:#a8322b;text-decoration:underline;text-decoration-color:#d16b5f;text-decoration-thickness:2px}
+.sudoku-layout #board .sudoku-cell.hinted{box-shadow:inset 0 0 0 3px #dfb45d}
+.sudoku-layout #board .sudoku-cell.selected{z-index:2;background:#d6eaf6!important;color:#1f5f88!important;box-shadow:inset 0 0 0 2px #4c91b7!important}
+.sudoku-layout #board .sudoku-cell:focus-visible{z-index:3;outline:2px solid #287fac;outline-offset:-3px}
+.sudoku-layout .game-tools { gap: 7px !important; }
+.sudoku-layout .sudoku-control-card {
+  display: grid;
+  width: 100%;
+  gap: 11px;
+  padding: 9px;
+  border: 1px solid #d9e4ee;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+.sudoku-layout .sudoku-progress {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 5px;
+  color: #526e84;
+  font-size: 12px;
+}
+.sudoku-layout .sudoku-progress strong { color: #294e6b; font-size: 19px; font-variant-numeric: tabular-nums; }
+.sudoku-layout .sudoku-progress progress { grid-column: 1/-1; width: 100%; height: 4px; accent-color: #5685aa; }
+.sudoku-layout .number-pad { display: grid !important; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px !important; }
+.sudoku-layout .number-pad button {
+  width: 100% !important;
+  height: 42px !important;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid #d5e2ea;
+  border-radius: 7px;
+  background: #fff;
+  color: #365c79;
+  font-size: 20px;
+  font-weight: 760;
+}
+.sudoku-layout .number-pad button[data-number="0"] { background: #f1f5f8; }
+.sudoku-layout .number-pad button:hover:not(:disabled) { border-color: #9fc4d8; background: #edf6fb; }
+.sudoku-layout .number-pad button.suggested:not(:disabled) { border-color: #c39b4b; background: #fff4d9; color: #74541d; }
+.sudoku-layout .number-pad button:disabled { opacity: .55; cursor: not-allowed; }
+.sudoku-layout .sudoku-actions { display: grid !important; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px !important; }
+#game.sudoku-layout .sudoku-actions .game-btn {
+  display: grid !important;
+  justify-items: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 0 !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+.sudoku-layout .sudoku-actions svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sudoku-layout .sudoku-status {
+  min-height: 30px;
+  padding: 0 4px;
+  color: #526e84;
+  font-size: 11px;
+  line-height: 1.35;
+}
+@media(max-width:700px) {
+  .sudoku-layout .number-pad button { height: 37px !important; font-size: 19px !important; }
+}
+@media(prefers-reduced-motion:reduce) { .sudoku-layout #board .sudoku-cell { transition: none; } }

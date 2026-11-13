@@ -1,0 +1,70 @@
+/* P111 — turn timing cards on the right of the nine board games. */
+.gs-turn-clock{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;
+ min-width:0;max-width:100%;padding:13px 12px;border:1px solid #d1e2ec;border-radius:12px;
+ background:linear-gradient(150deg,#fff,#f2f8fb);color:#3d6077;
+ box-shadow:0 4px 14px #22445c0e;font-variant-numeric:tabular-nums}
+.gs-turn-clock-header{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;justify-content:space-between}
+.gs-turn-clock-header span{font-size:13px;font-weight:730;white-space:nowrap}
+.gs-turn-clock-header b{font-size:11px;font-weight:700;color:#6c8a9c;white-space:nowrap}
+.gs-turn-clock-value{font:750 clamp(19px,1.6vw,24px)/1.1 ui-monospace,SFMono-Regular,Consolas,monospace;
+ letter-spacing:-.8px;color:#285979}
+.gs-turn-clock-latest{font-size:11px;line-height:1.4;color:#718c9f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-turn-clock-history{border-top:1px solid #e1ebf0;padding-top:7px;min-width:0}
+.gs-turn-clock-history summary{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:680;
+ color:#678297;cursor:pointer;user-select:none;list-style:none}
+.gs-turn-clock-history summary::-webkit-details-marker{display:none}
+.gs-turn-clock-history summary:before{content:"›";display:inline-block;font-size:17px;line-height:1;transition:transform .12s}
+.gs-turn-clock-history[open] summary:before{transform:rotate(90deg)}
+.gs-turn-clock-history summary span{margin-left:auto;opacity:.8}
+.gs-turn-clock-history ol{margin:7px 0 0;padding:0;list-style:none;max-height:156px;overflow-x:hidden;
+ overflow-y:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.gs-turn-clock-history li{display:flex;gap:8px;align-items:center;justify-content:space-between;
+ padding:5px 0;border-top:1px solid #edf2f5;font-size:11px;min-width:0}
+.gs-turn-clock-history li span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.gs-turn-clock-history time{font:700 11px/1 ui-monospace,Consolas,monospace;flex:none}
+.game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
+ /* Timer is now an accessory of the existing right rail, not a second
+    stage grid that would squeeze and offset the board. */
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ grid-template-rows:minmax(0,1fr)!important;gap:0!important;padding:7px 9px!important;
+ align-items:center!important;justify-items:stretch!important
+}
+.game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>:not(.gs-turn-clock):not(.gs-notice){
+ grid-column:1!important;grid-row:1!important;min-width:0!important;max-width:100%!important;
+ width:100%!important;height:100%!important
+}
+.game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>.gs-turn-clock{
+ grid-column:3!important;grid-row:1!important;width:100%!important;align-self:center!important;
+ justify-self:stretch!important;z-index:4
+}
+.game-root.gs-turn-clock-enabled:not(.xiangqi-layout):not(.gomoku-layout)>.game-tools>.gs-turn-clock,
+.game-root.gs-turn-clock-enabled.xiangqi-layout>.game-tools>.gs-turn-clock,
+.game-root.gs-turn-clock-enabled.gomoku-layout>.game-tools>.gs-turn-clock{
+ width:100%!important;flex:none!important;align-self:stretch!important;margin:0!important
+}
+
+/* Sea Battle uses two full-sized boards. Dock its timer in the top-right
+   unused vertical margin instead of removing a board column. */
+.game-root.gs-turn-clock-enabled.battleship-layout:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
+ grid-template-columns:minmax(0,1fr)!important
+}
+.game-root.gs-turn-clock-enabled.battleship-layout:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>.fleet-boards{
+ grid-column:1!important;grid-row:1!important;width:100%!important;height:100%!important
+}
+.game-root.gs-turn-clock-enabled.battleship-layout:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board>.gs-turn-clock{
+ position:absolute!important;top:9px!important;right:10px!important;
+ width:158px!important;max-width:158px!important;grid-column:auto!important;grid-row:auto!important;
+ align-self:flex-start!important;justify-self:auto!important
+}
+
+/* SVG stages are sized from their actual board-wrap rectangle in turn-clock.js. */
+@media(max-width:900px){
+ .game-root.gs-turn-clock-enabled:not(.gomoku-layout):not(.xiangqi-layout)>.game-main-board{
+  --gs-clock-gutter:134px;column-gap:6px!important;padding:5px!important
+ }
+ .gs-turn-clock{padding:10px 8px;gap:6px}
+ .gs-turn-clock-value{font-size:20px}
+}
+@media(prefers-reduced-motion:reduce){
+ .gs-turn-clock-history summary:before{transition:none}
+}

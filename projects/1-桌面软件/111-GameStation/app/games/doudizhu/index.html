@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>斗地主</title><link rel="stylesheet" href="../shared/game.css"><link id="gameWorkspaceStyles" rel="stylesheet" href="../shared/workspace.css?v=workspace-polish-20261113"></head>
+<body data-game="doudizhu"><main class="game-root game-layout card-table-layout doudizhu-layout" id="game">
+  <section class="game-main-board"><div class="card-table-main">
+   <div class="game-row opponents-row" id="opponents"></div>
+   <div class="card-table-center" id="lastPlayArea">
+    <span class="metric-pill">上一手 <strong id="lastPlay">尚未出牌</strong></span>
+    <span class="metric-pill">底牌 <strong id="bottomCards">未揭示</strong></span>
+   </div>
+   <div class="card-hand" id="hand"></div>
+   <div class="game-row" id="scoreLine"></div>
+  </div></section>
+  <aside class="game-tools">
+   <div class="game-status" id="tableInfo">等待叫地主</div>
+   <div class="game-info-grid">
+    <div><span>阶段</span><strong id="phaseLabel">叫地主</strong></div>
+    <div><span>地主</span><strong id="landlordLabel">未定</strong></div>
+    <div><span>倍数</span><strong id="multiplier">×1</strong></div>
+    <div><span>我的手牌</span><strong id="handCount">17</strong></div>
+   </div>
+   <div class="game-action-group" id="bidControls">
+    <button class="game-btn" id="bid0">不叫</button><button class="game-btn" id="bid1">1 分</button>
+    <button class="game-btn" id="bid2">2 分</button><button class="game-btn primary" id="bid3">3 分</button>
+   </div>
+   <div class="game-action-group hidden" id="playControls">
+    <button class="game-btn primary" id="play">出牌</button><button class="game-btn" id="pass">不出</button><button class="game-btn" id="hint">提示</button>
+   </div>
+   <div class="game-tool-note">先叫分确定地主。出牌需跟随上家牌型并严格比较；无法压制时可以不出。</div>
+  </aside>
+ </main>
+<script src="../shared/bridge.js?v=workspace-layout-20261113"></script><script src="../shared/workspace.js?v=workspace-layout-20261113"></script><script src="./game.js"></script></body></html>

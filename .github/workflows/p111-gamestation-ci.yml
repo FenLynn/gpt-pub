@@ -61,11 +61,20 @@ jobs:
           test -s "$APP/js/app.js"
           test -s "$APP/games/shared/bridge.js"
           test -s "$APP/games/shared/game.css"
+          grep -qE 'css/app\.css\?v=p111-icons-[^"]+' "$APP/index.html"
+          grep -qE 'css/r25\.css\?v=p111-icons-[^"]+' "$APP/index.html"
+          grep -q 'game-vector-icon' "$APP/js/app.js"
+          grep -q 'game-vector-icon' "$APP/css/app.css"
+          ! grep -q 'game-icon-glyph' "$APP/js/app.js"
+          grep -q 'Cache-Control: no-cache' "$APP/_headers"
           for game in gomoku xiangqi minesweeper solitaire tetris snake; do
             test -s "$APP/games/$game/index.html"
             test -s "$APP/games/$game/game.js"
           done
-          if grep -RInE 'https?://' "$APP"; then
+          # SVG namespace identifiers are XML vocabulary, not remote fetches.
+          URL_MATCHES="$(grep -RInE 'https?://' "$APP" | sed 's#http://www\.w3\.org/2000/svg##g' | grep -E 'https?://' || true)"
+          if [[ -n "$URL_MATCHES" ]]; then
+            echo "$URL_MATCHES"
             echo "::error::Remote URL found in the runtime app"
             exit 1
           fi

@@ -1,0 +1,88 @@
+/* P111 R38 — classic 2048 palette, full-height responsive board and tactile tile feedback. */
+body[data-game="2048"] #game.game2048-layout{
+ background:linear-gradient(145deg,#f7f8fa 0%,#eef2f5 100%)!important;
+}
+body[data-game="2048"] #game.game2048-layout .game-main-board>.game-panel{
+ display:grid!important;place-items:center!important;padding:0!important;
+ background:transparent!important;border:0!important;box-shadow:none!important;
+}
+body[data-game="2048"] #board{
+ display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ width:min(88cqh,90cqw,860px)!important;height:auto!important;aspect-ratio:1!important;
+ gap:clamp(7px,1.1cqh,13px)!important;padding:clamp(9px,1.5cqh,17px)!important;
+ border:1px solid #aa9c8d!important;border-radius:15px!important;
+ background:#b9aa9b!important;box-shadow:0 14px 34px #394b5b22,inset 0 2px 4px #fff6!important;
+ overflow:visible!important;
+}
+body[data-game="2048"] #board .tile{
+ aspect-ratio:1;min-width:0;min-height:0;border:0;border-radius:9px;
+ display:grid;place-items:center;padding:2px;
+ background:#cdc1b4;color:#766d64;
+ font-size:clamp(22px,5.8cqh,64px);font-weight:800;line-height:1;
+ letter-spacing:-.04em;font-variant-numeric:tabular-nums;
+ text-shadow:none;box-shadow:inset 0 1px #ffffff26;
+ transition:background .12s ease,color .12s ease,filter .12s ease;
+}
+body[data-game="2048"] #board .tile[data-value="0"]{color:transparent}
+body[data-game="2048"] #board .tile[data-value="2"]{background:#eee4da;color:#776e65}
+body[data-game="2048"] #board .tile[data-value="4"]{background:#ede0c8;color:#776e65}
+body[data-game="2048"] #board .tile[data-value="8"]{background:#f2b179;color:#fffaf4}
+body[data-game="2048"] #board .tile[data-value="16"]{background:#f59563;color:#fffaf4}
+body[data-game="2048"] #board .tile[data-value="32"]{background:#f67c5f;color:#fffaf4}
+body[data-game="2048"] #board .tile[data-value="64"]{background:#f65e3b;color:#fffaf4}
+body[data-game="2048"] #board .tile[data-value="128"]{background:#edcf72;color:#fff}
+body[data-game="2048"] #board .tile[data-value="256"]{background:#edcc61;color:#fff}
+body[data-game="2048"] #board .tile[data-value="512"]{background:#edc850;color:#fff}
+body[data-game="2048"] #board .tile[data-value="1024"]{background:#edc53f;color:#fff;font-size:clamp(20px,4.8cqh,52px)}
+body[data-game="2048"] #board .tile[data-value="2048"]{background:#edc22e;color:#fff;font-size:clamp(19px,4.6cqh,50px);box-shadow:0 0 18px #f2c94c66,inset 0 1px #fff8}
+body[data-game="2048"] #board .tile[data-value="4096"],
+body[data-game="2048"] #board .tile[data-value="8192"]{background:#3c4a65;color:#fff;font-size:clamp(18px,4.4cqh,48px)}
+body[data-game="2048"] #board .tile.is-new{animation:p2048-tile-appear 180ms cubic-bezier(.18,.8,.25,1) both}
+body[data-game="2048"] #board .tile.is-merged{z-index:2;animation:p2048-tile-merge 250ms cubic-bezier(.18,.8,.25,1) both}
+body[data-game="2048"] #board.is-won{box-shadow:0 0 0 3px #e7c96e88,0 16px 40px #c49a3c33,inset 0 2px 4px #fff8!important}
+body[data-game="2048"] #board.is-over{filter:saturate(.75)}
+@keyframes p2048-tile-appear{
+ 0%{opacity:.25;transform:scale(.55)}
+ 75%{opacity:1;transform:scale(1.12)}
+ 100%{opacity:1;transform:scale(1)}
+}
+@keyframes p2048-tile-merge{
+ 0%{transform:scale(.86);filter:brightness(1)}
+ 55%{transform:scale(1.16);filter:brightness(1.18)}
+ 100%{transform:scale(1);filter:brightness(1)}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-game="2048"] #board .tile.is-new,
+ body[data-game="2048"] #board .tile.is-merged{animation-duration:100ms!important}
+}
+
+/* R54 · No right-overlay flash: shared workspace CSS is preloaded in HEAD and
+   gs-tools-open is in HTML. Keep the square board centered between symmetric
+   virtual gutters and place the controls immediately alongside its real edge. */
+body[data-game="2048"] #game.game2048-layout>.game-tools>.game-status{
+ display:none!important;
+}
+@media(min-width:701px){
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed){
+  --p2048-guard:clamp(136px,14vw,185px);
+  grid-template-columns:minmax(0,1fr) minmax(0,min(94dvh,860px,calc(100% - 2 * var(--p2048-guard)))) minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;column-gap:0!important;justify-content:center!important
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed)>.game-main-board{
+  grid-column:2!important;grid-row:1!important;
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed) #board{
+  width:min(94cqh,100cqw,860px)!important;max-width:100%!important;max-height:100%!important;
+ }
+ body[data-game="2048"] #game.game2048-layout.gs-tools-open:not(.rail-collapsed)>.game-tools{
+  position:relative!important;grid-column:3!important;grid-row:1!important;
+  top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  justify-content:center!important;align-self:center!important;justify-self:start!important;
+  box-sizing:border-box!important;width:min(145px,calc(100% - 12px))!important;
+  height:max-content!important;min-height:0!important;max-height:calc(100% - 16px)!important;
+  margin:0!important;padding:0!important;gap:13px!important;
+  background:transparent!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;overflow-x:hidden!important;overflow-y:auto!important
+ }
+}
