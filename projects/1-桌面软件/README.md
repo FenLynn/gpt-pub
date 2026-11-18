@@ -1,33 +1,19 @@
 # 1｜桌面软件
 
-本分类维护 GPT-Pub 中已经确认可以公开的桌面软件源码、测试、CI、版本说明和 Release。
+本目录只维护尚在 GPT-Pub 开发的软件。已迁出的项目不再占据此处的活跃编号或复制源码；原编号属于历史，不重新分配给其他项目。
 
-## 设计记录参考
+| 编号 | 本仓库项目 | 状态 |
+|---|---|---|
+| P102 | [AtlasDesk](102-AtlasDesk/) | 已废弃；源码只读留档，不再发布新版 |
+| P104 | [CodexHandoff](104-CodexHandoff/) | 开发中 |
+| P109 | [AttendScope 考勤工作台](https://github.com/FenLynn/gpt-pub/tree/p109-exp/projects/1-%E6%A1%8C%E9%9D%A2%E8%BD%AF%E4%BB%B6/109-AttendScope) | `p109-exp` 开发中；[在线预览](https://fenlynn.github.io/gpt-pub/p109/) |
 
-长期维护的软件项目建议遵循 [《软件设计记录建议书》](软件设计记录建议书.md)，通过 `README.md`、`开发约束.md`、设计与演进记录、`工作记录.md` 和 `阶段记录.md` 分别维护项目入口、当前规则、设计原因、实时进度和正式版本证据。
+| 已迁出项目 | 独立仓库 | 本仓库历史编号 |
+|---|---|---|
+| Mediova | [FenLynn/Mediova](https://github.com/FenLynn/Mediova) | P101 |
+| DavBridge | [FenLynn/davbridge](https://github.com/FenLynn/davbridge) | P103；v0.5.4 已补迁至独立仓库 |
+| LocalSub | [FenLynn/LocalSub](https://github.com/FenLynn/LocalSub) | P105 |
+| FigureStudio | [FenLynn/figurestudio](https://github.com/FenLynn/figurestudio) | P108 |
+| GameStation | [FenLynn/game](https://github.com/FenLynn/game) | P111 |
 
-小型工具可以采用轻量结构，不为形式创建长期空白文档；已有项目应从下一轮开发开始渐进收敛，不为文档改名或整理破坏稳定历史。
-
-## 当前项目
-
-| 编号 | 项目 | 状态 | 正式路径 |
-|---|---|---|---|
-| P101 | [Mediova](101-Mediova/) | v4.5.5 稳定候选，待实机验收 | `101-Mediova/` |
-| P102 | [AtlasDesk](102-AtlasDesk/) | v1.3.0 候选源码已纳入主线 | `102-AtlasDesk/` |
-| P103 | [DavBridge](103-DavBridge/) | v0.4 候选源码已纳入主线 | `103-DavBridge/` |
-| P104 | [CodexHandoff](104-CodexHandoff/) | v1.0.0-alpha.1 Tauri 重构开发中 | `104-CodexHandoff/` |
-| P105 | [LocalSub](105-LocalSub/) | v0.1.1-dev 候选源码已纳入主线 | `105-LocalSub/` |
-
-## 分支模型
-
-| 项目 | 日常开发 | 稳定候选 | 正式主线 |
-|---|---|---|---|
-| P101 | `p101-exp` | `p101-stable` | `main` |
-| P102 | `p102-exp` | `p102-stable` | `main` |
-| P103 | `p103-exp` | `p103-stable` | `main` |
-| P104 | `p104-exp` | `p104-stable` | `main` |
-| P105 | `p105-exp` | `p105-stable` | `main` |
-
-默认流程：`main → exp → stable → main → 标签与 Release → 回流 exp/stable`。
-
-各项目长期分支相对最新 `main` 只能修改本项目目录、本项目 CI 与必要状态记录；项目长期分支不得互相合并。
+长期维护的软件可以参考[《软件设计记录建议书》](软件设计记录建议书.md)。迁出后的新开发、CI 与 Release 应在独立仓库完成；GPT-Pub 的旧 Git 历史与已有 Release 保留供追溯。
