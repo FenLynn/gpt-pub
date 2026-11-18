@@ -11,7 +11,7 @@
 | 已迁出项目 | 独立仓库 | 本仓库历史编号 |
 |---|---|---|
 | Mediova | [FenLynn/Mediova](https://github.com/FenLynn/Mediova) | P101 |
-| DavBridge | [FenLynn/davbridge](https://github.com/FenLynn/davbridge) | P103；旧 `p103-exp` 的 v0.5.4 仍待与独立仓库核对，不得直接删除 |
+| DavBridge | [FenLynn/davbridge](https://github.com/FenLynn/davbridge) | P103；v0.5.4 已补迁至独立仓库 |
 | LocalSub | [FenLynn/LocalSub](https://github.com/FenLynn/LocalSub) | P105 |
 | FigureStudio | [FenLynn/figurestudio](https://github.com/FenLynn/figurestudio) | P108 |
 | GameStation | [FenLynn/game](https://github.com/FenLynn/game) | P111 |
